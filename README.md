@@ -70,17 +70,17 @@ const definitions = Bpmn.createProcess("order-process")
   .startEvent("start")
   .serviceTask("validate", {
     name: "Validate Order",
-    taskDefinitionType: "validate-order",
+    taskType: "validate-order",
   })
   .exclusiveGateway("check", { name: "Order Valid?" })
     .branch("yes", (b) =>
       b.condition("= valid")
-        .serviceTask("fulfill", { name: "Fulfill", taskDefinitionType: "fulfill-order" })
+        .serviceTask("fulfill", { name: "Fulfill", taskType: "fulfill-order" })
         .endEvent("end-ok")
     )
     .branch("no", (b) =>
       b.defaultFlow()
-        .serviceTask("notify", { name: "Notify Customer", taskDefinitionType: "send-rejection" })
+        .serviceTask("notify", { name: "Notify Customer", taskType: "send-rejection" })
         .endEvent("end-rejected")
     )
   .build();
@@ -119,8 +119,8 @@ const definitions = Dmn.createDecisionTable("risk-level")
   .hitPolicy("FIRST")
   .input({ label: "Age", expression: "age", typeRef: "integer" })
   .output({ label: "Risk", name: "risk", typeRef: "string" })
-  .rule({ inputEntries: ["< 25"], outputEntries: ['"high"'], description: "Young driver" })
-  .rule({ inputEntries: [">= 25"], outputEntries: ['"low"'], description: "Standard" })
+  .rule({ inputs: ["< 25"], outputs: ['"high"'], description: "Young driver" })
+  .rule({ inputs: [">= 25"], outputs: ['"low"'], description: "Standard" })
   .build();
 
 const xml = Dmn.export(definitions);
@@ -180,10 +180,10 @@ const definitions = Bpmn.createProcess("parallel-flow")
   .startEvent("start")
   .parallelGateway("fork")
     .branch("a", (b) =>
-      b.serviceTask("task-a", { name: "Task A", taskDefinitionType: "worker-a" })
+      b.serviceTask("task-a", { name: "Task A", taskType: "worker-a" })
     )
     .branch("b", (b) =>
-      b.serviceTask("task-b", { name: "Task B", taskDefinitionType: "worker-b" })
+      b.serviceTask("task-b", { name: "Task B", taskType: "worker-b" })
     )
   .parallelGateway("join")
   .endEvent("end")
@@ -197,7 +197,7 @@ const definitions = Bpmn.createProcess("with-timeout")
   .startEvent("start")
   .serviceTask("long-task", {
     name: "Long Running Task",
-    taskDefinitionType: "long-worker",
+    taskType: "long-worker",
   })
   .boundaryEvent("timeout", {
     attachedTo: "long-task",
@@ -215,7 +215,7 @@ const definitions = Bpmn.createProcess("with-subprocess")
   .subProcess("inner", { name: "Inner Process" }, (sub) => {
     sub
       .startEvent("sub-start")
-      .serviceTask("sub-task", { name: "Sub Task", taskDefinitionType: "sub-worker" })
+      .serviceTask("sub-task", { name: "Sub Task", taskType: "sub-worker" })
       .endEvent("sub-end");
   })
   .endEvent("end")
@@ -363,8 +363,8 @@ Use `callActivity()` to reference sub-processes by ID, keeping each process focu
 ```typescript
 const definitions = Bpmn.createProcess("main")
   .startEvent("start")
-  .callActivity("validate", { calledElement: "validation-process" })
-  .callActivity("fulfill", { calledElement: "fulfillment-process" })
+  .callActivity("validate", { processId: "validation-process" })
+  .callActivity("fulfill", { processId: "fulfillment-process" })
   .endEvent("end")
   .build();
 ```
