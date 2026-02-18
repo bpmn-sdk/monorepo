@@ -34,8 +34,11 @@ function compareFlowElements(a: BpmnFlowElement[], b: BpmnFlowElement[]): void {
 	expect(sa.length).toBe(sb.length);
 
 	for (let i = 0; i < sa.length; i++) {
-		const ea = sa[i]!;
-		const eb = sb[i]!;
+		const ea = sa[i];
+		const eb = sb[i];
+		expect(ea).toBeDefined();
+		expect(eb).toBeDefined();
+		if (!ea || !eb) continue;
 		expect(ea.type).toBe(eb.type);
 		expect(ea.id).toBe(eb.id);
 		expect(ea.name).toBe(eb.name);
@@ -60,8 +63,11 @@ function compareSequenceFlows(a: BpmnSequenceFlow[], b: BpmnSequenceFlow[]): voi
 	expect(sa.length).toBe(sb.length);
 
 	for (let i = 0; i < sa.length; i++) {
-		const fa = sa[i]!;
-		const fb = sb[i]!;
+		const fa = sa[i];
+		const fb = sb[i];
+		expect(fa).toBeDefined();
+		expect(fb).toBeDefined();
+		if (!fa || !fb) continue;
 		expect(fa.id).toBe(fb.id);
 		expect(fa.sourceRef).toBe(fb.sourceRef);
 		expect(fa.targetRef).toBe(fb.targetRef);
@@ -134,22 +140,33 @@ function compareDefinitions(a: BpmnDefinitions, b: BpmnDefinitions): void {
 	// Collaborations
 	expect(a.collaborations.length).toBe(b.collaborations.length);
 	for (let i = 0; i < a.collaborations.length; i++) {
-		const ca = a.collaborations[i]!;
-		const cb = b.collaborations[i]!;
+		const ca = a.collaborations[i];
+		const cb = b.collaborations[i];
+		expect(ca).toBeDefined();
+		expect(cb).toBeDefined();
+		if (!ca || !cb) continue;
 		expect(ca.participants.length).toBe(cb.participants.length);
 	}
 
 	// Processes
 	expect(a.processes.length).toBe(b.processes.length);
 	for (let i = 0; i < a.processes.length; i++) {
-		compareProcess(a.processes[i]!, b.processes[i]!);
+		const pa = a.processes[i];
+		const pb = b.processes[i];
+		expect(pa).toBeDefined();
+		expect(pb).toBeDefined();
+		if (!pa || !pb) continue;
+		compareProcess(pa, pb);
 	}
 
 	// Diagrams
 	expect(a.diagrams.length).toBe(b.diagrams.length);
 	for (let i = 0; i < a.diagrams.length; i++) {
-		const da = a.diagrams[i]!;
-		const db = b.diagrams[i]!;
+		const da = a.diagrams[i];
+		const db = b.diagrams[i];
+		expect(da).toBeDefined();
+		expect(db).toBeDefined();
+		if (!da || !db) continue;
 		compareDiShapes(da.plane.shapes, db.plane.shapes);
 		compareDiEdges(da.plane.edges, db.plane.edges);
 	}
@@ -191,7 +208,9 @@ describe("BPMN parser", () => {
 	it("parses 9-branch exclusive gateway", () => {
 		const xml = readFileSync(join(EXAMPLES_DIR, "Handle PDP - Comment.bpmn"), "utf-8");
 		const model = parseBpmn(xml);
-		const process = model.processes[0]!;
+		const process = model.processes[0];
+		expect(process).toBeDefined();
+		if (!process) return;
 
 		const gateway = process.flowElements.find(
 			(e) => e.type === "exclusiveGateway" && e.id === "Gateway_0pqd380",
@@ -203,7 +222,9 @@ describe("BPMN parser", () => {
 	it("parses adHocSubProcess with multiInstanceLoopCharacteristics", () => {
 		const xml = readFileSync(join(EXAMPLES_DIR, "Epic Review Bot.bpmn"), "utf-8");
 		const model = parseBpmn(xml);
-		const process = model.processes.find((p) => p.id === "Process_Epic_Review")!;
+		const process = model.processes.find((p) => p.id === "Process_Epic_Review");
+		expect(process).toBeDefined();
+		if (!process) return;
 
 		const adHoc = process.flowElements.find((e) => e.type === "adHocSubProcess");
 		expect(adHoc).toBeDefined();
@@ -231,7 +252,9 @@ describe("BPMN parser", () => {
 	it("parses timer boundary event", () => {
 		const xml = readFileSync(join(EXAMPLES_DIR, "Handle PDP - New Epic.bpmn"), "utf-8");
 		const model = parseBpmn(xml);
-		const process = model.processes[0]!;
+		const process = model.processes[0];
+		expect(process).toBeDefined();
+		if (!process) return;
 
 		const timerEvent = process.flowElements.find(
 			(e) =>
@@ -243,7 +266,9 @@ describe("BPMN parser", () => {
 	it("parses sequence flow condition expressions", () => {
 		const xml = readFileSync(join(EXAMPLES_DIR, "Handle PDP - Comment.bpmn"), "utf-8");
 		const model = parseBpmn(xml);
-		const process = model.processes[0]!;
+		const process = model.processes[0];
+		expect(process).toBeDefined();
+		if (!process) return;
 
 		const condFlow = process.sequenceFlows.find((f) => f.conditionExpression);
 		expect(condFlow).toBeDefined();

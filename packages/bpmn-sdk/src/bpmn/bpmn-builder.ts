@@ -4,6 +4,7 @@ import type {
 	BpmnConditionExpression,
 	BpmnDefinitions,
 	BpmnElementType,
+	BpmnError,
 	BpmnEventDefinition,
 	BpmnFlowElement,
 	BpmnMultiInstanceLoopCharacteristics,
@@ -178,16 +179,19 @@ export interface AdHocSubProcessOptions extends ElementOptions {
 // Internal helpers
 // ---------------------------------------------------------------------------
 
-function buildEventDefinitions(opts: {
-	timerDuration?: string;
-	timerDate?: string;
-	timerCycle?: string;
-	errorCode?: string;
-	errorRef?: string;
-	messageName?: string;
-	signalName?: string;
-	escalationCode?: string;
-}): BpmnEventDefinition[] {
+function buildEventDefinitions(
+	opts: {
+		timerDuration?: string;
+		timerDate?: string;
+		timerCycle?: string;
+		errorCode?: string;
+		errorRef?: string;
+		messageName?: string;
+		signalName?: string;
+		escalationCode?: string;
+	},
+	rootErrors?: BpmnError[],
+): BpmnEventDefinition[] {
 	const defs: BpmnEventDefinition[] = [];
 	if (opts.timerDuration || opts.timerDate || opts.timerCycle) {
 		defs.push({
@@ -198,7 +202,13 @@ function buildEventDefinitions(opts: {
 		});
 	}
 	if (opts.errorCode !== undefined || opts.errorRef !== undefined) {
-		defs.push({ type: "error", errorRef: opts.errorRef });
+		let errorRef = opts.errorRef;
+		if (!errorRef && opts.errorCode !== undefined && rootErrors) {
+			const errorId = generateId("Error");
+			rootErrors.push({ id: errorId, name: opts.errorCode, errorCode: opts.errorCode });
+			errorRef = errorId;
+		}
+		defs.push({ type: "error", errorRef });
 	}
 	if (opts.messageName !== undefined) {
 		defs.push({ type: "message", messageRef: opts.messageName });
@@ -772,6 +782,7 @@ export class ProcessBuilder {
 	private _versionTag?: string;
 	private readonly flowElements: BpmnFlowElement[] = [];
 	private readonly sequenceFlows: BpmnSequenceFlow[] = [];
+	private readonly rootErrors: BpmnError[] = [];
 	private lastNodeId: string | undefined;
 	private currentGatewayId: string | undefined;
 
@@ -863,7 +874,7 @@ export class ProcessBuilder {
 		if (element.type === "boundaryEvent") {
 			element.attachedToRef = options.attachedTo;
 			element.cancelActivity = options.cancelActivity;
-			element.eventDefinitions = buildEventDefinitions(options);
+			element.eventDefinitions = buildEventDefinitions(options, this.rootErrors);
 		}
 		// Boundary events never auto-connect — temporarily clear lastNodeId
 		const prevLast = this.lastNodeId;
@@ -1279,7 +1290,7 @@ export class ProcessBuilder {
 				"modeler:executionPlatform": "Camunda Cloud",
 				"modeler:executionPlatformVersion": "8.6.0",
 			},
-			errors: [],
+			errors: this.rootErrors,
 			escalations: [],
 			collaborations: [],
 			processes: [process],

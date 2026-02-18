@@ -213,9 +213,13 @@ describe("Coordinate assignment", () => {
 
 		const result = assignCoordinates(orderedLayers, nodeIndex);
 
-		const startNode = result.find((n) => n.id === "start")!;
-		const taskNode = result.find((n) => n.id === "task")!;
-		const endNode = result.find((n) => n.id === "end")!;
+		const startNode = result.find((n) => n.id === "start");
+		const taskNode = result.find((n) => n.id === "task");
+		const endNode = result.find((n) => n.id === "end");
+		expect(startNode).toBeDefined();
+		expect(taskNode).toBeDefined();
+		expect(endNode).toBeDefined();
+		if (!startNode || !taskNode || !endNode) return;
 
 		expect(startNode.bounds.width).toBe(36);
 		expect(startNode.bounds.height).toBe(36);
@@ -232,8 +236,11 @@ describe("Coordinate assignment", () => {
 
 		const result = assignCoordinates(orderedLayers, nodeIndex);
 
-		const startNode = result.find((n) => n.id === "start")!;
-		const taskNode = result.find((n) => n.id === "task")!;
+		const startNode = result.find((n) => n.id === "start");
+		const taskNode = result.find((n) => n.id === "task");
+		expect(startNode).toBeDefined();
+		expect(taskNode).toBeDefined();
+		if (!startNode || !taskNode) return;
 
 		// Task should be at least 80px (HORIZONTAL_SPACING) after start's right edge
 		const startRight = startNode.bounds.x + startNode.bounds.width;
@@ -247,8 +254,11 @@ describe("Coordinate assignment", () => {
 
 		const result = assignCoordinates(orderedLayers, nodeIndex);
 
-		const nodeA = result.find((n) => n.id === "a")!;
-		const nodeB = result.find((n) => n.id === "b")!;
+		const nodeA = result.find((n) => n.id === "a");
+		const nodeB = result.find((n) => n.id === "b");
+		expect(nodeA).toBeDefined();
+		expect(nodeB).toBeDefined();
+		if (!nodeA || !nodeB) return;
 
 		const gap = nodeB.bounds.y - (nodeA.bounds.y + nodeA.bounds.height);
 		expect(gap).toBeGreaterThanOrEqual(60 - 1);
@@ -267,13 +277,16 @@ describe("Edge routing", () => {
 		const edges = routeEdges(flows, nodeMap, []);
 
 		expect(edges).toHaveLength(1);
-		const edge = edges[0]!;
+		const edge = edges[0];
+		expect(edge).toBeDefined();
+		if (!edge) return;
 		expect(edge.waypoints.length).toBeGreaterThanOrEqual(2);
 
 		// All segments should be orthogonal
 		for (let i = 1; i < edge.waypoints.length; i++) {
-			const prev = edge.waypoints[i - 1]!;
-			const curr = edge.waypoints[i]!;
+			const prev = edge.waypoints[i - 1];
+			const curr = edge.waypoints[i];
+			if (!prev || !curr) continue;
 			const isHorizontal = Math.abs(prev.y - curr.y) < 1;
 			const isVertical = Math.abs(prev.x - curr.x) < 1;
 			expect(isHorizontal || isVertical).toBe(true);
@@ -292,7 +305,9 @@ describe("Edge routing", () => {
 		const edges = routeEdges(flows, nodeMap, backEdges);
 
 		expect(edges).toHaveLength(1);
-		const edge = edges[0]!;
+		const edge = edges[0];
+		expect(edge).toBeDefined();
+		if (!edge) return;
 
 		// Back-edge should have waypoints above all nodes
 		const minNodeY = Math.min(...layoutNodes.map((n) => n.bounds.y));
@@ -367,8 +382,9 @@ describe("Layout engine (integration)", () => {
 		// All edges should be orthogonal
 		for (const edge of result.edges) {
 			for (let i = 1; i < edge.waypoints.length; i++) {
-				const prev = edge.waypoints[i - 1]!;
-				const curr = edge.waypoints[i]!;
+				const prev = edge.waypoints[i - 1];
+				const curr = edge.waypoints[i];
+				if (!prev || !curr) continue;
 				const isHorizontal = Math.abs(prev.y - curr.y) < 1;
 				const isVertical = Math.abs(prev.x - curr.x) < 1;
 				expect(isHorizontal || isVertical).toBe(true);
@@ -403,8 +419,11 @@ describe("Layout engine (integration)", () => {
 		expect(result.edges).toHaveLength(6);
 
 		// taskA and taskB should be in the same layer (column) at different y positions
-		const taskA = result.nodes.find((n) => n.id === "taskA")!;
-		const taskB = result.nodes.find((n) => n.id === "taskB")!;
+		const taskA = result.nodes.find((n) => n.id === "taskA");
+		const taskB = result.nodes.find((n) => n.id === "taskB");
+		expect(taskA).toBeDefined();
+		expect(taskB).toBeDefined();
+		if (!taskA || !taskB) return;
 		expect(taskA.layer).toBe(taskB.layer);
 		expect(taskA.bounds.y).not.toBe(taskB.bounds.y);
 	});
@@ -432,7 +451,9 @@ describe("Layout engine (integration)", () => {
 		expect(result.edges).toHaveLength(4);
 
 		// The back-edge should route above other elements
-		const backEdge = result.edges.find((e) => e.id === "f4")!;
+		const backEdge = result.edges.find((e) => e.id === "f4");
+		expect(backEdge).toBeDefined();
+		if (!backEdge) return;
 		expect(backEdge.waypoints.length).toBeGreaterThan(2);
 	});
 
@@ -509,8 +530,11 @@ describe("Layout engine (integration)", () => {
 
 		const result = layoutProcess(process);
 
-		const startNode = result.nodes.find((n) => n.id === "start")!;
-		const gwNode = result.nodes.find((n) => n.id === "gw")!;
+		const startNode = result.nodes.find((n) => n.id === "start");
+		const gwNode = result.nodes.find((n) => n.id === "gw");
+		expect(startNode).toBeDefined();
+		expect(gwNode).toBeDefined();
+		if (!startNode || !gwNode) return;
 
 		// Start event label should be below the element
 		expect(startNode.labelBounds).toBeDefined();
@@ -538,17 +562,19 @@ describe("Layout engine (integration)", () => {
 		const result = layoutProcess(process);
 
 		// Should contain parent nodes + child nodes
-		const parentNode = result.nodes.find((n) => n.id === "sub")!;
+		const parentNode = result.nodes.find((n) => n.id === "sub");
 		expect(parentNode).toBeDefined();
+		if (!parentNode) return;
 		// Sub-process should be sized to contain its children
 		expect(parentNode.bounds.width).toBeGreaterThan(100);
 		expect(parentNode.bounds.height).toBeGreaterThan(80);
 
 		// Child nodes should be positioned within the sub-process
-		const child1 = result.nodes.find((n) => n.id === "child1")!;
-		const child2 = result.nodes.find((n) => n.id === "child2")!;
+		const child1 = result.nodes.find((n) => n.id === "child1");
+		const child2 = result.nodes.find((n) => n.id === "child2");
 		expect(child1).toBeDefined();
 		expect(child2).toBeDefined();
+		if (!child1 || !child2) return;
 		expect(child1.bounds.x).toBeGreaterThanOrEqual(parentNode.bounds.x);
 		expect(child1.bounds.y).toBeGreaterThanOrEqual(parentNode.bounds.y);
 	});

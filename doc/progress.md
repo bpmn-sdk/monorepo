@@ -2,6 +2,9 @@
 
 ## 2026-02-18
 
+### Builder errorCode→errorRef Fix
+- Fixed `buildEventDefinitions` to auto-generate a root `BpmnError` element when `errorCode` is provided without `errorRef`, ensuring boundary events built with only `errorCode` serialize with a valid `errorRef`
+
 ### Review Fixes
 - Fixed `buildEventDefinitions` to pass `timeDate` and `timeCycle` into timer event definitions
 - Fixed `buildEventDefinitions` to store `messageName`/`signalName`/`escalationCode` as `messageRef`/`signalRef`/`escalationRef`
