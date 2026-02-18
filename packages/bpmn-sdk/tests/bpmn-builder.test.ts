@@ -1192,4 +1192,224 @@ describe("BpmnProcessBuilder", () => {
 			}
 		});
 	});
+
+	// -----------------------------------------------------------------------
+	// Regression: timerDate / timeCycle preserved
+	// -----------------------------------------------------------------------
+
+	describe("timer date and cycle", () => {
+		it("preserves timerDate on start event", () => {
+			const process = firstProcess(
+				Bpmn.createProcess("proc")
+					.startEvent("ts", { timerDate: "2026-01-01T00:00:00Z" })
+					.endEvent("e")
+					.build(),
+			);
+
+			const start = defined(process.flowElements.find((n) => n.id === "ts"));
+			if (start.type === "startEvent") {
+				expect(start.eventDefinitions).toHaveLength(1);
+				const td = defined(start.eventDefinitions[0]);
+				expect(td.type).toBe("timer");
+				if (td.type === "timer") {
+					expect(td.timeDate).toBe("2026-01-01T00:00:00Z");
+					expect(td.timeDuration).toBeUndefined();
+				}
+			}
+		});
+
+		it("preserves timerCycle on start event", () => {
+			const process = firstProcess(
+				Bpmn.createProcess("proc")
+					.startEvent("ts", { timerCycle: "R3/PT10M" })
+					.endEvent("e")
+					.build(),
+			);
+
+			const start = defined(process.flowElements.find((n) => n.id === "ts"));
+			if (start.type === "startEvent") {
+				const td = defined(start.eventDefinitions[0]);
+				if (td.type === "timer") {
+					expect(td.timeCycle).toBe("R3/PT10M");
+					expect(td.timeDuration).toBeUndefined();
+				}
+			}
+		});
+
+		it("preserves timerDate on intermediate catch event", () => {
+			const process = firstProcess(
+				Bpmn.createProcess("proc")
+					.startEvent("s")
+					.intermediateCatchEvent("ice", { timerDate: "2026-06-01T12:00:00Z" })
+					.endEvent("e")
+					.build(),
+			);
+
+			const ice = defined(process.flowElements.find((n) => n.id === "ice"));
+			if (ice.type === "intermediateCatchEvent") {
+				expect(ice.eventDefinitions).toHaveLength(1);
+				const td = defined(ice.eventDefinitions[0]);
+				expect(td.type).toBe("timer");
+				if (td.type === "timer") {
+					expect(td.timeDate).toBe("2026-06-01T12:00:00Z");
+					expect(td.timeDuration).toBeUndefined();
+				}
+			}
+		});
+
+		it("preserves timerCycle on intermediate catch event", () => {
+			const process = firstProcess(
+				Bpmn.createProcess("proc")
+					.startEvent("s")
+					.intermediateCatchEvent("ice", { timerCycle: "R5/PT30M" })
+					.endEvent("e")
+					.build(),
+			);
+
+			const ice = defined(process.flowElements.find((n) => n.id === "ice"));
+			if (ice.type === "intermediateCatchEvent") {
+				const td = defined(ice.eventDefinitions[0]);
+				expect(td.type).toBe("timer");
+				if (td.type === "timer") {
+					expect(td.timeCycle).toBe("R5/PT30M");
+					expect(td.timeDuration).toBeUndefined();
+				}
+			}
+		});
+
+		it("preserves timerDate on boundary event", () => {
+			const process = firstProcess(
+				Bpmn.createProcess("proc")
+					.startEvent("s")
+					.serviceTask("task1", { taskType: "io.example:1" })
+					.endEvent("e")
+					.boundaryEvent("bd", {
+						attachedTo: "task1",
+						cancelActivity: false,
+						timerDate: "2026-12-25T00:00:00Z",
+					})
+					.endEvent("e2")
+					.build(),
+			);
+
+			const bd = defined(process.flowElements.find((n) => n.id === "bd"));
+			if (bd.type === "boundaryEvent") {
+				expect(bd.eventDefinitions).toHaveLength(1);
+				const td = defined(bd.eventDefinitions[0]);
+				expect(td.type).toBe("timer");
+				if (td.type === "timer") {
+					expect(td.timeDate).toBe("2026-12-25T00:00:00Z");
+					expect(td.timeDuration).toBeUndefined();
+				}
+			}
+		});
+
+		it("preserves timerCycle on boundary event", () => {
+			const process = firstProcess(
+				Bpmn.createProcess("proc")
+					.startEvent("s")
+					.serviceTask("task1", { taskType: "io.example:1" })
+					.endEvent("e")
+					.boundaryEvent("bd", {
+						attachedTo: "task1",
+						cancelActivity: false,
+						timerCycle: "R/PT15M",
+					})
+					.endEvent("e2")
+					.build(),
+			);
+
+			const bd = defined(process.flowElements.find((n) => n.id === "bd"));
+			if (bd.type === "boundaryEvent") {
+				const td = defined(bd.eventDefinitions[0]);
+				expect(td.type).toBe("timer");
+				if (td.type === "timer") {
+					expect(td.timeCycle).toBe("R/PT15M");
+					expect(td.timeDuration).toBeUndefined();
+				}
+			}
+		});
+	});
+
+	// -----------------------------------------------------------------------
+	// Regression: event definition values stored
+	// -----------------------------------------------------------------------
+
+	describe("event definition values", () => {
+		it("stores messageName as messageRef", () => {
+			const process = firstProcess(
+				Bpmn.createProcess("proc")
+					.startEvent("s")
+					.intermediateThrowEvent("msg", { messageName: "order-placed" })
+					.endEvent("e")
+					.build(),
+			);
+
+			const ite = defined(process.flowElements.find((n) => n.id === "msg"));
+			if (ite.type === "intermediateThrowEvent") {
+				const def = defined(ite.eventDefinitions[0]);
+				expect(def.type).toBe("message");
+				if (def.type === "message") {
+					expect(def.messageRef).toBe("order-placed");
+				}
+			}
+		});
+
+		it("stores signalName as signalRef", () => {
+			const process = firstProcess(
+				Bpmn.createProcess("proc")
+					.startEvent("s")
+					.intermediateCatchEvent("sig", { signalName: "data-ready" })
+					.endEvent("e")
+					.build(),
+			);
+
+			const ice = defined(process.flowElements.find((n) => n.id === "sig"));
+			if (ice.type === "intermediateCatchEvent") {
+				const def = defined(ice.eventDefinitions[0]);
+				expect(def.type).toBe("signal");
+				if (def.type === "signal") {
+					expect(def.signalRef).toBe("data-ready");
+				}
+			}
+		});
+
+		it("stores escalationCode as escalationRef", () => {
+			const process = firstProcess(
+				Bpmn.createProcess("proc")
+					.startEvent("s")
+					.intermediateThrowEvent("esc", { escalationCode: "ESC_001" })
+					.endEvent("e")
+					.build(),
+			);
+
+			const ite = defined(process.flowElements.find((n) => n.id === "esc"));
+			if (ite.type === "intermediateThrowEvent") {
+				const def = defined(ite.eventDefinitions[0]);
+				expect(def.type).toBe("escalation");
+				if (def.type === "escalation") {
+					expect(def.escalationRef).toBe("ESC_001");
+				}
+			}
+		});
+	});
+
+	// -----------------------------------------------------------------------
+	// Regression: duplicate ID in branch
+	// -----------------------------------------------------------------------
+
+	describe("duplicate ID in branch", () => {
+		it("throws when branch element duplicates an existing process element", () => {
+			expect(() =>
+				Bpmn.createProcess("proc")
+					.startEvent("s")
+					.serviceTask("dup", { taskType: "work" })
+					.exclusiveGateway("gw")
+					.branch("a", (b) => b.serviceTask("dup", { taskType: "other" }).connectTo("merge"))
+					.exclusiveGateway("merge")
+					.endEvent("e")
+					.build(),
+			).toThrow('Duplicate element ID "dup"');
+		});
+	});
 });
