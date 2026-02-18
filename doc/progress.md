@@ -21,6 +21,8 @@
 - Committed `.changeset/` directory with `config.json` and `README.md`
 - Fixed changeset config to use `@changesets/changelog-github` with repo setting for PR/author links
 - Added `changeset`, `version-packages`, and `release` scripts to root `package.json`
+- Removed accidentally committed `.swarm/` session artifacts from version control
+- Added `.swarm` to `.gitignore`
 - Added auto-layout feature to README feature list
 - Added GitHub Actions CI workflow (build, typecheck, lint, test on push/PR)
 - Added GitHub Actions Release workflow using `changesets/action` for automated version PRs and npm publishing
