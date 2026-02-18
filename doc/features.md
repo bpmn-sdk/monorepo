@@ -5,10 +5,15 @@
 - **Typed model comparison** — validates semantic equivalence at the model level, not byte-level XML
 - **XML-level roundtrip** — additional structural validation at the raw XML element tree level
 
-## BPMN Support (2026-02-18)
+## BPMN Support (2026-02-19)
 - **Parse BPMN XML** — `Bpmn.parse(xml)` parses BPMN XML into a typed `BpmnDefinitions` model
 - **Export BPMN XML** — `Bpmn.export(model)` serializes a `BpmnDefinitions` model back to BPMN XML
 - **Fluent builder** — `Bpmn.createProcess(id)` creates processes with method chaining
+- **Gateway support** — exclusive, parallel, inclusive, event-based gateways with `branch(name, callback)` pattern
+- **Loop support** — `connectTo(targetId)` for merge points and back-edge loops
+- **Sub-process builders** — `adHocSubProcess()`, `subProcess()`, `eventSubProcess()` with nested content
+- **Multi-instance** — parallel/sequential multi-instance with Zeebe extension elements
+- **Aspirational elements** — sendTask, receiveTask, businessRuleTask builders
 - **REST connector builder** — `restConnector(id, config)` convenience method generates service tasks with `io.camunda:http-json:1` task type, IO mappings (method, url, auth, body, headers, queryParameters, timeouts), and task headers (resultVariable, resultExpression, retryBackoff)
 - **Extension preservation** — zeebe:*, modeler:*, camunda:* extensions roundtrip as `XmlElement[]`
 - **Diagram interchange** — BPMNDI shapes and edges preserved on roundtrip

@@ -2,6 +2,45 @@
 
 ## 2026-02-19
 
+### BPMN Fluent Builder API — Full Implementation
+- Rewrote `bpmn-builder.ts` with complete fluent builder API (~1400 lines)
+- **Gateway branching**: `branch(name, callback)` with `BranchBuilder` sub-builders
+  - `condition(expression)` sets FEEL condition on branch sequence flow
+  - `defaultFlow()` marks branch as gateway default path
+  - Both conditions and defaults work with direct `connectTo()` (no intermediate elements)
+- **Flow control**: `connectTo(id)` for merging branches and creating loops (backward references)
+- **Navigation**: `element(id)` repositions builder at existing element for additional outgoing flows
+- **Multiple start events**: `addStartEvent()` creates disconnected start events for parallel paths
+- **Boundary events**: `boundaryEvent(id, options)` attached to activities with error/timer/message/signal support
+- **Event definitions**: Timer (duration/date/cycle), message, signal, escalation on start/intermediate/boundary events
+- **Ad-hoc sub-process**: `activeElementsCollection` and `loopCharacteristics` with full zeebe extension support
+- **Modeler template**: `modelerTemplate`, `modelerTemplateVersion`, `modelerTemplateIcon` on service tasks
+- **Version tag**: `versionTag(tag)` on process
+- **`build()` returns `BpmnDefinitions`** (not just `BpmnProcess`) with full namespace declarations
+- **Aspirational elements**: inclusive gateway, event-based gateway, sub-process, event sub-process, send/receive tasks
+- Added `BpmnMessageEventDefinition` and `BpmnSignalEventDefinition` to model types
+- Updated `src/index.ts` exports for all new option types
+- 52 builder tests covering all features including 9-branch fan-out pattern
+- Fixed existing tests (rest-connector, roundtrip) for new `build()` return type
+- All 226 tests pass, zero lint errors, zero build warnings
+
+### BPMN Builder Unit Tests (52 tests)
+- Extended BPMN model with aspirational types: `sendTask`, `receiveTask`, `eventSubProcess`, `BpmnSubProcess`, `BpmnInclusiveGateway`, `BpmnEventBasedGateway`
+- Rewrote `ProcessBuilder` with full gateway support: exclusive, parallel, inclusive, event-based
+- Added `branch(name, callback)` pattern with `BranchBuilder` for gateway fan-out
+- Added `connectTo(targetId)` for merge points and loop patterns
+- Added sub-process builders: `adHocSubProcess()`, `subProcess()`, `eventSubProcess()` with `SubProcessContentBuilder`
+- Added multi-instance configuration (parallel/sequential) with Zeebe extension elements
+- Added aspirational element builders: `sendTask()`, `receiveTask()`, `businessRuleTask()`
+- Added `recomputeIncomingOutgoing()` to fix up incoming/outgoing arrays at build time
+- 52 comprehensive tests covering: linear flow, all validated element types, all aspirational types, exclusive gateway (2-branch and 9-branch fan-out), parallel gateway (2 and 3 branches), inclusive gateway, event-based gateway, loops via connectTo, ad-hoc sub-processes with multi-instance, sub-processes, event sub-processes, boundary events, error handling, complex nested patterns
+
+### BPMN Parser/Serializer Lint Cleanup
+- Fixed 14 `noNonNullAssertion` lint errors in `bpmn-roundtrip.test.ts`
+- Added bounds-checked `at()` helper to replace `arr[i]!` patterns
+- Replaced `find()!` with proper `undefined` checks and early returns
+- All 226 tests pass, zero lint errors, zero build warnings
+
 ### REST Connector Convenience Builder
 - Implemented `restConnector(id, config)` as syntactic sugar on `ProcessBuilder`
 - Generates `io.camunda:http-json:1` service tasks with proper Zeebe extensions
@@ -13,6 +52,11 @@
 - Fixed tests to work with updated `build()` return type (`BpmnDefinitions`)
 
 ## 2026-02-18
+
+### QA Fixes
+- Fixed duplicate `message`/`signal` switch cases in `bpmn-serializer.ts` (caused build failure)
+- Fixed sub-process child node positioning in layout engine — children now correctly track parent shifts after `reassignXCoordinates`
+- Auto-formatted `bpmn-serializer.ts` with Biome
 
 ### Roundtrip Tests for All Example Files
 - Fixed build errors in BPMN builder and layout modules (model type alignment)
