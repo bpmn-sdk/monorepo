@@ -2,6 +2,14 @@
 
 ## 2026-02-18
 
+### Review Fixes
+- Fixed `buildEventDefinitions` to pass `timeDate` and `timeCycle` into timer event definitions
+- Fixed `buildEventDefinitions` to store `messageName`/`signalName`/`escalationCode` as `messageRef`/`signalRef`/`escalationRef`
+- Added `timeDate`, `timeCycle` (and attribute maps) to `BpmnTimerEventDefinition` model type
+- Added `timeDate`/`timeCycle` parsing and serialization for XML roundtrip support
+- Added duplicate ID check when merging branch elements into the main process
+- Removed `.swarm` session artifacts from version control and added to `.gitignore`
+
 ### Comprehensive README Rewrite
 - Rewrote root `README.md` with best-practices structure matching top-tier SDKs
 - Added "Why this SDK?" section with value propositions
