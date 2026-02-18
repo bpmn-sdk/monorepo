@@ -1,0 +1,272 @@
+{
+  "executionPlatform": "Camunda Cloud",
+  "executionPlatformVersion": "8.7.0",
+  "exporter": {
+    "name": "Camunda Web Modeler",
+    "version": "4c8ade0"
+  },
+  "schemaVersion": 19,
+  "id": "Form_0mqyhhb",
+  "components": [
+    {
+      "text": "Define to Implement",
+      "type": "text",
+      "layout": {
+        "row": "Row_0jubwji",
+        "columns": null
+      },
+      "id": "Field_14kzghd"
+    },
+    {
+      "text": "=\"# PDP\" + string(pdp)",
+      "type": "text",
+      "layout": {
+        "row": "Row_0bezhps",
+        "columns": null
+      },
+      "id": "Field_0p9uwpx"
+    },
+    {
+      "label": "Release label",
+      "components": [
+        {
+          "label": "There is only one release label. This includes either target:xyz (committed) or potential:xyz (uncommitted). And the alpha/minor details.",
+          "type": "checkbox",
+          "id": "Checkbox_1",
+          "defaultValue": false,
+          "validate": {
+            "required": true
+          },
+          "key": "reviewedReleaseAmbition",
+          "layout": {
+            "row": "Row_0gypiz2",
+            "columns": null
+          }
+        }
+      ],
+      "showOutline": true,
+      "type": "group",
+      "layout": {
+        "row": "Row_1o8ejgi",
+        "columns": null
+      },
+      "id": "Field_17ugq68"
+    },
+    {
+      "label": "QA",
+      "components": [
+        {
+          "label": "Have you involved the QA team?",
+          "values": [
+            {
+              "label": "Yes. Their work is included in the epic task breakdown.",
+              "value": "true"
+            },
+            {
+              "label": "No. Testing is handled by the feature team.",
+              "value": "false"
+            }
+          ],
+          "type": "radio",
+          "layout": {
+            "row": "Row_1jgvn7m",
+            "columns": null
+          },
+          "id": "Field_1nghbfx",
+          "key": "implementQaInvolved",
+          "validate": {
+            "required": true
+          }
+        },
+        {
+          "label": "If you answered 'No' to the previous question. How will this change be tested? Describe briefly the plans for testing this epic",
+          "type": "textarea",
+          "id": "Textarea_11",
+          "validate": {
+            "minLength": 10,
+            "maxLength": 500,
+            "required": false
+          },
+          "key": "changeTestingDescription",
+          "layout": {
+            "row": "Row_1jgvn7m",
+            "columns": null
+          }
+        }
+      ],
+      "showOutline": true,
+      "type": "group",
+      "layout": {
+        "row": "Row_1v9vzlc",
+        "columns": null
+      },
+      "id": "Field_0grv1vy"
+    },
+    {
+      "label": "Documentation",
+      "components": [
+        {
+          "label": "Have you involved the Documentation team?",
+          "values": [
+            {
+              "label": "Yes. Their work is included in the epic task breakdown.",
+              "value": "true"
+            },
+            {
+              "label": "No. Documentation updates are handled by the feature team.",
+              "value": "false"
+            }
+          ],
+          "type": "radio",
+          "layout": {
+            "row": "Row_1w292lc",
+            "columns": null
+          },
+          "id": "Field_079ywvv",
+          "key": "implementDocsInvolved",
+          "validate": {
+            "required": true
+          }
+        },
+        {
+          "label": "If you answered 'No' to the previous question. How will this change be reflected in the documentation? Describe briefly what’s needed, link to existing pages and what you plan to change",
+          "type": "textarea",
+          "id": "Textarea_9",
+          "validate": {
+            "minLength": 10,
+            "maxLength": 500,
+            "required": false
+          },
+          "key": "changeInDocumentation",
+          "layout": {
+            "row": "Row_1w292lc",
+            "columns": null
+          }
+        }
+      ],
+      "showOutline": true,
+      "type": "group",
+      "layout": {
+        "row": "Row_1w40guk",
+        "columns": null
+      },
+      "id": "Field_12ss7gx"
+    },
+    {
+      "label": "Self-Managed",
+      "components": [
+        {
+          "label": "Have you considered how this change will be integrated into the Self-Managed Platforms and added the work to the epic task breakdown? (multiple select if needed)",
+          "values": [
+            {
+              "label": "Yes. Work is planned and included in the breakdown of this epic. The work is assigned to the feature team. The Distribution/InfraX team reviewed the design.",
+              "value": "true:feature"
+            },
+            {
+              "label": "Yes. Work is planned and included in the breakdown of this epic. The work is assigned to the Distribution/InfraEx team.",
+              "value": "true:distro"
+            },
+            {
+              "label": "No. Integration is not required for the Self-Managed Platform.",
+              "value": "false"
+            }
+          ],
+          "type": "checklist",
+          "layout": {
+            "row": "Row_0dgsowk",
+            "columns": null
+          },
+          "id": "Field_1oy6gm5",
+          "key": "implementSmInvolved",
+          "validate": {
+            "required": true
+          }
+        }
+      ],
+      "showOutline": true,
+      "type": "group",
+      "layout": {
+        "row": "Row_04p2lex",
+        "columns": null
+      },
+      "id": "Field_0s5zgtl"
+    },
+    {
+      "label": "SaaS",
+      "components": [
+        {
+          "label": "Have you considered how this change will be integrated into the SaaS Platforms? (multiple select if needed)",
+          "values": [
+            {
+              "label": "Yes. Work is planned and included in the breakdown of this epic. The work is assigned to the feature team.",
+              "value": "true:saas:feature"
+            },
+            {
+              "label": "Yes. Work is planned and included in the breakdown of this epic. The work is assigned to the Controller Team.",
+              "value": "true:saas:controller"
+            },
+            {
+              "label": "Yes. Work is planned and included in the breakdown of this epic. The work is assigned to the  SRE Team.",
+              "value": "true:saas:sre"
+            },
+            {
+              "label": "No. Integration is not required for the SaaS Platforms.",
+              "value": "false"
+            }
+          ],
+          "type": "checklist",
+          "layout": {
+            "row": "Row_0fronhd",
+            "columns": null
+          },
+          "id": "Field_1eqpx2t",
+          "key": "implementSaasInvolved",
+          "validate": {
+            "required": true
+          }
+        }
+      ],
+      "showOutline": true,
+      "type": "group",
+      "layout": {
+        "row": "Row_06wkhwu",
+        "columns": null
+      },
+      "id": "Field_1dcbz5f"
+    },
+    {
+      "label": "Risk Assessment",
+      "components": [
+        {
+          "label": "Have you completed a risk assessment?",
+          "values": [
+            {
+              "label": "Yes. A risk assessment has been completed using the '/riskAssessment' command in Github.",
+              "value": "value"
+            },
+            {
+              "label": "No. The change does not introduce significant architectural or structural extensions, and the '/noRiskAssessmentNeeded' command has been used in GitHub.",
+              "value": "value2"
+            }
+          ],
+          "type": "radio",
+          "layout": {
+            "row": "Row_1hv3w0d",
+            "columns": null
+          },
+          "id": "Field_1riugb4",
+          "key": "radio_p2kbp"
+        }
+      ],
+      "showOutline": true,
+      "type": "group",
+      "layout": {
+        "row": "Row_0pxzuiz",
+        "columns": null
+      },
+      "id": "Field_1ccygxx"
+    }
+  ],
+  "generated": true,
+  "type": "default"
+}

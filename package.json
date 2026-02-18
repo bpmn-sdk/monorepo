@@ -1,0 +1,21 @@
+{
+	"name": "@urbanisierung/bpmn-sdk-monorepo",
+	"private": true,
+	"type": "module",
+	"packageManager": "pnpm@10.21.0",
+	"scripts": {
+		"build": "pnpm turbo build",
+		"typecheck": "pnpm turbo typecheck",
+		"lint": "biome check .",
+		"format": "biome check --write .",
+		"test": "pnpm turbo test",
+		"check": "pnpm turbo check",
+		"verify": "pnpm turbo build typecheck check test"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "^1.9.4",
+		"turbo": "^2.4.4",
+		"typescript": "^5.7.3",
+		"vitest": "^3.0.5"
+	}
+}

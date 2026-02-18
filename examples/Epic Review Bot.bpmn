@@ -1,0 +1,460 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:zeebe="http://camunda.org/schema/zeebe/1.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:bioc="http://bpmn.io/schema/bpmn/biocolor/1.0" xmlns:color="http://www.omg.org/spec/BPMN/non-normative/color/1.0" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:modeler="http://camunda.org/schema/modeler/1.0" id="Definitions_1" targetNamespace="http://bpmn.io/schema/bpmn" exporter="Camunda Web Modeler" exporterVersion="0a9c425" modeler:executionPlatform="Camunda Cloud" modeler:executionPlatformVersion="8.8.0">
+  <bpmn:escalation id="Escalation_1qaovql" name="human escalation" escalationCode="100_human_escalation" />
+  <bpmn:error id="Error_1xmh0a2" name="index_not_found" errorCode="index_not_found" />
+  <bpmn:escalation id="Escalation_1x4421v" name="human escalation" escalationCode="100_human_escalation" />
+  <bpmn:escalation id="Escalation_1fpfwz8" name="human escalation" escalationCode="100_human_escalation" />
+  <bpmn:error id="Error_04dhtpa" name="index_not_found" errorCode="index_not_found" />
+  <bpmn:collaboration id="Collaboration_Epic_Review">
+    <bpmn:participant id="Participant_1ko3htp" name="Product Management Epic Review" processRef="Process_Epic_Review" />
+    <bpmn:participant id="Participant_14m4dos" name="Legacy Tools" processRef="Process_1ljb6t2" />
+    <bpmn:textAnnotation id="TextAnnotation_0oibtxl">
+      <bpmn:text>Can be integrated into ad hoc subprocess with 8.8
+
+For testing I use 3.5, 3.7 gives the best results from testing. 4 doesnt add much value
+
+us.anthropic.claude-3-5-sonnet-20241022-v2:0
+
+
+us.anthropic.claude-3-7-sonnet-20250219-v1:0
+
+
+us.anthropic.claude-sonnet-4-20250514-v1:0</bpmn:text>
+    </bpmn:textAnnotation>
+    <bpmn:textAnnotation id="TextAnnotation_14snsyd">
+      <bpmn:text>This can be deleted if it responses in a human task</bpmn:text>
+    </bpmn:textAnnotation>
+    <bpmn:association id="Association_08yiz8y" associationDirection="None" sourceRef="Activity_Slack" targetRef="TextAnnotation_14snsyd" />
+    <bpmn:association id="Association_0p2ywpv" associationDirection="None" sourceRef="Activity_01xvqn0" targetRef="TextAnnotation_0oibtxl" />
+  </bpmn:collaboration>
+  <bpmn:process id="Process_Epic_Review" name="Epic Review Bot" isExecutable="true">
+    <bpmn:extensionElements>
+      <zeebe:versionTag value="1.4" />
+    </bpmn:extensionElements>
+    <bpmn:sequenceFlow id="Flow_0l610js" sourceRef="Gateway_1j0oz23" targetRef="Activity_01xvqn0" />
+    <bpmn:sequenceFlow id="Flow_1jfjd7m" sourceRef="Activity_04glkkx" targetRef="Gateway_1j0oz23" />
+    <bpmn:sequenceFlow id="Flow_1vnsml5" name="Yes" sourceRef="Gateway_1k7euae" targetRef="Activity_04glkkx">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=not(agent.toolCalls = null) and count(agent.toolCalls) &gt; 0</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_05a4u5j" sourceRef="Gateway_1k7euae" targetRef="Event_1wufq95" />
+    <bpmn:sequenceFlow id="Flow_1imcl82" sourceRef="Activity_01xvqn0" targetRef="Gateway_1k7euae" />
+    <bpmn:sequenceFlow id="Flow_1wfklrx" sourceRef="Activity_0waqzte" targetRef="Gateway_1j0oz23" />
+    <bpmn:sequenceFlow id="Flow_1ux1bqv" sourceRef="epicSubmitted" targetRef="Activity_0waqzte" />
+    <bpmn:endEvent id="Event_1wufq95" name="Epic Reviewed">
+      <bpmn:incoming>Flow_05a4u5j</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:adHocSubProcess id="Activity_04glkkx" name="Tools available to AI agent">
+      <bpmn:extensionElements>
+        <zeebe:adHoc activeElementsCollection="=[toolCall._meta.name]" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_1vnsml5</bpmn:incoming>
+      <bpmn:outgoing>Flow_1jfjd7m</bpmn:outgoing>
+      <bpmn:multiInstanceLoopCharacteristics>
+        <bpmn:extensionElements>
+          <zeebe:loopCharacteristics inputCollection="=agent.toolCalls" inputElement="toolCall" outputCollection="toolResults" outputElement="={&#10;  id: toolCall._meta.id,&#10;  name: toolCall._meta.name,&#10;  content: toolResult&#10;}" />
+        </bpmn:extensionElements>
+      </bpmn:multiInstanceLoopCharacteristics>
+      <bpmn:serviceTask id="Activity_0hs0pu9" name="Search for context" zeebe:modelerTemplate="38a63182-d356-45e7-99c1-16c94460ec8d" zeebe:modelerTemplateVersion="1752162426400" zeebe:modelerTemplateIcon="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIEAAACBCAYAAADnoNlQAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAA5mSURBVHgB7Z1PbBzVHcd/b2ZMaXASmwDCXGokSI9xErtCwa43t1LSkkgFgXqIjZSKQyGEwiE51DGH9ECbGLhUIBFHKgKFA0mVkmPWTUCoNmQ5NiBhLiSCuF6wE/5kZ17fd9bj7K531/N2Z2Z/zzsfybL3j73rfd/5vd+/956gNuGBzHyv+yN1SUt9CfVF1FX5HEGUF1J9eZS3b6H8h9nuWWoDBK0hMpn5rsUC9ZH0+oRFW6QUGPA+IWUvNYgUYlYJY1YIOSs9+oSElet0KJfNdudpjWC0CDDo37q02yZvi0didzODrY/IKWHklEymbNvOmmw1jBNB/+B8Rn0bVh9+pvjFBV8UWSmt0zMXurNkEEaIYMnM75dCjiR7tTeGEDSrvmVt2xo3wUKwFkHxqpdjvK54XURWCO/E9Pk7Jokp7EQQXPXqgxuRknppjVC0DnKco//ARgTB4BN5z1KV8G2tADEov2HScegEFzGwEMHA4Px+Sd5hWsODX4kvBo9ennl/0wS1mJaKAHO+IO+YStz0UZsSTBOt9BlaIgLf9Ls0ppI6z1KKjxLDZKuiicRF8Iuhq7s9KY5TG5n+sLTKKiQmgvTqD0/SViEREQzsmO8j23t3LYV8ceNbBdfdM/3BXTmKGYtixvf8Le9cKgA98HlJy76onOcxiplYLUH/0Pyx1Pw3j7IKE9PnNx2gmIhFBMXEj1TOn9xNKREhco4j9sThJ0QuAr95o6Dm/zaO/eMCfoJyGHdGLYRIReALwE3n/ziJQwiRiSAVQHJELYRIRJAKIHmiFELTIoATeM31LqYCSJ6ohNB0nkBFAWkSqEXgcy+oz79PXYjUBE2JwM8DGN31sxaQfY4fjjdOwyLwM1lpIogJcnczmcWGfALUAlQq+CKlsMKyrJH//Lv7BGmiLYI0EmBN3nGsrbqOovZ0oAQwlgqALV1wFEkTLRH4FUFJI5RCm++3iSeyr39w7rDOb4QWAaaBpWbQtqenx6I339hIzz2zjtZ3sly6MTaw46vQtZvQIlBmRoWDaUsYBPD3Vzb4Pz/x6K305vGNdE9P7G0Z2kjLCR02hnr3A0NXR9KycJGxg510z903P7Ye9fM/lFXY9dBPiBdqWnhwLlQIv6otS9PCN9k3+lP6w5M/rfn4a298R68f/44YkS841r25VZbRr2oJ/IWgqQD8K72eAAAeh6/AaHro6nC9Y6s9qa4lgDNYKHifU5sTOIJhncDLVzx6/tACXfrUJR54O2cu3Jmt9ahT5zf9nAAZDMK4bX0d9HP1ffN9DnWqQSy9Sr+87NHioqQv1aBd+rRAH+du0EcXC2V/Y/164TuCOlEA/ITtWzsYicDGOGZrPVrzPzPVCmzf6tDw0C2++W4kfFtQopg6/6P6ukFZ9X3s0G3aTt/b73xPf3vlOvGitjWo+SkNDM0dNykxhMHfN7rO/x4VEISukC595tLvR78hfojszIXbd1Z9pNqdJlkBzNcI26Ic/EaBL/DU09/60wtHVF3h3mp1hapurOu6GTKAx5GsUQ4bBwGA5w8usBUAUBf2SLX7a8QygrVDCGdt7OBt9CdGaVvkBzAVMGd/tS6kFSLAngGc8wKBt77r13wydGfO/uAnigygy7mx0hqsEIEQ3l5iSiCAzffxqeDBDzjKLhKogxCPrLir9AZMhVPw5okpLx3ppIwK/zjx1DPfrsgtcEelkrtLU8lllqDDddkWiZC35yYAgLDUNNSFXlZYKnOrpbSUqZDEDXj/q+Xt6xEkgP6rMnhXrrj+bdBzt+1nFberrGKjTSJ4b4hSkCAyBzFcdqv0Rv/gHKYCdj0Dp9/pKivfhgVm+vXj10OZa6R6IbRGS8KPPJb309CmUDolLH+yS3sGsxMApgFdAfhJGzVX68zX+J3xI9fot4/mG5rj/6wSViZROvUvf7qSPHb+ALKBuqEg8v1I2zbqrAUC0u0LwLTAJWkVjptTwrIIBIktxAzM1TpWAPH6C4cWl+f8ZmikQcQkJ1HlgsotQTGLxG852T4NZzAw51ECIeg4fLAETBtPq9GFGhF+8EXgFPjtKgJvXccKoHATBxCCTj3gYXa9hrUJakTFT1l67EQwPBg+JwCzHVfhBlPLi0cWQz+fYy6jFp4U/rgXRSDK40YOoDMnLGfe+4HiBE5mWEcTFsyUKSE4QCSwt+xCw833h5sK4AwmUb5F1BEGCKCH4TqEagirGAwsvVvJajooXk3hPsiwg9MsUxqvg35GE0C1GEGBtVRfZmUJdMzp5YSaOPA6YTOCPXebYQlAx4/Ua3GMDMJaAZBkR+9iyPyDQWEiCdvttaRw2fkDnSE/xCiSQjqEfT30PZgCToq1ZLrItK2RUvRayhT0EjN0zC5H02tSNdG3BMSQL6+En+eTDMfChq0mYQnayHI6uKxxJWGZWRLohK2XPjOr3cyyhGQnAjhgC4vhhJBUmnbXr8LXBC4zXntQifRkN1v7FjZNm1Qdf/iX4cQGAfNZiBoCYW00XgQg7jo+egjDVjQ/uniDTIOtCP51NnxRKE5rAMfzicduDf38qYTS2FEhhJy1VJw4SwyBWdWxBi8dWR/5DiFI+vwVfzekFYAvcOasWSIArGMedAqHBfkCrE6KSggQwHN/XKe12snEqQBYnjIHxBRYAp0yMQo3UQgh2KZOt8n1dTPWI5ahKolfsM9+6HT1AAjh9MmuYqt6A2IIlrvrrndELyLnZek1kZR3bNfOSYvvmw+6enQdPywk+Y26kmGi31IDVC9sg+l/WOUB4AA2ssgFvsBbJ01agXQTVTeYFSbsSoKr+83jG7RKzJUE/QDI5i0sSH/g4Ucg49js9DGurJWJDmERb6dffekfnOO3ALGCzFCHHwFwA02uhuxNUBUsR/MvAekf2c6b7Pkb3HYL9VvbTBaAIo/1iL4ILJJTZACcto3F1jQvRrzYJXmEfyJ70RJ4Ivbj2aOCgxBgAbDYJenOpqiRJD/B96IILL65gmpACEdfuRa60hglCAXDrnd87ul1rBejqAqyf/H7jiH3bWpq4SeHXt3QUFinCwb9hUMLoVPZpTuiI0RFIomb5RCetXX6g+7ccm/W9qG5z4Whu5nveugW2vfkutjEgKv/NY1BxPsZO1S+X0Gw5J1R61l+5sKmbvxwUwSDcxPqxn4yFFiFjKr565R964EBx+qmt0/qZQLRgYSMYy34OLc3t7ldFsG2oasjlhRNnbTJBeQUsMn1tq16+xsEDSFw/FDK1jXfEECYHdFZWAVJB2be3zSBH5ffral+wWoES9zvv8/xM4OdfoeypQaimEYOBh6ZxGY6gqpNAfXA6+rufxAlgT/g/1z6QP/g/86lZx/rs9qxOLWAkwmLkDQ4bX36/KZ7g9vlVRkpTytZZCglFM3ssI4pQbdCGhWepNOlt8smzEKHNUkpoWhmh3VMBa3cEt/yysd5hQeTTgn1ieJwjfG/qKrje62pOlZOBWDlf5JOCVWJ6mQVhIetEkAROV55z4r/CFOCihJw3kHbL1RFz8Hjv7vVT/1GcTYyh7KzbdvZyvuqBrRLBy4bexIatqYtnnLmaoV9CCGxy8g2tLA3sd9xNY6+er3l3UdqKphUU8Fo5f1VbZvjWJOFgrnH4WH/w9IkEYQAZyzIDSBJE3QTdaqcAZ4LTz+OFc543aOvXmvxFFBESu9Etftr/temOogYzH+e5DGT+YdkHlxgcSyOGujc9IVNW6s9Vien6o6TgWxPaJXyaiARhD2W2ZyLJOTLtR6qKYLiQYoiS4YxPNRaERTN/3U/E8ildFwMC++YrPX4KvEOrIGVIYNo5U7juPqRBeS3/kDWtep1S2ywBkLIE2QIxQ2mk19PE9QA/MogOwGIbD0rAFa9bFRceVhFCjhBi33eYFvC/gAG/8zZ71mvOXAcMbrqc1Z7Ao5VVXkDOBXsQ0ad/ZCbQedYnVaCvEC1Y3ErCTWBFhxrosP19rI+NFPF+HH6AxjwRptNWgGcQdu2QkV4obMj/YNfZ5QLcY6YAhEgSYSMXxRiQELp49wNf/Cx8YRp7eXKlxtdzRdYfi5psH3w6oQgYUQfYmlHEWoA6EGs5jSWZhGR3EGHEXZPM3lNQa30cM3nkwZoQVPTwkXO00K7szQN7AzjCwRoxVP+OXquu0f9mKcUlqj6wKiOAIB2UD39wV05kmRkSnnt440XM716NFw2M8k/aA/EqZkLt++hBmg4veY69uFgVWtKa4EfoJJCB6hBGhYB/AP1wnuEAXsbrGUacQRX/A1qEmx347reuTRiaAl54Vk7g0UkjdJ0tcVXYBoxtAhvT7MCAJGU3BAxCM/F4sZUCAkhhDvaSCRQ9W9RhAzs+KpPWjZSy+mROjECAUyfv2uSIiLyzkoIQdWf3019hFjIYwqIygIExHKAUOosRo8fhblWJD5AJbG04cBZRNiS5hGiIQgD4xCA//cpZtLMYrOIU52OGM2ibhPXK1AC9D8496x6pWOUoof0Dsy8f+cExUwiIgCpnxAemH9UA6N2AGu+HiVMOj3UR5J8eb2qy8Rp/itJXARgYMe8CiO9NIwsIemrv+y1qYX0D359WAUoxi58jQ5vvNNxJpK8+ktpqQhA0VdwD0sp9lLbIbJYF9BMBTCSd0FMaC8xYI2nO94K018NNiIIWNti4DX4AexEEBCIQb3FYcMdyLwgeUJ5/ae4DX4AWxGUMjB0dURKa69Zm2aoq17K050d1mSrHL6wGCGCgCXrkOErCN/cTzlOYfLDbM8sGYJRIiglk5nvWlCCUBWw3UoUW5Qo+ihhpBCzFsmsS3Jqg22f4n7F18JYEVQCUSwWCn3FTTWEEgX8iOiEgQEXknKCvC88Qdn1tp01ddArWTMiqMUDmcu9hYLTqwaxS3iiV/3HfteTytD9bMWTpfxGksjj1FDPknlLylll2mdNMu2N8H9a+Kev9hXd5gAAAABJRU5ErkJggg==">
+        <bpmn:documentation>Use this tool, to get more context. NEVER INVOKE THIS MORE THAN ONCE</bpmn:documentation>
+        <bpmn:extensionElements>
+          <zeebe:taskDefinition type="io.camunda:http-json:1" retries="3" />
+          <zeebe:ioMapping>
+            <zeebe:input source="bearer" target="authentication.type" />
+            <zeebe:input source="{{secrets.PRODUCT_MANAGERS-ASK_PM_BOT_GLEAN}}" target="authentication.token" />
+            <zeebe:input source="POST" target="method" />
+            <zeebe:input source="https://camunda-be.glean.com/rest/api/v1/search" target="url" />
+            <zeebe:input source="=fromAi(toolCall.gleanQuestion, &#34;Ask Glean here anything. you can phrase it in natural language.&#34;)" target="gleanQuestion" />
+            <zeebe:input source="=false" target="storeResponse" />
+            <zeebe:input source="=20" target="connectionTimeoutInSeconds" />
+            <zeebe:input source="=20" target="readTimeoutInSeconds" />
+            <zeebe:input source="={ &#34;query&#34;: gleanQuestion,&#10;  &#34;maxSnippetSize&#34;: 400,&#10;  &#34;returnLlmContentOverSnippets&#34;: true,&#10;  &#34;pageSize&#34;: 10}" target="body" />
+            <zeebe:input source="=false" target="ignoreNullValues" />
+          </zeebe:ioMapping>
+          <zeebe:taskHeaders>
+            <zeebe:header key="resultVariable" value="debug" />
+            <zeebe:header key="resultExpression" value="={&#10;  &#34;toolResult&#34;: &#10;    flatten(&#10;      for result in body.results &#10;        return &#10;          for snippet in result.snippets &#10;            return { &#10;              &#34;text&#34;: snippet.text, &#10;              &#34;url&#34;: result.url &#10;            }&#10;    )&#10;}" />
+            <zeebe:header key="retryBackoff" value="PT0S" />
+          </zeebe:taskHeaders>
+        </bpmn:extensionElements>
+      </bpmn:serviceTask>
+      <bpmn:serviceTask id="Activity_1gsm7su" name="Search for relevant issues" zeebe:modelerTemplate="38a63182-d356-45e7-99c1-16c94460ec8d" zeebe:modelerTemplateVersion="1752162426400" zeebe:modelerTemplateIcon="data:image/png;base64,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">
+        <bpmn:documentation>Use this tool, to find relevant github issues. NEVER INVOKE THIS MORE THAN ONCE</bpmn:documentation>
+        <bpmn:extensionElements>
+          <zeebe:taskDefinition type="io.camunda:http-json:1" retries="3" />
+          <zeebe:ioMapping>
+            <zeebe:input source="bearer" target="authentication.type" />
+            <zeebe:input source="{{secrets.PRODUCT_MANAGERS-ASK_PM_BOT_GLEAN}}" target="authentication.token" />
+            <zeebe:input source="POST" target="method" />
+            <zeebe:input source="https://camunda-be.glean.com/rest/api/v1/search" target="url" />
+            <zeebe:input source="=fromAi(toolCall.gleanQuestion, &#34;Ask Glean here to search for relevant or duplicate issues. You can phrase it in natural language.&#34;)" target="gleanQuestion" />
+            <zeebe:input source="=false" target="storeResponse" />
+            <zeebe:input source="=20" target="connectionTimeoutInSeconds" />
+            <zeebe:input source="=20" target="readTimeoutInSeconds" />
+            <zeebe:input source="={ &#34;query&#34;: gleanQuestion,&#10;  &#34;maxSnippetSize&#34;: 400,&#10;  &#34;returnLlmContentOverSnippets&#34;: true,&#10;  &#34;pageSize&#34;: 10}" target="body" />
+            <zeebe:input source="=false" target="ignoreNullValues" />
+          </zeebe:ioMapping>
+          <zeebe:taskHeaders>
+            <zeebe:header key="resultVariable" value="debug" />
+            <zeebe:header key="resultExpression" value="={&#10;  &#34;toolResult&#34;: &#10;    flatten(&#10;      for result in body.results &#10;        return &#10;          for snippet in result.snippets &#10;            return { &#10;              &#34;text&#34;: snippet.text, &#10;              &#34;url&#34;: result.url &#10;            }&#10;    )&#10;}" />
+            <zeebe:header key="retryBackoff" value="PT0S" />
+          </zeebe:taskHeaders>
+        </bpmn:extensionElements>
+      </bpmn:serviceTask>
+      <bpmn:serviceTask id="Activity_Slack" name="Answer the question via Slack" zeebe:modelerTemplate="io.camunda.connectors.Slack.v1" zeebe:modelerTemplateVersion="7" zeebe:modelerTemplateIcon="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTI3IiBoZWlnaHQ9IjEyNyIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cGF0aCBkPSJNMjcuMiA4MGMwIDcuMy01LjkgMTMuMi0xMy4yIDEzLjJDNi43IDkzLjIuOCA4Ny4zLjggODBjMC03LjMgNS45LTEzLjIgMTMuMi0xMy4yaDEzLjJWODB6bTYuNiAwYzAtNy4zIDUuOS0xMy4yIDEzLjItMTMuMiA3LjMgMCAxMy4yIDUuOSAxMy4yIDEzLjJ2MzNjMCA3LjMtNS45IDEzLjItMTMuMiAxMy4yLTcuMyAwLTEzLjItNS45LTEzLjItMTMuMlY4MHoiIGZpbGw9IiNFMDFFNUEiLz4KICA8cGF0aCBkPSJNNDcgMjdjLTcuMyAwLTEzLjItNS45LTEzLjItMTMuMkMzMy44IDYuNSAzOS43LjYgNDcgLjZjNy4zIDAgMTMuMiA1LjkgMTMuMiAxMy4yVjI3SDQ3em0wIDYuN2M3LjMgMCAxMy4yIDUuOSAxMy4yIDEzLjIgMCA3LjMtNS45IDEzLjItMTMuMiAxMy4ySDEzLjlDNi42IDYwLjEuNyA1NC4yLjcgNDYuOWMwLTcuMyA1LjktMTMuMiAxMy4yLTEzLjJINDd6IiBmaWxsPSIjMzZDNUYwIi8+CiAgPHBhdGggZD0iTTk5LjkgNDYuOWMwLTcuMyA1LjktMTMuMiAxMy4yLTEzLjIgNy4zIDAgMTMuMiA1LjkgMTMuMiAxMy4yIDAgNy4zLTUuOSAxMy4yLTEzLjIgMTMuMkg5OS45VjQ2Ljl6bS02LjYgMGMwIDcuMy01LjkgMTMuMi0xMy4yIDEzLjItNy4zIDAtMTMuMi01LjktMTMuMi0xMy4yVjEzLjhDNjYuOSA2LjUgNzIuOC42IDgwLjEuNmM3LjMgMCAxMy4yIDUuOSAxMy4yIDEzLjJ2MzMuMXoiIGZpbGw9IiMyRUI2N0QiLz4KICA8cGF0aCBkPSJNODAuMSA5OS44YzcuMyAwIDEzLjIgNS45IDEzLjIgMTMuMiAwIDcuMy01LjkgMTMuMi0xMy4yIDEzLjItNy4zIDAtMTMuMi01LjktMTMuMi0xMy4yVjk5LjhoMTMuMnptMC02LjZjLTcuMyAwLTEzLjItNS45LTEzLjItMTMuMiAwLTcuMyA1LjktMTMuMiAxMy4yLTEzLjJoMzMuMWM3LjMgMCAxMy4yIDUuOSAxMy4yIDEzLjIgMCA3LjMtNS45IDEzLjItMTMuMiAxMy4ySDgwLjF6IiBmaWxsPSIjRUNCMjJFIi8+Cjwvc3ZnPgo=">
+        <bpmn:documentation>use this as a activity to reply to the user before finishing the process</bpmn:documentation>
+        <bpmn:extensionElements>
+          <zeebe:taskDefinition type="io.camunda:slack:1" retries="3" />
+          <zeebe:ioMapping type="io.camunda:slack:1">
+            <zeebe:input source="{{secrets.PDP_SLACK_CAMUNDA}}" target="token" />
+            <zeebe:input source="chat.postMessage" target="method" />
+            <zeebe:input source="messageBlock" target="data.messageType" />
+            <zeebe:input source="=[&#10;  {&#10;    &#34;type&#34;: &#34;header&#34;,&#10;    &#34;text&#34;: {&#10;      &#34;type&#34;: &#34;plain_text&#34;,&#10;      &#34;text&#34;: &#34;Epic Review Summary&#34;&#10;    }&#10;  },&#10;  {&#10;    &#34;type&#34;: &#34;section&#34;,&#10;    &#34;text&#34;: {&#10;      &#34;type&#34;: &#34;mrkdwn&#34;,&#10;      &#34;text&#34;: fromAi(toolCall.answer, &#34;💬 Here’s your epic review summary 👇 Use friendly emojis, keep it concise, close the discussion clearly, and never ask a follow-up question.&#34;)&#10;    }&#10;  }&#10;]&#10;" target="data.blockContent" />
+            <zeebe:input source="=channel" target="data.channel" />
+            <zeebe:input source="=thread" target="data.thread" />
+          </zeebe:ioMapping>
+          <zeebe:taskHeaders>
+            <zeebe:header key="elementTemplateVersion" value="7" />
+            <zeebe:header key="elementTemplateId" value="io.camunda.connectors.Slack.v1" />
+            <zeebe:header key="retryBackoff" value="PT0S" />
+          </zeebe:taskHeaders>
+        </bpmn:extensionElements>
+      </bpmn:serviceTask>
+    </bpmn:adHocSubProcess>
+    <bpmn:serviceTask id="Activity_01xvqn0" name="Review epic" zeebe:modelerTemplate="io.camunda.connectors.agenticai.aiagent.v1" zeebe:modelerTemplateVersion="4" zeebe:modelerTemplateIcon="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzIiIGhlaWdodD0iMzIiIHZpZXdCb3g9IjAgMCAzMiAzMiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPGNpcmNsZSBjeD0iMTYiIGN5PSIxNiIgcj0iMTYiIGZpbGw9IiNBNTZFRkYiLz4KPG1hc2sgaWQ9InBhdGgtMi1vdXRzaWRlLTFfMTg1XzYiIG1hc2tVbml0cz0idXNlclNwYWNlT25Vc2UiIHg9IjQiIHk9IjQiIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgZmlsbD0iYmxhY2siPgo8cmVjdCBmaWxsPSJ3aGl0ZSIgeD0iNCIgeT0iNCIgd2lkdGg9IjI0IiBoZWlnaHQ9IjI0Ii8+CjxwYXRoIGZpbGwtcnVsZT0iZXZlbm9kZCIgY2xpcC1ydWxlPSJldmVub2RkIiBkPSJNMjAuMDEwNSAxMi4wOTg3QzE4LjQ5IDEwLjU4OTQgMTcuMTU5NCA4LjEwODE0IDE2LjE3OTkgNi4wMTEwM0MxNi4xNTIgNi4wMDQ1MSAxNi4xMTc2IDYgMTYuMDc5NCA2QzE2LjA0MTEgNiAxNi4wMDY2IDYuMDA0NTEgMTUuOTc4OCA2LjAxMTA0QzE0Ljk5OTQgOC4xMDgxNCAxMy42Njk3IDEwLjU4ODkgMTIuMTQ4MSAxMi4wOTgxQzEwLjYyNjkgMTMuNjA3MSA4LjEyNTY4IDE0LjkyNjQgNi4wMTE1NyAxNS44OTgxQzYuMDA0NzQgMTUuOTI2MSA2IDE1Ljk2MTEgNiAxNkM2IDE2LjAzODcgNi4wMDQ2OCAxNi4wNzM2IDYuMDExNDQgMTYuMTAxNEM4LjEyNTE5IDE3LjA3MjkgMTAuNjI2MiAxOC4zOTE5IDEyLjE0NzcgMTkuOTAxNkMxMy42Njk3IDIxLjQxMDcgMTQuOTk5NiAyMy44OTIgMTUuOTc5MSAyNS45ODlDMTYuMDA2OCAyNS45OTU2IDE2LjA0MTEgMjYgMTYuMDc5MyAyNkMxNi4xMTc1IDI2IDE2LjE1MTkgMjUuOTk1NCAxNi4xNzk2IDI1Ljk4OUMxNy4xNTkxIDIzLjg5MiAxOC40ODg4IDIxLjQxMSAyMC4wMDk5IDE5LjkwMjFNMjAuMDA5OSAxOS45MDIxQzIxLjUyNTMgMTguMzk4NyAyMy45NDY1IDE3LjA2NjkgMjUuOTkxNSAxNi4wODI0QzI1Ljk5NjUgMTYuMDU5MyAyNiAxNi4wMzEgMjYgMTUuOTk5N0MyNiAxNS45Njg0IDI1Ljk5NjUgMTUuOTQwMyAyNS45OTE1IDE1LjkxNzFDMjMuOTQ3NCAxNC45MzI3IDIxLjUyNTkgMTMuNjAxIDIwLjAxMDUgMTIuMDk4NyIvPgo8L21hc2s+CjxwYXRoIGZpbGwtcnVsZT0iZXZlbm9kZCIgY2xpcC1ydWxlPSJldmVub2RkIiBkPSJNMjAuMDEwNSAxMi4wOTg3QzE4LjQ5IDEwLjU4OTQgMTcuMTU5NCA4LjEwODE0IDE2LjE3OTkgNi4wMTEwM0MxNi4xNTIgNi4wMDQ1MSAxNi4xMTc2IDYgMTYuMDc5NCA2QzE2LjA0MTEgNiAxNi4wMDY2IDYuMDA0NTEgMTUuOTc4OCA2LjAxMTA0QzE0Ljk5OTQgOC4xMDgxNCAxMy42Njk3IDEwLjU4ODkgMTIuMTQ4MSAxMi4wOTgxQzEwLjYyNjkgMTMuNjA3MSA4LjEyNTY4IDE0LjkyNjQgNi4wMTE1NyAxNS44OTgxQzYuMDA0NzQgMTUuOTI2MSA2IDE1Ljk2MTEgNiAxNkM2IDE2LjAzODcgNi4wMDQ2OCAxNi4wNzM2IDYuMDExNDQgMTYuMTAxNEM4LjEyNTE5IDE3LjA3MjkgMTAuNjI2MiAxOC4zOTE5IDEyLjE0NzcgMTkuOTAxNkMxMy42Njk3IDIxLjQxMDcgMTQuOTk5NiAyMy44OTIgMTUuOTc5MSAyNS45ODlDMTYuMDA2OCAyNS45OTU2IDE2LjA0MTEgMjYgMTYuMDc5MyAyNkMxNi4xMTc1IDI2IDE2LjE1MTkgMjUuOTk1NCAxNi4xNzk2IDI1Ljk4OUMxNy4xNTkxIDIzLjg5MiAxOC40ODg4IDIxLjQxMSAyMC4wMDk5IDE5LjkwMjFNMjAuMDA5OSAxOS45MDIxQzIxLjUyNTMgMTguMzk4NyAyMy45NDY1IDE3LjA2NjkgMjUuOTkxNSAxNi4wODI0QzI1Ljk5NjUgMTYuMDU5MyAyNiAxNi4wMzEgMjYgMTUuOTk5N0MyNiAxNS45Njg0IDI1Ljk5NjUgMTUuOTQwMyAyNS45OTE1IDE1LjkxNzFDMjMuOTQ3NCAxNC45MzI3IDIxLjUyNTkgMTMuNjAxIDIwLjAxMDUgMTIuMDk4NyIgZmlsbD0id2hpdGUiLz4KPHBhdGggZmlsbC1ydWxlPSJldmVub2RkIiBjbGlwLXJ1bGU9ImV2ZW5vZGQiIGQ9Ik0yMC4wMTA1IDEyLjA5ODdDMTguNDkgMTAuNTg5NCAxNy4xNTk0IDguMTA4MTQgMTYuMTc5OSA2LjAxMTAzQzE2LjE1MiA2LjAwNDUxIDE2LjExNzYgNiAxNi4wNzk0IDZDMTYuMDQxMSA2IDE2LjAwNjYgNi4wMDQ1MSAxNS45Nzg4IDYuMDExMDRDMTQuOTk5NCA4LjEwODE0IDEzLjY2OTcgMTAuNTg4OSAxMi4xNDgxIDEyLjA5ODFDMTAuNjI2OSAxMy42MDcxIDguMTI1NjggMTQuOTI2NCA2LjAxMTU3IDE1Ljg5ODFDNi4wMDQ3NCAxNS45MjYxIDYgMTUuOTYxMSA2IDE2QzYgMTYuMDM4NyA2LjAwNDY4IDE2LjA3MzYgNi4wMTE0NCAxNi4xMDE0QzguMTI1MTkgMTcuMDcyOSAxMC42MjYyIDE4LjM5MTkgMTIuMTQ3NyAxOS45MDE2QzEzLjY2OTcgMjEuNDEwNyAxNC45OTk2IDIzLjg5MiAxNS45NzkxIDI1Ljk4OUMxNi4wMDY4IDI1Ljk5NTYgMTYuMDQxMSAyNiAxNi4wNzkzIDI2QzE2LjExNzUgMjYgMTYuMTUxOSAyNS45OTU0IDE2LjE3OTYgMjUuOTg5QzE3LjE1OTEgMjMuODkyIDE4LjQ4ODggMjEuNDExIDIwLjAwOTkgMTkuOTAyMU0yMC4wMDk5IDE5LjkwMjFDMjEuNTI1MyAxOC4zOTg3IDIzLjk0NjUgMTcuMDY2OSAyNS45OTE1IDE2LjA4MjRDMjUuOTk2NSAxNi4wNTkzIDI2IDE2LjAzMSAyNiAxNS45OTk3QzI2IDE1Ljk2ODQgMjUuOTk2NSAxNS45NDAzIDI1Ljk5MTUgMTUuOTE3MUMyMy45NDc0IDE0LjkzMjcgMjEuNTI1OSAxMy42MDEgMjAuMDEwNSAxMi4wOTg3IiBzdHJva2U9IiM0OTFEOEIiIHN0cm9rZS13aWR0aD0iNCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIgbWFzaz0idXJsKCNwYXRoLTItb3V0c2lkZS0xXzE4NV82KSIvPgo8L3N2Zz4K">
+      <bpmn:documentation>The Agent (LLM based) - has access to vast knowledge and thinking capabilities that allow it to make decisions</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="io.camunda.agenticai:aiagent:1" retries="3" />
+        <zeebe:ioMapping>
+          <zeebe:input source="bedrock" target="provider.type" />
+          <zeebe:input source="us-east-1" target="provider.bedrock.region" />
+          <zeebe:input source="credentials" target="provider.bedrock.authentication.type" />
+          <zeebe:input source="{{secrets.PDP_CAMUNDAAGENT_AWS_ACCESS_KEY}}" target="provider.bedrock.authentication.accessKey" />
+          <zeebe:input source="{{secrets.PDP_CAMUNDAAGENT_AWS_SECRET_KEY}}" target="provider.bedrock.authentication.secretKey" />
+          <zeebe:input source="us.anthropic.claude-3-7-sonnet-20250219-v1:0" target="provider.bedrock.model.model" />
+          <zeebe:input source="=5000" target="provider.bedrock.model.parameters.maxTokens" />
+          <zeebe:input source="=0.2" target="provider.bedrock.model.parameters.temperature" />
+          <zeebe:input source="=0.1" target="provider.bedrock.model.parameters.topP" />
+          <zeebe:input source="=&#34;You are EpicReviewExpert, acting as a dedicated product-management expert for Camunda.com. You review only epics drafted for our Camunda Platform product, providing comprehensive, critical feedback on content quality, strategic alignment, and scope discipline. Your reviews must be thorough, actionable, and constructive. Any non-epic content must be declined with an error as defined below. ------------------------------------------------------------ # 0. CONTEXT – WHO IS &#39;USER&#39;? - Every incoming message is from a Product Manager submitting an epic for review. ------------------------------------------------------------ # 1. STRICT EPIC-REVIEW SCOPE - If the submission is not an epic (per our template), reply exactly (no markdown): ERROR: Out-of-scope (epic review only), and stop. - Otherwise proceed with the workflow below. ------------------------------------------------------------ # 2. MANDATORY REVIEW WORKFLOW 1) Template completeness check ✅ Compare against the epic template. If sections are missing or weak, continue the review but propose precise fixes for each gap. Epic template: - Value Proposition Statement - User Problem - Release Notes - User Stories - Implementation Notes 2) Scope &#38; Solution-Bias Audit 🧭 (must run on every epic) Rate each item 1–5 and justify briefly. Then output a clearly labelled section: ‘Scope Audit Result: PASS/FAIL with reasons and next actions. - Problem-first vs Solution-first: Is the problem stated before proposing UI/tech choices? Red flags: Add wizard, new dashboard, naming specific components before goals/metrics. - Scope tightness: Is the epic small enough to deliver in ≤1–2 releases, with a single primary outcome? Red flags: multiple domains, many personas, hard dependencies. - Outcome focus: Clear, measurable success metrics tied to user/business outcomes. - Non-goals &#38; constraints: Explicitly lists what is out of scope and key constraints. - MLP (Minimum Lovable Product) mindset: Defines a clear MLP — the smallest version that still delights users. The MLP must include a thoughtful first-time experience such as onboarding, usability, or early success feedback. Later phases and optimisations should be deferred. Decision rules: If Problem-first &#60;3 or Scope tightness &#60;3, mark Scope Audit = FAIL. When FAIL, propose 2–4 scope slices (independent, testable) with: goal, metric, acceptance criteria, and likely owning team. 3) Section quality ratings 📊 Rate each epic section 1–5 with up to three sentences of reasoning: Completeness, Clarity, Measurability, Alignment. 4) Strategic &#38; execution feedback 🧩 Summarise strengths, gaps, and concrete next actions across: Strategic alignment, User value, Technical feasibility &#38; dependencies, Stakeholder impact, Risk &#38; compliance, Scalability &#38; performance. 5) Relevant issues 🔎 Identify possible duplicates/related work. Use Issue finder once with clear keywords and include links. If none: No relevant issues found. 6) Context-based feedback &#38; asks 🧠 Based on what’s provided, state what is missing and propose concrete text or questions to resolve it. 7) QA Checklist ✅ Output a tick-box list with PASS/FAIL using emojis(✅ or ❌) per item and short evidence: -  Problem statement precedes any solution proposal - Single primary persona and outcome - Clear success metrics and targets - Explicit non-goals - MLP defined — includes first-time onboarding and a delightful initial experience - Acceptance criteria per story - Dependencies &#38; risks captured - Release notes reflect MLP only When Scope Audit = FAIL: Include a Scope-Slice Proposals section with 2–4 narrowly defined slices. Tone &#38; extras: Always be critical but constructive. Remind them that at Camunda, MVP means Minimum Lovable Product (MLP) — small, delightful, and valuable from day one. ------------------------------------------------------------ # 3. TOOLING (invoke at least one; justify in &#60;reflection&#62;) - Ask for Clarification: request missing or ambiguous details. - Issue finder: search GitHub for duplicates or related issues. NEVER invoke more than once. - Get context: retrieve background about Camunda topics. NEVER invoke more than once. Never invent tools outside this list. If after tool use and clarifications you cannot complete the review, reply exactly: ERROR: Unable to complete epic review (explain) ------------------------------------------------------------ # 4. CONFIDENTIALITY &#38; COMPLIANCE - Do not disclose internal account data or PII. ------------------------------------------------------------ # 5. CHAIN-OF-THOUGHT FORMAT Wrap minimal, inspectable reasoning in exactly this XML template: xml &#60;thinking&#62; &#60;context&#62;...briefly restate the epic goal and submitted content...&#60;/context&#62; &#60;reflection&#62;...list candidate tools, justify which you will call next and why...&#60;/reflection&#62; &#60;/thinking&#62; Reveal no private reasoning outside these tags. ------------------------------------------------------------ # 6. REAL-WORLD INFORMATION - Do not invent metrics, names, or dates. Use only information provided by the PM. - If market benchmarks or external data are required, call Get context. - If data is unavailable, state: I need to search; or Data not available. ------------------------------------------------------------ # # 7. SLACK OUTPUT FORMAT (mrkdwn-safe + length limits)&#10;- Output must be Slack mrkdwn with no headings (##, ###), no code blocks, no HTML.&#10;- Use only *bold*, _italic_, hyphen bullets, and line breaks.&#10;- HARD LIMITS: total message ≤ 2800 characters; keep any single logical section ≤ 1000 characters.&#10;- Be concise: max 5 bullets per subsection; bullets ≤ 120 characters each.&#10;- Prefer summary-first: start with a 2–3 sentence executive summary, then bullets.&#10;- If content would exceed limits, omit lower-priority details and include a final line: “Truncated to fit Slack limits.”&#10;- Always close decisively and never ask follow-up questions.&#34;" target="data.systemPrompt.prompt" />
+          <zeebe:input source="=epicContent" target="data.userPrompt.prompt" />
+          <zeebe:input source="Activity_04glkkx" target="data.tools.containerElementId" />
+          <zeebe:input source="=toolResults" target="data.tools.toolCallResults" />
+          <zeebe:input source="=agent.context" target="data.context" />
+          <zeebe:input source="in-process" target="data.memory.storage.type" />
+          <zeebe:input source="=20" target="data.memory.contextWindowSize" />
+          <zeebe:input source="=10" target="data.limits.maxModelCalls" />
+          <zeebe:input source="text" target="data.response.format.type" />
+          <zeebe:input source="=true" target="data.response.format.parseJson" />
+          <zeebe:input source="=false" target="data.response.includeAssistantMessage" />
+        </zeebe:ioMapping>
+        <zeebe:taskHeaders>
+          <zeebe:header key="elementTemplateVersion" value="4" />
+          <zeebe:header key="elementTemplateId" value="io.camunda.connectors.agenticai.aiagent.v1" />
+          <zeebe:header key="resultVariable" value="agent" />
+          <zeebe:header key="resultExpression" value="={&#10;&#34;classifierJSON&#34;:response.responseJson,&#10; &#34;legacy&#34;: response.chatResponse.text, &#10;&#34;classifierMessage&#34;: response.responseText&#10;}" />
+          <zeebe:header key="retryBackoff" value="PT0S" />
+        </zeebe:taskHeaders>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_0l610js</bpmn:incoming>
+      <bpmn:outgoing>Flow_1imcl82</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="Gateway_1j0oz23">
+      <bpmn:incoming>Flow_1jfjd7m</bpmn:incoming>
+      <bpmn:incoming>Flow_1wfklrx</bpmn:incoming>
+      <bpmn:outgoing>Flow_0l610js</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:exclusiveGateway id="Gateway_1k7euae" name="Action needed?" default="Flow_05a4u5j">
+      <bpmn:incoming>Flow_1imcl82</bpmn:incoming>
+      <bpmn:outgoing>Flow_05a4u5j</bpmn:outgoing>
+      <bpmn:outgoing>Flow_1vnsml5</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:scriptTask id="Activity_0waqzte" name="AWS Configuration">
+      <bpmn:extensionElements>
+        <zeebe:script expression="={&#10;  &#34;region&#34; : &#34;us-east-1&#34;,&#10;  &#34;longterm_memory_server_url&#34;:&#34;search-camundacon-general-demo-5m4u5spktnxuffe62pzkwxlzuy.aos.us-east-1.on.aws&#34;&#10;}" resultVariable="aws_configuration" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_1ux1bqv</bpmn:incoming>
+      <bpmn:outgoing>Flow_1wfklrx</bpmn:outgoing>
+    </bpmn:scriptTask>
+    <bpmn:startEvent id="epicSubmitted" name="PM Epic Submitted">
+      <bpmn:extensionElements>
+        <zeebe:ioMapping>
+          <zeebe:output source="=epiccontent" target="epicContent" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:outgoing>Flow_1ux1bqv</bpmn:outgoing>
+    </bpmn:startEvent>
+  </bpmn:process>
+  <bpmn:process id="Process_1ljb6t2" isExecutable="false">
+    <bpmn:userTask id="Ask_a_specialist" name="Ask PM specialist">
+      <bpmn:documentation>Use this activity when you are not confident with having enough information to successfully assist the product manager and want to have advise on a epic  from a senior product manager.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:userTask />
+        <zeebe:ioMapping>
+          <zeebe:input source="=fromAi(toolCall.requestToHuman, &#34;Describe what you need advise on from a specialist&#34;, &#34;string&#34;)" target="requestDetails" />
+          <zeebe:output source="=responseToRequest" target="toolResult" />
+          <zeebe:output source="=knowledgeBaseDecision" target="knowledgeBaseDecision" />
+          <zeebe:output source="=taking_full_control" target="taking_full_control" />
+        </zeebe:ioMapping>
+        <zeebe:formDefinition formId="Form_escalatetohuman" />
+        <zeebe:assignmentDefinition assignee="calvin.robbins@camunda.com" />
+      </bpmn:extensionElements>
+      <bpmn:outgoing>Flow_1aaxb1w</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:serviceTask id="Activity_062h34x" name="Save&#10;answer in knowledge base" zeebe:modelerTemplate="io.camunda.connectors.EmbeddingsVectorDB.v1" zeebe:modelerTemplateVersion="2" zeebe:modelerTemplateIcon="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgdmlld0JveD0iMCAwIDUxMiA1MTIiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSI1MTIiIGhlaWdodD0iNTEyIiBmaWxsPSJ3aGl0ZSIgZmlsbC1vcGFjaXR5PSIwLjAxIiBzdHlsZT0ibWl4LWJsZW5kLW1vZGU6bXVsdGlwbHkiLz4KPHBhdGggZD0iTTI1NS45OTkgMTM2LjcwMkMxOTMuMzE4IDEzNi43MDIgMTI1Ljg1NSAxNTEuNDg1IDEyNS44NTUgMTgzLjkzM1YzOTYuNDc1QzEyNS44NTUgNDI4LjkyMyAxOTMuMzE4IDQ0My43MDcgMjU1Ljk5OSA0NDMuNzA3QzMxOC42NzkgNDQzLjcwNyAzODYuMTQyIDQyOC45MjMgMzg2LjE0MiAzOTYuNDc1VjE4My45MzNDMzg2LjE0MiAxNTEuNDg1IDMxOC42NzkgMTM2LjcwMiAyNTUuOTk5IDEzNi43MDJaTTI1NS45OTkgMTYwLjMxOEMzMjQuNTkxIDE2MC4zMTggMzYwLjA1MyAxNzcuMjUxIDM2Mi40NDIgMTgzLjkzM0MzNjAuMDUzIDE5MC42MTUgMzI0LjU5MSAyMDcuNTQ5IDI1NS45OTkgMjA3LjU0OUMxODYuODg5IDIwNy41NDkgMTUxLjQxOCAxOTAuMzYyIDE0OS41MTggMTg0LjE0MVYxODQuMDgzQzE1MS40MTggMTc3LjUwNSAxODYuODg5IDE2MC4zMTggMjU1Ljk5OSAxNjAuMzE4Wk0xNDkuNTE4IDIxMi41OTlDMTc0LjY5NCAyMjUuMjAzIDIxNi4yNzcgMjMxLjE2NSAyNTUuOTk5IDIzMS4xNjVDMjk1LjcyMSAyMzEuMTY1IDMzNy4zMDQgMjI1LjIwMyAzNjIuNDggMjEyLjU5OVYyNTQuNjMxQzM2MC41OCAyNjEuMjA5IDMyNS4xMDggMjc4LjM5NiAyNTUuOTk5IDI3OC4zOTZDMTg2Ljc4NSAyNzguMzk2IDE1MS4zMDMgMjYxLjE1NyAxNDkuNTE4IDI1NC43ODFWMjEyLjU5OVpNMTQ5LjUxOCAyODMuNDQ3QzE3NC42OTQgMjk2LjA1IDIxNi4yNzcgMzAyLjAxMiAyNTUuOTk5IDMwMi4wMTJDMjk1LjcyMSAzMDIuMDEyIDMzNy4zMDQgMjk2LjA1IDM2Mi40OCAyODMuNDQ3VjMyNS40NzhDMzYwLjU4IDMzMi4wNTYgMzI1LjEwOCAzNDkuMjQ0IDI1NS45OTkgMzQ5LjI0NEMxODYuNzg1IDM0OS4yNDQgMTUxLjMwMyAzMzIuMDA0IDE0OS41MTggMzI1LjYyOFYyODMuNDQ3Wk0yNTUuOTk5IDQyMC4wOTFDMTg2Ljc4NSA0MjAuMDkxIDE1MS4zMDMgNDAyLjg1MSAxNDkuNTE4IDM5Ni40NzVWMzU0LjI5NEMxNzQuNjk0IDM2Ni44OTggMjE2LjI3NyAzNzIuODU5IDI1NS45OTkgMzcyLjg1OUMyOTUuNzIxIDM3Mi44NTkgMzM3LjMwNCAzNjYuODk4IDM2Mi40OCAzNTQuMjk0VjM5Ni4zMjVDMzYwLjU4IDQwMi45MDMgMzI1LjEwOCA0MjAuMDkxIDI1NS45OTkgNDIwLjA5MVoiIGZpbGw9IiNGQzVEMEQiIHN0cm9rZT0iI0ZDNUQwRCIgc3Ryb2tlLXdpZHRoPSI2LjY3NDAyIi8+CjxwYXRoIGQ9Ik0zODcuODYgMzk5Ljg4M0wzNzQuNTMxIDQxMy4yMTFMNDQ2Ljg4NiA0ODUuNTY2SDM4NC4wNTJWNTA0LjYwN0g0NzkuMjU2VjQwOS40MDNINDYwLjIxNVY0NzIuMjM4TDM4Ny44NiAzOTkuODgzWiIgZmlsbD0iI0ZDNUQwRCIgc3Ryb2tlPSIjRkM1RDBEIiBzdHJva2Utd2lkdGg9IjguMzQyNTIiLz4KPHBhdGggZD0iTTEyNC4xMzggMzk5Ljg4M0wxMzcuNDY3IDQxMy4yMTFMNjUuMTExNiA0ODUuNTY2SDEyNy45NDZWNTA0LjYwN0gzMi43NDIyVjQwOS40MDNINTEuNzgzVjQ3Mi4yMzhMMTI0LjEzOCAzOTkuODgzWiIgZmlsbD0iI0ZDNUQwRCIgc3Ryb2tlPSIjRkM1RDBEIiBzdHJva2Utd2lkdGg9IjguMzQyNTIiLz4KPHBhdGggZD0iTTI0Ni41NzUgMTQ2LjA3MUgyNjUuNDI1VjQzLjc0NTNMMzA5Ljg1NiA4OC4xNzYxTDMyMy4zMTkgNzQuNzEyMkwyNTYgNy4zOTI4MkwxODguNjgxIDc0LjcxMjJMMjAyLjE0NCA4OC4xNzYxTDI0Ni41NzUgNDMuNzQ1M1YxNDYuMDcxWiIgZmlsbD0iI0ZDNUQwRCIgc3Ryb2tlPSIjRkM1RDBEIiBzdHJva2Utd2lkdGg9IjguMzQyNTIiLz4KPC9zdmc+Cg==">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="io.camunda:embeddings-vector-database:1" retries="3" />
+        <zeebe:ioMapping type="io.camunda:embeddings-vector-database:1" modelerTemplate="io.camunda.connectors.EmbeddingsVectorDB.v1" modelerTemplateVersion="1">
+          <zeebe:input source="PlainText" target="vectorDatabaseConnectorOperation.documentSource" />
+          <zeebe:input source="=toolResult" target="vectorDatabaseConnectorOperation.documentSourceFromProcessVariable" />
+          <zeebe:input source="documentSplitterRecursive" target="vectorDatabaseConnectorOperation.documentSplitter.splitterType" />
+          <zeebe:input source="=500" target="vectorDatabaseConnectorOperation.documentSplitter.maxSegmentSizeInChars" />
+          <zeebe:input source="=80" target="vectorDatabaseConnectorOperation.documentSplitter.maxOverlapSizeInChars" />
+          <zeebe:input source="OPERATION_EMBED_DOCUMENT" target="vectorDatabaseConnectorOperation.operationType" />
+          <zeebe:input source="bedrockModelProvider" target="embeddingModelProvider.modelProvider" />
+          <zeebe:input source="{{secrets.PDP_CAMUNDAAGENT_AWS_ACCESS_KEY}}" target="embeddingModelProvider.bedrock.accessKey" />
+          <zeebe:input source="{{secrets.PDP_CAMUNDAAGENT_AWS_SECRET_KEY}}" target="embeddingModelProvider.bedrock.secretKey" />
+          <zeebe:input source="=aws_configuration.region" target="embeddingModelProvider.bedrock.region" />
+          <zeebe:input source="TitanEmbedTextV2" target="embeddingModelProvider.bedrock.modelName" />
+          <zeebe:input source="=3" target="embeddingModelProvider.bedrock.maxRetries" />
+          <zeebe:input source="amazonManagedOpenSearchStore" target="vectorStore.storeType" />
+          <zeebe:input source="AKIAZI2LDGGA5C3HDZUJ" target="vectorStore.amazonManagedOpensearch.accessKey" />
+          <zeebe:input source="{{secrets.AWS_OPEN_SEARCH}}" target="vectorStore.amazonManagedOpensearch.secretKey" />
+          <zeebe:input source="aws_configuration.longterm_memory_server_url" target="vectorStore.amazonManagedOpensearch.serverUrl" />
+          <zeebe:input source="aws_configuration.region" target="vectorStore.amazonManagedOpensearch.region" />
+          <zeebe:input source="pm-specialist-epic-knowledge-base" target="vectorStore.amazonManagedOpensearch.indexName" />
+        </zeebe:ioMapping>
+        <zeebe:taskHeaders>
+          <zeebe:header key="elementTemplateVersion" value="2" />
+          <zeebe:header key="elementTemplateId" value="io.camunda.connectors.EmbeddingsVectorDB.v1" />
+          <zeebe:header key="retryBackoff" value="PT0S" />
+        </zeebe:taskHeaders>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_1mudddl</bpmn:incoming>
+      <bpmn:outgoing>Flow_0j63wm9</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="query_knowledge_base" name="Query&#10;knowledge base" zeebe:modelerTemplate="io.camunda.connectors.EmbeddingsVectorDB.v1" zeebe:modelerTemplateVersion="2" zeebe:modelerTemplateIcon="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgdmlld0JveD0iMCAwIDUxMiA1MTIiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSI1MTIiIGhlaWdodD0iNTEyIiBmaWxsPSJ3aGl0ZSIgZmlsbC1vcGFjaXR5PSIwLjAxIiBzdHlsZT0ibWl4LWJsZW5kLW1vZGU6bXVsdGlwbHkiLz4KPHBhdGggZD0iTTI1NS45OTkgMTM2LjcwMkMxOTMuMzE4IDEzNi43MDIgMTI1Ljg1NSAxNTEuNDg1IDEyNS44NTUgMTgzLjkzM1YzOTYuNDc1QzEyNS44NTUgNDI4LjkyMyAxOTMuMzE4IDQ0My43MDcgMjU1Ljk5OSA0NDMuNzA3QzMxOC42NzkgNDQzLjcwNyAzODYuMTQyIDQyOC45MjMgMzg2LjE0MiAzOTYuNDc1VjE4My45MzNDMzg2LjE0MiAxNTEuNDg1IDMxOC42NzkgMTM2LjcwMiAyNTUuOTk5IDEzNi43MDJaTTI1NS45OTkgMTYwLjMxOEMzMjQuNTkxIDE2MC4zMTggMzYwLjA1MyAxNzcuMjUxIDM2Mi40NDIgMTgzLjkzM0MzNjAuMDUzIDE5MC42MTUgMzI0LjU5MSAyMDcuNTQ5IDI1NS45OTkgMjA3LjU0OUMxODYuODg5IDIwNy41NDkgMTUxLjQxOCAxOTAuMzYyIDE0OS41MTggMTg0LjE0MVYxODQuMDgzQzE1MS40MTggMTc3LjUwNSAxODYuODg5IDE2MC4zMTggMjU1Ljk5OSAxNjAuMzE4Wk0xNDkuNTE4IDIxMi41OTlDMTc0LjY5NCAyMjUuMjAzIDIxNi4yNzcgMjMxLjE2NSAyNTUuOTk5IDIzMS4xNjVDMjk1LjcyMSAyMzEuMTY1IDMzNy4zMDQgMjI1LjIwMyAzNjIuNDggMjEyLjU5OVYyNTQuNjMxQzM2MC41OCAyNjEuMjA5IDMyNS4xMDggMjc4LjM5NiAyNTUuOTk5IDI3OC4zOTZDMTg2Ljc4NSAyNzguMzk2IDE1MS4zMDMgMjYxLjE1NyAxNDkuNTE4IDI1NC43ODFWMjEyLjU5OVpNMTQ5LjUxOCAyODMuNDQ3QzE3NC42OTQgMjk2LjA1IDIxNi4yNzcgMzAyLjAxMiAyNTUuOTk5IDMwMi4wMTJDMjk1LjcyMSAzMDIuMDEyIDMzNy4zMDQgMjk2LjA1IDM2Mi40OCAyODMuNDQ3VjMyNS40NzhDMzYwLjU4IDMzMi4wNTYgMzI1LjEwOCAzNDkuMjQ0IDI1NS45OTkgMzQ5LjI0NEMxODYuNzg1IDM0OS4yNDQgMTUxLjMwMyAzMzIuMDA0IDE0OS41MTggMzI1LjYyOFYyODMuNDQ3Wk0yNTUuOTk5IDQyMC4wOTFDMTg2Ljc4NSA0MjAuMDkxIDE1MS4zMDMgNDAyLjg1MSAxNDkuNTE4IDM5Ni40NzVWMzU0LjI5NEMxNzQuNjk0IDM2Ni44OTggMjE2LjI3NyAzNzIuODU5IDI1NS45OTkgMzcyLjg1OUMyOTUuNzIxIDM3Mi44NTkgMzM3LjMwNCAzNjYuODk4IDM2Mi40OCAzNTQuMjk0VjM5Ni4zMjVDMzYwLjU4IDQwMi45MDMgMzI1LjEwOCA0MjAuMDkxIDI1NS45OTkgNDIwLjA5MVoiIGZpbGw9IiNGQzVEMEQiIHN0cm9rZT0iI0ZDNUQwRCIgc3Ryb2tlLXdpZHRoPSI2LjY3NDAyIi8+CjxwYXRoIGQ9Ik0zODcuODYgMzk5Ljg4M0wzNzQuNTMxIDQxMy4yMTFMNDQ2Ljg4NiA0ODUuNTY2SDM4NC4wNTJWNTA0LjYwN0g0NzkuMjU2VjQwOS40MDNINDYwLjIxNVY0NzIuMjM4TDM4Ny44NiAzOTkuODgzWiIgZmlsbD0iI0ZDNUQwRCIgc3Ryb2tlPSIjRkM1RDBEIiBzdHJva2Utd2lkdGg9IjguMzQyNTIiLz4KPHBhdGggZD0iTTEyNC4xMzggMzk5Ljg4M0wxMzcuNDY3IDQxMy4yMTFMNjUuMTExNiA0ODUuNTY2SDEyNy45NDZWNTA0LjYwN0gzMi43NDIyVjQwOS40MDNINTEuNzgzVjQ3Mi4yMzhMMTI0LjEzOCAzOTkuODgzWiIgZmlsbD0iI0ZDNUQwRCIgc3Ryb2tlPSIjRkM1RDBEIiBzdHJva2Utd2lkdGg9IjguMzQyNTIiLz4KPHBhdGggZD0iTTI0Ni41NzUgMTQ2LjA3MUgyNjUuNDI1VjQzLjc0NTNMMzA5Ljg1NiA4OC4xNzYxTDMyMy4zMTkgNzQuNzEyMkwyNTYgNy4zOTI4MkwxODguNjgxIDc0LjcxMjJMMjAyLjE0NCA4OC4xNzYxTDI0Ni41NzUgNDMuNzQ1M1YxNDYuMDcxWiIgZmlsbD0iI0ZDNUQwRCIgc3Ryb2tlPSIjRkM1RDBEIiBzdHJva2Utd2lkdGg9IjguMzQyNTIiLz4KPC9zdmc+Cg==">
+      <bpmn:documentation>Use this activity to search company knowledge base for general answers</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="io.camunda:embeddings-vector-database:1" retries="3" />
+        <zeebe:ioMapping>
+          <zeebe:input source="=fromAi(toolCall.query, &#34;The knowledge base query you want to perform&#34;)" target="vectorDatabaseConnectorOperation.query" />
+          <zeebe:input source="=5" target="vectorDatabaseConnectorOperation.documentLimit" />
+          <zeebe:input source="OPERATION_RETRIEVE_DOCUMENT" target="vectorDatabaseConnectorOperation.operationType" />
+          <zeebe:input source="bedrockModelProvider" target="embeddingModelProvider.modelProvider" />
+          <zeebe:input source="{{secrets.PDP_CAMUNDAAGENT_AWS_ACCESS_KEY}}" target="embeddingModelProvider.bedrock.accessKey" />
+          <zeebe:input source="{{secrets.PDP_CAMUNDAAGENT_AWS_SECRET_KEY}}" target="embeddingModelProvider.bedrock.secretKey" />
+          <zeebe:input source="=aws_configuration.region" target="embeddingModelProvider.bedrock.region" />
+          <zeebe:input source="TitanEmbedTextV2" target="embeddingModelProvider.bedrock.modelName" />
+          <zeebe:input source="=3" target="embeddingModelProvider.bedrock.maxRetries" />
+          <zeebe:input source="amazonManagedOpenSearchStore" target="vectorStore.storeType" />
+          <zeebe:input source="AKIAZI2LDGGA5C3HDZUJ" target="vectorStore.amazonManagedOpensearch.accessKey" />
+          <zeebe:input source="{{secrets.AWS_OPEN_SEARCH}}" target="vectorStore.amazonManagedOpensearch.secretKey" />
+          <zeebe:input source="=aws_configuration.longterm_memory_server_url" target="vectorStore.amazonManagedOpensearch.serverUrl" />
+          <zeebe:input source="=aws_configuration.region" target="vectorStore.amazonManagedOpensearch.region" />
+          <zeebe:input source="pm-specialist-epic-knowledge-base" target="vectorStore.amazonManagedOpensearch.indexName" />
+        </zeebe:ioMapping>
+        <zeebe:taskHeaders>
+          <zeebe:header key="elementTemplateVersion" value="2" />
+          <zeebe:header key="elementTemplateId" value="io.camunda.connectors.EmbeddingsVectorDB.v1" />
+          <zeebe:header key="resultVariable" value="toolResult" />
+          <zeebe:header key="errorExpression" value="=if contains(error.message, &#34;index_not_found&#34;) then bpmnError(&#34;index_not_found&#34;, &#34;The index does not exist&#34;) else null" />
+          <zeebe:header key="retryBackoff" value="PT0S" />
+        </zeebe:taskHeaders>
+      </bpmn:extensionElements>
+    </bpmn:serviceTask>
+    <bpmn:intermediateThrowEvent id="Event_0wh5ha7" name="Ignore">
+      <bpmn:incoming>Flow_0d4itte</bpmn:incoming>
+    </bpmn:intermediateThrowEvent>
+    <bpmn:exclusiveGateway id="Gateway_1whb5u5" name="Save answer to Knowledge base">
+      <bpmn:incoming>Flow_1aaxb1w</bpmn:incoming>
+      <bpmn:outgoing>Flow_1mudddl</bpmn:outgoing>
+      <bpmn:outgoing>Flow_0lexqwn</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:intermediateThrowEvent id="Event_1wd6fel" name="Specialist answered">
+      <bpmn:incoming>Flow_0j63wm9</bpmn:incoming>
+      <bpmn:incoming>Flow_0lexqwn</bpmn:incoming>
+    </bpmn:intermediateThrowEvent>
+    <bpmn:boundaryEvent id="Event_1wezv96" name="kKowledge base empty" attachedToRef="query_knowledge_base">
+      <bpmn:outgoing>Flow_0d4itte</bpmn:outgoing>
+      <bpmn:errorEventDefinition id="ErrorEventDefinition_07papr1" errorRef="Error_04dhtpa" />
+    </bpmn:boundaryEvent>
+    <bpmn:sequenceFlow id="Flow_1aaxb1w" sourceRef="Ask_a_specialist" targetRef="Gateway_1whb5u5" />
+    <bpmn:sequenceFlow id="Flow_1mudddl" name="Yes" sourceRef="Gateway_1whb5u5" targetRef="Activity_062h34x">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=knowledgeBaseDecision = "yes"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_0j63wm9" sourceRef="Activity_062h34x" targetRef="Event_1wd6fel" />
+    <bpmn:sequenceFlow id="Flow_0d4itte" sourceRef="Event_1wezv96" targetRef="Event_0wh5ha7" />
+    <bpmn:sequenceFlow id="Flow_0lexqwn" name="No" sourceRef="Gateway_1whb5u5" targetRef="Event_1wd6fel">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=knowledgeBaseDecision = "no"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_1">
+    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="Collaboration_Epic_Review">
+      <bpmndi:BPMNShape id="Participant_1ko3htp_di" bpmnElement="Participant_1ko3htp" isHorizontal="true">
+        <dc:Bounds x="120" y="180" width="1510" height="530" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_1wufq95_di" bpmnElement="Event_1wufq95">
+        <dc:Bounds x="1402" y="332" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1384" y="375" width="73" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_0icwfki_di" bpmnElement="Activity_04glkkx" isExpanded="true" bioc:stroke="#0d4372" bioc:fill="#bbdefb" color:background-color="#bbdefb" color:border-color="#0d4372">
+        <dc:Bounds x="410" y="460" width="1050" height="210" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_1hcmypo_di" bpmnElement="Activity_0hs0pu9" bioc:stroke="#6b3c00" bioc:fill="#ffe0b2" color:background-color="#ffe0b2" color:border-color="#6b3c00">
+        <dc:Bounds x="690" y="530" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="BPMNShape_0d7vabm" bpmnElement="Activity_1gsm7su" bioc:stroke="#6b3c00" bioc:fill="#ffe0b2" color:background-color="#ffe0b2" color:border-color="#6b3c00">
+        <dc:Bounds x="570" y="530" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_1fhrizd_di" bpmnElement="Activity_Slack">
+        <dc:Bounds x="990" y="530" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_1clcfsu_di" bpmnElement="Activity_01xvqn0" bioc:stroke="#0d4372" bioc:fill="#bbdefb" color:background-color="#bbdefb" color:border-color="#0d4372">
+        <dc:Bounds x="813" y="310" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_1j0oz23_di" bpmnElement="Gateway_1j0oz23" isMarkerVisible="true">
+        <dc:Bounds x="465" y="325" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="BPMNShape_1l0gxhp" bpmnElement="Gateway_1k7euae" isMarkerVisible="true">
+        <dc:Bounds x="1245" y="325" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1232" y="301" width="77" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_0v9uhlr_di" bpmnElement="Activity_0waqzte">
+        <dc:Bounds x="290" y="310" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_0ijw5cj_di" bpmnElement="epicSubmitted">
+        <dc:Bounds x="172" y="332" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="165" y="375" width="50" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_0l610js_di" bpmnElement="Flow_0l610js">
+        <di:waypoint x="515" y="350" />
+        <di:waypoint x="813" y="350" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_1jfjd7m_di" bpmnElement="Flow_1jfjd7m">
+        <di:waypoint x="490" y="460" />
+        <di:waypoint x="490" y="375" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="771" y="-353" width="77" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_1vnsml5_di" bpmnElement="Flow_1vnsml5">
+        <di:waypoint x="1270" y="375" />
+        <di:waypoint x="1270" y="460" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1277" y="415" width="18" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_05a4u5j_di" bpmnElement="Flow_05a4u5j">
+        <di:waypoint x="1295" y="350" />
+        <di:waypoint x="1402" y="350" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="BPMNEdge_06wqta8" bpmnElement="Flow_1imcl82">
+        <di:waypoint x="913" y="350" />
+        <di:waypoint x="1245" y="350" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_1wfklrx_di" bpmnElement="Flow_1wfklrx">
+        <di:waypoint x="390" y="350" />
+        <di:waypoint x="465" y="350" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_1ux1bqv_di" bpmnElement="Flow_1ux1bqv">
+        <di:waypoint x="208" y="350" />
+        <di:waypoint x="290" y="350" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNShape id="Participant_14m4dos_di" bpmnElement="Participant_14m4dos" isHorizontal="true">
+        <dc:Bounds x="120" y="780" width="933" height="250" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_1338851_di" bpmnElement="Ask_a_specialist" bioc:stroke="#205022" bioc:fill="#c8e6c9" color:background-color="#c8e6c9" color:border-color="#205022">
+        <dc:Bounds x="220" y="830" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_045jpsd_di" bpmnElement="Activity_062h34x" bioc:stroke="#6b3c00" bioc:fill="#ffe0b2" color:background-color="#ffe0b2" color:border-color="#6b3c00">
+        <dc:Bounds x="505" y="830" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="BPMNShape_1c9umdq" bpmnElement="query_knowledge_base" bioc:stroke="#6b3c00" bioc:fill="#ffe0b2" color:background-color="#ffe0b2" color:border-color="#6b3c00">
+        <dc:Bounds x="765" y="830" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_0wh5ha7_di" bpmnElement="Event_0wh5ha7">
+        <dc:Bounds x="917" y="892" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="921" y="935" width="32" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_1whb5u5_di" bpmnElement="Gateway_1whb5u5" isMarkerVisible="true">
+        <dc:Bounds x="380" y="845" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="364" y="815" width="82" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_1wd6fel_di" bpmnElement="Event_1wd6fel">
+        <dc:Bounds x="657" y="852" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="652" y="815" width="49" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="BPMNShape_0obdo5z" bpmnElement="Event_1wezv96">
+        <dc:Bounds x="837" y="892" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="805" y="928" width="81" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_1aaxb1w_di" bpmnElement="Flow_1aaxb1w">
+        <di:waypoint x="320" y="870" />
+        <di:waypoint x="380" y="870" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_1mudddl_di" bpmnElement="Flow_1mudddl">
+        <di:waypoint x="430" y="870" />
+        <di:waypoint x="505" y="870" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="461" y="852" width="18" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_0j63wm9_di" bpmnElement="Flow_0j63wm9">
+        <di:waypoint x="605" y="870" />
+        <di:waypoint x="657" y="870" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_0d4itte_di" bpmnElement="Flow_0d4itte">
+        <di:waypoint x="873" y="910" />
+        <di:waypoint x="917" y="910" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_0lexqwn_di" bpmnElement="Flow_0lexqwn">
+        <di:waypoint x="405" y="895" />
+        <di:waypoint x="405" y="950" />
+        <di:waypoint x="675" y="950" />
+        <di:waypoint x="675" y="888" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="447" y="933" width="15" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNShape id="TextAnnotation_0oibtxl_di" bpmnElement="TextAnnotation_0oibtxl">
+        <dc:Bounds x="910" y="80" width="350" height="208" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="TextAnnotation_14snsyd_di" bpmnElement="TextAnnotation_14snsyd">
+        <dc:Bounds x="1150" y="535" width="100" height="70" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Association_08yiz8y_di" bpmnElement="Association_08yiz8y">
+        <di:waypoint x="1090" y="564" />
+        <di:waypoint x="1150" y="556" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Association_0p2ywpv_di" bpmnElement="Association_0p2ywpv">
+        <di:waypoint x="873" y="310" />
+        <di:waypoint x="910" y="154" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

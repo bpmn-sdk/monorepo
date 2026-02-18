@@ -1,0 +1,134 @@
+{
+  "executionPlatform": "Camunda Cloud",
+  "executionPlatformVersion": "8.7.0",
+  "exporter": {
+    "name": "Camunda Web Modeler",
+    "version": "a131ae4"
+  },
+  "schemaVersion": 18,
+  "id": "Form_02f7j6q",
+  "components": [
+    {
+      "text": "## Cloud Request form",
+      "type": "text",
+      "layout": {
+        "row": "Row_0nvb02j",
+        "columns": null
+      },
+      "id": "Field_1rs3ow3"
+    },
+    {
+      "text": "=\"# PDP\" + string(pdp)",
+      "type": "text",
+      "layout": {
+        "row": "Row_0xu2tvu",
+        "columns": null
+      },
+      "id": "Field_13ggj60"
+    },
+    {
+      "text": "This form is required if your epic may change or add to our infrastructure, or could have a cost impact. The information you provide will be reviewed by the FinOps team to help assess any risks or resource needs. Please complete this step at the start of the Define phase so your epic can move forward.",
+      "type": "text",
+      "layout": {
+        "row": "Row_1gvngz8",
+        "columns": null
+      },
+      "id": "Field_1fvpatp"
+    },
+    {
+      "label": "Responsible team",
+      "type": "textfield",
+      "layout": {
+        "row": "Row_0nzg6wi",
+        "columns": null
+      },
+      "id": "Field_0s7qyk6",
+      "key": "finopsTeam",
+      "validate": {
+        "required": true
+      }
+    },
+    {
+      "label": "Resource Types (e.g. Ec2, Compute Engine, EBS...):",
+      "type": "textfield",
+      "layout": {
+        "row": "Row_12e68j0",
+        "columns": null
+      },
+      "id": "Field_07fn8eh",
+      "key": "finopsResourceTypes",
+      "validate": {
+        "required": true
+      }
+    },
+    {
+      "label": "Resource Scope:",
+      "values": [
+        {
+          "label": "Main k8s Cluster",
+          "value": "Main k8s Cluster"
+        },
+        {
+          "label": "Worker k8s Cluster",
+          "value": "Worker k8s Cluster"
+        },
+        {
+          "label": "Camunda Cluster",
+          "value": "Camunda Cluster"
+        }
+      ],
+      "type": "select",
+      "layout": {
+        "row": "Row_0qfgekp",
+        "columns": null
+      },
+      "id": "Field_1o6asmw",
+      "key": "finopsScope",
+      "validate": {
+        "required": true
+      }
+    },
+    {
+      "label": "Is the cost allocation assigned to COGS?",
+      "values": [
+        {
+          "label": "Yes",
+          "value": "Yes"
+        },
+        {
+          "label": "No",
+          "value": "No"
+        }
+      ],
+      "type": "select",
+      "layout": {
+        "row": "Row_18w5f1z",
+        "columns": null
+      },
+      "id": "Field_0v8c6kf",
+      "key": "finopsCostAssigned",
+      "validate": {
+        "required": true
+      }
+    },
+    {
+      "text": "If the cloud resources you’re requesting are necessary to serve your end users or customers (e.g., production workloads, user-facing APIs, customer data processing, etc.), it’s likely **COGS** (Cost of Goods Sold).\n\n_Not limited to the following examples:_\n\n✅ **Yes (COGS):**\n- Production EC2 instances running customer-facing applications  \n- Databases storing and serving customer data  \n- Load balancers handling live traffic  \n- S3 buckets used to serve content directly to users  \n- Stream processing (e.g., Kinesis) used to deliver real-time features to customers  \n\n❌ **No (Not COGS):**\n- Developer or QA environments  \n- Internal dashboards or reporting tools  \n- Experimentation, testing, or sandbox environments  \n- CI/CD pipelines or build servers  \n- Cloud spend for internal R&D or prototype work  \n",
+      "type": "text",
+      "layout": {
+        "row": "Row_1bh8fc6",
+        "columns": null
+      },
+      "id": "Field_1wyurdn"
+    },
+    {
+      "text": "Check with #top-finops if you have any questions about how to fill in this form.",
+      "type": "text",
+      "layout": {
+        "row": "Row_18t8qz5",
+        "columns": null
+      },
+      "id": "Field_1yfyqh2"
+    }
+  ],
+  "type": "default"
+}

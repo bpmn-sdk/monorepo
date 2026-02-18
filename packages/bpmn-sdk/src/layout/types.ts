@@ -1,0 +1,85 @@
+import type { BpmnElementType } from "../bpmn/bpmn-model.js";
+
+/** Fixed element dimensions by type. */
+export const ELEMENT_SIZES: Record<string, { width: number; height: number }> = {
+	startEvent: { width: 36, height: 36 },
+	endEvent: { width: 36, height: 36 },
+	intermediateThrowEvent: { width: 36, height: 36 },
+	intermediateCatchEvent: { width: 36, height: 36 },
+	boundaryEvent: { width: 36, height: 36 },
+	serviceTask: { width: 100, height: 80 },
+	scriptTask: { width: 100, height: 80 },
+	userTask: { width: 100, height: 80 },
+	sendTask: { width: 100, height: 80 },
+	receiveTask: { width: 100, height: 80 },
+	businessRuleTask: { width: 100, height: 80 },
+	callActivity: { width: 100, height: 80 },
+	exclusiveGateway: { width: 50, height: 50 },
+	parallelGateway: { width: 50, height: 50 },
+	inclusiveGateway: { width: 50, height: 50 },
+	eventBasedGateway: { width: 50, height: 50 },
+	// Sub-processes are sized dynamically
+	subProcess: { width: 100, height: 80 },
+	adHocSubProcess: { width: 100, height: 80 },
+	eventSubProcess: { width: 100, height: 80 },
+};
+
+/** Minimum spacing between elements. */
+export const HORIZONTAL_SPACING = 80;
+export const VERTICAL_SPACING = 60;
+
+/** Padding inside sub-process containers. */
+export const SUBPROCESS_PADDING = 20;
+
+/** Axis-aligned bounding box. */
+export interface Bounds {
+	x: number;
+	y: number;
+	width: number;
+	height: number;
+}
+
+/** A waypoint in an edge route. */
+export interface Waypoint {
+	x: number;
+	y: number;
+}
+
+/** A node in the layout graph. */
+export interface LayoutNode {
+	id: string;
+	type: BpmnElementType;
+	bounds: Bounds;
+	/** Layer (column) index assigned by Sugiyama algorithm. */
+	layer: number;
+	/** Position within the layer (row index). */
+	position: number;
+	/** Label text for the node. */
+	label?: string;
+	/** Label bounds for overlap checking. */
+	labelBounds?: Bounds;
+}
+
+/** A routed edge in the layout. */
+export interface LayoutEdge {
+	id: string;
+	sourceRef: string;
+	targetRef: string;
+	waypoints: Waypoint[];
+	/** Label text for the edge. */
+	label?: string;
+	/** Label bounds for overlap checking. */
+	labelBounds?: Bounds;
+}
+
+/** Result of laying out a sub-process's children, linked to its parent. */
+export interface SubProcessChildResult {
+	parentId: string;
+	result: LayoutResult;
+}
+
+/** Complete layout result for a process. */
+export interface LayoutResult {
+	nodes: LayoutNode[];
+	edges: LayoutEdge[];
+}

@@ -1,0 +1,183 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:zeebe="http://camunda.org/schema/zeebe/1.0" xmlns:modeler="http://camunda.org/schema/modeler/1.0" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:camunda="http://camunda.org/schema/1.0/bpmn" id="Definitions_1" targetNamespace="http://bpmn.io/schema/bpmn" exporter="Camunda Web Modeler" exporterVersion="f35ea64" modeler:executionPlatform="Camunda Cloud" modeler:executionPlatformVersion="8.5.0" camunda:diagramRelationId="c33149d3-8eb6-42ad-a841-2bf2dcdbeee1">
+  <bpmn:process id="Process_fhg2fog" name="Handle PDP - Comment - Next Phase" isExecutable="true">
+    <bpmn:exclusiveGateway id="Gateway_0033moo">
+      <bpmn:incoming>Flow_1scmvxf</bpmn:incoming>
+      <bpmn:outgoing>Flow_1ek6s6v</bpmn:outgoing>
+      <bpmn:outgoing>Flow_0srmeym</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:sequenceFlow id="Flow_1ek6s6v" name="Pause" sourceRef="Gateway_0033moo" targetRef="Activity_1quhcd1">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=starts with(webhook.body.comment.body, config.COMMAND_PAUSE)</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:exclusiveGateway id="Gateway_0jfu3i0">
+      <bpmn:incoming>Flow_0cmqogk</bpmn:incoming>
+      <bpmn:incoming>Flow_1y19omq</bpmn:incoming>
+      <bpmn:outgoing>Flow_0u0ysmq</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:callActivity id="Activity_1uyijrx" name="Get Project Data">
+      <bpmn:extensionElements>
+        <zeebe:calledElement processId="pdp-get-project-data" propagateAllChildVariables="true" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_086ffm0</bpmn:incoming>
+      <bpmn:outgoing>Flow_1scmvxf</bpmn:outgoing>
+    </bpmn:callActivity>
+    <bpmn:sequenceFlow id="Flow_1scmvxf" sourceRef="Activity_1uyijrx" targetRef="Gateway_0033moo" />
+    <bpmn:sequenceFlow id="Flow_0srmeym" name="Continue" sourceRef="Gateway_0033moo" targetRef="Activity_11gh0bi">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=starts with(webhook.body.comment.body, config.COMMAND_CONTINUE)</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:serviceTask id="Activity_1quhcd1" name="Github:&#10;Change project state" zeebe:modelerTemplate="io.camunda.connectors.HttpJson.v2" zeebe:modelerTemplateVersion="8" zeebe:modelerTemplateIcon="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTgiIGhlaWdodD0iMTgiIHZpZXdCb3g9IjAgMCAxOCAxOCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTE3LjAzMzUgOC45OTk5N0MxNy4wMzM1IDEzLjQ0NzUgMTMuNDI4MSAxNy4wNTI5IDguOTgwNjUgMTcuMDUyOUM0LjUzMzE2IDE3LjA1MjkgMC45Mjc3NjUgMTMuNDQ3NSAwLjkyNzc2NSA4Ljk5OTk3QzAuOTI3NzY1IDQuNTUyNDggNC41MzMxNiAwLjk0NzA4MyA4Ljk4MDY1IDAuOTQ3MDgzQzEzLjQyODEgMC45NDcwODMgMTcuMDMzNSA0LjU1MjQ4IDE3LjAzMzUgOC45OTk5N1oiIGZpbGw9IiM1MDU1NjIiLz4KPHBhdGggZD0iTTQuOTMxMjYgMTQuMTU3MUw2Ljc4MTA2IDMuNzE0NzFIMTAuMTM3NUMxMS4xOTE3IDMuNzE0NzEgMTEuOTgyNCAzLjk4MzIzIDEyLjUwOTUgNC41MjAyN0MxMy4wNDY1IDUuMDQ3MzYgMTMuMzE1IDUuNzMzNTggMTMuMzE1IDYuNTc4OTJDMTMuMzE1IDcuNDQ0MTQgMTMuMDcxNCA4LjE1NTIyIDEyLjU4NDEgOC43MTIxNUMxMi4xMDY3IDkuMjU5MTMgMTEuNDU1MyA5LjYzNzA1IDEwLjYyOTggOS44NDU5TDEyLjA2MTkgMTQuMTU3MUgxMC4zMzE1TDkuMDMzNjQgMTAuMDI0OUg3LjI0MzUxTDYuNTEyNTQgMTQuMTU3MUg0LjkzMTI2Wk03LjQ5NzExIDguNTkyODFIOS4yNDI0OEM5Ljk5ODMyIDguNTkyODEgMTAuNTkwMSA4LjQyMzc0IDExLjAxNzcgOC4wODU2MUMxMS40NTUzIDcuNzM3NTMgMTEuNjc0MSA3LjI2NTEzIDExLjY3NDEgNi42Njg0MkMxMS42NzQxIDYuMTkxMDYgMTEuNTI0OSA1LjgxODExIDExLjIyNjUgNS41NDk1OUMxMC45MjgyIDUuMjcxMTMgMTAuNDU1OCA1LjEzMTkgOS44MDkzNiA1LjEzMTlIOC4xMDg3NEw3LjQ5NzExIDguNTkyODFaIiBmaWxsPSJ3aGl0ZSIvPgo8L3N2Zz4K">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="io.camunda:http-json:1" retries="3" />
+        <zeebe:ioMapping>
+          <zeebe:input source="bearer" target="authentication.type" />
+          <zeebe:input source="{{secrets.PDP_GITHUB_PAT}}" target="authentication.token" />
+          <zeebe:input source="POST" target="method" />
+          <zeebe:input source="https://api.github.com/graphql" target="url" />
+          <zeebe:input source="20" target="connectionTimeoutInSeconds" />
+          <zeebe:input source="20" target="readTimeoutInSeconds" />
+          <zeebe:input source="={&#10;  query: &#34;mutation { updateProjectV2ItemFieldValue( input: { projectId: \&#34;&#34; + projectId + &#34;\&#34; itemId: \&#34;&#34; + projectData.epicProjectItemId + &#34;\&#34; fieldId: \&#34;&#34; + config.PROJECT_FIELD_ID_STATE + &#34;\&#34; value: { text: \&#34;&#34; + &#34;paused&#34; + &#34;\&#34; } } ) { projectV2Item { id } } }&#34;&#10;}" target="body" />
+        </zeebe:ioMapping>
+        <zeebe:taskHeaders>
+          <zeebe:header key="retryBackoff" value="PT0S" />
+        </zeebe:taskHeaders>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_1ek6s6v</bpmn:incoming>
+      <bpmn:outgoing>Flow_1opdfa5</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:startEvent id="Event_1pu2dfi">
+      <bpmn:outgoing>Flow_086ffm0</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:sequenceFlow id="Flow_086ffm0" sourceRef="Event_1pu2dfi" targetRef="Activity_1uyijrx" />
+    <bpmn:endEvent id="Event_1ik65lj">
+      <bpmn:incoming>Flow_0u0ysmq</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flow_0u0ysmq" sourceRef="Gateway_0jfu3i0" targetRef="Event_1ik65lj" />
+    <bpmn:serviceTask id="Activity_11gh0bi" name="Github:&#10;Change project state" zeebe:modelerTemplate="io.camunda.connectors.HttpJson.v2" zeebe:modelerTemplateVersion="8" zeebe:modelerTemplateIcon="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTgiIGhlaWdodD0iMTgiIHZpZXdCb3g9IjAgMCAxOCAxOCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTE3LjAzMzUgOC45OTk5N0MxNy4wMzM1IDEzLjQ0NzUgMTMuNDI4MSAxNy4wNTI5IDguOTgwNjUgMTcuMDUyOUM0LjUzMzE2IDE3LjA1MjkgMC45Mjc3NjUgMTMuNDQ3NSAwLjkyNzc2NSA4Ljk5OTk3QzAuOTI3NzY1IDQuNTUyNDggNC41MzMxNiAwLjk0NzA4MyA4Ljk4MDY1IDAuOTQ3MDgzQzEzLjQyODEgMC45NDcwODMgMTcuMDMzNSA0LjU1MjQ4IDE3LjAzMzUgOC45OTk5N1oiIGZpbGw9IiM1MDU1NjIiLz4KPHBhdGggZD0iTTQuOTMxMjYgMTQuMTU3MUw2Ljc4MTA2IDMuNzE0NzFIMTAuMTM3NUMxMS4xOTE3IDMuNzE0NzEgMTEuOTgyNCAzLjk4MzIzIDEyLjUwOTUgNC41MjAyN0MxMy4wNDY1IDUuMDQ3MzYgMTMuMzE1IDUuNzMzNTggMTMuMzE1IDYuNTc4OTJDMTMuMzE1IDcuNDQ0MTQgMTMuMDcxNCA4LjE1NTIyIDEyLjU4NDEgOC43MTIxNUMxMi4xMDY3IDkuMjU5MTMgMTEuNDU1MyA5LjYzNzA1IDEwLjYyOTggOS44NDU5TDEyLjA2MTkgMTQuMTU3MUgxMC4zMzE1TDkuMDMzNjQgMTAuMDI0OUg3LjI0MzUxTDYuNTEyNTQgMTQuMTU3MUg0LjkzMTI2Wk03LjQ5NzExIDguNTkyODFIOS4yNDI0OEM5Ljk5ODMyIDguNTkyODEgMTAuNTkwMSA4LjQyMzc0IDExLjAxNzcgOC4wODU2MUMxMS40NTUzIDcuNzM3NTMgMTEuNjc0MSA3LjI2NTEzIDExLjY3NDEgNi42Njg0MkMxMS42NzQxIDYuMTkxMDYgMTEuNTI0OSA1LjgxODExIDExLjIyNjUgNS41NDk1OUMxMC45MjgyIDUuMjcxMTMgMTAuNDU1OCA1LjEzMTkgOS44MDkzNiA1LjEzMTlIOC4xMDg3NEw3LjQ5NzExIDguNTkyODFaIiBmaWxsPSJ3aGl0ZSIvPgo8L3N2Zz4K">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="io.camunda:http-json:1" retries="3" />
+        <zeebe:ioMapping>
+          <zeebe:input source="bearer" target="authentication.type" />
+          <zeebe:input source="{{secrets.PDP_GITHUB_PAT}}" target="authentication.token" />
+          <zeebe:input source="POST" target="method" />
+          <zeebe:input source="https://api.github.com/graphql" target="url" />
+          <zeebe:input source="20" target="connectionTimeoutInSeconds" />
+          <zeebe:input source="20" target="readTimeoutInSeconds" />
+          <zeebe:input source="={&#10;  query: &#34;mutation { updateProjectV2ItemFieldValue( input: { projectId: \&#34;&#34; + projectId + &#34;\&#34; itemId: \&#34;&#34; + projectData.epicProjectItemId + &#34;\&#34; fieldId: \&#34;&#34; + config.PROJECT_FIELD_ID_STATE + &#34;\&#34; value: { text: \&#34;&#34; + &#34;&#34; + &#34;\&#34; } } ) { projectV2Item { id } } }&#34;&#10;}" target="body" />
+        </zeebe:ioMapping>
+        <zeebe:taskHeaders>
+          <zeebe:header key="retryBackoff" value="PT0S" />
+        </zeebe:taskHeaders>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_0srmeym</bpmn:incoming>
+      <bpmn:outgoing>Flow_18cf9ak</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:sequenceFlow id="Flow_18cf9ak" sourceRef="Activity_11gh0bi" targetRef="Activity_1x15zzb" />
+    <bpmn:sequenceFlow id="Flow_1opdfa5" sourceRef="Activity_1quhcd1" targetRef="Activity_1f484jj" />
+    <bpmn:sequenceFlow id="Flow_0cmqogk" sourceRef="Activity_1f484jj" targetRef="Gateway_0jfu3i0" />
+    <bpmn:callActivity id="Activity_1f484jj" name="Notifiy Github and Slack">
+      <bpmn:extensionElements>
+        <zeebe:calledElement processId="get-github-raw-content" propagateAllChildVariables="false" />
+        <zeebe:ioMapping>
+          <zeebe:input source="=&#34;texts/epic-paused.md&#34;" target="contentPath" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_1opdfa5</bpmn:incoming>
+      <bpmn:outgoing>Flow_0cmqogk</bpmn:outgoing>
+    </bpmn:callActivity>
+    <bpmn:callActivity id="Activity_1x15zzb" name="Notifiy Github and Slack">
+      <bpmn:extensionElements>
+        <zeebe:calledElement processId="get-github-raw-content" propagateAllChildVariables="false" />
+        <zeebe:ioMapping>
+          <zeebe:input source="=&#34;texts/epic-continued.md&#34;" target="contentPath" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_18cf9ak</bpmn:incoming>
+      <bpmn:outgoing>Flow_1y19omq</bpmn:outgoing>
+    </bpmn:callActivity>
+    <bpmn:sequenceFlow id="Flow_1y19omq" sourceRef="Activity_1x15zzb" targetRef="Gateway_0jfu3i0" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_1">
+    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="Process_fhg2fog">
+      <bpmndi:BPMNShape id="Gateway_0033moo_di" bpmnElement="Gateway_0033moo" isMarkerVisible="true">
+        <dc:Bounds x="955" y="453" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_1uyijrx_di" bpmnElement="Activity_1uyijrx">
+        <dc:Bounds x="780" y="438" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_1pu2dfi_di" bpmnElement="Event_1pu2dfi">
+        <dc:Bounds x="702" y="460" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="BPMNShape_1yiow4r" bpmnElement="Activity_11gh0bi">
+        <dc:Bounds x="1090" y="530" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="BPMNShape_0nuc4ky" bpmnElement="Activity_1quhcd1">
+        <dc:Bounds x="1090" y="340" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_0jfu3i0_di" bpmnElement="Gateway_0jfu3i0" isMarkerVisible="true">
+        <dc:Bounds x="1425" y="453" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_1ik65lj_di" bpmnElement="Event_1ik65lj">
+        <dc:Bounds x="1532" y="460" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_1mi69qr_di" bpmnElement="Activity_1f484jj">
+        <dc:Bounds x="1260" y="340" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="BPMNShape_1avhd5s" bpmnElement="Activity_1x15zzb">
+        <dc:Bounds x="1260" y="530" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_1ek6s6v_di" bpmnElement="Flow_1ek6s6v">
+        <di:waypoint x="980" y="453" />
+        <di:waypoint x="980" y="380" />
+        <di:waypoint x="1090" y="380" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="994" y="363" width="32" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_1scmvxf_di" bpmnElement="Flow_1scmvxf">
+        <di:waypoint x="880" y="478" />
+        <di:waypoint x="955" y="478" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_0srmeym_di" bpmnElement="Flow_0srmeym">
+        <di:waypoint x="980" y="503" />
+        <di:waypoint x="980" y="570" />
+        <di:waypoint x="1090" y="570" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1000" y="552" width="45" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_086ffm0_di" bpmnElement="Flow_086ffm0">
+        <di:waypoint x="738" y="478" />
+        <di:waypoint x="759" y="478" />
+        <di:waypoint x="759" y="480" />
+        <di:waypoint x="780" y="480" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_18cf9ak_di" bpmnElement="Flow_18cf9ak">
+        <di:waypoint x="1190" y="570" />
+        <di:waypoint x="1260" y="570" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_1opdfa5_di" bpmnElement="Flow_1opdfa5">
+        <di:waypoint x="1190" y="380" />
+        <di:waypoint x="1260" y="380" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_0u0ysmq_di" bpmnElement="Flow_0u0ysmq">
+        <di:waypoint x="1475" y="478" />
+        <di:waypoint x="1532" y="478" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_0cmqogk_di" bpmnElement="Flow_0cmqogk">
+        <di:waypoint x="1360" y="380" />
+        <di:waypoint x="1450" y="380" />
+        <di:waypoint x="1450" y="453" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_1y19omq_di" bpmnElement="Flow_1y19omq">
+        <di:waypoint x="1360" y="570" />
+        <di:waypoint x="1450" y="570" />
+        <di:waypoint x="1450" y="503" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

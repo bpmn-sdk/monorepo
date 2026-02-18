@@ -1,0 +1,131 @@
+{
+	"completedPhases": ["spec-0", "decompose-1", "design-2"],
+	"spec": "Now I have the confirmed count (9 branches). Here is the complete revised section:\n\n---\n\n### Engineering Decisions\n\n**\n\nThe requirements are exceptionally well-specified. Here is my summary of technical decisions and assumptions:\n\n### Key Assumptions\n1. **`camunda:` namespace** (Platform 7, present in example files) — treated as opaque `XmlElement` and passed through on roundtrip, since the SDK targets Zeebe/Cloud only.\n2. **Form `layout` property** (`row`, `columns`) — present in example forms but not explicitly called out in requirements. Will be preserved on roundtrip as part of the JSON model; builder support for grid layout positioning is not required.\n3. **Form metadata** (`executionPlatform`, `executionPlatformVersion`, `exporter`, `schemaVersion`) — preserved on roundtrip; builder sets sensible defaults.\n4. **Internal model design** — I have freedom to design the internal BPMN/DMN model interfaces; only the public builder API shape and `XmlElement` type are specified.\n5. **Parse error handling** — malformed XML/JSON throws descriptive errors (fail fast per coding guidelines); no partial-result mode.\n\n### Implementation Approach\n- **XML library**: Start with `fast-xml-parser`; fall back to `saxes` only if namespace handling fails (as specified).\n- **Layout**: Custom Sugiyama/layered algorithm, no external library. Back-edges detected via DFS, temporarily reversed for layering, restored for routing.\n- **Builder pattern**: Immutable-style method chaining where each method returns the builder. Gateway branching via `branch(name, callback)` with sub-builders. `connectTo()` for merging/loops.\n- **Roundtrip strategy**: Parse into typed model + `XmlElement[]` for unknowns → serialize back. Semantic equivalence validated by re-parsing exported XML and comparing model structures.\n- **Testing**: Vitest roundtrip tests for every example file (BPMN, DMN, Form). Builder tests for all element types including aspirational ones.\n\n### Confirmed Scope Boundaries\n- 9-branch exclusive gateway validated by `Handle PDP - Comment.bpmn` (all targets are call activities)\n- Ad-hoc sub-process with multi-instance loop validated by `Epic Review Bot.bpmn`\n- 2 plain intermediate throw events in `Epic Review Bot.bpmn`\n- 8 namespace prefixes in examples (`bpmn`, `bpmndi`, `dc`, `di`, `zeebe`, `modeler`, `xsi`, `camunda`)\n- No `bpmn:subProcess` in any example file (embedded sub-processes are aspirational only)\n- All 8 form component types in examples match the spec exactly; no `conditional` fields present\n\nReady to plan and implement on your signal.\n\n### Design Decisions\n\n**\n\nThe requirements are exceptionally detailed and leave no significant ambiguity from a developer experience / API design perspective. Here is my summary of the design decisions and assumptions:\n\n### API Surface (Developer Experience)\n- **Fluent builder** with method chaining is the primary creation API. The branching model (`gateway.branch(name, builder => {...})` + `connectTo(id)`) is well-specified with concrete examples covering fan-out, fan-in, parallel, and loop patterns.\n- **Three entry points**: `Bpmn.createProcess()`, `Dmn.createDecisionTable()`, and `Form.create()` — each with `parse()` / `export()` counterparts for roundtrip.\n- **REST connector convenience builder** is syntactic sugar — no new primitives, just ergonomic shortcuts.\n\n### Roundtrip Contract\n- Semantic equivalence, not byte-identical. Attribute ordering, whitespace, comments, and namespace prefix normalization are explicitly allowed to differ. Unknown extensions are preserved as opaque `XmlElement` nodes — this is the escape hatch for forward compatibility.\n\n### Auto-Layout Constraints\n- Fixed element sizes (events 36×36, tasks 100×80, gateways 50×50), minimum spacing (80px H, 60px V), orthogonal edge routing, Sugiyama-style layering with cycle handling via back-edge reversal. Sub-processes get nested layout passes. Overlap is a hard assertion; edge crossings are best-effort.\n\n### Scope Boundaries\n- Validated elements have roundtrip tests against the 35 example files. Aspirational elements (inclusive gateways, event sub-processes, message events, etc.) get builder + export support only — no roundtrip tests until examples are added.\n- Pools/lanes, CMMN, Zeebe Element Template files, nested sub-processes, and structural validation are explicitly out of scope.\n\n### Key Assumptions Confirmed\n- `fast-xml-parser` is the starting point for XML; `saxes` is the fallback.\n- 9-branch fan-out gateway confirmed in `Handle PDP - Comment.bpmn`.\n- Multi-output DMN validated by `Github>Slack users.dmn` (2 outputs).\n- Recursive form groups validated by `Transition form > Define to Implement.form`.\n- Ad-hoc sub-processes with multi-instance loops validated by `Epic Review Bot.bpmn`.\n\nNo further clarification needed — ready for implementation planning.",
+	"tasks": [
+		"Define XmlElement type and implement XML parsing/serialization core using fast-xml-parser with support for all 8 namespace prefixes and opaque unknown-extension preservation",
+		"Define BPMN internal model TypeScript interfaces and implement BPMN XML parser (XML to typed model with XmlElement[] for unknown extensions) and BPMN XML serializer (typed model back to semantically equivalent XML)",
+		"Implement BPMN fluent builder API: Bpmn.createProcess() entry point, method chaining for all element types (tasks, events, gateways, call activities, ad-hoc sub-processes), gateway branch(name, callback) with sub-builders, connectTo(id) for merging and loops, including aspirational element support",
+		"Implement DMN model types, XML parser, XML serializer, and Dmn.createDecisionTable() fluent builder with multi-output decision table support",
+		"Implement Form model types, JSON parser, JSON serializer, and Form.create() fluent builder supporting all 8 component types, recursive groups, and layout property preservation",
+		"Implement auto-layout engine: Sugiyama/layered algorithm with DFS back-edge detection and reversal, fixed element sizes (events 36x36, tasks 100x80, gateways 50x50), minimum spacing (80px H, 60px V), orthogonal edge routing, nested sub-process layout passes, overlap assertion, and best-effort edge-crossing minimization",
+		"Implement REST connector convenience builder as syntactic sugar on top of BPMN task builder",
+		"Add Vitest roundtrip tests for all 35 example files (BPMN, DMN, Form) validating semantic equivalence by re-parsing exported output and comparing model structures",
+		"Add Vitest builder unit tests for all element types including aspirational elements, covering gateway fan-out/fan-in patterns, parallel gateways, loops via connectTo, ad-hoc sub-processes with multi-instance, and REST connector builder"
+	],
+	"designSpec": "Design specification created. Key points:\n\n**This is a pure SDK library with no visual UI** — the spec covers Developer Experience (DX) as the \"UX.\"\n\n1. **Component hierarchy**: 3 domains (BPMN/DMN/Form) × 4 modules each (model/parser/serializer/builder) + shared XML layer + Sugiyama layout engine. Three entry points: `Bpmn`, `Dmn`, `Form`.\n\n2. **Interaction flows**: 6 developer journeys documented — linear process creation, gateway branching with `branch()`/`connectTo()`, roundtrip parse→export, DMN tables, form creation, and REST connector sugar.\n\n3. **States**: Builder lifecycle (Initial → Building → Complete) with 6 fail-fast error conditions (duplicate IDs, invalid connectTo, malformed XML/JSON, missing required fields, layout overlap violations).\n\n4. **Layout**: Sugiyama algorithm with fixed sizes (events 36×36, tasks 100×80, gateways 50×50), ≥80px H / ≥60px V spacing, orthogonal edge routing, nested sub-process layout passes, and overlap assertions as hard post-conditions.\n\n5. **Accessibility (DX)**: IntelliSense-first JSDoc, self-documenting names, progressive complexity (simple flows = 3 calls), compile-time type safety via discriminated unions, and actionable error messages that name the element and process.\n\nFull spec saved to session artifacts.",
+	"streamResults": [],
+	"issueBody": "Now I have the confirmed count (9 branches). Here is the complete revised section:\n\n---\n\n### Engineering Decisions\n\n**\n\nThe requirements are exceptionally well-specified. Here is my summary of technical decisions and assumptions:\n\n### Key Assumptions\n1. **`camunda:` namespace** (Platform 7, present in example files) — treated as opaque `XmlElement` and passed through on roundtrip, since the SDK targets Zeebe/Cloud only.\n2. **Form `layout` property** (`row`, `columns`) — present in example forms but not explicitly called out in requirements. Will be preserved on roundtrip as part of the JSON model; builder support for grid layout positioning is not required.\n3. **Form metadata** (`executionPlatform`, `executionPlatformVersion`, `exporter`, `schemaVersion`) — preserved on roundtrip; builder sets sensible defaults.\n4. **Internal model design** — I have freedom to design the internal BPMN/DMN model interfaces; only the public builder API shape and `XmlElement` type are specified.\n5. **Parse error handling** — malformed XML/JSON throws descriptive errors (fail fast per coding guidelines); no partial-result mode.\n\n### Implementation Approach\n- **XML library**: Start with `fast-xml-parser`; fall back to `saxes` only if namespace handling fails (as specified).\n- **Layout**: Custom Sugiyama/layered algorithm, no external library. Back-edges detected via DFS, temporarily reversed for layering, restored for routing.\n- **Builder pattern**: Immutable-style method chaining where each method returns the builder. Gateway branching via `branch(name, callback)` with sub-builders. `connectTo()` for merging/loops.\n- **Roundtrip strategy**: Parse into typed model + `XmlElement[]` for unknowns → serialize back. Semantic equivalence validated by re-parsing exported XML and comparing model structures.\n- **Testing**: Vitest roundtrip tests for every example file (BPMN, DMN, Form). Builder tests for all element types including aspirational ones.\n\n### Confirmed Scope Boundaries\n- 9-branch exclusive gateway validated by `Handle PDP - Comment.bpmn` (all targets are call activities)\n- Ad-hoc sub-process with multi-instance loop validated by `Epic Review Bot.bpmn`\n- 2 plain intermediate throw events in `Epic Review Bot.bpmn`\n- 8 namespace prefixes in examples (`bpmn`, `bpmndi`, `dc`, `di`, `zeebe`, `modeler`, `xsi`, `camunda`)\n- No `bpmn:subProcess` in any example file (embedded sub-processes are aspirational only)\n- All 8 form component types in examples match the spec exactly; no `conditional` fields present\n\nReady to plan and implement on your signal.\n\n### Design Decisions\n\n**\n\nThe requirements are exceptionally detailed and leave no significant ambiguity from a developer experience / API design perspective. Here is my summary of the design decisions and assumptions:\n\n### API Surface (Developer Experience)\n- **Fluent builder** with method chaining is the primary creation API. The branching model (`gateway.branch(name, builder => {...})` + `connectTo(id)`) is well-specified with concrete examples covering fan-out, fan-in, parallel, and loop patterns.\n- **Three entry points**: `Bpmn.createProcess()`, `Dmn.createDecisionTable()`, and `Form.create()` — each with `parse()` / `export()` counterparts for roundtrip.\n- **REST connector convenience builder** is syntactic sugar — no new primitives, just ergonomic shortcuts.\n\n### Roundtrip Contract\n- Semantic equivalence, not byte-identical. Attribute ordering, whitespace, comments, and namespace prefix normalization are explicitly allowed to differ. Unknown extensions are preserved as opaque `XmlElement` nodes — this is the escape hatch for forward compatibility.\n\n### Auto-Layout Constraints\n- Fixed element sizes (events 36×36, tasks 100×80, gateways 50×50), minimum spacing (80px H, 60px V), orthogonal edge routing, Sugiyama-style layering with cycle handling via back-edge reversal. Sub-processes get nested layout passes. Overlap is a hard assertion; edge crossings are best-effort.\n\n### Scope Boundaries\n- Validated elements have roundtrip tests against the 35 example files. Aspirational elements (inclusive gateways, event sub-processes, message events, etc.) get builder + export support only — no roundtrip tests until examples are added.\n- Pools/lanes, CMMN, Zeebe Element Template files, nested sub-processes, and structural validation are explicitly out of scope.\n\n### Key Assumptions Confirmed\n- `fast-xml-parser` is the starting point for XML; `saxes` is the fallback.\n- 9-branch fan-out gateway confirmed in `Handle PDP - Comment.bpmn`.\n- Multi-output DMN validated by `Github>Slack users.dmn` (2 outputs).\n- Recursive form groups validated by `Transition form > Define to Implement.form`.\n- Ad-hoc sub-processes with multi-instance loops validated by `Epic Review Bot.bpmn`.\n\nNo further clarification needed — ready for implementation planning.",
+	"runId": "2026-02-18T15-15-10-034Z",
+	"mode": "run",
+	"activePhase": "implement-3",
+	"iterationProgress": {
+		"stream-0-code": {
+			"content": "All 45 tests pass. Here's a summary of what was implemented:\n\n**Files modified:**\n- `packages/bpmn-sdk/src/xml/xml-parser.ts` — Rewrote XML parser and serializer using `fast-xml-parser` v5 with `preserveOrder: true` mode. Key fixes: disabled entity processing (preserves BPMN expressions verbatim), removed `@_` attribute prefix (no-prefix mode), enabled `suppressEmptyNode` for clean self-closing tags, fixed text node handling to not incorrectly drop whitespace-only content.\n- `packages/bpmn-sdk/src/index.ts` — Added `parseXml` and `serializeXml` to public API exports.\n\n**Files created:**\n- `packages/bpmn-sdk/tests/xml/xml-roundtrip.test.ts` — 45 tests covering: basic parsing, namespace prefix preservation (all 8 prefixes), attribute preservation (`xsi:type`, `camunda:` attrs), text content, error handling, serializer output format, roundtrip for all 27 BPMN + 1 DMN example files, and the 9-branch gateway validation.",
+			"completedIterations": 0
+		},
+		"stream-0-review-0": {
+			"content": "All 3 Biome issues fixed — zero lint errors, 45/45 tests pass.",
+			"completedIterations": 1
+		},
+		"stream-3-code": {
+			"content": "All files are new and untracked. Here's a summary of what was implemented:\n\n## Summary\n\n**Files created (14 new files):**\n\n### Infrastructure\n- `package.json` — root monorepo config with pnpm, turbo, biome, vitest, typescript devDeps\n- `pnpm-workspace.yaml` — workspace declaration\n- `turbo.json` — build/test/typecheck/check pipelines\n- `biome.json` — linter/formatter config\n- `tsconfig.base.json` — shared TypeScript strict config\n- `packages/bpmn-sdk/package.json` — SDK package with `fast-xml-parser` dependency\n- `packages/bpmn-sdk/tsconfig.json`, `vitest.config.ts`\n\n### Shared Types\n- `src/types/xml-element.ts` — `XmlElement` interface for opaque extension preservation\n- `src/types/id-generator.ts` — unique ID generator\n- `src/types/index.ts`\n\n### XML Layer\n- `src/xml/xml-parser.ts` — generic XML ↔ `XmlElement` tree using `fast-xml-parser` (namespace-aware)\n\n### DMN Module\n- `src/dmn/dmn-model.ts` — all DMN types (`DmnDefinitions`, `DmnDecision`, `DmnDecisionTable`, `DmnInput`, `DmnOutput`, `DmnRule`, `HitPolicy`, etc.)\n- `src/dmn/dmn-parser.ts` — parses DMN XML into typed model\n- `src/dmn/dmn-serializer.ts` — serializes typed model to DMN XML\n- `src/dmn/dmn-builder.ts` — `DecisionTableBuilder` fluent API with multi-output support\n- `src/dmn/index.ts` — `Dmn` entry point (`createDecisionTable`, `parse`, `export`)\n\n### Tests\n- `tests/dmn.test.ts` — **10 tests** covering builder (single/multi-output, hit policies, validation errors, XML export, diagram), parser, and roundtrip against `Github>Slack users.dmn`\n\n### Docs\n- `doc/progress.md`, `doc/features.md`",
+			"completedIterations": 0
+		},
+		"stream-4-code": {
+			"content": "Done. Here's what was implemented:\n\n**Files created (6 source, 2 test):**\n\n| File | Purpose |\n|---|---|\n| `src/form/form-model.ts` | Discriminated union types for all 8 component types + `FormDefinition` |\n| `src/form/form-parser.ts` | `parseForm()` — JSON → typed model with fail-fast validation |\n| `src/form/form-serializer.ts` | `exportForm()` — typed model → JSON with Camunda property ordering |\n| `src/form/form-builder.ts` | Fluent `FormBuilder` + `GroupBuilder` with method chaining |\n| `src/form/index.ts` | `Form.create()`, `Form.parse()`, `Form.export()` entry points |\n| `src/index.ts` | Updated with Form re-exports |\n| `tests/form/roundtrip.test.ts` | 20 tests: roundtrip for all 3 `.form` files + parser validation |\n| `tests/form/builder.test.ts` | 17 tests: all 8 component types, recursive groups, fluent chaining |\n\n**37 tests passing**, zero form-specific type errors, zero lint warnings.",
+			"completedIterations": 0
+		}
+	},
+	"sessionLog": {
+		"decompose": {
+			"sessionId": "1bc55635-692d-4025-ad5b-932869306b72",
+			"agent": "pm",
+			"role": "pm"
+		},
+		"design": {
+			"sessionId": "ed0c91be-3171-46ac-9e0b-92846bf15770",
+			"agent": "designer",
+			"role": "designer"
+		},
+		"design/review-0-1": {
+			"sessionId": "16e8627f-7f30-4813-ae7d-0c0998a6f237",
+			"agent": "design-reviewer",
+			"role": "design-reviewer"
+		},
+		"implement/stream-0": {
+			"sessionId": "92b59261-fc2a-4087-a6d5-4ab076725ad5",
+			"agent": "engineer",
+			"role": "engineer"
+		},
+		"implement/stream-2": {
+			"sessionId": "e5204089-e9e9-49de-b8cd-f4f1e16d2b65",
+			"agent": "engineer",
+			"role": "engineer"
+		},
+		"implement/stream-1": {
+			"sessionId": "63fd49b5-e700-4930-ac9a-f3bcf131c027",
+			"agent": "engineer",
+			"role": "engineer"
+		},
+		"implement/stream-3": {
+			"sessionId": "e2af5844-407f-4623-aa03-8a9cb96a1471",
+			"agent": "engineer",
+			"role": "engineer"
+		},
+		"implement/stream-4": {
+			"sessionId": "12199b5b-5bf9-48fb-a78d-b2bbb7000415",
+			"agent": "engineer",
+			"role": "engineer"
+		},
+		"implement/stream-5": {
+			"sessionId": "7de55855-33b5-43db-bef9-9e01979dea22",
+			"agent": "engineer",
+			"role": "engineer"
+		},
+		"implement/stream-7": {
+			"sessionId": "1ea8fc03-3a70-4153-9824-0082d2709dfe",
+			"agent": "engineer",
+			"role": "engineer"
+		},
+		"implement/stream-6": {
+			"sessionId": "01c6bb65-07e3-455a-b3d9-2fa838415536",
+			"agent": "engineer",
+			"role": "engineer"
+		},
+		"implement/stream-8": {
+			"sessionId": "d7fc78db-b5fd-4f2b-9daa-624105315339",
+			"agent": "engineer",
+			"role": "engineer"
+		},
+		"implement/stream-0/review-0-1": {
+			"sessionId": "60506fe1-1584-43ac-8c2f-b7ff9ff96367",
+			"agent": "code-reviewer",
+			"role": "code-reviewer"
+		},
+		"implement/stream-0/review-0-2": {
+			"sessionId": "69be22f2-de96-4983-b5ac-8371719b8de5",
+			"agent": "code-reviewer",
+			"role": "code-reviewer"
+		},
+		"implement/stream-3/review-0-1": {
+			"sessionId": "7dadcf6e-743a-48b8-95a4-6f6f6ba1960b",
+			"agent": "code-reviewer",
+			"role": "code-reviewer"
+		},
+		"implement/stream-4/review-0-1": {
+			"sessionId": "a1192133-d06b-4df3-a4ca-25898917c0c6",
+			"agent": "code-reviewer",
+			"role": "code-reviewer"
+		},
+		"implement/stream-3/qa-1": {
+			"sessionId": "75885f04-d128-425d-88e9-175df4c6a16d",
+			"agent": "tester",
+			"role": "tester"
+		},
+		"implement/stream-4/qa-1": {
+			"sessionId": "d84fab9f-dfc4-4fa0-87f1-8a9a7edf9565",
+			"agent": "tester",
+			"role": "tester"
+		}
+	}
+}

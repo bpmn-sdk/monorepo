@@ -1,0 +1,257 @@
+{
+  "executionPlatform": "Camunda Cloud",
+  "executionPlatformVersion": "8.5.0",
+  "exporter": {
+    "name": "Camunda Web Modeler",
+    "version": "a131ae4"
+  },
+  "schemaVersion": 18,
+  "id": "status-change-discover-define",
+  "components": [
+    {
+      "text": "Discover to Define",
+      "label": "Text view",
+      "type": "text",
+      "layout": {
+        "row": "Row_1rpsw7r",
+        "columns": null
+      },
+      "id": "Field_1w9naai"
+    },
+    {
+      "text": "=\"# PDP\" + string(pdp)",
+      "type": "text",
+      "layout": {
+        "row": "Row_1yqvg9s",
+        "columns": null
+      },
+      "id": "Field_1dtrdz6"
+    },
+    {
+      "label": "Next DRI",
+      "type": "select",
+      "layout": {
+        "row": "Row_19j17wc",
+        "columns": null
+      },
+      "id": "Field_1ed48q4",
+      "key": "statusChangeNextDri",
+      "valuesKey": "repoCollaborators",
+      "validate": {
+        "required": true
+      },
+      "searchable": true
+    },
+    {
+      "label": "Confirm the epic is ready in Productboard",
+      "components": [
+        {
+          "label": "Epic template ",
+          "values": [
+            {
+              "label": "Completed 'Value Proposition Statement'",
+              "value": "Completed 'Value Proposition Statement'"
+            },
+            {
+              "label": "Completed 'User Problem' ",
+              "value": "Completed 'User Problem' "
+            },
+            {
+              "label": "Proposed 'User Stories'",
+              "value": "Proposed 'User Stories'"
+            },
+            {
+              "label": "Confirmed technical feasibility with Engineering Manager ",
+              "value": "Confirmed technical feasibility with Engineering Manager "
+            },
+            {
+              "label": "Added notes under 'Implementation Notes'",
+              "value": "Added notes under 'Implementation Notes'"
+            }
+          ],
+          "type": "checklist",
+          "layout": {
+            "row": "Row_0qsiyae",
+            "columns": null
+          },
+          "id": "Field_0mzgiil",
+          "key": "epicTemplateValues",
+          "validate": {
+            "required": true
+          }
+        },
+        {
+          "label": "Productboard fields",
+          "values": [
+            {
+              "label": "‘Priority’ confirmed",
+              "value": "‘Priority’ confirmed"
+            },
+            {
+              "label": "'Release' uncommitted preference confirmed",
+              "value": "'Release' uncommitted preference confirmed"
+            },
+            {
+              "label": "'Eng DRI' and 'Design DRI' added",
+              "value": "'Eng DRI' and 'Design DRI' added"
+            },
+            {
+              "label": "'Design link' added with the user workflows",
+              "value": "'Design link' added with the user workflows"
+            }
+          ],
+          "type": "checklist",
+          "layout": {
+            "row": "Row_0kfgp2j",
+            "columns": null
+          },
+          "id": "Field_01c0ini",
+          "key": "productBoardFieldValues",
+          "validate": {
+            "required": true
+          }
+        }
+      ],
+      "showOutline": true,
+      "type": "group",
+      "layout": {
+        "row": "Row_1f4uez6",
+        "columns": null
+      },
+      "id": "Field_124teyu"
+    },
+    {
+      "label": "Inform key stakeholders",
+      "components": [
+        {
+          "label": "Should Support receive internal training for this feature? This is preferred for new projects and large changes ",
+          "values": [
+            {
+              "label": "Yes",
+              "value": "true"
+            },
+            {
+              "label": "No",
+              "value": "false"
+            }
+          ],
+          "type": "radio",
+          "layout": {
+            "row": "Row_0o6wk3m",
+            "columns": null
+          },
+          "id": "Field_0d21efj",
+          "key": "statusChangeSupportInternalTrainingNeeded",
+          "validate": {
+            "required": true
+          },
+          "defaultValue": "false"
+        },
+        {
+          "label": "Should Education create external training for this feature?",
+          "values": [
+            {
+              "label": "Yes",
+              "value": "true"
+            },
+            {
+              "label": "No",
+              "value": "false"
+            }
+          ],
+          "type": "radio",
+          "layout": {
+            "row": "Row_1ofzfq1",
+            "columns": null
+          },
+          "id": "Field_1n4w4uu",
+          "key": "statusChangeExternalTrainingNeeded",
+          "validate": {
+            "required": true
+          },
+          "defaultValue": "false"
+        },
+        {
+          "label": "Does this improvement involve a third party service provider that is not included in the subcrontractors list? Mark yes to notify Legal",
+          "values": [
+            {
+              "label": "Yes",
+              "value": "true"
+            },
+            {
+              "label": "No",
+              "value": "false"
+            }
+          ],
+          "type": "radio",
+          "layout": {
+            "row": "Row_077nhbq",
+            "columns": null
+          },
+          "id": "Field_00noa7n",
+          "key": "statusChangeNotifyLegal",
+          "validate": {
+            "required": false
+          },
+          "defaultValue": "false"
+        },
+        {
+          "label": "Do you need InfoSec assistance for the solution design of this feature?",
+          "values": [
+            {
+              "label": "Yes",
+              "value": "true"
+            },
+            {
+              "label": "No",
+              "value": "false"
+            }
+          ],
+          "type": "radio",
+          "layout": {
+            "row": "Row_0p92cqk",
+            "columns": null
+          },
+          "id": "Field_04czqm1",
+          "key": "statusChangeSecurityRequired",
+          "defaultValue": "false",
+          "validate": {
+            "required": true
+          }
+        },
+        {
+          "label": "Does this change update existing infrastructure, provision new infrastructure, or require input from FinOps on the cost impact?",
+          "values": [
+            {
+              "label": "Yes",
+              "value": "true"
+            },
+            {
+              "label": "No",
+              "value": "false"
+            }
+          ],
+          "type": "radio",
+          "layout": {
+            "row": "Row_0grze8x",
+            "columns": null
+          },
+          "id": "Field_1h6m0tp",
+          "key": "statusChangeFinOpsRequired",
+          "validate": {
+            "required": true
+          },
+          "defaultValue": "false"
+        }
+      ],
+      "showOutline": true,
+      "type": "group",
+      "layout": {
+        "row": "Row_0tu11d7",
+        "columns": null
+      },
+      "id": "Field_0gup0ig"
+    }
+  ],
+  "type": "default"
+}

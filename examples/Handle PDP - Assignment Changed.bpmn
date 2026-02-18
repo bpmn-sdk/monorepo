@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:zeebe="http://camunda.org/schema/zeebe/1.0" xmlns:modeler="http://camunda.org/schema/modeler/1.0" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:camunda="http://camunda.org/schema/1.0/bpmn" id="Definitions_1" targetNamespace="http://bpmn.io/schema/bpmn" exporter="Camunda Web Modeler" exporterVersion="42c698d" modeler:executionPlatform="Camunda Cloud" modeler:executionPlatformVersion="8.5.0" camunda:diagramRelationId="c33149d3-8eb6-42ad-a841-2bf2dcdbeee1">
+  <bpmn:process id="Process_7l543eo" name="Handle PDP - Assignment Changed" isExecutable="true">
+    <bpmn:callActivity id="Activity_1wari1p" name="Get Project Data">
+      <bpmn:extensionElements>
+        <zeebe:calledElement processId="pdp-get-project-data" propagateAllChildVariables="true" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_1n48w6q</bpmn:incoming>
+      <bpmn:outgoing>Flow_1ddmyii</bpmn:outgoing>
+    </bpmn:callActivity>
+    <bpmn:sequenceFlow id="Flow_1ddmyii" sourceRef="Activity_1wari1p" targetRef="Gateway_1wvfuls" />
+    <bpmn:serviceTask id="Activity_1yk6gk1" name="Slack:&#10;Notify about new assignees" zeebe:modelerTemplate="io.camunda.connectors.Slack.v1" zeebe:modelerTemplateVersion="5" zeebe:modelerTemplateIcon="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTI3IiBoZWlnaHQ9IjEyNyIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cGF0aCBkPSJNMjcuMiA4MGMwIDcuMy01LjkgMTMuMi0xMy4yIDEzLjJDNi43IDkzLjIuOCA4Ny4zLjggODBjMC03LjMgNS45LTEzLjIgMTMuMi0xMy4yaDEzLjJWODB6bTYuNiAwYzAtNy4zIDUuOS0xMy4yIDEzLjItMTMuMiA3LjMgMCAxMy4yIDUuOSAxMy4yIDEzLjJ2MzNjMCA3LjMtNS45IDEzLjItMTMuMiAxMy4yLTcuMyAwLTEzLjItNS45LTEzLjItMTMuMlY4MHoiIGZpbGw9IiNFMDFFNUEiLz4KICA8cGF0aCBkPSJNNDcgMjdjLTcuMyAwLTEzLjItNS45LTEzLjItMTMuMkMzMy44IDYuNSAzOS43LjYgNDcgLjZjNy4zIDAgMTMuMiA1LjkgMTMuMiAxMy4yVjI3SDQ3em0wIDYuN2M3LjMgMCAxMy4yIDUuOSAxMy4yIDEzLjIgMCA3LjMtNS45IDEzLjItMTMuMiAxMy4ySDEzLjlDNi42IDYwLjEuNyA1NC4yLjcgNDYuOWMwLTcuMyA1LjktMTMuMiAxMy4yLTEzLjJINDd6IiBmaWxsPSIjMzZDNUYwIi8+CiAgPHBhdGggZD0iTTk5LjkgNDYuOWMwLTcuMyA1LjktMTMuMiAxMy4yLTEzLjIgNy4zIDAgMTMuMiA1LjkgMTMuMiAxMy4yIDAgNy4zLTUuOSAxMy4yLTEzLjIgMTMuMkg5OS45VjQ2Ljl6bS02LjYgMGMwIDcuMy01LjkgMTMuMi0xMy4yIDEzLjItNy4zIDAtMTMuMi01LjktMTMuMi0xMy4yVjEzLjhDNjYuOSA2LjUgNzIuOC42IDgwLjEuNmM3LjMgMCAxMy4yIDUuOSAxMy4yIDEzLjJ2MzMuMXoiIGZpbGw9IiMyRUI2N0QiLz4KICA8cGF0aCBkPSJNODAuMSA5OS44YzcuMyAwIDEzLjIgNS45IDEzLjIgMTMuMiAwIDcuMy01LjkgMTMuMi0xMy4yIDEzLjItNy4zIDAtMTMuMi01LjktMTMuMi0xMy4yVjk5LjhoMTMuMnptMC02LjZjLTcuMyAwLTEzLjItNS45LTEzLjItMTMuMiAwLTcuMyA1LjktMTMuMiAxMy4yLTEzLjJoMzMuMWM3LjMgMCAxMy4yIDUuOSAxMy4yIDEzLjIgMCA3LjMtNS45IDEzLjItMTMuMiAxMy4ySDgwLjF6IiBmaWxsPSIjRUNCMjJFIi8+Cjwvc3ZnPgo=">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="io.camunda:slack:1" retries="3" />
+        <zeebe:ioMapping>
+          <zeebe:input source="{{secrets.PDP_SLACK_CAMUNDA}}" target="token" />
+          <zeebe:input source="chat.postMessage" target="method" />
+          <zeebe:input source="messageBlock" target="data.messageType" />
+          <zeebe:input source="=[&#10;	{&#10;			&#34;type&#34;: &#34;section&#34;,&#10;			&#34;text&#34;: {&#10;				&#34;type&#34;: &#34;mrkdwn&#34;,&#10;				&#34;text&#34;: &#34;New Epic assignments: &#34; + string join(for assignee in webhook.body.issue.assignees return assignee.login, &#34;, &#34;)&#10;			}&#10;		}&#10;]" target="data.blockContent" />
+          <zeebe:input source="=if (slackChannelId != null) then slackChannelId else generatedSlackChannel" target="data.channel" />
+        </zeebe:ioMapping>
+        <zeebe:taskHeaders>
+          <zeebe:header key="retryBackoff" value="PT0S" />
+        </zeebe:taskHeaders>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_06yqkjj</bpmn:incoming>
+      <bpmn:outgoing>Flow_1aofbcn</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:sequenceFlow id="Flow_1aofbcn" sourceRef="Activity_1yk6gk1" targetRef="Gateway_1q8emzy" />
+    <bpmn:exclusiveGateway id="Gateway_1wvfuls" default="Flow_093qa7g">
+      <bpmn:incoming>Flow_1ddmyii</bpmn:incoming>
+      <bpmn:outgoing>Flow_06yqkjj</bpmn:outgoing>
+      <bpmn:outgoing>Flow_093qa7g</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:sequenceFlow id="Flow_06yqkjj" sourceRef="Gateway_1wvfuls" targetRef="Activity_1yk6gk1">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=generatedSlackChannel != null</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:exclusiveGateway id="Gateway_1q8emzy">
+      <bpmn:incoming>Flow_1aofbcn</bpmn:incoming>
+      <bpmn:incoming>Flow_093qa7g</bpmn:incoming>
+      <bpmn:outgoing>Flow_1xbb8t1</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:sequenceFlow id="Flow_1xbb8t1" sourceRef="Gateway_1q8emzy" targetRef="Activity_0bsjuvc" />
+    <bpmn:sequenceFlow id="Flow_093qa7g" name="slack channel not available" sourceRef="Gateway_1wvfuls" targetRef="Gateway_1q8emzy" />
+    <bpmn:callActivity id="Activity_0bsjuvc" name="Mixpanel:&#10;Track Event">
+      <bpmn:extensionElements>
+        <zeebe:calledElement processId="Process_17xxjhi" propagateAllChildVariables="false" />
+        <zeebe:ioMapping>
+          <zeebe:input source="=&#34;update:assignee&#34;" target="analyticsEvent" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_1xbb8t1</bpmn:incoming>
+      <bpmn:outgoing>Flow_1iiw7y9</bpmn:outgoing>
+    </bpmn:callActivity>
+    <bpmn:startEvent id="Event_10lpde0">
+      <bpmn:outgoing>Flow_1n48w6q</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:sequenceFlow id="Flow_1n48w6q" sourceRef="Event_10lpde0" targetRef="Activity_1wari1p" />
+    <bpmn:endEvent id="Event_0sk4cin">
+      <bpmn:incoming>Flow_1iiw7y9</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flow_1iiw7y9" sourceRef="Activity_0bsjuvc" targetRef="Event_0sk4cin" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_1">
+    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="Process_7l543eo">
+      <bpmndi:BPMNShape id="BPMNShape_1691n5v" bpmnElement="Activity_1wari1p">
+        <dc:Bounds x="370" y="1330" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="BPMNShape_1fff6k7" bpmnElement="Activity_1yk6gk1">
+        <dc:Bounds x="690" y="1330" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_1wvfuls_di" bpmnElement="Gateway_1wvfuls" isMarkerVisible="true">
+        <dc:Bounds x="575" y="1345" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_1q8emzy_di" bpmnElement="Gateway_1q8emzy" isMarkerVisible="true">
+        <dc:Bounds x="845" y="1345" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="BPMNShape_0vl4yk0" bpmnElement="Activity_0bsjuvc">
+        <dc:Bounds x="990" y="1330" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_10lpde0_di" bpmnElement="Event_10lpde0">
+        <dc:Bounds x="232" y="1352" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_0sk4cin_di" bpmnElement="Event_0sk4cin">
+        <dc:Bounds x="1192" y="1352" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_1ddmyii_di" bpmnElement="Flow_1ddmyii">
+        <di:waypoint x="470" y="1370" />
+        <di:waypoint x="575" y="1370" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_1aofbcn_di" bpmnElement="Flow_1aofbcn">
+        <di:waypoint x="790" y="1370" />
+        <di:waypoint x="845" y="1370" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_06yqkjj_di" bpmnElement="Flow_06yqkjj">
+        <di:waypoint x="625" y="1370" />
+        <di:waypoint x="690" y="1370" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_1xbb8t1_di" bpmnElement="Flow_1xbb8t1">
+        <di:waypoint x="895" y="1370" />
+        <di:waypoint x="990" y="1370" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_093qa7g_di" bpmnElement="Flow_093qa7g">
+        <di:waypoint x="600" y="1345" />
+        <di:waypoint x="600" y="1280" />
+        <di:waypoint x="870" y="1280" />
+        <di:waypoint x="870" y="1345" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="697" y="1246" width="85" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_1n48w6q_di" bpmnElement="Flow_1n48w6q">
+        <di:waypoint x="268" y="1370" />
+        <di:waypoint x="370" y="1370" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_1iiw7y9_di" bpmnElement="Flow_1iiw7y9">
+        <di:waypoint x="1090" y="1370" />
+        <di:waypoint x="1192" y="1370" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

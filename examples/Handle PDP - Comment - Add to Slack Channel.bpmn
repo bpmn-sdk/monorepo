@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:zeebe="http://camunda.org/schema/zeebe/1.0" xmlns:modeler="http://camunda.org/schema/modeler/1.0" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:camunda="http://camunda.org/schema/1.0/bpmn" id="Definitions_1" targetNamespace="http://bpmn.io/schema/bpmn" exporter="Camunda Web Modeler" exporterVersion="f14cdf2" modeler:executionPlatform="Camunda Cloud" modeler:executionPlatformVersion="8.5.0" camunda:diagramRelationId="c33149d3-8eb6-42ad-a841-2bf2dcdbeee1">
+  <bpmn:process id="Process_qwyod3m" name="Handle PDP - Comment - Add to Slack Channel" isExecutable="true">
+    <bpmn:scriptTask id="Activity_0l0dzvb" name="Get Github User Handle from Command">
+      <bpmn:extensionElements>
+        <zeebe:script expression="=replace(webhook.body.comment.body, config.COMMAND_SLACK, &#34;&#34;)" resultVariable="ghUserHandleFromCommandOriginal" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_0mn9sux</bpmn:incoming>
+      <bpmn:outgoing>Flow_1bqs055</bpmn:outgoing>
+    </bpmn:scriptTask>
+    <bpmn:exclusiveGateway id="Gateway_1pkgvwl" default="Flow_092tva5">
+      <bpmn:incoming>Flow_133gc0r</bpmn:incoming>
+      <bpmn:outgoing>Flow_153j36f</bpmn:outgoing>
+      <bpmn:outgoing>Flow_092tva5</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:sequenceFlow id="Flow_1bqs055" sourceRef="Activity_0l0dzvb" targetRef="Activity_13zu4u4" />
+    <bpmn:exclusiveGateway id="Gateway_0g2ml74">
+      <bpmn:incoming>Flow_0feusw0</bpmn:incoming>
+      <bpmn:incoming>Flow_1v4uuck</bpmn:incoming>
+      <bpmn:outgoing>Flow_0bjgl8x</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:sequenceFlow id="Flow_153j36f" sourceRef="Gateway_1pkgvwl" targetRef="Activity_0dmmtxr">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=ghUserHandleFromCommand != null and contains(ghUserHandleFromCommand, "@")</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_0feusw0" sourceRef="Activity_0dmmtxr" targetRef="Gateway_0g2ml74" />
+    <bpmn:scriptTask id="Activity_0dmmtxr" name="Remove @">
+      <bpmn:extensionElements>
+        <zeebe:script expression="=replace(ghUserHandleFromCommand, &#34;@&#34;, &#34;&#34;)" resultVariable="ghUserHandle" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_153j36f</bpmn:incoming>
+      <bpmn:outgoing>Flow_0feusw0</bpmn:outgoing>
+    </bpmn:scriptTask>
+    <bpmn:sequenceFlow id="Flow_092tva5" sourceRef="Gateway_1pkgvwl" targetRef="Activity_0k34fdc" />
+    <bpmn:scriptTask id="Activity_0k34fdc" name="Comment Creator">
+      <bpmn:extensionElements>
+        <zeebe:script expression="=webhook.body.comment.user.login" resultVariable="ghUserHandle" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_092tva5</bpmn:incoming>
+      <bpmn:outgoing>Flow_1v4uuck</bpmn:outgoing>
+    </bpmn:scriptTask>
+    <bpmn:sequenceFlow id="Flow_1v4uuck" sourceRef="Activity_0k34fdc" targetRef="Gateway_0g2ml74" />
+    <bpmn:sequenceFlow id="Flow_0bjgl8x" sourceRef="Gateway_0g2ml74" targetRef="Activity_046mpcl" />
+    <bpmn:callActivity id="Activity_1vv607l" name="Add epic creator to slack channel">
+      <bpmn:extensionElements>
+        <zeebe:calledElement processId="Process_c7ddeq2" propagateAllChildVariables="false" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_05l38yf</bpmn:incoming>
+      <bpmn:outgoing>Flow_1dboeuu</bpmn:outgoing>
+    </bpmn:callActivity>
+    <bpmn:callActivity id="Activity_046mpcl" name="Get Project Data">
+      <bpmn:extensionElements>
+        <zeebe:calledElement processId="pdp-get-project-data" propagateAllChildVariables="true" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_0bjgl8x</bpmn:incoming>
+      <bpmn:outgoing>Flow_05l38yf</bpmn:outgoing>
+    </bpmn:callActivity>
+    <bpmn:sequenceFlow id="Flow_05l38yf" sourceRef="Activity_046mpcl" targetRef="Activity_1vv607l" />
+    <bpmn:scriptTask id="Activity_13zu4u4" name="Trim">
+      <bpmn:extensionElements>
+        <zeebe:script expression="=replace(ghUserHandleFromCommandOriginal, &#34; &#34;, &#34;&#34;)" resultVariable="ghUserHandleFromCommand" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_1bqs055</bpmn:incoming>
+      <bpmn:outgoing>Flow_133gc0r</bpmn:outgoing>
+    </bpmn:scriptTask>
+    <bpmn:sequenceFlow id="Flow_133gc0r" sourceRef="Activity_13zu4u4" targetRef="Gateway_1pkgvwl" />
+    <bpmn:startEvent id="Event_138wrok">
+      <bpmn:outgoing>Flow_0mn9sux</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:sequenceFlow id="Flow_0mn9sux" sourceRef="Event_138wrok" targetRef="Activity_0l0dzvb" />
+    <bpmn:endEvent id="Event_1jgqm4k">
+      <bpmn:incoming>Flow_1dboeuu</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flow_1dboeuu" sourceRef="Activity_1vv607l" targetRef="Event_1jgqm4k" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_1">
+    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="Process_qwyod3m">
+      <bpmndi:BPMNShape id="Activity_08r8sbv_di" bpmnElement="Activity_0l0dzvb">
+        <dc:Bounds x="560" y="1140" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_1pkgvwl_di" bpmnElement="Gateway_1pkgvwl" isMarkerVisible="true">
+        <dc:Bounds x="845" y="1155" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_0g2ml74_di" bpmnElement="Gateway_0g2ml74" isMarkerVisible="true">
+        <dc:Bounds x="1135" y="1155" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_0977uuh_di" bpmnElement="Activity_0dmmtxr">
+        <dc:Bounds x="970" y="1140" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="BPMNShape_1gqgfky" bpmnElement="Activity_0k34fdc">
+        <dc:Bounds x="970" y="1030" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="BPMNShape_07974qe" bpmnElement="Activity_1vv607l">
+        <dc:Bounds x="1380" y="1140" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="BPMNShape_19akegz" bpmnElement="Activity_046mpcl">
+        <dc:Bounds x="1230" y="1140" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="BPMNShape_0sh0vqw" bpmnElement="Activity_13zu4u4">
+        <dc:Bounds x="690" y="1140" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_138wrok_di" bpmnElement="Event_138wrok">
+        <dc:Bounds x="452" y="1162" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_1jgqm4k_di" bpmnElement="Event_1jgqm4k">
+        <dc:Bounds x="1532" y="1162" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_1bqs055_di" bpmnElement="Flow_1bqs055">
+        <di:waypoint x="660" y="1180" />
+        <di:waypoint x="690" y="1180" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_153j36f_di" bpmnElement="Flow_153j36f">
+        <di:waypoint x="895" y="1180" />
+        <di:waypoint x="970" y="1180" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_0feusw0_di" bpmnElement="Flow_0feusw0">
+        <di:waypoint x="1070" y="1180" />
+        <di:waypoint x="1135" y="1180" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_092tva5_di" bpmnElement="Flow_092tva5">
+        <di:waypoint x="870" y="1155" />
+        <di:waypoint x="870" y="1070" />
+        <di:waypoint x="970" y="1070" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_1v4uuck_di" bpmnElement="Flow_1v4uuck">
+        <di:waypoint x="1070" y="1070" />
+        <di:waypoint x="1160" y="1070" />
+        <di:waypoint x="1160" y="1155" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_0bjgl8x_di" bpmnElement="Flow_0bjgl8x">
+        <di:waypoint x="1185" y="1180" />
+        <di:waypoint x="1230" y="1180" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_05l38yf_di" bpmnElement="Flow_05l38yf">
+        <di:waypoint x="1330" y="1180" />
+        <di:waypoint x="1380" y="1180" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_133gc0r_di" bpmnElement="Flow_133gc0r">
+        <di:waypoint x="790" y="1180" />
+        <di:waypoint x="845" y="1180" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_0mn9sux_di" bpmnElement="Flow_0mn9sux">
+        <di:waypoint x="488" y="1180" />
+        <di:waypoint x="560" y="1180" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_1dboeuu_di" bpmnElement="Flow_1dboeuu">
+        <di:waypoint x="1480" y="1180" />
+        <di:waypoint x="1532" y="1180" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>
