@@ -2,15 +2,28 @@
 
 ## 2026-02-18
 
+### Comprehensive README Rewrite
+- Rewrote root `README.md` with best-practices structure matching top-tier SDKs
+- Added "Why this SDK?" section with value propositions
+- Added feature matrix table (BPMN/DMN/Forms × Parse/Build/Export)
+- Added advanced examples: REST connector, parallel branches, boundary events, sub-processes, roundtrip workflow, type narrowing
+- Added "Best Practices" section: descriptive IDs, discriminated unions, branch patterns, roundtrip modifications, composable processes
+- Enhanced API reference with return types and categorized builder methods table
+- Added semantic versioning guidance to contributing section
+
 ### Enhanced README and Changesets
 - Enhanced root `README.md` with badges (npm, TypeScript, license), table of contents, requirements section, yarn install option, expanded contributing guide with code quality expectations and release workflow
 - Added TypeScript usage section with discriminated union type narrowing examples
 - Added REST connector convenience builder example
+- Fixed README code examples to use correct `taskType` property name (was `type`)
 - Added MIT `LICENSE` file
 - Changesets (`@changesets/cli`, `@changesets/changelog-github`) configured for version management and publishing
 - Committed `.changeset/` directory with `config.json` and `README.md`
 - Fixed changeset config to use `@changesets/changelog-github` with repo setting for PR/author links
-- Cleaned up duplicate release scripts in root `package.json`
+- Added `changeset`, `version-packages`, and `release` scripts to root `package.json`
+- Added auto-layout feature to README feature list
+- Added GitHub Actions CI workflow (build, typecheck, lint, test on push/PR)
+- Added GitHub Actions Release workflow using `changesets/action` for automated version PRs and npm publishing
 
 ### Timer Event Definition Attribute Roundtrip Fix
 - Added `timeDateAttributes` and `timeCycleAttributes` to `BpmnTimerEventDefinition` model

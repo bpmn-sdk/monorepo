@@ -8,24 +8,36 @@ A TypeScript SDK for working with Camunda 8 process automation artifacts — BPM
 
 ## Table of Contents
 
+- [Why this SDK?](#why-this-sdk)
 - [Features](#features)
 - [Installation](#installation)
 - [Quick Start](#quick-start)
+- [Advanced Examples](#advanced-examples)
 - [API Reference](#api-reference)
+- [Best Practices](#best-practices)
 - [Development](#development)
 - [Contributing](#contributing)
 - [License](#license)
 
+## Why this SDK?
+
+- **Type-safe models** — Discriminated unions, strict TypeScript, and full IntelliSense support
+- **Roundtrip fidelity** — Parse → export preserves semantic equivalence, extensions, and diagram interchange
+- **Fluent builders** — Method-chaining APIs that guide you through valid process construction
+- **Minimal footprint** — Single runtime dependency (`fast-xml-parser`), ESM-only, tree-shakeable
+- **Production-tested** — Roundtrip-validated against 34 real-world process files
+
 ## Features
 
-- **BPMN** — Parse, build, and export BPMN 2.0 XML with full element support
-- **DMN** — Parse, build, and export DMN decision tables with all hit policies
-- **Forms** — Parse, build, and export Camunda Form JSON with 8 component types
-- **Roundtrip fidelity** — Parse → export preserves semantic equivalence
-- **Fluent builders** — Method-chaining APIs for constructing definitions programmatically
+| Module | Parse | Build | Export | Format |
+|--------|:-----:|:-----:|:------:|--------|
+| **BPMN** | ✅ | ✅ | ✅ | XML |
+| **DMN** | ✅ | ✅ | ✅ | XML |
+| **Forms** | ✅ | ✅ | ✅ | JSON |
+
 - **Auto-layout** — Sugiyama/layered layout algorithm with sub-process support
-- **Full type safety** — Discriminated unions and strict TypeScript throughout
-- **Zero runtime dependencies** — Only `fast-xml-parser` for XML handling
+- **Extension preservation** — Zeebe, modeler, and Camunda extensions roundtrip correctly
+- **Diagram interchange** — BPMNDI shapes and edges preserved on roundtrip
 
 ## Requirements
 
@@ -48,27 +60,52 @@ yarn add @urbanisierung/bpmn-sdk
 
 ## Quick Start
 
-### BPMN
+### BPMN — Build a Process
 
 ```typescript
 import { Bpmn } from "@urbanisierung/bpmn-sdk";
 
-// Parse existing BPMN XML
-const model = Bpmn.parse(xml);
-
-// Build a new process
-const definitions = Bpmn.createProcess("my-process")
-  .name("My Process")
+const definitions = Bpmn.createProcess("order-process")
+  .name("Order Process")
   .startEvent("start")
-  .serviceTask("task-1", { taskType: "io.camunda:http-json:1" })
-  .exclusiveGateway("gw-1")
-  .branch("yes", (b) => b.condition("= approved").serviceTask("approve", { taskType: "approve-task" }))
-  .branch("no", (b) => b.defaultFlow().serviceTask("reject", { taskType: "reject-task" }))
-  .endEvent("end")
+  .serviceTask("validate", {
+    name: "Validate Order",
+    taskDefinitionType: "validate-order",
+  })
+  .exclusiveGateway("check", { name: "Order Valid?" })
+    .branch("yes", (b) =>
+      b.condition("= valid")
+        .serviceTask("fulfill", { name: "Fulfill", taskDefinitionType: "fulfill-order" })
+        .endEvent("end-ok")
+    )
+    .branch("no", (b) =>
+      b.defaultFlow()
+        .serviceTask("notify", { name: "Notify Customer", taskDefinitionType: "send-rejection" })
+        .endEvent("end-rejected")
+    )
   .build();
 
-// Export to XML
 const xml = Bpmn.export(definitions);
+```
+
+### BPMN — Parse and Inspect
+
+```typescript
+import { Bpmn } from "@urbanisierung/bpmn-sdk";
+
+const definitions = Bpmn.parse(xml);
+const process = definitions.processes[0];
+
+for (const element of process.flowElements) {
+  switch (element.type) {
+    case "serviceTask":
+      console.log(`Service: ${element.id} — ${element.name}`);
+      break;
+    case "exclusiveGateway":
+      console.log(`Gateway: ${element.name}`);
+      break;
+  }
+}
 ```
 
 ### DMN
@@ -76,18 +113,21 @@ const xml = Bpmn.export(definitions);
 ```typescript
 import { Dmn } from "@urbanisierung/bpmn-sdk";
 
-// Parse existing DMN XML
-const model = Dmn.parse(xml);
-
-// Build a new decision table
+// Build a decision table
 const definitions = Dmn.createDecisionTable("risk-level")
   .name("Risk Level")
   .hitPolicy("FIRST")
   .input({ label: "Age", expression: "age", typeRef: "integer" })
   .output({ label: "Risk", name: "risk", typeRef: "string" })
-  .rule({ inputs: ["< 25"], outputs: ['"high"'], description: "Young driver" })
-  .rule({ inputs: [">= 25"], outputs: ['"low"'], description: "Standard" })
-  .toXml();
+  .rule({ inputEntries: ["< 25"], outputEntries: ['"high"'], description: "Young driver" })
+  .rule({ inputEntries: [">= 25"], outputEntries: ['"low"'], description: "Standard" })
+  .build();
+
+const xml = Dmn.export(definitions);
+
+// Parse existing DMN
+const parsed = Dmn.parse(xml);
+console.log(`${parsed.decisions[0].decisionTable.rules.length} rules`);
 ```
 
 ### Forms
@@ -95,11 +135,7 @@ const definitions = Dmn.createDecisionTable("risk-level")
 ```typescript
 import { Form } from "@urbanisierung/bpmn-sdk";
 
-// Parse existing form JSON
-const model = Form.parse(json);
-
-// Build a new form
-const form = Form.create("my-form")
+const form = Form.create("onboarding")
   .textField({ key: "name", label: "Full Name" })
   .select({
     key: "department",
@@ -112,69 +148,10 @@ const form = Form.create("my-form")
   .checkbox({ key: "agree", label: "I agree to the terms" })
   .build();
 
-// Export to JSON
 const json = Form.export(form);
 ```
 
-## API Reference
-
-### `Bpmn`
-
-| Method | Description |
-| --- | --- |
-| `Bpmn.parse(xml)` | Parse BPMN XML string into a typed `BpmnDefinitions` model |
-| `Bpmn.export(model)` | Serialize a `BpmnDefinitions` model to BPMN XML string |
-| `Bpmn.createProcess(id)` | Create a new process using the fluent builder API |
-
-**Builder highlights:**
-
-- `startEvent()`, `endEvent()` — process boundaries
-- `serviceTask()`, `userTask()`, `scriptTask()`, `sendTask()`, `receiveTask()`, `businessRuleTask()` — task types
-- `exclusiveGateway()`, `parallelGateway()`, `inclusiveGateway()`, `eventBasedGateway()` — gateways with `branch()` pattern
-- `subProcess()`, `adHocSubProcess()`, `eventSubProcess()` — sub-process containers
-- `callActivity()` — external process invocation
-- `restConnector()` — convenience builder for HTTP connector service tasks
-- `connectTo(id)` — merge branches or create loops
-- `boundaryEvent()` — attach events to activities
-
-### `Dmn`
-
-| Method | Description |
-| --- | --- |
-| `Dmn.parse(xml)` | Parse DMN XML string into a typed `DmnDefinitions` model |
-| `Dmn.export(model)` | Serialize a `DmnDefinitions` model to DMN XML string |
-| `Dmn.createDecisionTable(id)` | Create a new decision table using the fluent builder API |
-
-**Supported hit policies:** `UNIQUE`, `FIRST`, `ANY`, `COLLECT`, `RULE ORDER`, `OUTPUT ORDER`, `PRIORITY`
-
-### `Form`
-
-| Method | Description |
-| --- | --- |
-| `Form.parse(json)` | Parse Camunda Form JSON string into a typed `FormDefinition` model |
-| `Form.export(model)` | Serialize a `FormDefinition` model to JSON string |
-| `Form.create(id?)` | Create a new form using the fluent builder API |
-
-**Component types:** `text`, `textfield`, `textarea`, `select`, `radio`, `checkbox`, `checklist`, `group`
-
-## TypeScript Usage
-
-The SDK exports all model types for fully typed workflows:
-
-```typescript
-import type {
-  BpmnDefinitions,
-  BpmnServiceTask,
-  BpmnFlowElement,
-} from "@urbanisierung/bpmn-sdk";
-
-// Use discriminated unions to narrow element types
-function getServiceTasks(definitions: BpmnDefinitions): BpmnServiceTask[] {
-  return definitions.processes
-    .flatMap((p) => p.flowElements)
-    .filter((el): el is BpmnServiceTask => el.type === "serviceTask");
-}
-```
+## Advanced Examples
 
 ### REST Connector
 
@@ -196,63 +173,266 @@ const definitions = Bpmn.createProcess("api-call")
   .build();
 ```
 
+### Parallel Branches
+
+```typescript
+const definitions = Bpmn.createProcess("parallel-flow")
+  .startEvent("start")
+  .parallelGateway("fork")
+    .branch("a", (b) =>
+      b.serviceTask("task-a", { name: "Task A", taskDefinitionType: "worker-a" })
+    )
+    .branch("b", (b) =>
+      b.serviceTask("task-b", { name: "Task B", taskDefinitionType: "worker-b" })
+    )
+  .parallelGateway("join")
+  .endEvent("end")
+  .build();
+```
+
+### Boundary Events
+
+```typescript
+const definitions = Bpmn.createProcess("with-timeout")
+  .startEvent("start")
+  .serviceTask("long-task", {
+    name: "Long Running Task",
+    taskDefinitionType: "long-worker",
+  })
+  .boundaryEvent("timeout", {
+    attachedTo: "long-task",
+    timerDuration: "PT30S",
+  })
+  .endEvent("timeout-end")
+  .build();
+```
+
+### Sub-Processes
+
+```typescript
+const definitions = Bpmn.createProcess("with-subprocess")
+  .startEvent("start")
+  .subProcess("inner", { name: "Inner Process" }, (sub) => {
+    sub
+      .startEvent("sub-start")
+      .serviceTask("sub-task", { name: "Sub Task", taskDefinitionType: "sub-worker" })
+      .endEvent("sub-end");
+  })
+  .endEvent("end")
+  .build();
+```
+
+### Roundtrip — Parse, Modify, Export
+
+```typescript
+import { Bpmn } from "@urbanisierung/bpmn-sdk";
+import type { BpmnDefinitions } from "@urbanisierung/bpmn-sdk";
+
+// Parse existing BPMN XML
+const definitions: BpmnDefinitions = Bpmn.parse(existingXml);
+
+// Inspect the model
+const process = definitions.processes[0];
+console.log(`Process: ${process.id}, ${process.flowElements.length} elements`);
+
+// Export back to XML (preserves extensions, DI, namespaces)
+const xml = Bpmn.export(definitions);
+```
+
+### TypeScript Type Narrowing
+
+The SDK exports all model types for fully typed workflows:
+
+```typescript
+import type {
+  BpmnDefinitions,
+  BpmnServiceTask,
+  BpmnFlowElement,
+} from "@urbanisierung/bpmn-sdk";
+
+// Use discriminated unions to narrow element types
+function getServiceTasks(definitions: BpmnDefinitions): BpmnServiceTask[] {
+  return definitions.processes
+    .flatMap((p) => p.flowElements)
+    .filter((el): el is BpmnServiceTask => el.type === "serviceTask");
+}
+```
+
+## API Reference
+
+### `Bpmn`
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `Bpmn.createProcess(id)` | `ProcessBuilder` | Create a new process using the fluent builder API |
+| `Bpmn.parse(xml)` | `BpmnDefinitions` | Parse BPMN XML string into a typed model |
+| `Bpmn.export(definitions)` | `string` | Serialize a `BpmnDefinitions` model to BPMN XML |
+
+**Builder methods:**
+
+| Category | Methods |
+|----------|---------|
+| **Events** | `startEvent()`, `endEvent()`, `intermediateThrowEvent()`, `intermediateCatchEvent()`, `boundaryEvent()` |
+| **Tasks** | `serviceTask()`, `userTask()`, `scriptTask()`, `sendTask()`, `receiveTask()`, `businessRuleTask()`, `callActivity()` |
+| **Gateways** | `exclusiveGateway()`, `parallelGateway()`, `inclusiveGateway()`, `eventBasedGateway()` — each with `branch(name, callback)` |
+| **Sub-processes** | `subProcess()`, `adHocSubProcess()`, `eventSubProcess()` — with nested `SubProcessContentBuilder` |
+| **Flow control** | `connectTo(id)` for merging and loops, `element(id)` for navigation |
+| **Connectors** | `restConnector(id, config)` for Camunda HTTP JSON connector tasks |
+| **Extensions** | Multi-instance (parallel/sequential), Zeebe task definitions, IO mappings, task headers, modeler templates |
+
+### `Dmn`
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `Dmn.createDecisionTable(id)` | `DecisionTableBuilder` | Create a new decision table |
+| `Dmn.parse(xml)` | `DmnDefinitions` | Parse DMN XML into a typed model |
+| `Dmn.export(definitions)` | `string` | Serialize a `DmnDefinitions` model to DMN XML |
+
+**Supported hit policies:** `UNIQUE` (default), `FIRST`, `ANY`, `COLLECT`, `RULE ORDER`, `OUTPUT ORDER`, `PRIORITY`
+
+### `Form`
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `Form.create(id?)` | `FormBuilder` | Create a new form using the fluent builder |
+| `Form.parse(json)` | `FormDefinition` | Parse Camunda Form JSON into a typed model |
+| `Form.export(form)` | `string` | Serialize a `FormDefinition` model to JSON |
+
+**Component types:** `text`, `textfield`, `textarea`, `select`, `radio`, `checkbox`, `checklist`, `group` (with nesting)
+
+## Best Practices
+
+### Use Descriptive IDs
+
+Element IDs appear in logs, metrics, and error messages. Use meaningful, kebab-case identifiers:
+
+```typescript
+// ✅ Good — IDs describe what the element does
+Bpmn.createProcess("order-fulfillment")
+  .serviceTask("validate-payment", { ... })
+  .serviceTask("ship-order", { ... })
+
+// ❌ Avoid — auto-generated or meaningless IDs
+Bpmn.createProcess("Process_1")
+  .serviceTask("Activity_0x1a2b", { ... })
+```
+
+### Leverage Discriminated Unions
+
+The parsed model uses discriminated unions on the `type` field. Use `switch` or type guards for safe property access:
+
+```typescript
+for (const el of process.flowElements) {
+  if (el.type === "serviceTask") {
+    // TypeScript narrows `el` to BpmnServiceTask
+    console.log(el.extensionElements);
+  }
+}
+```
+
+### Prefer `branch()` for Gateway Patterns
+
+The `branch(name, callback)` pattern ensures gateway branches are properly connected with sequence flows:
+
+```typescript
+.exclusiveGateway("decision")
+  .branch("approved", (b) =>
+    b.condition("= status = 'approved'")
+      .serviceTask("process", { ... })
+  )
+  .branch("rejected", (b) =>
+    b.defaultFlow()
+      .endEvent("end-rejected")
+  )
+```
+
+### Use Roundtrip for Modifications
+
+When modifying existing BPMN files, parse → modify → export to preserve extensions and diagram data:
+
+```typescript
+const definitions = Bpmn.parse(existingXml);
+// Modify the model...
+const updatedXml = Bpmn.export(definitions);
+```
+
+### Keep Processes Composable
+
+Use `callActivity()` to reference sub-processes by ID, keeping each process focused:
+
+```typescript
+const definitions = Bpmn.createProcess("main")
+  .startEvent("start")
+  .callActivity("validate", { calledElement: "validation-process" })
+  .callActivity("fulfill", { calledElement: "fulfillment-process" })
+  .endEvent("end")
+  .build();
+```
+
+## Project Structure
+
+```
+packages/
+  bpmn-sdk/          # Main SDK package (@urbanisierung/bpmn-sdk)
+    src/
+      bpmn/          # BPMN parser, serializer, builder, model
+      dmn/           # DMN parser, serializer, builder, model
+      form/          # Form parser, serializer, builder, model
+      layout/        # BPMN auto-layout engine (Sugiyama/layered)
+      xml/           # Generic XML parser/serializer
+      types/         # Shared types (XmlElement, ID generator)
+    tests/           # Vitest test suites
+examples/            # 34 real-world BPMN, DMN, and Form files for roundtrip testing
+```
+
 ## Development
 
 ### Prerequisites
 
-- Node.js (latest LTS)
-- pnpm 10+
+- [Node.js](https://nodejs.org/) 18+ (latest LTS recommended)
+- [pnpm](https://pnpm.io/) 10+
 
 ### Setup
 
 ```bash
+git clone https://github.com/urbanisierung/bpmn-sdk.git
+cd bpmn-sdk
 pnpm install
 ```
 
 ### Commands
 
-```bash
-pnpm build        # Build all packages
-pnpm test         # Run all tests
-pnpm check        # Lint and format check
-pnpm typecheck    # TypeScript type checking
-pnpm verify       # Run all of the above
-```
-
-### Project Structure
-
-```
-packages/
-  bpmn-sdk/        # Main SDK package (@urbanisierung/bpmn-sdk)
-    src/
-      bpmn/        # BPMN parser, serializer, builder, model
-      dmn/         # DMN parser, serializer, builder, model
-      form/        # Form parser, serializer, builder, model
-      layout/      # BPMN auto-layout engine
-      xml/         # Generic XML parser/serializer
-      types/       # Shared types (XmlElement, ID generator)
-    tests/         # Vitest test suites
-examples/          # Real-world BPMN, DMN, and Form files for roundtrip testing
-```
+| Command | Description |
+|---------|-------------|
+| `pnpm build` | Build all packages |
+| `pnpm test` | Run all tests (Vitest) |
+| `pnpm check` | Lint and format check (Biome) |
+| `pnpm typecheck` | TypeScript type checking |
+| `pnpm verify` | Build + typecheck + check + test |
 
 ## Contributing
 
 1. Fork the repository and create a feature branch
 2. Install dependencies: `pnpm install`
-3. Make your changes
+3. Make your changes and add tests
 4. Validate everything passes: `pnpm verify`
 5. Add a changeset describing your change: `pnpm changeset`
 6. Commit and open a pull request
 
 ### Versioning & Releases
 
-This project uses [Changesets](https://github.com/changesets/changesets) for version management and publishing. Every PR that changes package functionality should include a changeset.
+This project uses [Changesets](https://github.com/changesets/changesets) for version management and publishing. Every PR that changes package functionality **must** include a changeset.
 
 ```bash
 pnpm changeset            # Create a new changeset (interactive)
 pnpm version-packages     # Apply changesets and bump versions
 pnpm release              # Build and publish to npm
 ```
+
+Changesets enforce semantic versioning:
+- **patch** — Bug fixes, internal refactors
+- **minor** — New features, new builder methods, new model fields
+- **major** — Breaking API changes, model restructuring
 
 ### Code Quality
 
