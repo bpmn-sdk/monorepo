@@ -1,5 +1,22 @@
 # Progress
 
+## 2026-02-18
+
+### Enhanced README and Changesets
+- Enhanced root `README.md` with badges (npm, TypeScript, license), table of contents, requirements section, yarn install option, expanded contributing guide with code quality expectations and release workflow
+- Added TypeScript usage section with discriminated union type narrowing examples
+- Added REST connector convenience builder example
+- Added MIT `LICENSE` file
+- Changesets (`@changesets/cli`, `@changesets/changelog-github`) configured for version management and publishing
+- Committed `.changeset/` directory with `config.json` and `README.md`
+- Fixed changeset config to use `@changesets/changelog-github` with repo setting for PR/author links
+- Cleaned up duplicate release scripts in root `package.json`
+
+### Timer Event Definition Attribute Roundtrip Fix
+- Added `timeDateAttributes` and `timeCycleAttributes` to `BpmnTimerEventDefinition` model
+- Parser now extracts attributes (e.g. `xsi:type`) from `timeDate` and `timeCycle` elements, matching existing `timeDuration` handling
+- Serializer now emits those attributes on roundtrip, preventing loss of `xsi:type`
+
 ## 2026-02-19
 
 ### BPMN Fluent Builder API — Full Implementation
