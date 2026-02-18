@@ -193,19 +193,21 @@ function buildEventDefinitions(opts: {
 		defs.push({
 			type: "timer",
 			timeDuration: opts.timerDuration,
+			timeDate: opts.timerDate,
+			timeCycle: opts.timerCycle,
 		});
 	}
 	if (opts.errorCode !== undefined || opts.errorRef !== undefined) {
 		defs.push({ type: "error", errorRef: opts.errorRef });
 	}
 	if (opts.messageName !== undefined) {
-		defs.push({ type: "message" });
+		defs.push({ type: "message", messageRef: opts.messageName });
 	}
 	if (opts.signalName !== undefined) {
-		defs.push({ type: "signal" });
+		defs.push({ type: "signal", signalRef: opts.signalName });
 	}
 	if (opts.escalationCode !== undefined) {
-		defs.push({ type: "escalation" });
+		defs.push({ type: "escalation", escalationRef: opts.escalationCode });
 	}
 	return defs;
 }
@@ -1093,6 +1095,9 @@ export class ProcessBuilder {
 		callback(b);
 
 		for (const el of b._elements) {
+			if (this.flowElements.some((n) => n.id === el.id)) {
+				throw new Error(`Duplicate element ID "${el.id}"`);
+			}
 			this.flowElements.push(el);
 		}
 		for (const fl of b._flows) {

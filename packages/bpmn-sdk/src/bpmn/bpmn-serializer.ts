@@ -74,6 +74,12 @@ function serializeEventDefinitions(defs: BpmnEventDefinition[], bp: string): Xml
 						el(`${bp}:timeDuration`, d.timeDurationAttributes ?? {}, [], d.timeDuration),
 					);
 				}
+				if (d.timeDate !== undefined) {
+					children.push(el(`${bp}:timeDate`, d.timeDateAttributes ?? {}, [], d.timeDate));
+				}
+				if (d.timeCycle !== undefined) {
+					children.push(el(`${bp}:timeCycle`, d.timeCycleAttributes ?? {}, [], d.timeCycle));
+				}
 				return el(`${bp}:timerEventDefinition`, d.id ? { id: d.id } : {}, children);
 			}
 			case "error": {

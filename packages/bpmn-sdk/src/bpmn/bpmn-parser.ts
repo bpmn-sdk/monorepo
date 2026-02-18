@@ -161,6 +161,8 @@ function parseEventDefinitions(element: XmlElement): BpmnEventDefinition[] {
 		const ln = localName(child.name);
 		if (ln === "timerEventDefinition") {
 			const durationEl = findChild(child, "timeDuration");
+			const dateEl = findChild(child, "timeDate");
+			const cycleEl = findChild(child, "timeCycle");
 			defs.push({
 				type: "timer",
 				id: attr(child, "id"),
@@ -168,6 +170,18 @@ function parseEventDefinitions(element: XmlElement): BpmnEventDefinition[] {
 				timeDurationAttributes: durationEl
 					? Object.keys(durationEl.attributes).length > 0
 						? { ...durationEl.attributes }
+						: undefined
+					: undefined,
+				timeDate: dateEl?.text?.trim(),
+				timeDateAttributes: dateEl
+					? Object.keys(dateEl.attributes).length > 0
+						? { ...dateEl.attributes }
+						: undefined
+					: undefined,
+				timeCycle: cycleEl?.text?.trim(),
+				timeCycleAttributes: cycleEl
+					? Object.keys(cycleEl.attributes).length > 0
+						? { ...cycleEl.attributes }
 						: undefined
 					: undefined,
 			});

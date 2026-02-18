@@ -50,6 +50,10 @@ export interface BpmnTimerEventDefinition {
 	id?: string;
 	timeDuration?: string;
 	timeDurationAttributes?: Record<string, string>;
+	timeDate?: string;
+	timeDateAttributes?: Record<string, string>;
+	timeCycle?: string;
+	timeCycleAttributes?: Record<string, string>;
 }
 
 export interface BpmnErrorEventDefinition {
