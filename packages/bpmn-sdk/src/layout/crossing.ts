@@ -32,7 +32,8 @@ function orderByBarycenter(
 	graph: DirectedGraph,
 	direction: "predecessors" | "successors",
 ): void {
-	const layer = layers[layerIndex]!;
+	const layer = layers[layerIndex];
+	if (!layer) return;
 	const adjacentLayer =
 		direction === "predecessors" ? layers[layerIndex - 1] : layers[layerIndex + 1];
 
@@ -41,7 +42,9 @@ function orderByBarycenter(
 	// Build position index for the adjacent layer
 	const posIndex = new Map<string, number>();
 	for (let i = 0; i < adjacentLayer.length; i++) {
-		posIndex.set(adjacentLayer[i]!, i);
+		const adjNode = adjacentLayer[i];
+		if (!adjNode) continue;
+		posIndex.set(adjNode, i);
 	}
 
 	// Compute barycenter for each node in current layer

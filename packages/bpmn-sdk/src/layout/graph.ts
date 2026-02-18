@@ -142,7 +142,8 @@ export function topologicalSort(graph: DirectedGraph): string[] {
 
 	const sorted: string[] = [];
 	while (queue.length > 0) {
-		const node = queue.shift()!;
+		const node = queue.shift();
+		if (!node) break;
 		sorted.push(node);
 		for (const succ of graph.successors.get(node) ?? []) {
 			const newDeg = (inDegree.get(succ) ?? 1) - 1;

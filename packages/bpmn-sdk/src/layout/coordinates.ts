@@ -26,7 +26,8 @@ export function assignCoordinates(
 
 		// Find the widest element in this layer
 		let maxWidth = 0;
-		const layer = orderedLayers[layerIdx]!;
+		const layer = orderedLayers[layerIdx];
+		if (!layer) continue;
 		for (const nodeId of layer) {
 			const node = nodeIndex.get(nodeId);
 			if (node) {
@@ -40,8 +41,10 @@ export function assignCoordinates(
 
 	// Calculate y offset for each node within its layer
 	for (let layerIdx = 0; layerIdx < orderedLayers.length; layerIdx++) {
-		const layer = orderedLayers[layerIdx]!;
-		const layerX = layerXOffsets[layerIdx]!;
+		const layer = orderedLayers[layerIdx];
+		if (!layer) continue;
+		const layerX = layerXOffsets[layerIdx];
+		if (layerX === undefined) continue;
 
 		// Find max height of elements in this layer for centering
 		let maxWidth = 0;
@@ -55,7 +58,8 @@ export function assignCoordinates(
 
 		let currentY = 0;
 		for (let posIdx = 0; posIdx < layer.length; posIdx++) {
-			const nodeId = layer[posIdx]!;
+			const nodeId = layer[posIdx];
+			if (!nodeId) continue;
 			const node = nodeIndex.get(nodeId);
 			if (!node) continue;
 
@@ -113,8 +117,10 @@ function centerLayersVertically(nodes: LayoutNode[], orderedLayers: string[][]):
 
 	// Shift each layer so it's centered relative to the tallest layer
 	for (let i = 0; i < orderedLayers.length; i++) {
-		const layer = orderedLayers[i]!;
-		const layerHeight = layerHeights[i]!;
+		const layer = orderedLayers[i];
+		if (!layer) continue;
+		const layerHeight = layerHeights[i];
+		if (layerHeight === undefined) continue;
 		const yShift = (maxHeight - layerHeight) / 2;
 
 		if (yShift > 0) {
@@ -177,8 +183,10 @@ export function reassignXCoordinates(layoutNodes: LayoutNode[], orderedLayers: s
 	}
 
 	for (let i = 1; i < orderedLayers.length; i++) {
-		const prevLayer = orderedLayers[i - 1]!;
-		const currLayer = orderedLayers[i]!;
+		const prevLayer = orderedLayers[i - 1];
+		if (!prevLayer) continue;
+		const currLayer = orderedLayers[i];
+		if (!currLayer) continue;
 
 		// Find the rightmost edge of the previous layer
 		let prevMaxRight = 0;
@@ -202,7 +210,7 @@ export function reassignXCoordinates(layoutNodes: LayoutNode[], orderedLayers: s
 		if (shift > 0) {
 			// Shift all nodes in this layer and subsequent layers
 			for (let j = i; j < orderedLayers.length; j++) {
-				for (const id of orderedLayers[j]!) {
+				for (const id of orderedLayers[j] ?? []) {
 					const n = nodeMap.get(id);
 					if (n) {
 						n.bounds.x += shift;

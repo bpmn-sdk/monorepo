@@ -100,13 +100,15 @@ function routeBackEdge(
 /** Compute label bounds centered above the midpoint of an edge. */
 function computeEdgeLabelBounds(waypoints: Waypoint[], label: string): Bounds {
 	const midIdx = Math.floor(waypoints.length / 2);
-	const midPoint = waypoints[midIdx]!;
+	const midPoint = waypoints[midIdx];
+	if (!midPoint) return { x: 0, y: 0, width: 0, height: 0 };
 
 	// If there's a segment, use the midpoint of that segment
 	let labelX = midPoint.x;
 	let labelY = midPoint.y;
 	if (midIdx > 0) {
-		const prevPoint = waypoints[midIdx - 1]!;
+		const prevPoint = waypoints[midIdx - 1];
+		if (!prevPoint) return { x: 0, y: 0, width: 0, height: 0 };
 		labelX = (prevPoint.x + midPoint.x) / 2;
 		labelY = (prevPoint.y + midPoint.y) / 2;
 	}

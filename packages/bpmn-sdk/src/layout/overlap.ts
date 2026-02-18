@@ -23,8 +23,10 @@ export function assertNoOverlap(result: LayoutResult): void {
 
 	for (let i = 0; i < allBounds.length; i++) {
 		for (let j = i + 1; j < allBounds.length; j++) {
-			const a = allBounds[i]!;
-			const b = allBounds[j]!;
+			const a = allBounds[i];
+			if (!a) continue;
+			const b = allBounds[j];
+			if (!b) continue;
 
 			// Skip label-to-same-element overlap checks (labels belong to their element)
 			if (a.id.replace("-label", "") === b.id.replace("-label", "")) continue;
