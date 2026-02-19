@@ -1,5 +1,16 @@
 # Progress
 
+## 2026-02-19
+
+### Auto-Layout Documentation
+- Added auto-layout section to README with full usage example showing `.withAutoLayout()` on a gateway workflow
+- Added `withAutoLayout()` to builder methods table in API reference under new "Layout" category
+- Expanded `doc/features.md` auto-layout entry with configuration details (opt-in behavior, element sizing, round-trip fidelity)
+
+### Builder Layout Integration Tests
+- Added `builder-layout-integration.test.ts` with 12 integration tests verifying auto-layout data generation for builder-created workflows
+- Tests cover: shape/edge completeness, valid bounds, no overlaps, left-to-right ordering, DI ID conventions, orthogonal edge routing, element-type sizing, subprocess child containment, complex multi-pattern workflows, export→parse roundtrip, double roundtrip, and XML element verification
+
 ## 2026-02-18
 
 ### Builder errorCode→errorRef Fix

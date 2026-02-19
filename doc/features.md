@@ -10,6 +10,11 @@
 - **Export BPMN XML** — `Bpmn.export(model)` serializes a `BpmnDefinitions` model back to BPMN XML
 - **Fluent builder** — `Bpmn.createProcess(id)` creates processes with method chaining
 - **Auto-layout** — `.withAutoLayout()` populates diagram interchange (shapes + edges) via Sugiyama layout engine
+  - Opt-in: call `.withAutoLayout()` on `ProcessBuilder` before `.build()`
+  - Without it, `diagrams` array remains empty (backward-compatible)
+  - Handles gateway branches, sub-process containment, and orthogonal edge routing
+  - Element sizing: events 36×36, tasks 100×80, gateways 50×50
+  - Layout data survives export→parse→export round-trips
 - **Gateway support** — exclusive, parallel, inclusive, event-based gateways with `branch(name, callback)` pattern
 - **Loop support** — `connectTo(targetId)` for merge points and back-edge loops
 - **Sub-process builders** — `adHocSubProcess()`, `subProcess()`, `eventSubProcess()` with nested content

@@ -222,6 +222,44 @@ const definitions = Bpmn.createProcess("with-subprocess")
   .build();
 ```
 
+### Auto-Layout
+
+Builder-created workflows have no visual layout by default. Call `.withAutoLayout()` to automatically generate diagram interchange data (shapes with bounds and edges with waypoints) using a Sugiyama/layered layout algorithm:
+
+```typescript
+const definitions = Bpmn.createProcess("order-process")
+  .withAutoLayout()
+  .startEvent("start")
+  .serviceTask("validate", {
+    name: "Validate Order",
+    taskType: "validate-order",
+  })
+  .exclusiveGateway("check", { name: "Order Valid?" })
+    .branch("yes", (b) =>
+      b.condition("= valid")
+        .serviceTask("fulfill", { name: "Fulfill", taskType: "fulfill-order" })
+        .endEvent("end-ok")
+    )
+    .branch("no", (b) =>
+      b.defaultFlow()
+        .serviceTask("notify", { name: "Notify Customer", taskType: "send-rejection" })
+        .endEvent("end-rejected")
+    )
+  .build();
+
+const xml = Bpmn.export(definitions);
+// XML now includes <bpmndi:BPMNDiagram> with shapes and edges
+```
+
+The layout engine handles:
+- **Left-to-right flow** — elements are positioned with increasing x coordinates
+- **Gateway branches** — parallel paths are spaced vertically without overlaps
+- **Sub-processes** — children are positioned within parent bounds
+- **Element sizing** — events (36×36), tasks (100×80), gateways (50×50)
+- **Orthogonal edge routing** — sequence flow waypoints use right-angle paths
+
+Without `.withAutoLayout()`, the exported XML contains valid BPMN semantics but an empty `<bpmndi:BPMNDiagram>` section. Most BPMN viewers require diagram interchange data to render processes visually.
+
 ### Roundtrip — Parse, Modify, Export
 
 ```typescript
@@ -278,6 +316,7 @@ function getServiceTasks(definitions: BpmnDefinitions): BpmnServiceTask[] {
 | **Sub-processes** | `subProcess()`, `adHocSubProcess()`, `eventSubProcess()` — with nested `SubProcessContentBuilder` |
 | **Flow control** | `connectTo(id)` for merging and loops, `element(id)` for navigation |
 | **Connectors** | `restConnector(id, config)` for Camunda HTTP JSON connector tasks |
+| **Layout** | `withAutoLayout()` — generates diagram interchange (shapes + edges) via Sugiyama layout engine |
 | **Extensions** | Multi-instance (parallel/sequential), Zeebe task definitions, IO mappings, task headers, modeler templates |
 
 ### `Dmn`
