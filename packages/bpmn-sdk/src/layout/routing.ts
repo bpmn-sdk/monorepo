@@ -119,17 +119,18 @@ export function routeEdges(
 			waypoints = port ? routeFromPort(source, target, port) : routeForwardEdge(source, target);
 		}
 
-		const labelBounds = flow.name ? computeEdgeLabelBounds(waypoints, flow.name) : undefined;
-
 		edges.push({
 			id: flow.id,
 			sourceRef: flow.sourceRef,
 			targetRef: flow.targetRef,
 			waypoints,
 			label: flow.name,
-			labelBounds,
+			labelBounds: undefined,
 		});
 	}
+
+	// Collision-aware label placement
+	placeEdgeLabels(edges, nodeMap);
 
 	return edges;
 }
@@ -159,12 +160,48 @@ function routeForwardEdge(source: LayoutNode, target: LayoutNode): Waypoint[] {
 	];
 }
 
-/** Route a forward edge from a specific port side on the source node. */
+/** Count the number of direction changes (bends) in a waypoint sequence. */
+function countBends(waypoints: Waypoint[]): number {
+	let bends = 0;
+	for (let i = 1; i < waypoints.length - 1; i++) {
+		const prev = waypoints[i - 1];
+		const curr = waypoints[i];
+		const next = waypoints[i + 1];
+		if (!prev || !curr || !next) continue;
+		const dx1 = curr.x - prev.x;
+		const dy1 = curr.y - prev.y;
+		const dx2 = next.x - curr.x;
+		const dy2 = next.y - curr.y;
+		// Direction changes when we go from horizontal to vertical or vice versa
+		if (
+			(Math.abs(dx1) > 0.1 && Math.abs(dy2) > 0.1) ||
+			(Math.abs(dy1) > 0.1 && Math.abs(dx2) > 0.1)
+		) {
+			bends++;
+		}
+	}
+	return bends;
+}
+
+/** Route a forward edge from a specific port side on the source node, choosing minimum bends. */
 function routeFromPort(source: LayoutNode, target: LayoutNode, port: PortSide): Waypoint[] {
 	if (port === "right") {
 		return routeForwardEdge(source, target);
 	}
 
+	// Generate candidate routes: assigned port route + right-port alternative
+	const portRoute = routeFromPortDirect(source, target, port);
+	const rightRoute = routeForwardEdge(source, target);
+
+	const portBends = countBends(portRoute);
+	const rightBends = countBends(rightRoute);
+
+	// Prefer the assigned port route unless right route has strictly fewer bends
+	return rightBends < portBends ? rightRoute : portRoute;
+}
+
+/** Route directly from top/bottom port with Z-shaped path. */
+function routeFromPortDirect(source: LayoutNode, target: LayoutNode, port: PortSide): Waypoint[] {
 	const sourceRight = source.bounds.x + source.bounds.width;
 	const targetLeft = target.bounds.x;
 	const targetCenterY = target.bounds.y + target.bounds.height / 2;
@@ -180,8 +217,7 @@ function routeFromPort(source: LayoutNode, target: LayoutNode, port: PortSide): 
 		];
 	}
 
-	// Z-shaped: horizontal to midpoint column, vertical to target Y, horizontal to target.
-	// Keeps the vertical segment away from the gateway's column to avoid crossing nearby elements.
+	// Z-shaped: horizontal to midpoint column, vertical to target Y, horizontal to target
 	const midX = (sourceRight + targetLeft) / 2;
 	return [
 		{ x: srcX, y: srcY },
@@ -192,60 +228,223 @@ function routeFromPort(source: LayoutNode, target: LayoutNode, port: PortSide): 
 }
 
 /**
- * Route a back-edge (loop) above all nodes.
- * Goes: source right → up → left → down → target left
+ * Route a back-edge (loop) above or below all nodes, choosing the shorter path.
  */
 function routeBackEdge(
 	source: LayoutNode,
 	target: LayoutNode,
 	nodeMap: Map<string, LayoutNode>,
 ): Waypoint[] {
-	// Find the topmost y coordinate of all nodes to route above
 	let minY = Number.POSITIVE_INFINITY;
+	let maxY = Number.NEGATIVE_INFINITY;
 	for (const node of nodeMap.values()) {
 		const top = node.bounds.y - (node.labelBounds ? node.labelBounds.height + 8 : 0);
 		if (top < minY) minY = top;
+		const bottom = node.bounds.y + node.bounds.height;
+		if (bottom > maxY) maxY = bottom;
 	}
-
-	const routeY = minY - 30;
 
 	const sourceRight = source.bounds.x + source.bounds.width;
 	const sourceCenterY = source.bounds.y + source.bounds.height / 2;
 	const targetLeft = target.bounds.x;
 	const targetCenterY = target.bounds.y + target.bounds.height / 2;
 
-	return [
+	// Route above
+	const routeAboveY = minY - 30;
+	const aboveRoute: Waypoint[] = [
 		{ x: sourceRight, y: sourceCenterY },
 		{ x: sourceRight + 20, y: sourceCenterY },
-		{ x: sourceRight + 20, y: routeY },
-		{ x: targetLeft - 20, y: routeY },
+		{ x: sourceRight + 20, y: routeAboveY },
+		{ x: targetLeft - 20, y: routeAboveY },
 		{ x: targetLeft - 20, y: targetCenterY },
 		{ x: targetLeft, y: targetCenterY },
 	];
+
+	// Route below
+	const routeBelowY = maxY + 30;
+	const belowRoute: Waypoint[] = [
+		{ x: sourceRight, y: sourceCenterY },
+		{ x: sourceRight + 20, y: sourceCenterY },
+		{ x: sourceRight + 20, y: routeBelowY },
+		{ x: targetLeft - 20, y: routeBelowY },
+		{ x: targetLeft - 20, y: targetCenterY },
+		{ x: targetLeft, y: targetCenterY },
+	];
+
+	// Compare total path length and pick shorter
+	const aboveLen = pathLength(aboveRoute);
+	const belowLen = pathLength(belowRoute);
+	return belowLen < aboveLen ? belowRoute : aboveRoute;
 }
 
-/** Compute label bounds centered above the midpoint of an edge. */
-function computeEdgeLabelBounds(waypoints: Waypoint[], label: string): Bounds {
-	const midIdx = Math.floor(waypoints.length / 2);
-	const midPoint = waypoints[midIdx];
-	if (!midPoint) return { x: 0, y: 0, width: 0, height: 0 };
+function pathLength(waypoints: Waypoint[]): number {
+	let len = 0;
+	for (let i = 1; i < waypoints.length; i++) {
+		const a = waypoints[i - 1];
+		const b = waypoints[i];
+		if (!a || !b) continue;
+		len += Math.abs(b.x - a.x) + Math.abs(b.y - a.y);
+	}
+	return len;
+}
 
-	// If there's a segment, use the midpoint of that segment
-	let labelX = midPoint.x;
-	let labelY = midPoint.y;
-	if (midIdx > 0) {
-		const prevPoint = waypoints[midIdx - 1];
-		if (!prevPoint) return { x: 0, y: 0, width: 0, height: 0 };
-		labelX = (prevPoint.x + midPoint.x) / 2;
-		labelY = (prevPoint.y + midPoint.y) / 2;
+/** Collision tolerance in pixels — small overlap allowed for rounding. */
+const LABEL_COLLISION_TOLERANCE = 2;
+
+/** Number of slide steps along a segment when searching for clear space. */
+const LABEL_SLIDE_STEPS = 10;
+
+function boundsOverlap(a: Bounds, b: Bounds): boolean {
+	return !(
+		a.x + a.width + LABEL_COLLISION_TOLERANCE <= b.x ||
+		b.x + b.width + LABEL_COLLISION_TOLERANCE <= a.x ||
+		a.y + a.height + LABEL_COLLISION_TOLERANCE <= b.y ||
+		b.y + b.height + LABEL_COLLISION_TOLERANCE <= a.y
+	);
+}
+
+/**
+ * Collision-aware edge label placement.
+ * For each labeled edge, generates candidate positions on the longest segment
+ * and picks the first one that doesn't overlap nodes or already-placed labels.
+ */
+function placeEdgeLabels(edges: LayoutEdge[], nodeMap: Map<string, LayoutNode>): void {
+	const occupied: Bounds[] = [];
+
+	// Collect all node bounds as obstacles
+	for (const node of nodeMap.values()) {
+		occupied.push(node.bounds);
+		if (node.labelBounds) occupied.push(node.labelBounds);
 	}
 
-	const labelWidth = Math.max(label.length * LABEL_CHAR_WIDTH, LABEL_MIN_WIDTH);
-	const labelHeight = LABEL_HEIGHT;
+	for (const edge of edges) {
+		if (!edge.label) continue;
 
+		const labelWidth = Math.max(edge.label.length * LABEL_CHAR_WIDTH, LABEL_MIN_WIDTH);
+		const labelHeight = LABEL_HEIGHT;
+
+		// Find the longest segment
+		const { segStart, segEnd } = findLongestSegment(edge.waypoints);
+
+		// Generate candidate positions along the segment
+		const candidates = generateLabelCandidates(segStart, segEnd, labelWidth, labelHeight);
+
+		// Pick the first non-overlapping candidate
+		let placed = false;
+		for (const candidate of candidates) {
+			if (!occupied.some((ob) => boundsOverlap(candidate, ob))) {
+				edge.labelBounds = candidate;
+				occupied.push(candidate);
+				placed = true;
+				break;
+			}
+		}
+
+		// Fallback: slide along segment to find clear space
+		if (!placed) {
+			const fallback = slideLabelAlongSegment(segStart, segEnd, labelWidth, labelHeight, occupied);
+			edge.labelBounds = fallback;
+			occupied.push(fallback);
+		}
+	}
+}
+
+function findLongestSegment(waypoints: Waypoint[]): { segStart: Waypoint; segEnd: Waypoint } {
+	let bestLen = 0;
+	let bestStart: Waypoint = waypoints[0] ?? { x: 0, y: 0 };
+	let bestEnd: Waypoint = waypoints[1] ?? waypoints[0] ?? { x: 0, y: 0 };
+
+	for (let i = 1; i < waypoints.length; i++) {
+		const a = waypoints[i - 1];
+		const b = waypoints[i];
+		if (!a || !b) continue;
+		const len = Math.abs(b.x - a.x) + Math.abs(b.y - a.y);
+		if (len > bestLen) {
+			bestLen = len;
+			bestStart = a;
+			bestEnd = b;
+		}
+	}
+
+	return { segStart: bestStart, segEnd: bestEnd };
+}
+
+function generateLabelCandidates(
+	segStart: Waypoint,
+	segEnd: Waypoint,
+	labelWidth: number,
+	labelHeight: number,
+): Bounds[] {
+	const candidates: Bounds[] = [];
+	// Positions along segment: 0.5, 0.25, 0.75, 0.33, 0.67
+	const fractions = [0.5, 0.25, 0.75, 0.33, 0.67];
+	// Perpendicular offsets: above, below
+	const offsets = [-LABEL_VERTICAL_OFFSET - labelHeight, LABEL_VERTICAL_OFFSET];
+
+	for (const f of fractions) {
+		const px = segStart.x + (segEnd.x - segStart.x) * f;
+		const py = segStart.y + (segEnd.y - segStart.y) * f;
+
+		for (const offset of offsets) {
+			// Determine perpendicular direction
+			const isHorizontal = Math.abs(segEnd.y - segStart.y) < 1;
+			let lx: number;
+			let ly: number;
+
+			if (isHorizontal) {
+				lx = px - labelWidth / 2;
+				ly = py + offset;
+			} else {
+				lx = px + offset;
+				ly = py - labelHeight / 2;
+			}
+
+			candidates.push({ x: lx, y: ly, width: labelWidth, height: labelHeight });
+		}
+	}
+
+	return candidates;
+}
+
+function slideLabelAlongSegment(
+	segStart: Waypoint,
+	segEnd: Waypoint,
+	labelWidth: number,
+	labelHeight: number,
+	occupied: Bounds[],
+): Bounds {
+	const isHorizontal = Math.abs(segEnd.y - segStart.y) < 1;
+
+	for (let step = 0; step <= LABEL_SLIDE_STEPS; step++) {
+		const t = step / LABEL_SLIDE_STEPS;
+		const px = segStart.x + (segEnd.x - segStart.x) * t;
+		const py = segStart.y + (segEnd.y - segStart.y) * t;
+
+		const candidate: Bounds = isHorizontal
+			? {
+					x: px - labelWidth / 2,
+					y: py - labelHeight - LABEL_VERTICAL_OFFSET,
+					width: labelWidth,
+					height: labelHeight,
+				}
+			: {
+					x: px - labelWidth - LABEL_VERTICAL_OFFSET,
+					y: py - labelHeight / 2,
+					width: labelWidth,
+					height: labelHeight,
+				};
+
+		if (!occupied.some((ob) => boundsOverlap(candidate, ob))) {
+			return candidate;
+		}
+	}
+
+	// Absolute fallback: original midpoint placement
+	const mx = (segStart.x + segEnd.x) / 2;
+	const my = (segStart.y + segEnd.y) / 2;
 	return {
-		x: labelX - labelWidth / 2,
-		y: labelY - labelHeight - LABEL_VERTICAL_OFFSET,
+		x: mx - labelWidth / 2,
+		y: my - labelHeight - LABEL_VERTICAL_OFFSET,
 		width: labelWidth,
 		height: labelHeight,
 	};

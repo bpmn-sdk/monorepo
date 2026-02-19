@@ -1488,5 +1488,60 @@ describe("BpmnProcessBuilder", () => {
 			expect(diagram.plane.shapes).toHaveLength(3);
 			expect(diagram.plane.edges).toHaveLength(2);
 		});
+
+		it("positions survive full export → parse → export round-trip", () => {
+			const defs = Bpmn.createProcess("proc1")
+				.withAutoLayout()
+				.startEvent("s")
+				.serviceTask("t1", { name: "First", taskType: "job" })
+				.exclusiveGateway("gw")
+				.branch("a", (b) => b.serviceTask("t2", { name: "A", taskType: "a" }))
+				.branch("b", (b) => b.serviceTask("t3", { name: "B", taskType: "b" }))
+				.exclusiveGateway("merge")
+				.endEvent("e")
+				.build();
+
+			// First cycle: export → parse
+			const xml1 = Bpmn.export(defs);
+			const parsed1 = Bpmn.parse(xml1);
+
+			// Second cycle: re-export → re-parse
+			const xml2 = Bpmn.export(parsed1);
+			const parsed2 = Bpmn.parse(xml2);
+
+			const diag1 = defined(parsed1.diagrams[0]);
+			const diag2 = defined(parsed2.diagrams[0]);
+
+			// Same number of shapes and edges
+			expect(diag2.plane.shapes).toHaveLength(diag1.plane.shapes.length);
+			expect(diag2.plane.edges).toHaveLength(diag1.plane.edges.length);
+
+			// Shape bounds are identical across cycles
+			const sortedShapes1 = [...diag1.plane.shapes].sort((a, b) =>
+				a.bpmnElement.localeCompare(b.bpmnElement),
+			);
+			const sortedShapes2 = [...diag2.plane.shapes].sort((a, b) =>
+				a.bpmnElement.localeCompare(b.bpmnElement),
+			);
+			for (let i = 0; i < sortedShapes1.length; i++) {
+				expect(sortedShapes2[i]?.bpmnElement).toBe(sortedShapes1[i]?.bpmnElement);
+				expect(sortedShapes2[i]?.bounds).toEqual(sortedShapes1[i]?.bounds);
+			}
+
+			// Edge waypoints are identical across cycles
+			const sortedEdges1 = [...diag1.plane.edges].sort((a, b) =>
+				a.bpmnElement.localeCompare(b.bpmnElement),
+			);
+			const sortedEdges2 = [...diag2.plane.edges].sort((a, b) =>
+				a.bpmnElement.localeCompare(b.bpmnElement),
+			);
+			for (let i = 0; i < sortedEdges1.length; i++) {
+				expect(sortedEdges2[i]?.bpmnElement).toBe(sortedEdges1[i]?.bpmnElement);
+				expect(sortedEdges2[i]?.waypoints).toEqual(sortedEdges1[i]?.waypoints);
+			}
+
+			// XML output is stable (idempotent serialization)
+			expect(xml2).toBe(xml1);
+		});
 	});
 });

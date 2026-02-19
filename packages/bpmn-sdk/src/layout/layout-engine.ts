@@ -1,5 +1,10 @@
 import type { BpmnFlowElement, BpmnProcess, BpmnSequenceFlow } from "../bpmn/bpmn-model.js";
-import { assignCoordinates, reassignXCoordinates } from "./coordinates.js";
+import {
+	alignBranchBaselines,
+	alignSplitJoinPairs,
+	assignCoordinates,
+	reassignXCoordinates,
+} from "./coordinates.js";
 import { minimizeCrossings } from "./crossing.js";
 import { buildGraph, detectBackEdges, reverseBackEdges } from "./graph.js";
 import { assignLayers, groupByLayer } from "./layers.js";
@@ -57,6 +62,12 @@ export function layoutFlowNodes(
 
 	// Phase 4: Coordinate assignment
 	const layoutNodes = assignCoordinates(orderedLayers, nodeIndex);
+
+	// Phase 4b: Align linear sequences to a common y-baseline
+	alignBranchBaselines(layoutNodes, dag);
+
+	// Phase 4c: Align split/join gateway pairs to same y-coordinate
+	alignSplitJoinPairs(layoutNodes, dag);
 
 	// Phase 5: Sub-process layout (recursive) — may resize sub-process nodes
 	const childResults = layoutSubProcesses(layoutNodes, nodeIndex);

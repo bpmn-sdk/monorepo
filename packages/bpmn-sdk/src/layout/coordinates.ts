@@ -1,4 +1,5 @@
 import type { BpmnElementType, BpmnFlowElement } from "../bpmn/bpmn-model.js";
+import type { DirectedGraph } from "./graph.js";
 import type { Bounds, LayoutNode } from "./types.js";
 import { ELEMENT_SIZES, HORIZONTAL_SPACING, VERTICAL_SPACING } from "./types.js";
 
@@ -220,4 +221,166 @@ export function reassignXCoordinates(layoutNodes: LayoutNode[], orderedLayers: s
 			}
 		}
 	}
+}
+
+const GATEWAY_TYPE_SET: ReadonlySet<string> = new Set([
+	"exclusiveGateway",
+	"parallelGateway",
+	"inclusiveGateway",
+	"eventBasedGateway",
+]);
+
+/**
+ * Align nodes in linear sequences to a common y-baseline.
+ * A "linear" node has ≤1 predecessor and ≤1 successor, and is not a gateway.
+ * Walks forward from each chain root, setting successors to the same center-y.
+ */
+export function alignBranchBaselines(layoutNodes: LayoutNode[], dag: DirectedGraph): void {
+	const nodeMap = new Map<string, LayoutNode>();
+	for (const n of layoutNodes) {
+		nodeMap.set(n.id, n);
+	}
+
+	const visited = new Set<string>();
+
+	for (const n of layoutNodes) {
+		if (visited.has(n.id)) continue;
+		if (GATEWAY_TYPE_SET.has(n.type)) continue;
+
+		// Walk backward to find the chain root
+		let rootId = n.id;
+		for (;;) {
+			const preds = dag.predecessors.get(rootId) ?? [];
+			if (preds.length !== 1) break;
+			const pred = preds[0];
+			if (!pred) break;
+			const predNode = nodeMap.get(pred);
+			if (!predNode || GATEWAY_TYPE_SET.has(predNode.type)) break;
+			const predSuccs = dag.successors.get(pred) ?? [];
+			if (predSuccs.length !== 1) break;
+			rootId = pred;
+		}
+
+		// Walk forward from root, aligning to root's center-y
+		const rootNode = nodeMap.get(rootId);
+		if (!rootNode) continue;
+		const baselineCenterY = rootNode.bounds.y + rootNode.bounds.height / 2;
+
+		let currentId: string | undefined = rootId;
+		while (currentId) {
+			if (visited.has(currentId)) break;
+			visited.add(currentId);
+
+			const current = nodeMap.get(currentId);
+			if (!current) break;
+			if (GATEWAY_TYPE_SET.has(current.type)) break;
+
+			const dy = baselineCenterY - (current.bounds.y + current.bounds.height / 2);
+			if (Math.abs(dy) > 0.5) {
+				current.bounds.y += dy;
+				if (current.labelBounds) current.labelBounds.y += dy;
+			}
+
+			const succs: string[] = dag.successors.get(currentId) ?? [];
+			if (succs.length !== 1) break;
+			const nextId: string | undefined = succs[0];
+			if (!nextId) break;
+			const nextNode = nodeMap.get(nextId);
+			if (!nextNode || GATEWAY_TYPE_SET.has(nextNode.type)) break;
+			const nextPreds = dag.predecessors.get(nextId) ?? [];
+			if (nextPreds.length !== 1) break;
+			currentId = nextId;
+		}
+	}
+}
+
+/**
+ * Align split/join gateway pairs to the same y-coordinate.
+ * A split gateway fans out to multiple successors; the corresponding join gateway
+ * is the nearest downstream gateway where all branches reconverge.
+ */
+export function alignSplitJoinPairs(layoutNodes: LayoutNode[], dag: DirectedGraph): void {
+	const nodeMap = new Map<string, LayoutNode>();
+	for (const n of layoutNodes) {
+		nodeMap.set(n.id, n);
+	}
+
+	for (const n of layoutNodes) {
+		if (!GATEWAY_TYPE_SET.has(n.type)) continue;
+		const succs = dag.successors.get(n.id) ?? [];
+		if (succs.length < 2) continue;
+
+		// This is a split gateway — find its merge partner
+		const joinId = findJoinGateway(n.id, dag, nodeMap);
+		if (!joinId) continue;
+
+		const joinNode = nodeMap.get(joinId);
+		if (!joinNode) continue;
+
+		// Force join gateway to same center-y as split gateway
+		const splitCenterY = n.bounds.y + n.bounds.height / 2;
+		const joinCenterY = joinNode.bounds.y + joinNode.bounds.height / 2;
+		const dy = splitCenterY - joinCenterY;
+		if (Math.abs(dy) > 0.5) {
+			joinNode.bounds.y += dy;
+			if (joinNode.labelBounds) joinNode.labelBounds.y += dy;
+		}
+	}
+}
+
+/**
+ * Find the merge gateway for a given split gateway.
+ * Walks forward from each successor until all paths converge at a common gateway.
+ */
+function findJoinGateway(
+	splitId: string,
+	dag: DirectedGraph,
+	nodeMap: Map<string, LayoutNode>,
+): string | undefined {
+	const succs = dag.successors.get(splitId) ?? [];
+	if (succs.length < 2) return undefined;
+
+	// For each branch, walk forward to find the first downstream gateway
+	const branchEndpoints = new Map<string, Set<string>>();
+
+	for (const startId of succs) {
+		const reachableGateways = new Set<string>();
+		const queue = [startId];
+		const seen = new Set<string>();
+
+		while (queue.length > 0) {
+			const id = queue.shift();
+			if (!id || seen.has(id)) continue;
+			seen.add(id);
+
+			const node = nodeMap.get(id);
+			if (!node) continue;
+
+			if (GATEWAY_TYPE_SET.has(node.type) && id !== splitId) {
+				reachableGateways.add(id);
+				continue; // Don't traverse past gateways
+			}
+
+			for (const next of dag.successors.get(id) ?? []) {
+				if (next !== splitId) queue.push(next);
+			}
+		}
+
+		branchEndpoints.set(startId, reachableGateways);
+	}
+
+	// Find the gateway reachable from ALL branches
+	const allBranches = [...branchEndpoints.values()];
+	if (allBranches.length === 0) return undefined;
+
+	const firstSet = allBranches[0];
+	if (!firstSet) return undefined;
+
+	for (const candidate of firstSet) {
+		if (allBranches.every((s) => s.has(candidate))) {
+			return candidate;
+		}
+	}
+
+	return undefined;
 }

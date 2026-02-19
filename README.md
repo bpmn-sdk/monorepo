@@ -258,7 +258,7 @@ The layout engine handles:
 - **Element sizing** — events (36×36), tasks (100×80), gateways (50×50)
 - **Orthogonal edge routing** — sequence flow waypoints use right-angle paths
 
-Without `.withAutoLayout()`, the exported XML contains valid BPMN semantics but an empty `<bpmndi:BPMNDiagram>` section. Most BPMN viewers require diagram interchange data to render processes visually.
+Without `.withAutoLayout()`, the exported XML contains valid BPMN semantics but the `<bpmndi:BPMNDiagram>` section is omitted entirely. Most BPMN viewers require diagram interchange data to render processes visually.
 
 ### Roundtrip — Parse, Modify, Export
 

@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { BpmnFlowElement, BpmnProcess, BpmnSequenceFlow } from "../src/bpmn/bpmn-model.js";
-import { assignCoordinates } from "../src/layout/coordinates.js";
+import {
+	alignBranchBaselines,
+	alignSplitJoinPairs,
+	assignCoordinates,
+} from "../src/layout/coordinates.js";
 import { minimizeCrossings } from "../src/layout/crossing.js";
 import {
 	buildGraph,
@@ -13,6 +17,7 @@ import { layoutProcess } from "../src/layout/layout-engine.js";
 import { assertNoOverlap } from "../src/layout/overlap.js";
 import { assignGatewayPorts, routeEdges } from "../src/layout/routing.js";
 import type { PortSide } from "../src/layout/routing.js";
+import { VERTICAL_SPACING } from "../src/layout/types.js";
 import type { LayoutNode, LayoutResult } from "../src/layout/types.js";
 
 // Helper: create a simple flow element with required fields
@@ -262,7 +267,7 @@ describe("Coordinate assignment", () => {
 		if (!nodeA || !nodeB) return;
 
 		const gap = nodeB.bounds.y - (nodeA.bounds.y + nodeA.bounds.height);
-		expect(gap).toBeGreaterThanOrEqual(60 - 1);
+		expect(gap).toBeGreaterThanOrEqual(VERTICAL_SPACING - 1);
 	});
 });
 
@@ -798,5 +803,238 @@ describe("Layout engine (integration)", () => {
 		const result = layoutProcess(process);
 		expect(result.nodes).toHaveLength(2);
 		expect(() => assertNoOverlap(result)).not.toThrow();
+	});
+});
+
+describe("Branch baseline alignment", () => {
+	it("aligns linear sequence nodes to the same y-coordinate", () => {
+		// s → a → b → e: all should share the same center-y
+		const process = proc(
+			"linear",
+			[node("s", "startEvent"), node("a"), node("b"), node("e", "endEvent")],
+			[flow("f1", "s", "a"), flow("f2", "a", "b"), flow("f3", "b", "e")],
+		);
+
+		const result = layoutProcess(process);
+		const centerYs = result.nodes.map((n) => n.bounds.y + n.bounds.height / 2);
+		const first = centerYs[0];
+		expect(first).toBeDefined();
+		for (const cy of centerYs) {
+			expect(cy).toBeCloseTo(first as number, 0);
+		}
+	});
+
+	it("keeps branches on different y from the main flow", () => {
+		// s → gw → a (top branch) → join → e
+		//       → b (bottom branch) → join
+		const process = proc(
+			"branching",
+			[
+				node("s", "startEvent"),
+				node("gw", "exclusiveGateway"),
+				node("a"),
+				node("b"),
+				node("join", "exclusiveGateway"),
+				node("e", "endEvent"),
+			],
+			[
+				flow("f1", "s", "gw"),
+				flow("f2", "gw", "a"),
+				flow("f3", "gw", "b"),
+				flow("f4", "a", "join"),
+				flow("f5", "b", "join"),
+				flow("f6", "join", "e"),
+			],
+		);
+
+		const result = layoutProcess(process);
+		const nodeMap = new Map(result.nodes.map((n) => [n.id, n]));
+		const aCenter = (nodeMap.get("a")?.bounds.y ?? 0) + (nodeMap.get("a")?.bounds.height ?? 0) / 2;
+		const bCenter = (nodeMap.get("b")?.bounds.y ?? 0) + (nodeMap.get("b")?.bounds.height ?? 0) / 2;
+		// Branches should be on different y-coordinates
+		expect(Math.abs(aCenter - bCenter)).toBeGreaterThan(10);
+	});
+});
+
+describe("Split/Join Y-alignment", () => {
+	it("aligns fork and join gateways to the same y-coordinate", () => {
+		const process = proc(
+			"fork-join",
+			[
+				node("s", "startEvent"),
+				node("fork", "parallelGateway"),
+				node("a"),
+				node("b"),
+				node("join", "parallelGateway"),
+				node("e", "endEvent"),
+			],
+			[
+				flow("f1", "s", "fork"),
+				flow("f2", "fork", "a"),
+				flow("f3", "fork", "b"),
+				flow("f4", "a", "join"),
+				flow("f5", "b", "join"),
+				flow("f6", "join", "e"),
+			],
+		);
+
+		const result = layoutProcess(process);
+		const nodeMap = new Map(result.nodes.map((n) => [n.id, n]));
+		const forkCenterY =
+			(nodeMap.get("fork")?.bounds.y ?? 0) + (nodeMap.get("fork")?.bounds.height ?? 0) / 2;
+		const joinCenterY =
+			(nodeMap.get("join")?.bounds.y ?? 0) + (nodeMap.get("join")?.bounds.height ?? 0) / 2;
+		expect(forkCenterY).toBeCloseTo(joinCenterY, 0);
+	});
+
+	it("aligns exclusive gateway split/join pairs", () => {
+		const process = proc(
+			"excl-fork-join",
+			[
+				node("s", "startEvent"),
+				node("split", "exclusiveGateway"),
+				node("a"),
+				node("b"),
+				node("merge", "exclusiveGateway"),
+				node("e", "endEvent"),
+			],
+			[
+				flow("f1", "s", "split"),
+				flow("f2", "split", "a"),
+				flow("f3", "split", "b"),
+				flow("f4", "a", "merge"),
+				flow("f5", "b", "merge"),
+				flow("f6", "merge", "e"),
+			],
+		);
+
+		const result = layoutProcess(process);
+		const nodeMap = new Map(result.nodes.map((n) => [n.id, n]));
+		const splitCenterY =
+			(nodeMap.get("split")?.bounds.y ?? 0) + (nodeMap.get("split")?.bounds.height ?? 0) / 2;
+		const mergeCenterY =
+			(nodeMap.get("merge")?.bounds.y ?? 0) + (nodeMap.get("merge")?.bounds.height ?? 0) / 2;
+		expect(splitCenterY).toBeCloseTo(mergeCenterY, 0);
+	});
+});
+
+describe("Edge label collision avoidance", () => {
+	it("places edge labels without overlapping nodes", () => {
+		const process = proc(
+			"labeled",
+			[node("s", "startEvent"), node("a"), node("e", "endEvent")],
+			[
+				{ ...flow("f1", "s", "a"), name: "Go to A" },
+				{ ...flow("f2", "a", "e"), name: "Finish" },
+			],
+		);
+
+		const result = layoutProcess(process);
+		const nodeMap = new Map(result.nodes.map((n) => [n.id, n]));
+
+		for (const edge of result.edges) {
+			if (!edge.labelBounds) continue;
+			for (const n of result.nodes) {
+				// Check label doesn't overlap any non-parent/child node
+				const lOverlap =
+					edge.labelBounds.x < n.bounds.x + n.bounds.width &&
+					edge.labelBounds.x + edge.labelBounds.width > n.bounds.x &&
+					edge.labelBounds.y < n.bounds.y + n.bounds.height &&
+					edge.labelBounds.y + edge.labelBounds.height > n.bounds.y;
+				if (lOverlap) {
+					// Allow overlap with source/target only
+					expect([edge.sourceRef, edge.targetRef]).toContain(n.id);
+				}
+			}
+		}
+	});
+
+	it("places multiple labels without overlapping each other", () => {
+		const process = proc(
+			"multi-label",
+			[
+				node("s", "startEvent"),
+				node("gw", "exclusiveGateway"),
+				node("a"),
+				node("b"),
+				node("join", "exclusiveGateway"),
+				node("e", "endEvent"),
+			],
+			[
+				flow("f1", "s", "gw"),
+				{ ...flow("f2", "gw", "a"), name: "Path A" },
+				{ ...flow("f3", "gw", "b"), name: "Path B" },
+				flow("f4", "a", "join"),
+				flow("f5", "b", "join"),
+				flow("f6", "join", "e"),
+			],
+		);
+
+		const result = layoutProcess(process);
+		const labels = result.edges
+			.filter((e) => e.labelBounds)
+			.map((e) => e.labelBounds as NonNullable<typeof e.labelBounds>);
+
+		// Check no two labels overlap
+		for (let i = 0; i < labels.length; i++) {
+			for (let j = i + 1; j < labels.length; j++) {
+				const a = labels[i];
+				const b = labels[j];
+				if (!a || !b) continue;
+				const overlap =
+					a.x < b.x + b.width &&
+					a.x + a.width > b.x &&
+					a.y < b.y + b.height &&
+					a.y + a.height > b.y;
+				expect(overlap).toBe(false);
+			}
+		}
+	});
+});
+
+describe("Edge routing efficiency", () => {
+	it("uses 2 or fewer bends for simple forward edges", () => {
+		const process = proc(
+			"simple",
+			[node("s", "startEvent"), node("a"), node("e", "endEvent")],
+			[flow("f1", "s", "a"), flow("f2", "a", "e")],
+		);
+
+		const result = layoutProcess(process);
+		for (const edge of result.edges) {
+			// Each edge should have at most 4 waypoints (= 2 bends)
+			expect(edge.waypoints.length).toBeLessThanOrEqual(4);
+		}
+	});
+
+	it("gateway port routes have comparable or fewer bends than right-only", () => {
+		// 3-branch gateway: one right, one top, one bottom
+		const process = proc(
+			"gw-bends",
+			[
+				node("s", "startEvent"),
+				node("gw", "exclusiveGateway"),
+				node("a"),
+				node("b"),
+				node("c"),
+				node("e", "endEvent"),
+			],
+			[
+				flow("f1", "s", "gw"),
+				flow("f2", "gw", "a"),
+				flow("f3", "gw", "b"),
+				flow("f4", "gw", "c"),
+				flow("f5", "a", "e"),
+				flow("f6", "b", "e"),
+				flow("f7", "c", "e"),
+			],
+		);
+
+		const result = layoutProcess(process);
+		// All gateway outgoing edges should route with ≤ 4 waypoints (2 bends)
+		const gwEdges = result.edges.filter((e) => e.sourceRef === "gw");
+		for (const edge of gwEdges) {
+			expect(edge.waypoints.length).toBeLessThanOrEqual(4);
+		}
 	});
 });

@@ -51,7 +51,7 @@
     </bpmn:serviceTask>
     <bpmn:scriptTask id="checkInventory" name="Check Inventory">
       <bpmn:extensionElements>
-        <zeebe:script expression="=inventory[item = order.itemId].quantity &gt; 0" resultVariable="inStock"/>
+        <zeebe:script expression="=inventory[item = order.itemId].quantity > 0" resultVariable="inStock"/>
       </bpmn:extensionElements>
       <bpmn:incoming>Flow_0000008</bpmn:incoming>
       <bpmn:outgoing>Flow_0000009</bpmn:outgoing>
@@ -75,8 +75,8 @@
           <zeebe:input source="bearer" target="authentication.type"/>
           <zeebe:input source="=secrets.ERP_TOKEN" target="authentication.token"/>
           <zeebe:input source="POST" target="method"/>
-          <zeebe:input source="=erpBaseUrl + &quot;/api/orders&quot;" target="url"/>
-          <zeebe:input source="={orderId: order.id, status: &quot;approved&quot;}" target="body"/>
+          <zeebe:input source="=erpBaseUrl + "/api/orders"" target="url"/>
+          <zeebe:input source="={orderId: order.id, status: "approved"}" target="body"/>
           <zeebe:input source="20" target="connectionTimeoutInSeconds"/>
           <zeebe:input source="20" target="readTimeoutInSeconds"/>
         </zeebe:ioMapping>

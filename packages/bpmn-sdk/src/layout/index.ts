@@ -4,6 +4,10 @@ export type { Bounds, LayoutEdge, LayoutNode, LayoutResult, Waypoint } from "./t
 export {
 	ELEMENT_SIZES,
 	HORIZONTAL_SPACING,
+	LABEL_CHAR_WIDTH,
+	LABEL_HEIGHT,
+	LABEL_MIN_WIDTH,
+	LABEL_VERTICAL_OFFSET,
 	SUBPROCESS_PADDING,
 	VERTICAL_SPACING,
 } from "./types.js";

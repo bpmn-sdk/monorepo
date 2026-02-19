@@ -24,109 +24,105 @@ import { Bpmn } from "../packages/bpmn-sdk/src/index.js";
 // no visual layout (diagrams: []). The layout engine uses overlap detection, so
 // very dense workflows may require manual DI adjustments after export.
 const definitions = Bpmn.createProcess("OrderProcessing")
-  .withAutoLayout()
-  .name("Order Processing Workflow")
-  .versionTag("1.0.0")
+	.withAutoLayout()
+	.name("Order Processing Workflow")
+	.versionTag("1.0.0")
 
-  // ── Start ──
-  .startEvent("start", { name: "Order Received" })
+	// ── Start ──
+	.startEvent("start", { name: "Order Received" })
 
-  // ── Validate ──
-  .serviceTask("validate", {
-    name: "Validate Order",
-    taskType: "order-validation",
-    retries: "3",
-    ioMapping: {
-      inputs: [{ source: "=order", target: "orderData" }],
-      outputs: [{ source: "=valid", target: "isValid" }],
-    },
-  })
+	// ── Validate ──
+	.serviceTask("validate", {
+		name: "Validate Order",
+		taskType: "order-validation",
+		retries: "3",
+		ioMapping: {
+			inputs: [{ source: "=order", target: "orderData" }],
+			outputs: [{ source: "=valid", target: "isValid" }],
+		},
+	})
 
-  // ── Decision gateway ──
-  .exclusiveGateway("checkValid", { name: "Order Valid?" })
+	// ── Decision gateway ──
+	.exclusiveGateway("checkValid", { name: "Order Valid?" })
 
-  // Branch: invalid order → reject
-  .branch("Invalid", (b) =>
-    b
-      .condition("=isValid = false")
-      .serviceTask("notifyRejection", {
-        name: "Send Rejection Email",
-        taskType: "email-sender",
-        taskHeaders: { template: "order-rejected" },
-      })
-      .endEvent("endRejected", { name: "Order Rejected" }),
-  )
+	// Branch: invalid order → reject
+	.branch("Invalid", (b) =>
+		b
+			.condition("=isValid = false")
+			.serviceTask("notifyRejection", {
+				name: "Send Rejection Email",
+				taskType: "email-sender",
+				taskHeaders: { template: "order-rejected" },
+			})
+			.endEvent("endRejected", { name: "Order Rejected" }),
+	)
 
-  // Branch: valid order → continue processing
-  .branch("Valid", (b) =>
-    b
-      .condition("=isValid = true")
-      .connectTo("parallelStart"),
-  )
+	// Branch: valid order → continue processing
+	.branch("Valid", (b) => b.condition("=isValid = true").connectTo("parallelStart"))
 
-  // ── Parallel processing ──
-  .parallelGateway("parallelStart", { name: "Start Parallel" })
+	// ── Parallel processing ──
+	.parallelGateway("parallelStart", { name: "Start Parallel" })
 
-  .branch("Payment", (b) =>
-    b
-      .serviceTask("processPayment", {
-        name: "Process Payment",
-        taskType: "payment-processor",
-        retries: "5",
-      })
-      .connectTo("parallelEnd"),
-  )
+	.branch("Payment", (b) =>
+		b
+			.serviceTask("processPayment", {
+				name: "Process Payment",
+				taskType: "payment-processor",
+				retries: "5",
+			})
+			.connectTo("parallelEnd"),
+	)
 
-  .branch("Inventory", (b) =>
-    b
-      .scriptTask("checkInventory", {
-        name: "Check Inventory",
-        expression: "=inventory[item = order.itemId].quantity > 0",
-        resultVariable: "inStock",
-      })
-      .connectTo("parallelEnd"),
-  )
+	.branch("Inventory", (b) =>
+		b
+			.scriptTask("checkInventory", {
+				name: "Check Inventory",
+				expression: "=inventory[item = order.itemId].quantity > 0",
+				resultVariable: "inStock",
+			})
+			.connectTo("parallelEnd"),
+	)
 
-  .parallelGateway("parallelEnd", { name: "All Complete" })
+	.parallelGateway("parallelEnd", { name: "All Complete" })
 
-  // ── Manual review ──
-  .userTask("manualReview", {
-    name: "Manager Approval",
-    formId: "order-approval-form",
-  })
+	// ── Manual review ──
+	.userTask("manualReview", {
+		name: "Manager Approval",
+		formId: "order-approval-form",
+	})
 
-  // ── REST connector: notify external system ──
-  .restConnector("notifyERP", {
-    name: "Notify ERP System",
-    method: "POST",
-    url: "=erpBaseUrl + \"/api/orders\"",
-    authentication: { type: "bearer", token: "=secrets.ERP_TOKEN" },
-    body: "={orderId: order.id, status: \"approved\"}",
-    resultVariable: "erpResponse",
-  })
+	// ── REST connector: notify external system ──
+	.restConnector("notifyERP", {
+		name: "Notify ERP System",
+		method: "POST",
+		url: '=erpBaseUrl + "/api/orders"',
+		authentication: { type: "bearer", token: "=secrets.ERP_TOKEN" },
+		body: '={orderId: order.id, status: "approved"}',
+		resultVariable: "erpResponse",
+	})
 
-  // ── Shipping sub-process ──
-  .subProcess(
-    "shippingSubProcess",
-    (sub) => {
-      sub
-        .startEvent("shipStart")
-        .serviceTask("createLabel", {
-          name: "Create Shipping Label",
-          taskType: "shipping-label",
-        })
-        .serviceTask("dispatchOrder", {
-          name: "Dispatch Order",
-          taskType: "dispatch",
-        })
-        .endEvent("shipEnd");
-    },
-    { name: "Handle Shipping" },
-  )
+	// ── Shipping sub-process ──
+	.subProcess(
+		"shippingSubProcess",
+		(sub) => {
+			sub
+				.startEvent("shipStart")
+				.serviceTask("createLabel", {
+					name: "Create Shipping Label",
+					taskType: "shipping-label",
+				})
+				.serviceTask("dispatchOrder", {
+					name: "Dispatch Order",
+					taskType: "dispatch",
+				})
+				.endEvent("shipEnd");
+		},
+		{ name: "Handle Shipping" },
+	)
 
-  // ── Done ──
-  .endEvent("endSuccess", { name: "Order Fulfilled" })
-  .build();
+	// ── Done ──
+	.endEvent("endSuccess", { name: "Order Fulfilled" })
+	.build();
 
 // ---------------------------------------------------------------------------
 // 2. Export to BPMN XML

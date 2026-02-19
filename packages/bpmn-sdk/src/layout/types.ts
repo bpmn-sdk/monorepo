@@ -26,10 +26,16 @@ export const ELEMENT_SIZES: Record<string, { width: number; height: number }> = 
 
 /** Minimum spacing between elements. */
 export const HORIZONTAL_SPACING = 80;
-export const VERTICAL_SPACING = 60;
+export const VERTICAL_SPACING = 80;
 
 /** Padding inside sub-process containers. */
 export const SUBPROCESS_PADDING = 20;
+
+/** Edge-label sizing constants (used for placement & collision detection). */
+export const LABEL_CHAR_WIDTH = 7;
+export const LABEL_MIN_WIDTH = 40;
+export const LABEL_HEIGHT = 14;
+export const LABEL_VERTICAL_OFFSET = 10;
 
 /** Axis-aligned bounding box. */
 export interface Bounds {

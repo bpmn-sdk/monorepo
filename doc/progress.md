@@ -2,6 +2,19 @@
 
 ## 2026-02-19
 
+### Layout Engine QA Fixes — Branch Alignment, Split/Join, Labels, Routing
+- **Branch baseline alignment**: Added `alignBranchBaselines()` to `coordinates.ts` — nodes in linear sequences (non-gateway, single-pred/single-succ chains) now share the same center-y coordinate
+- **Split/join Y-alignment**: Added `alignSplitJoinPairs()` to `coordinates.ts` — merge gateways are forced to the same y-coordinate as their corresponding split gateway
+- **Edge label collision avoidance**: Replaced simple midpoint label placement with collision-aware system in `routing.ts`:
+  - Generates 5 candidate positions along the longest edge segment (at 25%/33%/50%/67%/75%) with above/below offsets
+  - Greedy placement: processes labels in order, picks first non-overlapping candidate
+  - Fallback: slides label along segment in 10 steps to find clear space
+- **Edge routing efficiency**: `routeFromPort()` now compares assigned-port route against right-port route by bend count, preferring the assigned port unless right-only gives strictly fewer bends; back-edges now evaluate routing above vs. below all nodes and pick the shorter path
+- **VERTICAL_SPACING test fix**: Updated test to check against imported `VERTICAL_SPACING` constant instead of hardcoded `60`
+- Integrated `alignBranchBaselines` and `alignSplitJoinPairs` as phases 4b/4c in `layout-engine.ts`
+- Added 8 new tests: linear baseline alignment, branch divergence, fork/join parallel alignment, fork/join exclusive alignment, label-node non-overlap, label-label non-overlap, forward edge bend limit, gateway bend efficiency
+- All 272 tests pass, zero lint errors, zero build warnings
+
 ### Gateway Port Assignment for Auto-Layout
 - Added gateway port assignment logic to `routing.ts` — gateway outgoing edges now follow BPMN port conventions
   - Odd outgoing edges: middle edge exits right, upper half exits top, lower half exits bottom
