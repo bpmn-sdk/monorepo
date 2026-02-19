@@ -11,8 +11,9 @@ import {
 import { assignLayers, groupByLayer } from "../src/layout/layers.js";
 import { layoutProcess } from "../src/layout/layout-engine.js";
 import { assertNoOverlap } from "../src/layout/overlap.js";
-import { routeEdges } from "../src/layout/routing.js";
-import type { LayoutResult } from "../src/layout/types.js";
+import { assignGatewayPorts, routeEdges } from "../src/layout/routing.js";
+import type { PortSide } from "../src/layout/routing.js";
+import type { LayoutNode, LayoutResult } from "../src/layout/types.js";
 
 // Helper: create a simple flow element with required fields
 function node(id: string, type: BpmnFlowElement["type"] = "serviceTask"): BpmnFlowElement {
@@ -313,6 +314,210 @@ describe("Edge routing", () => {
 		const minNodeY = Math.min(...layoutNodes.map((n) => n.bounds.y));
 		const lowestWaypointY = Math.min(...edge.waypoints.map((w) => w.y));
 		expect(lowestWaypointY).toBeLessThan(minNodeY);
+	});
+});
+
+describe("Gateway port assignment", () => {
+	// Helper: create a named sequence flow
+	function namedFlow(id: string, source: string, target: string, name?: string): BpmnSequenceFlow {
+		return {
+			id,
+			sourceRef: source,
+			targetRef: target,
+			name,
+			extensionElements: [],
+			unknownAttributes: {},
+		};
+	}
+
+	// Helper: create a minimal LayoutNode at a given position
+	function layoutNode(id: string, type: BpmnFlowElement["type"], x: number, y: number): LayoutNode {
+		const size =
+			type === "exclusiveGateway" || type === "parallelGateway"
+				? { width: 50, height: 50 }
+				: { width: 100, height: 80 };
+		return { id, type, bounds: { x, y, ...size }, layer: 0, position: 0 };
+	}
+
+	it("assigns right port for single outgoing edge", () => {
+		const flows = [namedFlow("f1", "gw", "t1")];
+		const nodeMap = new Map<string, LayoutNode>([
+			["gw", layoutNode("gw", "exclusiveGateway", 0, 0)],
+			["t1", layoutNode("t1", "serviceTask", 200, 0)],
+		]);
+
+		const ports = assignGatewayPorts(flows, nodeMap);
+
+		expect(ports.get("f1")).toBe("right");
+	});
+
+	it("assigns top and bottom for 2 outgoing edges (even)", () => {
+		const flows = [namedFlow("f1", "gw", "t1"), namedFlow("f2", "gw", "t2")];
+		const nodeMap = new Map<string, LayoutNode>([
+			["gw", layoutNode("gw", "exclusiveGateway", 0, 100)],
+			["t1", layoutNode("t1", "serviceTask", 200, 0)],
+			["t2", layoutNode("t2", "serviceTask", 200, 200)],
+		]);
+
+		const ports = assignGatewayPorts(flows, nodeMap);
+
+		expect(ports.get("f1")).toBe("top");
+		expect(ports.get("f2")).toBe("bottom");
+		expect([...ports.values()].filter((p) => p === "right")).toHaveLength(0);
+	});
+
+	it("assigns top, right, bottom for 3 outgoing edges (odd)", () => {
+		const flows = [
+			namedFlow("f1", "gw", "t1"),
+			namedFlow("f2", "gw", "t2"),
+			namedFlow("f3", "gw", "t3"),
+		];
+		const nodeMap = new Map<string, LayoutNode>([
+			["gw", layoutNode("gw", "exclusiveGateway", 0, 150)],
+			["t1", layoutNode("t1", "serviceTask", 200, 0)],
+			["t2", layoutNode("t2", "serviceTask", 200, 150)],
+			["t3", layoutNode("t3", "serviceTask", 200, 300)],
+		]);
+
+		const ports = assignGatewayPorts(flows, nodeMap);
+
+		expect(ports.get("f1")).toBe("top");
+		expect(ports.get("f2")).toBe("right");
+		expect(ports.get("f3")).toBe("bottom");
+	});
+
+	it("distributes 5 outgoing edges: 2 top, 1 right, 2 bottom", () => {
+		const flows = Array.from({ length: 5 }, (_, i) => namedFlow(`f${i}`, "gw", `t${i}`));
+		const nodeMap = new Map<string, LayoutNode>([
+			["gw", layoutNode("gw", "parallelGateway", 0, 200)],
+			...Array.from(
+				{ length: 5 },
+				(_, i) =>
+					[`t${i}`, layoutNode(`t${i}`, "serviceTask", 200, i * 100)] as [string, LayoutNode],
+			),
+		]);
+
+		const ports = assignGatewayPorts(flows, nodeMap);
+
+		const sides = [...ports.values()];
+		expect(sides.filter((s) => s === "top")).toHaveLength(2);
+		expect(sides.filter((s) => s === "right")).toHaveLength(1);
+		expect(sides.filter((s) => s === "bottom")).toHaveLength(2);
+	});
+
+	it("distributes 4 outgoing edges: 2 top, 2 bottom (no right)", () => {
+		const flows = Array.from({ length: 4 }, (_, i) => namedFlow(`f${i}`, "gw", `t${i}`));
+		const nodeMap = new Map<string, LayoutNode>([
+			["gw", layoutNode("gw", "inclusiveGateway", 0, 200)],
+			...Array.from(
+				{ length: 4 },
+				(_, i) =>
+					[`t${i}`, layoutNode(`t${i}`, "serviceTask", 200, i * 100)] as [string, LayoutNode],
+			),
+		]);
+
+		const ports = assignGatewayPorts(flows, nodeMap);
+
+		const sides = [...ports.values()];
+		expect(sides.filter((s) => s === "top")).toHaveLength(2);
+		expect(sides.filter((s) => s === "right")).toHaveLength(0);
+		expect(sides.filter((s) => s === "bottom")).toHaveLength(2);
+	});
+
+	it("returns empty map for no outgoing edges", () => {
+		const ports = assignGatewayPorts([], new Map());
+		expect(ports.size).toBe(0);
+	});
+
+	it("gateway edges exit from correct port positions in routed edges", () => {
+		const flowNodes = [
+			node("gw", "exclusiveGateway"),
+			node("t1", "serviceTask"),
+			node("t2", "serviceTask"),
+			node("t3", "serviceTask"),
+		];
+		const nodeIndex = new Map(flowNodes.map((n) => [n.id, n]));
+		const orderedLayers = [["gw"], ["t1", "t2", "t3"]];
+		const layoutNodes = assignCoordinates(orderedLayers, nodeIndex);
+		const nodeMap = new Map(layoutNodes.map((n) => [n.id, n]));
+
+		const flows = [flow("f1", "gw", "t1"), flow("f2", "gw", "t2"), flow("f3", "gw", "t3")];
+		const edges = routeEdges(flows, nodeMap, []);
+
+		expect(edges).toHaveLength(3);
+
+		const gwNode = layoutNodes.find((n) => n.id === "gw");
+		expect(gwNode).toBeDefined();
+		if (!gwNode) return;
+		const gwCenterX = gwNode.bounds.x + gwNode.bounds.width / 2;
+		const gwRight = gwNode.bounds.x + gwNode.bounds.width;
+		const gwTop = gwNode.bounds.y;
+		const gwBottom = gwNode.bounds.y + gwNode.bounds.height;
+
+		// Sort edges by target y to match port assignment order
+		const sortedEdges = [...edges].sort((a, b) => {
+			const tA = nodeMap.get(a.targetRef);
+			const tB = nodeMap.get(b.targetRef);
+			if (!tA || !tB) return 0;
+			return tA.bounds.y + tA.bounds.height / 2 - (tB.bounds.y + tB.bounds.height / 2);
+		});
+
+		// Top-port edge: starts at gateway's top center
+		const topEdge = sortedEdges[0];
+		expect(topEdge).toBeDefined();
+		if (!topEdge) return;
+		expect(topEdge.waypoints[0]?.x).toBeCloseTo(gwCenterX, 0);
+		expect(topEdge.waypoints[0]?.y).toBeCloseTo(gwTop, 0);
+
+		// Right-port edge: starts at gateway's right center
+		const rightEdge = sortedEdges[1];
+		expect(rightEdge).toBeDefined();
+		if (!rightEdge) return;
+		expect(rightEdge.waypoints[0]?.x).toBeCloseTo(gwRight, 0);
+
+		// Bottom-port edge: starts at gateway's bottom center
+		const bottomEdge = sortedEdges[2];
+		expect(bottomEdge).toBeDefined();
+		if (!bottomEdge) return;
+		expect(bottomEdge.waypoints[0]?.x).toBeCloseTo(gwCenterX, 0);
+		expect(bottomEdge.waypoints[0]?.y).toBeCloseTo(gwBottom, 0);
+
+		// All segments should be orthogonal
+		for (const edge of edges) {
+			for (let i = 1; i < edge.waypoints.length; i++) {
+				const prev = edge.waypoints[i - 1];
+				const curr = edge.waypoints[i];
+				if (!prev || !curr) continue;
+				const isH = Math.abs(prev.y - curr.y) < 1;
+				const isV = Math.abs(prev.x - curr.x) < 1;
+				expect(isH || isV).toBe(true);
+			}
+		}
+	});
+
+	it("non-gateway sources always use right port", () => {
+		const flowNodes = [
+			node("task", "serviceTask"),
+			node("t1", "serviceTask"),
+			node("t2", "serviceTask"),
+		];
+		const nodeIndex = new Map(flowNodes.map((n) => [n.id, n]));
+		const orderedLayers = [["task"], ["t1", "t2"]];
+		const layoutNodes = assignCoordinates(orderedLayers, nodeIndex);
+		const nodeMap = new Map(layoutNodes.map((n) => [n.id, n]));
+
+		const flows = [flow("f1", "task", "t1"), flow("f2", "task", "t2")];
+		const edges = routeEdges(flows, nodeMap, []);
+
+		const taskNode = layoutNodes.find((n) => n.id === "task");
+		expect(taskNode).toBeDefined();
+		if (!taskNode) return;
+		const taskRight = taskNode.bounds.x + taskNode.bounds.width;
+
+		// Both edges should start from the right side (not top/bottom)
+		for (const edge of edges) {
+			expect(edge.waypoints[0]?.x).toBeCloseTo(taskRight, 0);
+		}
 	});
 });
 

@@ -2,14 +2,27 @@
 
 ## 2026-02-19
 
+### Gateway Port Assignment for Auto-Layout
+- Added gateway port assignment logic to `routing.ts` — gateway outgoing edges now follow BPMN port conventions
+  - Odd outgoing edges: middle edge exits right, upper half exits top, lower half exits bottom
+  - Even outgoing edges: upper half exits top, lower half exits bottom (no right port)
+  - Single outgoing edge: exits right (straight horizontal)
+- Added `routeFromPort()` Z-shaped routing from top/bottom ports, keeping vertical segments in the safe mid-zone between layers
+- Exported `assignGatewayPorts` and `PortSide` type for direct unit testing
+- 8 new tests covering port assignment (1/2/3/4/5 edges, empty, waypoint positions, non-gateway passthrough)
+- All 277 tests pass, zero lint errors, zero build warnings
+
 ### Auto-Layout Documentation
 - Added auto-layout section to README with full usage example showing `.withAutoLayout()` on a gateway workflow
 - Added `withAutoLayout()` to builder methods table in API reference under new "Layout" category
 - Expanded `doc/features.md` auto-layout entry with configuration details (opt-in behavior, element sizing, round-trip fidelity)
 
 ### Builder Layout Integration Tests
-- Added `builder-layout-integration.test.ts` with 12 integration tests verifying auto-layout data generation for builder-created workflows
+- Added `builder-layout-integration.test.ts` with 15 integration tests verifying auto-layout data generation for builder-created workflows
 - Tests cover: shape/edge completeness, valid bounds, no overlaps, left-to-right ordering, DI ID conventions, orthogonal edge routing, element-type sizing, subprocess child containment, complex multi-pattern workflows, export→parse roundtrip, double roundtrip, and XML element verification
+- Added round-trip position stability test to `bpmn-builder.test.ts`
+- Updated `examples/create-workflow.ts` to use `.withAutoLayout()`
+- Regenerated `order-process.bpmn` example output with layout data
 
 ## 2026-02-18
 
