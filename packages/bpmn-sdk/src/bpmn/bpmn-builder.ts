@@ -1,8 +1,14 @@
+import { layoutProcess } from "../layout/layout-engine.js";
+import type { LayoutResult } from "../layout/types.js";
 import { generateId } from "../types/id-generator.js";
 import type { XmlElement } from "../types/xml-element.js";
 import type {
 	BpmnConditionExpression,
 	BpmnDefinitions,
+	BpmnDiEdge,
+	BpmnDiPlane,
+	BpmnDiShape,
+	BpmnDiagram,
 	BpmnElementType,
 	BpmnError,
 	BpmnEventDefinition,
@@ -114,6 +120,10 @@ export interface GatewayOptions extends ElementOptions {
 export interface IntermediateCatchEventOptions extends ElementOptions {
 	/** Timer duration (ISO 8601) — creates a timer catch event. */
 	timerDuration?: string;
+	/** Timer date (ISO 8601) — creates a timer catch event that fires at a specific date/time. */
+	timerDate?: string;
+	/** Timer cycle (ISO 8601) — creates a recurring timer catch event. */
+	timerCycle?: string;
 	/** Message name — creates a message catch event (aspirational). */
 	messageName?: string;
 	/** Signal name — creates a signal catch event (aspirational). */
@@ -142,6 +152,10 @@ export interface BoundaryEventOptions extends ElementOptions {
 	errorRef?: string;
 	/** Timer duration — creates a timer boundary event (aspirational). */
 	timerDuration?: string;
+	/** Timer date (ISO 8601) — creates a timer boundary event that fires at a specific date/time. */
+	timerDate?: string;
+	/** Timer cycle (ISO 8601) — creates a recurring timer boundary event. */
+	timerCycle?: string;
 	/** Message name — creates a message boundary event (aspirational). */
 	messageName?: string;
 	/** Signal name — creates a signal boundary event (aspirational). */
@@ -332,6 +346,47 @@ function buildAdHocLoopCharacteristics(lc: {
 				children: [],
 			},
 		],
+	};
+}
+
+/** Convert a layout engine result into a BPMN diagram interchange structure. */
+function layoutResultToDiagram(processId: string, layout: LayoutResult): BpmnDiagram {
+	const shapes: BpmnDiShape[] = layout.nodes.map((node) => {
+		const shape: BpmnDiShape = {
+			id: `${node.id}_di`,
+			bpmnElement: node.id,
+			bounds: { ...node.bounds },
+			unknownAttributes: {},
+		};
+		if (node.labelBounds) {
+			shape.label = { bounds: { ...node.labelBounds } };
+		}
+		return shape;
+	});
+
+	const edges: BpmnDiEdge[] = layout.edges.map((edge) => {
+		const diEdge: BpmnDiEdge = {
+			id: `${edge.id}_di`,
+			bpmnElement: edge.id,
+			waypoints: edge.waypoints.map((wp) => ({ ...wp })),
+			unknownAttributes: {},
+		};
+		if (edge.labelBounds) {
+			diEdge.label = { bounds: { ...edge.labelBounds } };
+		}
+		return diEdge;
+	});
+
+	const plane: BpmnDiPlane = {
+		id: `${processId}_di_plane`,
+		bpmnElement: processId,
+		shapes,
+		edges,
+	};
+
+	return {
+		id: `${processId}_di`,
+		plane,
 	};
 }
 
@@ -785,9 +840,16 @@ export class ProcessBuilder {
 	private readonly rootErrors: BpmnError[] = [];
 	private lastNodeId: string | undefined;
 	private currentGatewayId: string | undefined;
+	private _autoLayout = false;
 
 	constructor(processId: string) {
 		this.processId = processId;
+	}
+
+	/** Enable auto-layout: `build()` will run the layout engine and populate diagram interchange data. */
+	withAutoLayout(): this {
+		this._autoLayout = true;
+		return this;
 	}
 
 	/** Set the display name for this process. */
@@ -1294,8 +1356,13 @@ export class ProcessBuilder {
 			escalations: [],
 			collaborations: [],
 			processes: [process],
-			diagrams: [],
+			diagrams: this._autoLayout ? [this.buildDiagram(process)] : [],
 		};
+	}
+
+	private buildDiagram(process: BpmnProcess): BpmnDiagram {
+		const layoutResult = layoutProcess(process);
+		return layoutResultToDiagram(this.processId, layoutResult);
 	}
 
 	// ---- Internal ----

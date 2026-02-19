@@ -45,6 +45,12 @@
 
 ## 2026-02-19
 
+### Auto-Layout for ProcessBuilder
+- Added `withAutoLayout()` fluent method to `ProcessBuilder` — when enabled, `build()` runs the Sugiyama layout engine and populates `BpmnDiagram` with DI shapes (bounds) and edges (waypoints)
+- Layout-to-DI conversion maps `LayoutResult` nodes/edges to `BpmnDiShape`/`BpmnDiEdge` with proper element references
+- Without `withAutoLayout()`, behavior is unchanged (`diagrams: []`)
+- 4 new tests: default empty diagrams, linear flow DI, gateway branch DI, export→parse roundtrip with DI
+
 ### BPMN Fluent Builder API — Full Implementation
 - Rewrote `bpmn-builder.ts` with complete fluent builder API (~1400 lines)
 - **Gateway branching**: `branch(name, callback)` with `BranchBuilder` sub-builders

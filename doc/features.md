@@ -9,6 +9,7 @@
 - **Parse BPMN XML** — `Bpmn.parse(xml)` parses BPMN XML into a typed `BpmnDefinitions` model
 - **Export BPMN XML** — `Bpmn.export(model)` serializes a `BpmnDefinitions` model back to BPMN XML
 - **Fluent builder** — `Bpmn.createProcess(id)` creates processes with method chaining
+- **Auto-layout** — `.withAutoLayout()` populates diagram interchange (shapes + edges) via Sugiyama layout engine
 - **Gateway support** — exclusive, parallel, inclusive, event-based gateways with `branch(name, callback)` pattern
 - **Loop support** — `connectTo(targetId)` for merge points and back-edge loops
 - **Sub-process builders** — `adHocSubProcess()`, `subProcess()`, `eventSubProcess()` with nested content

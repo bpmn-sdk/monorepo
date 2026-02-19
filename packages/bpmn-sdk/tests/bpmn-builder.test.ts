@@ -1412,4 +1412,81 @@ describe("BpmnProcessBuilder", () => {
 			).toThrow('Duplicate element ID "dup"');
 		});
 	});
+
+	// -----------------------------------------------------------------------
+	// Auto-layout
+	// -----------------------------------------------------------------------
+
+	describe("withAutoLayout", () => {
+		it("produces empty diagrams by default", () => {
+			const defs = Bpmn.createProcess("proc1").startEvent("s").endEvent("e").build();
+			expect(defs.diagrams).toHaveLength(0);
+		});
+
+		it("produces DI shapes and edges for a linear flow", () => {
+			const defs = Bpmn.createProcess("proc1")
+				.withAutoLayout()
+				.startEvent("s")
+				.serviceTask("t", { name: "Task", taskType: "job" })
+				.endEvent("e")
+				.build();
+
+			expect(defs.diagrams).toHaveLength(1);
+			const diagram = defined(defs.diagrams[0]);
+			expect(diagram.plane.bpmnElement).toBe("proc1");
+
+			// 3 elements → 3 shapes
+			expect(diagram.plane.shapes).toHaveLength(3);
+			const shapeElements = diagram.plane.shapes.map((s) => s.bpmnElement);
+			expect(shapeElements).toContain("s");
+			expect(shapeElements).toContain("t");
+			expect(shapeElements).toContain("e");
+
+			// All shapes have valid bounds
+			for (const shape of diagram.plane.shapes) {
+				expect(shape.bounds.width).toBeGreaterThan(0);
+				expect(shape.bounds.height).toBeGreaterThan(0);
+			}
+
+			// 2 sequence flows → 2 edges
+			expect(diagram.plane.edges).toHaveLength(2);
+			for (const edge of diagram.plane.edges) {
+				expect(edge.waypoints.length).toBeGreaterThanOrEqual(2);
+			}
+		});
+
+		it("produces DI for gateway branches", () => {
+			const defs = Bpmn.createProcess("proc1")
+				.withAutoLayout()
+				.startEvent("s")
+				.exclusiveGateway("gw")
+				.branch("a", (b) => b.serviceTask("t1", { name: "A", taskType: "a" }))
+				.branch("b", (b) => b.serviceTask("t2", { name: "B", taskType: "b" }))
+				.exclusiveGateway("merge")
+				.endEvent("e")
+				.build();
+
+			const diagram = defined(defs.diagrams[0]);
+			// s, gw, t1, t2, merge, e = 6 shapes
+			expect(diagram.plane.shapes.length).toBeGreaterThanOrEqual(6);
+			expect(diagram.plane.edges.length).toBeGreaterThanOrEqual(4);
+		});
+
+		it("survives roundtrip: export → parse preserves DI", () => {
+			const defs = Bpmn.createProcess("proc1")
+				.withAutoLayout()
+				.startEvent("s")
+				.serviceTask("t", { name: "Task", taskType: "job" })
+				.endEvent("e")
+				.build();
+
+			const xml = Bpmn.export(defs);
+			const parsed = Bpmn.parse(xml);
+
+			expect(parsed.diagrams).toHaveLength(1);
+			const diagram = defined(parsed.diagrams[0]);
+			expect(diagram.plane.shapes).toHaveLength(3);
+			expect(diagram.plane.edges).toHaveLength(2);
+		});
+	});
 });
