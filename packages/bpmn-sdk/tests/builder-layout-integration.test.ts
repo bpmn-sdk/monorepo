@@ -446,29 +446,36 @@ describe("Builder → auto-layout integration", () => {
 			.endEvent("e")
 			.build();
 
+		const process = firstProcess(defs);
 		const diagram = firstDiagram(defs);
 		const t1Shape = shapeFor(diagram.plane.shapes, "t1");
 		const t2Shape = shapeFor(diagram.plane.shapes, "t2");
 
-		// Find edges targeting t1 and t2 — last waypoint should be at the left side
-		for (const edge of diagram.plane.edges) {
-			const lastWp = edge.waypoints[edge.waypoints.length - 1];
-			if (!lastWp) continue;
+		// Find the sequence flows targeting t1 and t2 by targetRef
+		const sfToT1 = process.sequenceFlows.find((sf) => sf.targetRef === "t1");
+		const sfToT2 = process.sequenceFlows.find((sf) => sf.targetRef === "t2");
+		expect(sfToT1, "sequence flow targeting t1").toBeDefined();
+		expect(sfToT2, "sequence flow targeting t2").toBeDefined();
 
-			const matchesT1 =
-				Math.abs(lastWp.x - t1Shape.bounds.x) < 1 &&
-				Math.abs(lastWp.y - (t1Shape.bounds.y + t1Shape.bounds.height / 2)) < 1;
-			const matchesT2 =
-				Math.abs(lastWp.x - t2Shape.bounds.x) < 1 &&
-				Math.abs(lastWp.y - (t2Shape.bounds.y + t2Shape.bounds.height / 2)) < 1;
+		const edgeToT1 = edgeFor(diagram.plane.edges, sfToT1?.id ?? "");
+		const edgeToT2 = edgeFor(diagram.plane.edges, sfToT2?.id ?? "");
 
-			if (matchesT1) {
-				expect(lastWp.x, "t1 entry should be at left edge").toBe(t1Shape.bounds.x);
-			}
-			if (matchesT2) {
-				expect(lastWp.x, "t2 entry should be at left edge").toBe(t2Shape.bounds.x);
-			}
-		}
+		// Last waypoint of each edge must be at (left edge, center Y) of the target
+		const lastT1 = edgeToT1.waypoints.at(-1);
+		expect(lastT1).toBeDefined();
+		expect(lastT1?.x, "t1 entry x at left edge").toBe(t1Shape.bounds.x);
+		expect(lastT1?.y, "t1 entry y at center").toBeCloseTo(
+			t1Shape.bounds.y + t1Shape.bounds.height / 2,
+			0,
+		);
+
+		const lastT2 = edgeToT2.waypoints.at(-1);
+		expect(lastT2).toBeDefined();
+		expect(lastT2?.x, "t2 entry x at left edge").toBe(t2Shape.bounds.x);
+		expect(lastT2?.y, "t2 entry y at center").toBeCloseTo(
+			t2Shape.bounds.y + t2Shape.bounds.height / 2,
+			0,
+		);
 	});
 
 	// -----------------------------------------------------------------------

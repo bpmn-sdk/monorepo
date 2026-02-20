@@ -7,7 +7,8 @@
 - Added `resolveTargetPort()` to determine edge entry side: non-gateway targets always enter from the left; gateway targets enter top/bottom/left based on source relative Y position (with +/-1px tolerance)
 - Integrated `resolveTargetPort` into `routeForwardEdge()` and `routeFromPortDirect()` for correct target-side routing
 - Added 2 new `resolveTargetPort` test cases (non-gateway always left, gateway Y-based with tolerance)
-- Verification: `pnpm turbo build`, `pnpm turbo test` (274 pass), `pnpm biome check .`, `pnpm turbo typecheck` -- all zero errors
+- Added 2 integration tests in `builder-layout-integration.test.ts` for non-gateway left-entry and branch vertical spacing
+- Verification: `pnpm turbo build`, `pnpm turbo test` (276 pass), `pnpm biome check .`, `pnpm turbo typecheck` — all zero errors
 
 ## 2026-02-19
 
