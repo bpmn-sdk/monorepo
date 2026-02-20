@@ -2,6 +2,57 @@
 
 ## 2026-02-20
 
+### Minimum Row Gap Between Elements & Gateway Label Position
+- **Minimum row gap**: `distributeSplitBranches()` now uses two-pass processing (multi-branch first, single-branch second) with peer-aware gap enforcement. Single-branch gateways check all chain nodes against layer peers and push further away if any gap would be less than `GRID_CELL_HEIGHT/2` (80px).
+- **Gateway labels**: Labels moved from centered-above to **top-right** position (`x = bounds.right + 4, y = bounds.top - labelHeight - 4`), preventing overlap with upward edge paths.
+- Verification: `pnpm verify` — 288 tests pass, zero errors
+
+### Symmetric Branch Distribution for Split Gateways
+- **Symmetric branches**: Added `distributeSplitBranches()` — branches of split gateways with 2+ non-baseline branches are now equally distributed above and below the gateway center Y, spaced by `GRID_CELL_HEIGHT` (160px)
+- **Single-branch gateways**: Gateways with exactly 1 non-baseline branch (e.g., early-return splits) now place the branch a full `GRID_CELL_HEIGHT` away from the gateway center, ensuring clear separation from inner gateway branches
+- **Layer overlap resolution**: Added `resolveLayerOverlaps()` — after redistribution, overlapping nodes within the same layer are pushed apart with minimum gap, and coordinates are normalized to ensure no negative Y values
+- Example result: `parallelStart` (cy=251) branches at processPayment (cy=171) and checkInventory (cy=331); early return at notifyRejection/endRejected (cy=91) — one full grid row above
+- Verification: `pnpm verify` — 288 tests pass, zero errors
+
+### Collapsed Sub-Processes & Baseline Continuation Through Early-Return Splits
+- **Collapsed sub-processes**: Sub-processes now render at 100×80 (same as regular tasks) instead of being expanded to show child elements. Removed the sub-process expansion phase from the layout engine.
+- **Baseline continuation**: `findContinuationSuccessor()` now correctly follows gateway successors as baseline continuation points. When a split gateway has one early-return branch (dead-end) and one branch leading to another gateway, the gateway branch is chosen as the baseline continuation. Non-gateway branches are never promoted to the baseline.
+- **Overlap fix**: Fixed 3 test failures caused by branch nodes being incorrectly placed on the baseline (overlapping siblings). The fix ensures that only gateway successors are followed as continuation, preventing branch content from being aligned to the baseline Y.
+- Verification: `pnpm verify` — 288 tests pass, zero errors
+
+### Baseline Path Alignment & Gateway Edge Fix
+- **Baseline path detection**: Added `findBaselinePath()` that identifies the process "spine" — the sequence of nodes every path must traverse (start event → gateways → end event), skipping branch content
+- **Baseline Y-alignment**: Added `alignBaselinePath()` that forces all spine nodes to share the same center-Y, ensuring start and end events are horizontally aligned
+- **Gateway incoming edge fix**: Updated `resolveTargetPort()` to distinguish split (starting) vs join (closing) gateways:
+  - Split gateways: incoming edges always connect from the left
+  - Join gateways: incoming edges connect based on relative position (above→top, below→bottom, same Y→left)
+- Added 5 new tests: baseline path detection (2), baseline Y-alignment (2), split gateway left-side port (1)
+- Verification: `pnpm verify` — 287 tests pass, zero errors
+
+### XML Attribute Value Escaping Fix
+- Fixed `serializeXml()` to escape `"` as `&quot;` in XML attribute values
+- Root cause: `fast-xml-parser` `XMLBuilder` with `processEntities: false` writes attribute values verbatim, producing invalid XML when values contain double quotes (e.g., FEEL expressions like `=erpBaseUrl + "/api/orders"`)
+- Added regression test for attribute escaping and roundtrip
+- Regenerated `order-process.bpmn` with proper escaping
+- Verification: `pnpm verify` — 282 tests pass, zero errors
+
+### Grid-Based Layout & Edge Routing Improvements
+- **Virtual grid system**: Replaced cumulative-offset coordinate assignment with a 200×160 virtual grid
+  - All elements placed in grid cells, centered horizontally and vertically within cells
+  - Grid cells merge automatically for oversized elements (e.g., expanded sub-processes)
+  - Grid constants: `GRID_CELL_WIDTH=200`, `GRID_CELL_HEIGHT=160`
+- **Gateway size**: Changed gateway dimensions from 50×50 to 36×36 (matching BPMN standard)
+- **L-shaped edge routing**: Forward edges now prefer L-shaped paths (1 bend) over Z-shaped paths (2 bends)
+  - `routeForwardEdge()` produces horizontal→vertical L-shape instead of horizontal→vertical→horizontal Z-shape
+  - `routeFromPortDirect()` also uses L-shaped routing from top/bottom ports
+- **Early-return branch positioning**: Added `ensureEarlyReturnOffBaseline()` — shorter branches at gateway splits are swapped off the baseline so they're never on the split gateway's center-y
+- **Edge connection rules** (unchanged, verified):
+  - Non-gateway elements: outgoing from right center, incoming to left center
+  - Starting gateways: incoming on left, vertically centered
+  - Closing gateways: incoming from top/bottom/left based on relative position
+- Added 5 new tests: grid cell centering, grid layer spacing, grid row spacing, L-shaped edge preference, early-return off-baseline
+- Verification: `pnpm verify` — build, typecheck, check, test (281 pass) — all zero errors
+
 ### Edge Routing & Vertical Spacing Improvements
 - Changed `VERTICAL_SPACING` from 80px to 160px for better visual separation between branches
 - Added `resolveTargetPort()` to determine edge entry side: non-gateway targets always enter from the left; gateway targets enter top/bottom/left based on source relative Y position (with +/-1px tolerance)

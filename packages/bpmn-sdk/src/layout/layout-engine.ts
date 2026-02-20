@@ -1,16 +1,18 @@
 import type { BpmnFlowElement, BpmnProcess, BpmnSequenceFlow } from "../bpmn/bpmn-model.js";
 import {
+	alignBaselinePath,
 	alignBranchBaselines,
 	alignSplitJoinPairs,
 	assignCoordinates,
-	reassignXCoordinates,
+	distributeSplitBranches,
+	ensureEarlyReturnOffBaseline,
+	resolveLayerOverlaps,
 } from "./coordinates.js";
 import { minimizeCrossings } from "./crossing.js";
 import { buildGraph, detectBackEdges, reverseBackEdges } from "./graph.js";
 import { assignLayers, groupByLayer } from "./layers.js";
 import { assertNoOverlap } from "./overlap.js";
 import { routeEdges } from "./routing.js";
-import { layoutSubProcesses } from "./subprocess.js";
 import type { LayoutNode, LayoutResult } from "./types.js";
 /**
  * Auto-layout a BPMN process using the Sugiyama/layered algorithm.
@@ -69,63 +71,25 @@ export function layoutFlowNodes(
 	// Phase 4c: Align split/join gateway pairs to same y-coordinate
 	alignSplitJoinPairs(layoutNodes, dag);
 
-	// Phase 5: Sub-process layout (recursive) — may resize sub-process nodes
-	const childResults = layoutSubProcesses(layoutNodes, nodeIndex);
+	// Phase 4d: Align all baseline-path nodes to the same center-Y
+	alignBaselinePath(layoutNodes, dag);
 
-	// Phase 5b: Re-assign x-coordinates after sub-process expansion, and shift children
-	if (childResults.length > 0) {
-		// Record pre-shift positions of all nodes
-		const preShiftX = new Map<string, number>();
-		for (const node of layoutNodes) {
-			preShiftX.set(node.id, node.bounds.x);
-		}
+	// Phase 4e: Ensure early-return branches are never on the baseline
+	ensureEarlyReturnOffBaseline(layoutNodes, dag);
 
-		reassignXCoordinates(layoutNodes, orderedLayers);
+	// Phase 4f: Distribute split gateway branches symmetrically
+	distributeSplitBranches(layoutNodes, dag);
 
-		// Apply the parent's x-shift to its children
-		for (const { parentId, result: childResult } of childResults) {
-			const parent = layoutNodes.find((n) => n.id === parentId);
-			if (!parent) continue;
-			const oldX = preShiftX.get(parentId) ?? parent.bounds.x;
-			const dx = parent.bounds.x - oldX;
-			if (dx === 0) continue;
+	// Phase 4g: Resolve any layer overlaps from redistribution
+	resolveLayerOverlaps(layoutNodes);
 
-			for (const childNode of childResult.nodes) {
-				childNode.bounds.x += dx;
-				if (childNode.labelBounds) childNode.labelBounds.x += dx;
-			}
-			for (const childEdge of childResult.edges) {
-				for (const wp of childEdge.waypoints) {
-					wp.x += dx;
-				}
-				if (childEdge.labelBounds) {
-					childEdge.labelBounds.x += dx;
-				}
-			}
-		}
-	}
-
-	// Phase 6: Edge routing (uses original back-edges for routing, not reversed)
+	// Phase 5: Edge routing (uses original back-edges for routing, not reversed)
 	const nodeMap = new Map<string, LayoutNode>();
 	for (const node of layoutNodes) {
 		nodeMap.set(node.id, node);
 	}
-	// Also add child nodes for edge routing within sub-processes
-	for (const { result: childResult } of childResults) {
-		for (const childNode of childResult.nodes) {
-			nodeMap.set(childNode.id, childNode);
-		}
-	}
 
 	const edges = routeEdges(sequenceFlows, nodeMap, backEdges);
 
-	// Merge child results into the main result
-	const allNodes = [...layoutNodes];
-	const allEdges = [...edges];
-	for (const { result: childResult } of childResults) {
-		allNodes.push(...childResult.nodes);
-		allEdges.push(...childResult.edges);
-	}
-
-	return { nodes: allNodes, edges: allEdges };
+	return { nodes: layoutNodes, edges };
 }

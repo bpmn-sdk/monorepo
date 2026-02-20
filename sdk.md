@@ -1,0 +1,18 @@
+Improve how nodes are positioned and edges bahave:
+- BPMN Shape default size:
+  - Element: 100x80
+  - Gateway: 36x36
+- Create a virtual grid of 200x160 grid items
+  - All bpmn elements must be placed in one grid item
+  - If an element is too big, then merge grid items so that it fits
+  - Within the grid items the elements are vertically and horizontally centered
+- On gateway splits: if one path has an early return, it's never on the base line
+- Outgoing paths: for all elements but gateways, all outgoing paths must leave the element on the right side, vertically centered
+- Incoming paths: for all elements but gateways, all incoming paths must connect the element on the left side, vertically centered
+- Starting Gateways: incoming paths always connect on the left side, vertically centered
+- Closing gateways: incoming paths connect from the positioning:
+  - above gateway: from the top
+  - below gateway: from the bottom
+  - left to the gateway: from the left
+- Always prefer L-shaped edges over Z-shaped ones. Use Z-shaped edges only if not possible differently
+- Elements may never overlap

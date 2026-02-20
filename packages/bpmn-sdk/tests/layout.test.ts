@@ -4,6 +4,7 @@ import {
 	alignBranchBaselines,
 	alignSplitJoinPairs,
 	assignCoordinates,
+	findBaselinePath,
 } from "../src/layout/coordinates.js";
 import { minimizeCrossings } from "../src/layout/crossing.js";
 import {
@@ -343,7 +344,7 @@ describe("Gateway port assignment", () => {
 	function layoutNode(id: string, type: BpmnFlowElement["type"], x: number, y: number): LayoutNode {
 		const size =
 			type === "exclusiveGateway" || type === "parallelGateway"
-				? { width: 50, height: 50 }
+				? { width: 36, height: 36 }
 				: { width: 100, height: 80 };
 		return { id, type, bounds: { x, y, ...size }, layer: 0, position: 0 };
 	}
@@ -759,7 +760,7 @@ describe("Layout engine (integration)", () => {
 		expect(gwNode.labelBounds?.y).toBeLessThan(gwNode.bounds.y);
 	});
 
-	it("lays out a sub-process with children", () => {
+	it("lays out a sub-process as collapsed (same size as a task)", () => {
 		const subprocess = node("sub", "adHocSubProcess") as BpmnFlowElement & {
 			flowElements: BpmnFlowElement[];
 			sequenceFlows: BpmnSequenceFlow[];
@@ -775,22 +776,18 @@ describe("Layout engine (integration)", () => {
 
 		const result = layoutProcess(process);
 
-		// Should contain parent nodes + child nodes
 		const parentNode = result.nodes.find((n) => n.id === "sub");
 		expect(parentNode).toBeDefined();
 		if (!parentNode) return;
-		// Sub-process should be sized to contain its children
-		expect(parentNode.bounds.width).toBeGreaterThan(100);
-		expect(parentNode.bounds.height).toBeGreaterThan(80);
+		// Collapsed sub-process should be same size as a task
+		expect(parentNode.bounds.width).toBe(100);
+		expect(parentNode.bounds.height).toBe(80);
 
-		// Child nodes should be positioned within the sub-process
+		// No child nodes in the layout result
 		const child1 = result.nodes.find((n) => n.id === "child1");
 		const child2 = result.nodes.find((n) => n.id === "child2");
-		expect(child1).toBeDefined();
-		expect(child2).toBeDefined();
-		if (!child1 || !child2) return;
-		expect(child1.bounds.x).toBeGreaterThanOrEqual(parentNode.bounds.x);
-		expect(child1.bounds.y).toBeGreaterThanOrEqual(parentNode.bounds.y);
+		expect(child1).toBeUndefined();
+		expect(child2).toBeUndefined();
 	});
 
 	it("handles an empty process", () => {
@@ -1051,8 +1048,8 @@ describe("resolveTargetPort", () => {
 			"inclusiveGateway",
 			"eventBasedGateway",
 		].includes(type);
-		const w = isGateway ? 50 : 100;
-		const h = isGateway ? 50 : 80;
+		const w = isGateway ? 36 : 100;
+		const h = isGateway ? 36 : 80;
 		return {
 			id,
 			type,
@@ -1068,28 +1065,345 @@ describe("resolveTargetPort", () => {
 		const taskSameY = portNode("t3", "serviceTask", 200, 100);
 		const startEvt = portNode("s1", "startEvent", 200, 0);
 		const subProc = portNode("sp1", "subProcess", 200, 300);
+		const noJoins = new Set<string>();
 
-		expect(resolveTargetPort(source, taskAbove)).toBe("left");
-		expect(resolveTargetPort(source, taskBelow)).toBe("left");
-		expect(resolveTargetPort(source, taskSameY)).toBe("left");
-		expect(resolveTargetPort(source, startEvt)).toBe("left");
-		expect(resolveTargetPort(source, subProc)).toBe("left");
+		expect(resolveTargetPort(source, taskAbove, noJoins)).toBe("left");
+		expect(resolveTargetPort(source, taskBelow, noJoins)).toBe("left");
+		expect(resolveTargetPort(source, taskSameY, noJoins)).toBe("left");
+		expect(resolveTargetPort(source, startEvt, noJoins)).toBe("left");
+		expect(resolveTargetPort(source, subProc, noJoins)).toBe("left");
 	});
 
-	it("returns top/bottom/left for gateway targets based on relative Y", () => {
+	it("returns left for split (non-join) gateways regardless of Y position", () => {
+		const source = portNode("t1", "serviceTask", 0, 100);
+		const splitGw = portNode("gw1", "exclusiveGateway", 200, 200);
+		const noJoins = new Set<string>();
+
+		expect(resolveTargetPort(source, splitGw, noJoins)).toBe("left");
+	});
+
+	it("returns top/bottom/left for join gateway targets based on relative Y", () => {
 		const source = portNode("gw1", "exclusiveGateway", 0, 100);
 		const gwBelow = portNode("gw2", "parallelGateway", 200, 200);
 		const gwAbove = portNode("gw3", "inclusiveGateway", 200, 0);
 		const gwSameY = portNode("gw4", "eventBasedGateway", 200, 100);
+		const joinIds = new Set(["gw2", "gw3", "gw4", "gw5", "gw6"]);
 
-		expect(resolveTargetPort(source, gwBelow)).toBe("top");
-		expect(resolveTargetPort(source, gwAbove)).toBe("bottom");
-		expect(resolveTargetPort(source, gwSameY)).toBe("left");
+		expect(resolveTargetPort(source, gwBelow, joinIds)).toBe("top");
+		expect(resolveTargetPort(source, gwAbove, joinIds)).toBe("bottom");
+		expect(resolveTargetPort(source, gwSameY, joinIds)).toBe("left");
 
 		const gwAlmostSameY = portNode("gw5", "exclusiveGateway", 200, 100.5);
-		expect(resolveTargetPort(source, gwAlmostSameY)).toBe("left");
+		expect(resolveTargetPort(source, gwAlmostSameY, joinIds)).toBe("left");
 
 		const gwJustOutside = portNode("gw6", "exclusiveGateway", 200, 102);
-		expect(resolveTargetPort(source, gwJustOutside)).toBe("top");
+		expect(resolveTargetPort(source, gwJustOutside, joinIds)).toBe("top");
+	});
+});
+
+describe("Grid-based coordinate system", () => {
+	it("places elements centered in 200×160 grid cells", () => {
+		const flowNodes = [
+			node("start", "startEvent"),
+			node("task", "serviceTask"),
+			node("end", "endEvent"),
+		];
+		const nodeIndex = new Map(flowNodes.map((n) => [n.id, n]));
+		const orderedLayers = [["start"], ["task"], ["end"]];
+
+		const result = assignCoordinates(orderedLayers, nodeIndex);
+
+		// Each element should be centered within its grid cell (200×160)
+		for (const n of result) {
+			const cellX = n.layer * 200;
+			const centerX = cellX + 100;
+			const nodeCenterX = n.bounds.x + n.bounds.width / 2;
+			expect(nodeCenterX).toBeCloseTo(centerX, 0);
+		}
+	});
+
+	it("respects grid spacing between layers", () => {
+		const flowNodes = [node("a", "serviceTask"), node("b", "serviceTask")];
+		const nodeIndex = new Map(flowNodes.map((n) => [n.id, n]));
+		const orderedLayers = [["a"], ["b"]];
+
+		const result = assignCoordinates(orderedLayers, nodeIndex);
+		const nodeA = result.find((n) => n.id === "a");
+		const nodeB = result.find((n) => n.id === "b");
+		expect(nodeA).toBeDefined();
+		expect(nodeB).toBeDefined();
+		if (!nodeA || !nodeB) return;
+
+		// Layer 0 starts at x=0, layer 1 at x=200 (grid cell width)
+		expect(nodeB.bounds.x - nodeA.bounds.x).toBe(200);
+	});
+
+	it("grid spacing between nodes in same layer is 160px cell height", () => {
+		const flowNodes = [node("a", "serviceTask"), node("b", "serviceTask")];
+		const nodeIndex = new Map(flowNodes.map((n) => [n.id, n]));
+		const orderedLayers = [["a", "b"]];
+
+		const result = assignCoordinates(orderedLayers, nodeIndex);
+		const nodeA = result.find((n) => n.id === "a");
+		const nodeB = result.find((n) => n.id === "b");
+		expect(nodeA).toBeDefined();
+		expect(nodeB).toBeDefined();
+		if (!nodeA || !nodeB) return;
+
+		// Nodes should be in adjacent grid rows (160px apart center-to-center)
+		const centerA = nodeA.bounds.y + nodeA.bounds.height / 2;
+		const centerB = nodeB.bounds.y + nodeB.bounds.height / 2;
+		expect(Math.abs(centerB - centerA)).toBeCloseTo(160, 0);
+	});
+});
+
+describe("L-shaped edge preference", () => {
+	it("produces L-shaped edges (1 bend) instead of Z-shaped (2 bends) for forward edges", () => {
+		const flowNodes = [
+			node("gw", "exclusiveGateway"),
+			node("t1", "serviceTask"),
+			node("t2", "serviceTask"),
+		];
+		const nodeIndex = new Map(flowNodes.map((n) => [n.id, n]));
+		const orderedLayers = [["gw"], ["t1", "t2"]];
+		const layoutNodes = assignCoordinates(orderedLayers, nodeIndex);
+		const nodeMap = new Map(layoutNodes.map((n) => [n.id, n]));
+
+		const flows = [flow("f1", "gw", "t1"), flow("f2", "gw", "t2")];
+		const edges = routeEdges(flows, nodeMap, []);
+
+		// Each edge from a port should have at most 3 waypoints (L-shape = 1 bend)
+		for (const edge of edges) {
+			expect(edge.waypoints.length).toBeLessThanOrEqual(3);
+		}
+	});
+});
+
+describe("Early-return baseline", () => {
+	it("positions shorter branches off the split gateway baseline", () => {
+		const process = proc(
+			"early-return",
+			[
+				node("s", "startEvent"),
+				node("gw", "exclusiveGateway"),
+				node("a"),
+				node("b"),
+				node("c"),
+				node("join", "exclusiveGateway"),
+				node("e", "endEvent"),
+			],
+			[
+				flow("f1", "s", "gw"),
+				flow("f2", "gw", "a"),
+				flow("f3", "gw", "b"),
+				flow("f4", "a", "join"),
+				flow("f5", "b", "c"),
+				flow("f6", "c", "join"),
+				flow("f7", "join", "e"),
+			],
+		);
+
+		const result = layoutProcess(process);
+		const nodeMap = new Map(result.nodes.map((n) => [n.id, n]));
+
+		const gwNode = nodeMap.get("gw");
+		const aNode = nodeMap.get("a"); // short branch
+		expect(gwNode).toBeDefined();
+		expect(aNode).toBeDefined();
+		if (!gwNode || !aNode) return;
+
+		const gwCenterY = gwNode.bounds.y + gwNode.bounds.height / 2;
+		const aCenterY = aNode.bounds.y + aNode.bounds.height / 2;
+
+		// Short branch "a" should NOT be on the same Y as the gateway
+		expect(Math.abs(aCenterY - gwCenterY)).toBeGreaterThan(10);
+	});
+});
+
+describe("Baseline path detection", () => {
+	it("finds the spine path (start → gateways → end) skipping branch content", () => {
+		const elements = [
+			node("s", "startEvent"),
+			node("t1"),
+			node("gw1", "exclusiveGateway"),
+			node("t2"),
+			node("t3"),
+			node("t4"),
+			node("gw2", "exclusiveGateway"),
+			node("t5"),
+			node("e", "endEvent"),
+		];
+		const flows = [
+			flow("f1", "s", "t1"),
+			flow("f2", "t1", "gw1"),
+			flow("f3", "gw1", "t2"),
+			flow("f4", "t2", "t3"),
+			flow("f5", "t3", "gw2"),
+			flow("f6", "gw1", "t4"),
+			flow("f7", "t4", "gw2"),
+			flow("f8", "gw2", "t5"),
+			flow("f9", "t5", "e"),
+		];
+		const graph = buildGraph(elements, flows);
+		const backEdges = detectBackEdges(graph, flows);
+		const dag = backEdges.length > 0 ? reverseBackEdges(graph, backEdges) : graph;
+		const layers = assignLayers(dag);
+		const layerGroups = groupByLayer(layers);
+		const orderedLayers = minimizeCrossings(layerGroups, dag);
+		const nodeIndex = new Map(elements.map((n) => [n.id, n]));
+		const layoutNodes = assignCoordinates(orderedLayers, nodeIndex);
+
+		const baseline = findBaselinePath(layoutNodes, dag);
+		// Should include start, t1, gw1, gw2, t5, end — NOT branch content (t2, t3, t4)
+		expect(baseline).toContain("s");
+		expect(baseline).toContain("t1");
+		expect(baseline).toContain("gw1");
+		expect(baseline).toContain("gw2");
+		expect(baseline).toContain("t5");
+		expect(baseline).toContain("e");
+		expect(baseline).not.toContain("t2");
+		expect(baseline).not.toContain("t3");
+		expect(baseline).not.toContain("t4");
+	});
+
+	it("stops at split without a gateway successor or join", () => {
+		const elements = [
+			node("s", "startEvent"),
+			node("gw", "exclusiveGateway"),
+			node("a"),
+			node("b"),
+		];
+		const flows = [flow("f1", "s", "gw"), flow("f2", "gw", "a"), flow("f3", "gw", "b")];
+		const graph = buildGraph(elements, flows);
+		const dag = graph;
+		const layers = assignLayers(dag);
+		const layerGroups = groupByLayer(layers);
+		const orderedLayers = minimizeCrossings(layerGroups, dag);
+		const nodeIndex = new Map(elements.map((n) => [n.id, n]));
+		const layoutNodes = assignCoordinates(orderedLayers, nodeIndex);
+
+		const baseline = findBaselinePath(layoutNodes, dag);
+		// No gateway successor and no join → baseline stops at split
+		expect(baseline).toEqual(["s", "gw"]);
+	});
+
+	it("follows the gateway successor when one branch is a dead-end", () => {
+		const elements = [
+			node("s", "startEvent"),
+			node("gw", "exclusiveGateway"),
+			node("deadEnd"),
+			node("continue", "parallelGateway"),
+			node("t1"),
+			node("e", "endEvent"),
+		];
+		const flows = [
+			flow("f1", "s", "gw"),
+			flow("f2", "gw", "deadEnd"),
+			flow("f3", "gw", "continue"),
+			flow("f4", "continue", "t1"),
+			flow("f5", "t1", "e"),
+		];
+		const graph = buildGraph(elements, flows);
+		const dag = graph;
+		const layers = assignLayers(dag);
+		const layerGroups = groupByLayer(layers);
+		const orderedLayers = minimizeCrossings(layerGroups, dag);
+		const nodeIndex = new Map(elements.map((n) => [n.id, n]));
+		const layoutNodes = assignCoordinates(orderedLayers, nodeIndex);
+
+		const baseline = findBaselinePath(layoutNodes, dag);
+		// Should follow gw → continue (gateway) → t1 → e, NOT gw → deadEnd
+		expect(baseline).toContain("s");
+		expect(baseline).toContain("gw");
+		expect(baseline).toContain("continue");
+		expect(baseline).toContain("t1");
+		expect(baseline).toContain("e");
+		expect(baseline).not.toContain("deadEnd");
+	});
+});
+
+describe("Baseline Y-alignment", () => {
+	it("aligns all baseline nodes to the same center-Y", () => {
+		const process = proc(
+			"bp",
+			[
+				node("s", "startEvent"),
+				node("t1"),
+				node("gw1", "exclusiveGateway"),
+				node("t2"),
+				node("t3"),
+				node("t4"),
+				node("gw2", "exclusiveGateway"),
+				node("t5"),
+				node("e", "endEvent"),
+			],
+			[
+				flow("f1", "s", "t1"),
+				flow("f2", "t1", "gw1"),
+				flow("f3", "gw1", "t2"),
+				flow("f4", "t2", "t3"),
+				flow("f5", "t3", "gw2"),
+				flow("f6", "gw1", "t4"),
+				flow("f7", "t4", "gw2"),
+				flow("f8", "gw2", "t5"),
+				flow("f9", "t5", "e"),
+			],
+		);
+
+		const result = layoutProcess(process);
+		const nodeMap = new Map(result.nodes.map((n) => [n.id, n]));
+
+		const baselineIds = ["s", "t1", "gw1", "gw2", "t5", "e"];
+		const centerYs = baselineIds.map((id) => {
+			const n = nodeMap.get(id);
+			expect(n).toBeDefined();
+			return (n?.bounds.y ?? 0) + (n?.bounds.height ?? 0) / 2;
+		});
+
+		// All baseline nodes should share the same center-Y
+		const baselineY = centerYs[0] ?? 0;
+		for (const cy of centerYs) {
+			expect(Math.abs(cy - baselineY)).toBeLessThan(1);
+		}
+	});
+
+	it("branch nodes are not on the baseline Y", () => {
+		const process = proc(
+			"bp",
+			[
+				node("s", "startEvent"),
+				node("gw1", "exclusiveGateway"),
+				node("a"),
+				node("b"),
+				node("gw2", "exclusiveGateway"),
+				node("e", "endEvent"),
+			],
+			[
+				flow("f1", "s", "gw1"),
+				flow("f2", "gw1", "a"),
+				flow("f3", "gw1", "b"),
+				flow("f4", "a", "gw2"),
+				flow("f5", "b", "gw2"),
+				flow("f6", "gw2", "e"),
+			],
+		);
+
+		const result = layoutProcess(process);
+		const nodeMap = new Map(result.nodes.map((n) => [n.id, n]));
+
+		const gw1 = nodeMap.get("gw1");
+		const aNode = nodeMap.get("a");
+		const bNode = nodeMap.get("b");
+		expect(gw1).toBeDefined();
+		expect(aNode).toBeDefined();
+		expect(bNode).toBeDefined();
+		if (!gw1 || !aNode || !bNode) return;
+
+		const gw1CenterY = gw1.bounds.y + gw1.bounds.height / 2;
+		const aCenterY = aNode.bounds.y + aNode.bounds.height / 2;
+		const bCenterY = bNode.bounds.y + bNode.bounds.height / 2;
+
+		// At least one branch should be off the baseline
+		expect(Math.abs(aCenterY - gw1CenterY) > 10 || Math.abs(bCenterY - gw1CenterY) > 10).toBe(true);
 	});
 });

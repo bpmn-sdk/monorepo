@@ -106,7 +106,12 @@ function xmlElementToNode(element: XmlElement): Record<string, unknown> {
 	const node: Record<string, unknown> = { [element.name]: children };
 
 	if (Object.keys(element.attributes).length > 0) {
-		node[ATTRS_KEY] = { ...element.attributes };
+		// Escape double quotes in attribute values since processEntities is disabled
+		const escaped: Record<string, string> = {};
+		for (const [key, value] of Object.entries(element.attributes)) {
+			escaped[key] = value.replaceAll('"', "&quot;");
+		}
+		node[ATTRS_KEY] = escaped;
 	}
 
 	return node;

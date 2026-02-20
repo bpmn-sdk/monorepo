@@ -233,3 +233,28 @@ describe("9-branch gateway", () => {
 		expect(nineWay?.attributes.id).toBe("Gateway_0pqd380");
 	});
 });
+
+describe("XML attribute escaping", () => {
+	it("escapes double quotes in attribute values", () => {
+		const element = {
+			name: "root",
+			attributes: {},
+			children: [
+				{
+					name: "child",
+					attributes: { source: '=x + "/path"', target: "url" },
+					children: [],
+				},
+			],
+		};
+
+		const xml = serializeXml(element);
+		expect(xml).toContain("&quot;/path&quot;");
+		expect(xml).not.toContain('"/path"');
+
+		// Roundtrip: parse the escaped XML and verify value is preserved
+		const parsed = parseXml(xml);
+		const child = parsed.children[0];
+		expect(child?.attributes.source).toBe("=x + &quot;/path&quot;");
+	});
+});

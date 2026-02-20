@@ -16,15 +16,22 @@ const GATEWAY_TYPES: ReadonlySet<string> = new Set([
 /**
  * Determine which side of the target a forward edge should connect to.
  * Non-gateway targets always receive edges from the left side.
- * Gateway targets receive edges based on relative Y position of source.
+ * Split gateways (starting): incoming always from the left.
+ * Join gateways (closing): incoming based on relative position (top/bottom/left).
  */
 export function resolveTargetPort(
 	source: LayoutNode,
 	target: LayoutNode,
+	joinGateways: ReadonlySet<string>,
 ): "left" | "top" | "bottom" {
 	if (!GATEWAY_TYPES.has(target.type)) {
 		return "left";
 	}
+	// Split/starting gateways always receive from left
+	if (!joinGateways.has(target.id)) {
+		return "left";
+	}
+	// Join/closing gateways: connect based on relative position
 	const srcCy = source.bounds.y + source.bounds.height / 2;
 	const tgtCy = target.bounds.y + target.bounds.height / 2;
 	if (Math.abs(srcCy - tgtCy) <= 1) {
@@ -101,6 +108,7 @@ export function routeEdges(
 
 	// Group forward flows by source for gateway port assignment
 	const forwardFlowsBySource = new Map<string, BpmnSequenceFlow[]>();
+	const forwardIncomingCount = new Map<string, number>();
 	for (const flow of sequenceFlows) {
 		if (backEdgeIds.has(flow.id)) continue;
 		let bucket = forwardFlowsBySource.get(flow.sourceRef);
@@ -109,6 +117,18 @@ export function routeEdges(
 			forwardFlowsBySource.set(flow.sourceRef, bucket);
 		}
 		bucket.push(flow);
+		forwardIncomingCount.set(flow.targetRef, (forwardIncomingCount.get(flow.targetRef) ?? 0) + 1);
+	}
+
+	// Identify join gateways (gateways with multiple incoming forward edges)
+	const joinGateways = new Set<string>();
+	for (const [targetId, count] of forwardIncomingCount) {
+		if (count >= 2) {
+			const node = nodeMap.get(targetId);
+			if (node && GATEWAY_TYPES.has(node.type)) {
+				joinGateways.add(targetId);
+			}
+		}
 	}
 
 	// Assign ports for gateway sources
@@ -136,7 +156,9 @@ export function routeEdges(
 			waypoints = routeBackEdge(source, target, nodeMap);
 		} else {
 			const port = portAssignments.get(flow.id);
-			waypoints = port ? routeFromPort(source, target, port) : routeForwardEdge(source, target);
+			waypoints = port
+				? routeFromPort(source, target, port, joinGateways)
+				: routeForwardEdge(source, target, joinGateways);
 		}
 
 		edges.push({
@@ -155,9 +177,13 @@ export function routeEdges(
 	return edges;
 }
 
-/** Route a forward edge with orthogonal segments. */
-function routeForwardEdge(source: LayoutNode, target: LayoutNode): Waypoint[] {
-	const targetPort = resolveTargetPort(source, target);
+/** Route a forward edge with orthogonal segments, preferring L-shaped over Z-shaped. */
+function routeForwardEdge(
+	source: LayoutNode,
+	target: LayoutNode,
+	joinGateways: ReadonlySet<string>,
+): Waypoint[] {
+	const targetPort = resolveTargetPort(source, target, joinGateways);
 
 	if (targetPort === "top" || targetPort === "bottom") {
 		const sourceRight = source.bounds.x + source.bounds.width;
@@ -185,12 +211,13 @@ function routeForwardEdge(source: LayoutNode, target: LayoutNode): Waypoint[] {
 		];
 	}
 
-	// Different vertical positions: L-shaped or Z-shaped routing
-	const midX = (sourceRight + targetLeft) / 2;
+	// Different vertical positions: prefer L-shaped routing
+	// L-shape option 1: horizontal to target's X, then vertical down/up
+	// L-shape option 2: vertical to target's Y, then horizontal to target
+	// For left-to-right flow, option 1 (horizontal first, then vertical into target) is cleaner
 	return [
 		{ x: sourceRight, y: sourceCenterY },
-		{ x: midX, y: sourceCenterY },
-		{ x: midX, y: targetCenterY },
+		{ x: targetLeft, y: sourceCenterY },
 		{ x: targetLeft, y: targetCenterY },
 	];
 }
@@ -219,14 +246,19 @@ function countBends(waypoints: Waypoint[]): number {
 }
 
 /** Route a forward edge from a specific port side on the source node, choosing minimum bends. */
-function routeFromPort(source: LayoutNode, target: LayoutNode, port: PortSide): Waypoint[] {
+function routeFromPort(
+	source: LayoutNode,
+	target: LayoutNode,
+	port: PortSide,
+	joinGateways: ReadonlySet<string>,
+): Waypoint[] {
 	if (port === "right") {
-		return routeForwardEdge(source, target);
+		return routeForwardEdge(source, target, joinGateways);
 	}
 
 	// Generate candidate routes: assigned port route + right-port alternative
-	const portRoute = routeFromPortDirect(source, target, port);
-	const rightRoute = routeForwardEdge(source, target);
+	const portRoute = routeFromPortDirect(source, target, port, joinGateways);
+	const rightRoute = routeForwardEdge(source, target, joinGateways);
 
 	const portBends = countBends(portRoute);
 	const rightBends = countBends(rightRoute);
@@ -235,9 +267,14 @@ function routeFromPort(source: LayoutNode, target: LayoutNode, port: PortSide): 
 	return rightBends < portBends ? rightRoute : portRoute;
 }
 
-/** Route directly from top/bottom port with Z-shaped path. */
-function routeFromPortDirect(source: LayoutNode, target: LayoutNode, port: PortSide): Waypoint[] {
-	const targetPort = resolveTargetPort(source, target);
+/** Route directly from top/bottom port, preferring L-shaped path. */
+function routeFromPortDirect(
+	source: LayoutNode,
+	target: LayoutNode,
+	port: PortSide,
+	joinGateways: ReadonlySet<string>,
+): Waypoint[] {
+	const targetPort = resolveTargetPort(source, target, joinGateways);
 
 	const srcX = source.bounds.x + source.bounds.width / 2;
 	const srcY = port === "top" ? source.bounds.y : source.bounds.y + source.bounds.height;
@@ -252,6 +289,7 @@ function routeFromPortDirect(source: LayoutNode, target: LayoutNode, port: PortS
 				{ x: tgtX, y: tgtY },
 			];
 		}
+		// L-shape: vertical to target Y, then horizontal to target X
 		return [
 			{ x: srcX, y: srcY },
 			{ x: srcX, y: tgtY },
@@ -259,7 +297,6 @@ function routeFromPortDirect(source: LayoutNode, target: LayoutNode, port: PortS
 		];
 	}
 
-	const sourceRight = source.bounds.x + source.bounds.width;
 	const targetLeft = target.bounds.x;
 	const targetCenterY = target.bounds.y + target.bounds.height / 2;
 
@@ -271,12 +308,10 @@ function routeFromPortDirect(source: LayoutNode, target: LayoutNode, port: PortS
 		];
 	}
 
-	// Z-shaped: horizontal to midpoint column, vertical to target Y, horizontal to target
-	const midX = (sourceRight + targetLeft) / 2;
+	// L-shape: vertical to target's center-Y, then horizontal to target
 	return [
 		{ x: srcX, y: srcY },
-		{ x: midX, y: srcY },
-		{ x: midX, y: targetCenterY },
+		{ x: srcX, y: targetCenterY },
 		{ x: targetLeft, y: targetCenterY },
 	];
 }

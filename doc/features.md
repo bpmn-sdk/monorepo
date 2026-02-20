@@ -13,7 +13,11 @@
   - Opt-in: call `.withAutoLayout()` on `ProcessBuilder` before `.build()`
   - Without it, `diagrams` array remains empty (backward-compatible)
   - Handles gateway branches, sub-process containment, and orthogonal edge routing
-  - Element sizing: events 36×36, tasks 100×80, gateways 50×50
+  - Element sizing: events 36×36, tasks 100×80, gateways 36×36
+  - Virtual grid: 200×160 cells with centered element placement
+  - Baseline path alignment: process spine (start → gateways → end) shares same Y
+  - L-shaped edge routing preferred over Z-shaped
+  - Split gateways receive edges from left; join gateways from top/bottom/left based on position
   - Layout data survives export→parse→export round-trips
 - **Gateway support** — exclusive, parallel, inclusive, event-based gateways with `branch(name, callback)` pattern
 - **Loop support** — `connectTo(targetId)` for merge points and back-edge loops

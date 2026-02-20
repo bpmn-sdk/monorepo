@@ -14,19 +14,23 @@ export const ELEMENT_SIZES: Record<string, { width: number; height: number }> = 
 	receiveTask: { width: 100, height: 80 },
 	businessRuleTask: { width: 100, height: 80 },
 	callActivity: { width: 100, height: 80 },
-	exclusiveGateway: { width: 50, height: 50 },
-	parallelGateway: { width: 50, height: 50 },
-	inclusiveGateway: { width: 50, height: 50 },
-	eventBasedGateway: { width: 50, height: 50 },
+	exclusiveGateway: { width: 36, height: 36 },
+	parallelGateway: { width: 36, height: 36 },
+	inclusiveGateway: { width: 36, height: 36 },
+	eventBasedGateway: { width: 36, height: 36 },
 	// Sub-processes are sized dynamically
 	subProcess: { width: 100, height: 80 },
 	adHocSubProcess: { width: 100, height: 80 },
 	eventSubProcess: { width: 100, height: 80 },
 };
 
-/** Minimum spacing between elements. */
-export const HORIZONTAL_SPACING = 80;
-export const VERTICAL_SPACING = 160;
+/** Virtual grid cell dimensions for element placement. */
+export const GRID_CELL_WIDTH = 200;
+export const GRID_CELL_HEIGHT = 160;
+
+/** Minimum spacing between elements (derived from grid). */
+export const HORIZONTAL_SPACING = GRID_CELL_WIDTH - 100; // 100 = max element width
+export const VERTICAL_SPACING = GRID_CELL_HEIGHT - 80; // 80 = max element height
 
 /** Padding inside sub-process containers. */
 export const SUBPROCESS_PADDING = 20;

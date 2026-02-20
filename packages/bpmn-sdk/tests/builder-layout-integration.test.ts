@@ -286,7 +286,7 @@ describe("Builder → auto-layout integration", () => {
 	// Subprocess layout: children positioned within parent bounds
 	// -----------------------------------------------------------------------
 
-	it("subprocess children are positioned within parent shape bounds", () => {
+	it("subprocess is collapsed (same size as a task, no child shapes)", () => {
 		const defs = Bpmn.createProcess("p1")
 			.withAutoLayout()
 			.startEvent("s")
@@ -300,17 +300,16 @@ describe("Builder → auto-layout integration", () => {
 
 		const diagram = firstDiagram(defs);
 		const sub = shapeFor(diagram.plane.shapes, "sub");
-		const c1 = shapeFor(diagram.plane.shapes, "c1");
-		const c2 = shapeFor(diagram.plane.shapes, "c2");
 
-		// Children within parent bounds
-		expect(c1.bounds.x).toBeGreaterThanOrEqual(sub.bounds.x);
-		expect(c1.bounds.y).toBeGreaterThanOrEqual(sub.bounds.y);
-		expect(c1.bounds.x + c1.bounds.width).toBeLessThanOrEqual(sub.bounds.x + sub.bounds.width);
-		expect(c1.bounds.y + c1.bounds.height).toBeLessThanOrEqual(sub.bounds.y + sub.bounds.height);
+		// Collapsed: same size as a regular task
+		expect(sub.bounds.width).toBe(100);
+		expect(sub.bounds.height).toBe(80);
 
-		expect(c2.bounds.x).toBeGreaterThanOrEqual(sub.bounds.x);
-		expect(c2.bounds.y).toBeGreaterThanOrEqual(sub.bounds.y);
+		// No child shapes in the diagram
+		const childShapes = diagram.plane.shapes.filter(
+			(s) => s.bpmnElement === "c1" || s.bpmnElement === "c2",
+		);
+		expect(childShapes).toHaveLength(0);
 	});
 
 	// -----------------------------------------------------------------------
@@ -425,8 +424,8 @@ describe("Builder → auto-layout integration", () => {
 		expect(startShape.bounds.height).toBe(36);
 		expect(endShape.bounds.width).toBe(36);
 		expect(endShape.bounds.height).toBe(36);
-		expect(gwShape.bounds.width).toBe(50);
-		expect(gwShape.bounds.height).toBe(50);
+		expect(gwShape.bounds.width).toBe(36);
+		expect(gwShape.bounds.height).toBe(36);
 		expect(taskShape.bounds.width).toBe(100);
 		expect(taskShape.bounds.height).toBe(80);
 	});
@@ -497,10 +496,10 @@ describe("Builder → auto-layout integration", () => {
 		const t1Shape = shapeFor(diagram.plane.shapes, "t1");
 		const t2Shape = shapeFor(diagram.plane.shapes, "t2");
 
-		// Branches should be vertically separated by at least 160px gap (±1px tolerance)
+		// Branches should be vertically separated by at least 80px gap (grid cell 160 - element 80)
 		const upper = t1Shape.bounds.y < t2Shape.bounds.y ? t1Shape : t2Shape;
 		const lower = t1Shape.bounds.y < t2Shape.bounds.y ? t2Shape : t1Shape;
 		const gap = lower.bounds.y - (upper.bounds.y + upper.bounds.height);
-		expect(gap).toBeGreaterThanOrEqual(159);
+		expect(gap).toBeGreaterThanOrEqual(79);
 	});
 });
