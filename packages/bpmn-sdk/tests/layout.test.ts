@@ -15,7 +15,7 @@ import {
 import { assignLayers, groupByLayer } from "../src/layout/layers.js";
 import { layoutProcess } from "../src/layout/layout-engine.js";
 import { assertNoOverlap } from "../src/layout/overlap.js";
-import { assignGatewayPorts, routeEdges } from "../src/layout/routing.js";
+import { assignGatewayPorts, resolveTargetPort, routeEdges } from "../src/layout/routing.js";
 import type { PortSide } from "../src/layout/routing.js";
 import { VERTICAL_SPACING } from "../src/layout/types.js";
 import type { LayoutNode, LayoutResult } from "../src/layout/types.js";
@@ -1036,5 +1036,56 @@ describe("Edge routing efficiency", () => {
 		for (const edge of gwEdges) {
 			expect(edge.waypoints.length).toBeLessThanOrEqual(4);
 		}
+	});
+});
+
+describe("resolveTargetPort", () => {
+	function portNode(id: string, type: string, x: number, y: number): LayoutNode {
+		const isGateway = [
+			"exclusiveGateway",
+			"parallelGateway",
+			"inclusiveGateway",
+			"eventBasedGateway",
+		].includes(type);
+		const w = isGateway ? 50 : 100;
+		const h = isGateway ? 50 : 80;
+		return {
+			id,
+			type,
+			bounds: { x, y, width: w, height: h },
+			labelBounds: undefined,
+		};
+	}
+
+	it("returns left for non-gateway targets regardless of Y position", () => {
+		const source = portNode("gw", "exclusiveGateway", 0, 100);
+		const taskAbove = portNode("t1", "serviceTask", 200, 0);
+		const taskBelow = portNode("t2", "serviceTask", 200, 300);
+		const taskSameY = portNode("t3", "serviceTask", 200, 100);
+		const startEvt = portNode("s1", "startEvent", 200, 0);
+		const subProc = portNode("sp1", "subProcess", 200, 300);
+
+		expect(resolveTargetPort(source, taskAbove)).toBe("left");
+		expect(resolveTargetPort(source, taskBelow)).toBe("left");
+		expect(resolveTargetPort(source, taskSameY)).toBe("left");
+		expect(resolveTargetPort(source, startEvt)).toBe("left");
+		expect(resolveTargetPort(source, subProc)).toBe("left");
+	});
+
+	it("returns top/bottom/left for gateway targets based on relative Y", () => {
+		const source = portNode("gw1", "exclusiveGateway", 0, 100);
+		const gwBelow = portNode("gw2", "parallelGateway", 200, 200);
+		const gwAbove = portNode("gw3", "inclusiveGateway", 200, 0);
+		const gwSameY = portNode("gw4", "eventBasedGateway", 200, 100);
+
+		expect(resolveTargetPort(source, gwBelow)).toBe("top");
+		expect(resolveTargetPort(source, gwAbove)).toBe("bottom");
+		expect(resolveTargetPort(source, gwSameY)).toBe("left");
+
+		const gwAlmostSameY = portNode("gw5", "exclusiveGateway", 200, 100.5);
+		expect(resolveTargetPort(source, gwAlmostSameY)).toBe("left");
+
+		const gwJustOutside = portNode("gw6", "exclusiveGateway", 200, 102);
+		expect(resolveTargetPort(source, gwJustOutside)).toBe("top");
 	});
 });

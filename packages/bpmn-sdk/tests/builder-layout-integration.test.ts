@@ -430,4 +430,70 @@ describe("Builder → auto-layout integration", () => {
 		expect(taskShape.bounds.width).toBe(100);
 		expect(taskShape.bounds.height).toBe(80);
 	});
+
+	// -----------------------------------------------------------------------
+	// Non-gateway targets receive edges from the left side
+	// -----------------------------------------------------------------------
+
+	it("edges entering non-gateway targets connect to the left side", () => {
+		const defs = Bpmn.createProcess("p1")
+			.withAutoLayout()
+			.startEvent("s")
+			.exclusiveGateway("gw")
+			.branch("upper", (b) => b.serviceTask("t1", { name: "Upper", taskType: "a" }))
+			.branch("lower", (b) => b.serviceTask("t2", { name: "Lower", taskType: "b" }))
+			.exclusiveGateway("merge")
+			.endEvent("e")
+			.build();
+
+		const diagram = firstDiagram(defs);
+		const t1Shape = shapeFor(diagram.plane.shapes, "t1");
+		const t2Shape = shapeFor(diagram.plane.shapes, "t2");
+
+		// Find edges targeting t1 and t2 — last waypoint should be at the left side
+		for (const edge of diagram.plane.edges) {
+			const lastWp = edge.waypoints[edge.waypoints.length - 1];
+			if (!lastWp) continue;
+
+			const matchesT1 =
+				Math.abs(lastWp.x - t1Shape.bounds.x) < 1 &&
+				Math.abs(lastWp.y - (t1Shape.bounds.y + t1Shape.bounds.height / 2)) < 1;
+			const matchesT2 =
+				Math.abs(lastWp.x - t2Shape.bounds.x) < 1 &&
+				Math.abs(lastWp.y - (t2Shape.bounds.y + t2Shape.bounds.height / 2)) < 1;
+
+			if (matchesT1) {
+				expect(lastWp.x, "t1 entry should be at left edge").toBe(t1Shape.bounds.x);
+			}
+			if (matchesT2) {
+				expect(lastWp.x, "t2 entry should be at left edge").toBe(t2Shape.bounds.x);
+			}
+		}
+	});
+
+	// -----------------------------------------------------------------------
+	// Vertical spacing between branches is adequate (VERTICAL_SPACING = 160)
+	// -----------------------------------------------------------------------
+
+	it("branch nodes have adequate vertical spacing after gateway split", () => {
+		const defs = Bpmn.createProcess("p1")
+			.withAutoLayout()
+			.startEvent("s")
+			.parallelGateway("fork")
+			.branch("a", (b) => b.serviceTask("t1", { name: "A", taskType: "a" }))
+			.branch("b", (b) => b.serviceTask("t2", { name: "B", taskType: "b" }))
+			.parallelGateway("join")
+			.endEvent("e")
+			.build();
+
+		const diagram = firstDiagram(defs);
+		const t1Shape = shapeFor(diagram.plane.shapes, "t1");
+		const t2Shape = shapeFor(diagram.plane.shapes, "t2");
+
+		// Branches should be vertically separated by at least 160px gap (±1px tolerance)
+		const upper = t1Shape.bounds.y < t2Shape.bounds.y ? t1Shape : t2Shape;
+		const lower = t1Shape.bounds.y < t2Shape.bounds.y ? t2Shape : t1Shape;
+		const gap = lower.bounds.y - (upper.bounds.y + upper.bounds.height);
+		expect(gap).toBeGreaterThanOrEqual(159);
+	});
 });

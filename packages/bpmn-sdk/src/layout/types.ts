@@ -26,7 +26,7 @@ export const ELEMENT_SIZES: Record<string, { width: number; height: number }> = 
 
 /** Minimum spacing between elements. */
 export const HORIZONTAL_SPACING = 80;
-export const VERTICAL_SPACING = 80;
+export const VERTICAL_SPACING = 160;
 
 /** Padding inside sub-process containers. */
 export const SUBPROCESS_PADDING = 20;

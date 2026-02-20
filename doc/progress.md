@@ -1,5 +1,14 @@
 # Progress
 
+## 2026-02-20
+
+### Edge Routing & Vertical Spacing Improvements
+- Changed `VERTICAL_SPACING` from 80px to 160px for better visual separation between branches
+- Added `resolveTargetPort()` to determine edge entry side: non-gateway targets always enter from the left; gateway targets enter top/bottom/left based on source relative Y position (with +/-1px tolerance)
+- Integrated `resolveTargetPort` into `routeForwardEdge()` and `routeFromPortDirect()` for correct target-side routing
+- Added 2 new `resolveTargetPort` test cases (non-gateway always left, gateway Y-based with tolerance)
+- Verification: `pnpm turbo build`, `pnpm turbo test` (274 pass), `pnpm biome check .`, `pnpm turbo typecheck` -- all zero errors
+
 ## 2026-02-19
 
 ### Layout Engine QA Fixes — Branch Alignment, Split/Join, Labels, Routing

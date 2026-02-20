@@ -14,6 +14,26 @@ const GATEWAY_TYPES: ReadonlySet<string> = new Set([
 ]);
 
 /**
+ * Determine which side of the target a forward edge should connect to.
+ * Non-gateway targets always receive edges from the left side.
+ * Gateway targets receive edges based on relative Y position of source.
+ */
+export function resolveTargetPort(
+	source: LayoutNode,
+	target: LayoutNode,
+): "left" | "top" | "bottom" {
+	if (!GATEWAY_TYPES.has(target.type)) {
+		return "left";
+	}
+	const srcCy = source.bounds.y + source.bounds.height / 2;
+	const tgtCy = target.bounds.y + target.bounds.height / 2;
+	if (Math.abs(srcCy - tgtCy) <= 1) {
+		return "left";
+	}
+	return srcCy < tgtCy ? "top" : "bottom";
+}
+
+/**
  * Assign source ports for outgoing edges of a gateway.
  * - Single output: right port.
  * - Odd count: middle (by target y) → right, upper half → top, lower half → bottom.
@@ -137,6 +157,21 @@ export function routeEdges(
 
 /** Route a forward edge with orthogonal segments. */
 function routeForwardEdge(source: LayoutNode, target: LayoutNode): Waypoint[] {
+	const targetPort = resolveTargetPort(source, target);
+
+	if (targetPort === "top" || targetPort === "bottom") {
+		const sourceRight = source.bounds.x + source.bounds.width;
+		const sourceCenterY = source.bounds.y + source.bounds.height / 2;
+		const tgtX = target.bounds.x + target.bounds.width / 2;
+		const tgtY = targetPort === "top" ? target.bounds.y : target.bounds.y + target.bounds.height;
+
+		return [
+			{ x: sourceRight, y: sourceCenterY },
+			{ x: tgtX, y: sourceCenterY },
+			{ x: tgtX, y: tgtY },
+		];
+	}
+
 	const sourceRight = source.bounds.x + source.bounds.width;
 	const sourceCenterY = source.bounds.y + source.bounds.height / 2;
 	const targetLeft = target.bounds.x;
@@ -202,12 +237,31 @@ function routeFromPort(source: LayoutNode, target: LayoutNode, port: PortSide): 
 
 /** Route directly from top/bottom port with Z-shaped path. */
 function routeFromPortDirect(source: LayoutNode, target: LayoutNode, port: PortSide): Waypoint[] {
-	const sourceRight = source.bounds.x + source.bounds.width;
-	const targetLeft = target.bounds.x;
-	const targetCenterY = target.bounds.y + target.bounds.height / 2;
+	const targetPort = resolveTargetPort(source, target);
 
 	const srcX = source.bounds.x + source.bounds.width / 2;
 	const srcY = port === "top" ? source.bounds.y : source.bounds.y + source.bounds.height;
+
+	if (targetPort === "top" || targetPort === "bottom") {
+		const tgtX = target.bounds.x + target.bounds.width / 2;
+		const tgtY = targetPort === "top" ? target.bounds.y : target.bounds.y + target.bounds.height;
+
+		if (Math.abs(srcX - tgtX) < 1) {
+			return [
+				{ x: srcX, y: srcY },
+				{ x: tgtX, y: tgtY },
+			];
+		}
+		return [
+			{ x: srcX, y: srcY },
+			{ x: srcX, y: tgtY },
+			{ x: tgtX, y: tgtY },
+		];
+	}
+
+	const sourceRight = source.bounds.x + source.bounds.width;
+	const targetLeft = target.bounds.x;
+	const targetCenterY = target.bounds.y + target.bounds.height / 2;
 
 	// Same vertical position as target: straight horizontal
 	if (Math.abs(srcY - targetCenterY) < 1) {
