@@ -299,7 +299,7 @@ describe("Edge routing", () => {
 		}
 	});
 
-	it("routes back-edges above all nodes", () => {
+	it("routes back-edges above or below all nodes", () => {
 		const flowNodes = [node("a", "serviceTask"), node("b", "serviceTask")];
 		const nodeIndex = new Map(flowNodes.map((n) => [n.id, n]));
 		const orderedLayers = [["a"], ["b"]];
@@ -315,10 +315,14 @@ describe("Edge routing", () => {
 		expect(edge).toBeDefined();
 		if (!edge) return;
 
-		// Back-edge should have waypoints above all nodes
+		// Back-edge should route above or below all nodes (shortest path)
 		const minNodeY = Math.min(...layoutNodes.map((n) => n.bounds.y));
+		const maxNodeY = Math.max(...layoutNodes.map((n) => n.bounds.y + n.bounds.height));
 		const lowestWaypointY = Math.min(...edge.waypoints.map((w) => w.y));
-		expect(lowestWaypointY).toBeLessThan(minNodeY);
+		const highestWaypointY = Math.max(...edge.waypoints.map((w) => w.y));
+		const routesAbove = lowestWaypointY < minNodeY;
+		const routesBelow = highestWaypointY > maxNodeY;
+		expect(routesAbove || routesBelow).toBe(true);
 	});
 });
 
