@@ -18,14 +18,21 @@
   - Baseline path alignment: process spine (start → gateways → end) shares same Y
   - L-shaped edge routing preferred over Z-shaped
   - Split gateways receive edges from left; join gateways from top/bottom/left based on position
+  - Expanded sub-processes: containers with children are auto-sized and children laid out inside
   - Layout data survives export→parse→export round-trips
 - **Gateway support** — exclusive, parallel, inclusive, event-based gateways with `branch(name, callback)` pattern
+- **Auto-join gateways** — split gateways automatically get matching join gateways inserted when branches converge (BPMN best practice)
 - **Loop support** — `connectTo(targetId)` for merge points and back-edge loops
 - **Sub-process builders** — `adHocSubProcess()`, `subProcess()`, `eventSubProcess()` with nested content
 - **Multi-instance** — parallel/sequential multi-instance with Zeebe extension elements
 - **Aspirational elements** — sendTask, receiveTask, businessRuleTask builders
 - **REST connector builder** — `restConnector(id, config)` convenience method generates service tasks with `io.camunda:http-json:1` task type, IO mappings (method, url, auth, body, headers, queryParameters, timeouts), and task headers (resultVariable, resultExpression, retryBackoff)
 - **Extension preservation** — zeebe:*, modeler:*, camunda:* extensions roundtrip as `XmlElement[]`
+- **Root-level messages** — `bpmn:message` elements parsed, preserved, and serialized at definitions level
+- **Message start events** — builder creates proper `<bpmn:message>` root elements with ID references
+- **Webhook/connector config** — `zeebe:properties` support for connector configuration (e.g. webhook inbound type, method, context)
+- **Agentic AI sub-process** — `adHocSubProcess()` supports full AI agent pattern: `taskDefinition`, `ioMapping`, `taskHeaders`, `outputCollection`/`outputElement` on `zeebe:adHoc`, modeler template attributes
+- **Call activity** — `callActivity(id, {processId, propagateAllChildVariables})` with `zeebe:calledElement` extension
 - **Diagram interchange** — BPMNDI shapes and edges preserved on roundtrip
 
 ## Form Support (2026-02-18)

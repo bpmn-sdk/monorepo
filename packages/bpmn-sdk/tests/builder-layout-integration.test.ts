@@ -286,7 +286,7 @@ describe("Builder → auto-layout integration", () => {
 	// Subprocess layout: children positioned within parent bounds
 	// -----------------------------------------------------------------------
 
-	it("subprocess is collapsed (same size as a task, no child shapes)", () => {
+	it("subprocess is expanded with child shapes in the diagram", () => {
 		const defs = Bpmn.createProcess("p1")
 			.withAutoLayout()
 			.startEvent("s")
@@ -301,15 +301,16 @@ describe("Builder → auto-layout integration", () => {
 		const diagram = firstDiagram(defs);
 		const sub = shapeFor(diagram.plane.shapes, "sub");
 
-		// Collapsed: same size as a regular task
-		expect(sub.bounds.width).toBe(100);
-		expect(sub.bounds.height).toBe(80);
+		// Expanded: larger than a regular task
+		expect(sub.bounds.width).toBeGreaterThan(100);
+		expect(sub.bounds.height).toBeGreaterThan(80);
+		expect(sub.isExpanded).toBe(true);
 
-		// No child shapes in the diagram
+		// Child shapes are in the diagram
 		const childShapes = diagram.plane.shapes.filter(
 			(s) => s.bpmnElement === "c1" || s.bpmnElement === "c2",
 		);
-		expect(childShapes).toHaveLength(0);
+		expect(childShapes).toHaveLength(2);
 	});
 
 	// -----------------------------------------------------------------------

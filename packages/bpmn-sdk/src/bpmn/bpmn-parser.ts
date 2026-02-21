@@ -16,6 +16,7 @@ import type {
 	BpmnEscalation,
 	BpmnEventDefinition,
 	BpmnFlowElement,
+	BpmnMessage,
 	BpmnMultiInstanceLoopCharacteristics,
 	BpmnParticipant,
 	BpmnProcess,
@@ -479,6 +480,14 @@ function parseEscalation(element: XmlElement): BpmnEscalation {
 	};
 }
 
+function parseMessage(element: XmlElement): BpmnMessage {
+	return {
+		id: requiredAttr(element, "id"),
+		name: attr(element, "name"),
+		unknownAttributes: unknownAttrs(element),
+	};
+}
+
 // ---------------------------------------------------------------------------
 // Diagram interchange
 // ---------------------------------------------------------------------------
@@ -593,6 +602,7 @@ export function parseBpmn(xml: string): BpmnDefinitions {
 
 	const errors: BpmnError[] = [];
 	const escalations: BpmnEscalation[] = [];
+	const messages: BpmnMessage[] = [];
 	const collaborations: BpmnCollaboration[] = [];
 	const processes: BpmnProcess[] = [];
 	const diagrams: BpmnDiagram[] = [];
@@ -601,6 +611,7 @@ export function parseBpmn(xml: string): BpmnDefinitions {
 		const ln = localName(child.name);
 		if (ln === "error") errors.push(parseError(child));
 		else if (ln === "escalation") escalations.push(parseEscalation(child));
+		else if (ln === "message") messages.push(parseMessage(child));
 		else if (ln === "collaboration") collaborations.push(parseCollaboration(child));
 		else if (ln === "process") processes.push(parseProcess(child));
 		else if (ln === "BPMNDiagram") diagrams.push(parseDiagram(child));
@@ -615,6 +626,7 @@ export function parseBpmn(xml: string): BpmnDefinitions {
 		unknownAttributes,
 		errors,
 		escalations,
+		messages,
 		collaborations,
 		processes,
 		diagrams,

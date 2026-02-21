@@ -29,11 +29,23 @@ export interface ZeebeTaskHeaders {
 	headers: ZeebeTaskHeaderEntry[];
 }
 
+/** A single Zeebe property entry. */
+export interface ZeebePropertyEntry {
+	name: string;
+	value: string;
+}
+
+/** Zeebe properties extension. */
+export interface ZeebeProperties {
+	properties: ZeebePropertyEntry[];
+}
+
 /** Collected Zeebe extensions on a service task. */
 export interface ZeebeExtensions {
 	taskDefinition?: ZeebeTaskDefinition;
 	ioMapping?: ZeebeIoMapping;
 	taskHeaders?: ZeebeTaskHeaders;
+	properties?: ZeebeProperties;
 	/** Unrecognized extension elements preserved for roundtrip. */
 	unknownElements?: XmlElement[];
 }
@@ -87,6 +99,19 @@ export function zeebeExtensionsToXmlElements(extensions: ZeebeExtensions): XmlEl
 		}));
 		elements.push({
 			name: "zeebe:taskHeaders",
+			attributes: {},
+			children,
+		});
+	}
+
+	if (extensions.properties) {
+		const children: XmlElement[] = extensions.properties.properties.map((prop) => ({
+			name: "zeebe:property",
+			attributes: { name: prop.name, value: prop.value },
+			children: [],
+		}));
+		elements.push({
+			name: "zeebe:properties",
 			attributes: {},
 			children,
 		});

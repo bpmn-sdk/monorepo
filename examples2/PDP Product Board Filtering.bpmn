@@ -1,0 +1,590 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:zeebe="http://camunda.org/schema/zeebe/1.0" xmlns:modeler="http://camunda.org/schema/modeler/1.0" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" id="Definitions_1" targetNamespace="http://bpmn.io/schema/bpmn" exporter="Camunda Web Modeler" exporterVersion="063b968" modeler:executionPlatform="Camunda Cloud" modeler:executionPlatformVersion="8.8.0">
+  <bpmn:process id="Process_0ouiedg" name="PDP Product Board Filtering" isExecutable="true">
+    <bpmn:startEvent id="StartEvent_1" name="Trigger" zeebe:modelerTemplate="io.camunda.connectors.webhook.WebhookConnectorStartMessage.v1" zeebe:modelerTemplateVersion="13" zeebe:modelerTemplateIcon="data:image/svg+xml;base64,PHN2ZyBpZD0naWNvbicgeG1sbnM9J2h0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnJyB3aWR0aD0nMTgnIGhlaWdodD0nMTgnIHZpZXdCb3g9JzAgMCAzMiAzMic+CiAgPGRlZnM+CiAgICA8c3R5bGU+LmNscy0xIHsgZmlsbDogbm9uZTsgfTwvc3R5bGU+CiAgPC9kZWZzPgogIDxwYXRoCiAgICBkPSdNMjQsMjZhMywzLDAsMSwwLTIuODE2NC00SDEzdjFhNSw1LDAsMSwxLTUtNVYxNmE3LDcsMCwxLDAsNi45Mjg3LDhoNi4yNTQ5QTIuOTkxNCwyLjk5MTQsMCwwLDAsMjQsMjZaJy8+CiAgPHBhdGgKICAgIGQ9J00yNCwxNmE3LjAyNCw3LjAyNCwwLDAsMC0yLjU3LjQ4NzNsLTMuMTY1Ni01LjUzOTVhMy4wNDY5LDMuMDQ2OSwwLDEsMC0xLjczMjYuOTk4NWw0LjExODksNy4yMDg1Ljg2ODYtLjQ5NzZhNS4wMDA2LDUuMDAwNiwwLDEsMS0xLjg1MSw2Ljg0MThMMTcuOTM3LDI2LjUwMUE3LjAwMDUsNy4wMDA1LDAsMSwwLDI0LDE2WicvPgogIDxwYXRoCiAgICBkPSdNOC41MzIsMjAuMDUzN2EzLjAzLDMuMDMsMCwxLDAsMS43MzI2Ljk5ODVDMTEuNzQsMTguNDcsMTMuODYsMTQuNzYwNywxMy44OSwxNC43MDhsLjQ5NzYtLjg2ODItLjg2NzctLjQ5N2E1LDUsMCwxLDEsNi44MTItMS44NDM4bDEuNzMxNSwxLjAwMmE3LjAwMDgsNy4wMDA4LDAsMSwwLTEwLjM0NjIsMi4wMzU2Yy0uNDU3Ljc0MjctMS4xMDIxLDEuODcxNi0yLjA3MzcsMy41NzI4WicvPgogIDxyZWN0IGlkPSdfVHJhbnNwYXJlbnRfUmVjdGFuZ2xlXycgZGF0YS1uYW1lPScmbHQ7VHJhbnNwYXJlbnQgUmVjdGFuZ2xlJmd0OycgY2xhc3M9J2Nscy0xJwogICAgd2lkdGg9JzMyJyBoZWlnaHQ9JzMyJy8+Cjwvc3ZnPg==">
+      <bpmn:extensionElements>
+        <zeebe:properties>
+          <zeebe:property name="inbound.type" value="io.camunda:webhook:1" />
+          <zeebe:property name="inbound.method" value="any" />
+          <zeebe:property name="inbound.context" value="4ea5b386-225e-4e80-9148-1665be4cd838" />
+          <zeebe:property name="inbound.shouldValidateHmac" value="disabled" />
+          <zeebe:property name="inbound.auth.type" value="NONE" />
+          <zeebe:property name="inbound.responseExpression" value="=if request.params.validationToken != null then {&#10;  &#34;body&#34;: request.params.validationToken,&#10;  &#34;headers&#34;: {&#34;Content-Type&#34;: &#34;text/plain&#34;}&#10;} else {&#10;  &#34;body&#34;: {&#10;    &#34;success&#34;: true&#10;  }&#10;}" />
+          <zeebe:property name="consumeUnmatchedEvents" value="true" />
+          <zeebe:property name="correlationRequired" value="notRequired" />
+          <zeebe:property name="deduplicationModeManualFlag" value="false" />
+          <zeebe:property name="deduplicationMode" value="AUTO" />
+          <zeebe:property name="resultVariable" value="webhook" />
+          <zeebe:property name="resultExpression" value="" />
+        </zeebe:properties>
+      </bpmn:extensionElements>
+      <bpmn:outgoing>Flow_0uhivv4</bpmn:outgoing>
+      <bpmn:messageEventDefinition id="MessageEventDefinition_0edyoxf" messageRef="Message_02rx26p" />
+    </bpmn:startEvent>
+    <bpmn:endEvent id="Event_0gun2jc">
+      <bpmn:incoming>Flow_19oql0c</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flow_0uhivv4" sourceRef="StartEvent_1" targetRef="Gateway_1xd2ut4" />
+    <bpmn:sequenceFlow id="Flow_1vsfov8" sourceRef="Gateway_0l0cwlw" targetRef="Activity_1h7415w" />
+    <bpmn:parallelGateway id="Gateway_0l0cwlw">
+      <bpmn:incoming>Flow_19h01an</bpmn:incoming>
+      <bpmn:outgoing>Flow_1vsfov8</bpmn:outgoing>
+      <bpmn:outgoing>Flow_0dzaa3m</bpmn:outgoing>
+    </bpmn:parallelGateway>
+    <bpmn:sequenceFlow id="Flow_1dhbhdi" sourceRef="Gateway_1ccpblt" targetRef="Gateway_1cjq6ee" />
+    <bpmn:parallelGateway id="Gateway_1ccpblt">
+      <bpmn:incoming>Flow_1xb5886</bpmn:incoming>
+      <bpmn:incoming>Flow_1jo1lng</bpmn:incoming>
+      <bpmn:outgoing>Flow_1dhbhdi</bpmn:outgoing>
+    </bpmn:parallelGateway>
+    <bpmn:sequenceFlow id="Flow_1xb5886" sourceRef="Activity_1h7415w" targetRef="Gateway_1ccpblt" />
+    <bpmn:callActivity id="Activity_1h7415w" name="Fetch Notes">
+      <bpmn:extensionElements>
+        <zeebe:calledElement processId="Process_05dunyd" propagateAllChildVariables="false" />
+        <zeebe:ioMapping>
+          <zeebe:input source="=&#34;\&#34;new idea\&#34;&#34;" target="searchTerm" />
+          <zeebe:output source="=notes" target="notes" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_1vsfov8</bpmn:incoming>
+      <bpmn:outgoing>Flow_1xb5886</bpmn:outgoing>
+    </bpmn:callActivity>
+    <bpmn:sequenceFlow id="Flow_0dzaa3m" sourceRef="Gateway_0l0cwlw" targetRef="Activity_0f8xnpr" />
+    <bpmn:callActivity id="Activity_0f8xnpr" name="Fetch Features">
+      <bpmn:extensionElements>
+        <zeebe:ioMapping>
+          <zeebe:output source="=features" target="features" />
+        </zeebe:ioMapping>
+        <zeebe:calledElement processId="Process_kgroqbq" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_0dzaa3m</bpmn:incoming>
+      <bpmn:outgoing>Flow_1jo1lng</bpmn:outgoing>
+    </bpmn:callActivity>
+    <bpmn:sequenceFlow id="Flow_1jo1lng" sourceRef="Activity_0f8xnpr" targetRef="Gateway_1ccpblt" />
+    <bpmn:serviceTask id="Activity_0o2ra2b" name="Review new Note" zeebe:modelerTemplate="io.camunda.connectors.agenticai.aiagent.v1" zeebe:modelerTemplateVersion="5" zeebe:modelerTemplateIcon="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzIiIGhlaWdodD0iMzIiIHZpZXdCb3g9IjAgMCAzMiAzMiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPGNpcmNsZSBjeD0iMTYiIGN5PSIxNiIgcj0iMTYiIGZpbGw9IiNBNTZFRkYiLz4KPG1hc2sgaWQ9InBhdGgtMi1vdXRzaWRlLTFfMTg1XzYiIG1hc2tVbml0cz0idXNlclNwYWNlT25Vc2UiIHg9IjQiIHk9IjQiIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgZmlsbD0iYmxhY2siPgo8cmVjdCBmaWxsPSJ3aGl0ZSIgeD0iNCIgeT0iNCIgd2lkdGg9IjI0IiBoZWlnaHQ9IjI0Ii8+CjxwYXRoIGZpbGwtcnVsZT0iZXZlbm9kZCIgY2xpcC1ydWxlPSJldmVub2RkIiBkPSJNMjAuMDEwNSAxMi4wOTg3QzE4LjQ5IDEwLjU4OTQgMTcuMTU5NCA4LjEwODE0IDE2LjE3OTkgNi4wMTEwM0MxNi4xNTIgNi4wMDQ1MSAxNi4xMTc2IDYgMTYuMDc5NCA2QzE2LjA0MTEgNiAxNi4wMDY2IDYuMDA0NTEgMTUuOTc4OCA2LjAxMTA0QzE0Ljk5OTQgOC4xMDgxNCAxMy42Njk3IDEwLjU4ODkgMTIuMTQ4MSAxMi4wOTgxQzEwLjYyNjkgMTMuNjA3MSA4LjEyNTY4IDE0LjkyNjQgNi4wMTE1NyAxNS44OTgxQzYuMDA0NzQgMTUuOTI2MSA2IDE1Ljk2MTEgNiAxNkM2IDE2LjAzODcgNi4wMDQ2OCAxNi4wNzM2IDYuMDExNDQgMTYuMTAxNEM4LjEyNTE5IDE3LjA3MjkgMTAuNjI2MiAxOC4zOTE5IDEyLjE0NzcgMTkuOTAxNkMxMy42Njk3IDIxLjQxMDcgMTQuOTk5NiAyMy44OTIgMTUuOTc5MSAyNS45ODlDMTYuMDA2OCAyNS45OTU2IDE2LjA0MTEgMjYgMTYuMDc5MyAyNkMxNi4xMTc1IDI2IDE2LjE1MTkgMjUuOTk1NCAxNi4xNzk2IDI1Ljk4OUMxNy4xNTkxIDIzLjg5MiAxOC40ODg4IDIxLjQxMSAyMC4wMDk5IDE5LjkwMjFNMjAuMDA5OSAxOS45MDIxQzIxLjUyNTMgMTguMzk4NyAyMy45NDY1IDE3LjA2NjkgMjUuOTkxNSAxNi4wODI0QzI1Ljk5NjUgMTYuMDU5MyAyNiAxNi4wMzEgMjYgMTUuOTk5N0MyNiAxNS45Njg0IDI1Ljk5NjUgMTUuOTQwMyAyNS45OTE1IDE1LjkxNzFDMjMuOTQ3NCAxNC45MzI3IDIxLjUyNTkgMTMuNjAxIDIwLjAxMDUgMTIuMDk4NyIvPgo8L21hc2s+CjxwYXRoIGZpbGwtcnVsZT0iZXZlbm9kZCIgY2xpcC1ydWxlPSJldmVub2RkIiBkPSJNMjAuMDEwNSAxMi4wOTg3QzE4LjQ5IDEwLjU4OTQgMTcuMTU5NCA4LjEwODE0IDE2LjE3OTkgNi4wMTEwM0MxNi4xNTIgNi4wMDQ1MSAxNi4xMTc2IDYgMTYuMDc5NCA2QzE2LjA0MTEgNiAxNi4wMDY2IDYuMDA0NTEgMTUuOTc4OCA2LjAxMTA0QzE0Ljk5OTQgOC4xMDgxNCAxMy42Njk3IDEwLjU4ODkgMTIuMTQ4MSAxMi4wOTgxQzEwLjYyNjkgMTMuNjA3MSA4LjEyNTY4IDE0LjkyNjQgNi4wMTE1NyAxNS44OTgxQzYuMDA0NzQgMTUuOTI2MSA2IDE1Ljk2MTEgNiAxNkM2IDE2LjAzODcgNi4wMDQ2OCAxNi4wNzM2IDYuMDExNDQgMTYuMTAxNEM4LjEyNTE5IDE3LjA3MjkgMTAuNjI2MiAxOC4zOTE5IDEyLjE0NzcgMTkuOTAxNkMxMy42Njk3IDIxLjQxMDcgMTQuOTk5NiAyMy44OTIgMTUuOTc5MSAyNS45ODlDMTYuMDA2OCAyNS45OTU2IDE2LjA0MTEgMjYgMTYuMDc5MyAyNkMxNi4xMTc1IDI2IDE2LjE1MTkgMjUuOTk1NCAxNi4xNzk2IDI1Ljk4OUMxNy4xNTkxIDIzLjg5MiAxOC40ODg4IDIxLjQxMSAyMC4wMDk5IDE5LjkwMjFNMjAuMDA5OSAxOS45MDIxQzIxLjUyNTMgMTguMzk4NyAyMy45NDY1IDE3LjA2NjkgMjUuOTkxNSAxNi4wODI0QzI1Ljk5NjUgMTYuMDU5MyAyNiAxNi4wMzEgMjYgMTUuOTk5N0MyNiAxNS45Njg0IDI1Ljk5NjUgMTUuOTQwMyAyNS45OTE1IDE1LjkxNzFDMjMuOTQ3NCAxNC45MzI3IDIxLjUyNTkgMTMuNjAxIDIwLjAxMDUgMTIuMDk4NyIgZmlsbD0id2hpdGUiLz4KPHBhdGggZmlsbC1ydWxlPSJldmVub2RkIiBjbGlwLXJ1bGU9ImV2ZW5vZGQiIGQ9Ik0yMC4wMTA1IDEyLjA5ODdDMTguNDkgMTAuNTg5NCAxNy4xNTk0IDguMTA4MTQgMTYuMTc5OSA2LjAxMTAzQzE2LjE1MiA2LjAwNDUxIDE2LjExNzYgNiAxNi4wNzk0IDZDMTYuMDQxMSA2IDE2LjAwNjYgNi4wMDQ1MSAxNS45Nzg4IDYuMDExMDRDMTQuOTk5NCA4LjEwODE0IDEzLjY2OTcgMTAuNTg4OSAxMi4xNDgxIDEyLjA5ODFDMTAuNjI2OSAxMy42MDcxIDguMTI1NjggMTQuOTI2NCA2LjAxMTU3IDE1Ljg5ODFDNi4wMDQ3NCAxNS45MjYxIDYgMTUuOTYxMSA2IDE2QzYgMTYuMDM4NyA2LjAwNDY4IDE2LjA3MzYgNi4wMTE0NCAxNi4xMDE0QzguMTI1MTkgMTcuMDcyOSAxMC42MjYyIDE4LjM5MTkgMTIuMTQ3NyAxOS45MDE2QzEzLjY2OTcgMjEuNDEwNyAxNC45OTk2IDIzLjg5MiAxNS45NzkxIDI1Ljk4OUMxNi4wMDY4IDI1Ljk5NTYgMTYuMDQxMSAyNiAxNi4wNzkzIDI2QzE2LjExNzUgMjYgMTYuMTUxOSAyNS45OTU0IDE2LjE3OTYgMjUuOTg5QzE3LjE1OTEgMjMuODkyIDE4LjQ4ODggMjEuNDExIDIwLjAwOTkgMTkuOTAyMU0yMC4wMDk5IDE5LjkwMjFDMjEuNTI1MyAxOC4zOTg3IDIzLjk0NjUgMTcuMDY2OSAyNS45OTE1IDE2LjA4MjRDMjUuOTk2NSAxNi4wNTkzIDI2IDE2LjAzMSAyNiAxNS45OTk3QzI2IDE1Ljk2ODQgMjUuOTk2NSAxNS45NDAzIDI1Ljk5MTUgMTUuOTE3MUMyMy45NDc0IDE0LjkzMjcgMjEuNTI1OSAxMy42MDEgMjAuMDEwNSAxMi4wOTg3IiBzdHJva2U9IiM0OTFEOEIiIHN0cm9rZS13aWR0aD0iNCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIgbWFzaz0idXJsKCNwYXRoLTItb3V0c2lkZS0xXzE4NV82KSIvPgo8L3N2Zz4K">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="io.camunda.agenticai:aiagent:1" retries="3" />
+        <zeebe:ioMapping>
+          <zeebe:input source="bedrock" target="provider.type" />
+          <zeebe:input source="us-east-1" target="provider.bedrock.region" />
+          <zeebe:input source="credentials" target="provider.bedrock.authentication.type" />
+          <zeebe:input source="{{secrets.PDP_CAMUNDAAGENT_AWS_ACCESS_KEY}}" target="provider.bedrock.authentication.accessKey" />
+          <zeebe:input source="{{secrets.PDP_CAMUNDAAGENT_AWS_SECRET_KEY}}" target="provider.bedrock.authentication.secretKey" />
+          <zeebe:input source="anthropic.claude-3-5-sonnet-20240620-v1:0" target="provider.bedrock.model.model" />
+          <zeebe:input source="=&#34;You are an experienced Product Manager reviewing a newly submitted product idea. Your goal is to analyze the idea in the context of existing notes and planned features, assign a responsible owner, and identify missing information.&#10;&#10;You receive the following inputs:&#10;&#10;- \&#34;idea\&#34;: an object describing the newly submitted product idea, including at least:&#10;  - \&#34;title\&#34;: short title of the idea&#10;  - \&#34;content\&#34;: detailed description of the idea&#10;  - \&#34;web\&#34;: URL linking to the idea in the product tool&#10;- \&#34;notes\&#34;: a list of customer ideas. Each item has:&#10;  - \&#34;title\&#34;: short title of the item&#10;  - \&#34;content\&#34;: detailed description of the item&#10;  - \&#34;web\&#34;: URL to the related topic&#10;  - \&#34;owner\&#34;: the responsible contact for this item (can be empty)&#10;- \&#34;features\&#34;: a list of already validated and planned items. Each item has:&#10;  - \&#34;title\&#34;: short title of the item&#10;  - \&#34;content\&#34;: detailed description of the item&#10;  - \&#34;web\&#34;: URL to the related topic&#10;  - \&#34;owner\&#34;: the responsible contact for this item (can be empty)&#10;- \&#34;pms\&#34;: a JSON array of Product Manager contacts. Each item has:&#10;  - \&#34;name\&#34;: full name of the PM&#10;  - \&#34;topic\&#34;: a short description of their responsibility area(s)&#10;  - \&#34;email\&#34;: their email address&#10;  - \&#34;slack_user_id\&#34;: their Slack user id (used for tagging, for example &#38;lt;@U123ABC456&#38;gt;)&#10;&#10;Important distinctions:&#10;&#10;- \&#34;notes\&#34;: ideas from customers that are not yet validated or planned&#10;- \&#34;features\&#34;: items that are already validated and planned&#10;&#10;Matching responsible PM rules:&#10;&#10;- If you find at least one similar or duplicate note/feature:&#10;  - Check whether that note/feature has an \&#34;owner\&#34; field set (non-empty).&#10;  - Try to match this owner to a PM in \&#34;pms\&#34; (for example, by comparing the owner name with \&#34;name\&#34; in \&#34;pms\&#34; case-insensitively, or by matching emails if available).&#10;  - If a matching PM is found in \&#34;pms\&#34;, **use this PM as the responsible person**, even if another PM might also fit by responsibility topic.&#10;- If no suitable owner match is found in the similar items:&#10;  - Choose the best fitting PM from \&#34;pms\&#34; based on the idea’s main topic and the \&#34;topic\&#34; fields in \&#34;pms\&#34;.&#10;&#10;When you mention the responsible person in the final Slack message, tag them using their \&#34;slack_user_id\&#34; from \&#34;pms\&#34; in the form: &#38;lt;@SLACK_USER_ID&#38;gt;.&#10;&#10;Your tasks:&#10;&#10;1) Find similar or duplicate items&#10;&#10;Compare the new idea against all items in both \&#34;notes\&#34; and \&#34;features\&#34;.&#10;&#10;- Identify items that are:&#10;  - the same as the idea (duplicate), or&#10;  - substantially similar or overlapping (same problem, user need, or solution, even if phrased differently)&#10;- Consider similarity based on:&#10;  - problem or use case&#10;  - target user or persona&#10;  - proposed solution or behavior&#10;  - domain or topic suggested by the \&#34;web\&#34; URL, if helpful&#10;&#10;For each match, determine:&#10;&#10;- whether it is a duplicate or similar&#10;- whether it comes from notes or features&#10;- the item title and web URL&#10;- a brief explanation of why it is considered a duplicate or similar&#10;&#10;If you find no similar or duplicate items, you must indicate clearly that no similar ideas were found in the final Slack message.&#10;&#10;2) Assign a responsible person (PM)&#10;&#10;Using the rules above:&#10;&#10;- If any similar/duplicate note or feature has an \&#34;owner\&#34; that can be matched to an entry in \&#34;pms\&#34;, select that PM as the responsible person.&#10;- Otherwise, select exactly one PM from \&#34;pms\&#34; whose \&#34;topic\&#34; best fits the idea’s main theme.&#10;- Be prepared to explain your choice based on either:&#10;  - the matched owner from the similar item, or&#10;  - the best fit between the idea’s content and the PM’s \&#34;topic\&#34;.&#10;&#10;In the final Slack message, show the responsible PM as a Slack mention using their \&#34;slack_user_id\&#34; from \&#34;pms\&#34;, for example: \&#34;Suggested PM - &#38;lt;@U123ABC456&#38;gt;\&#34;.&#10;&#10;3) Identify missing information&#10;&#10;Identify important gaps in the idea description that prevent proper evaluation, scoping, or confident ownership assignment.&#10;&#10;Possible missing aspects can include (non exhaustive):&#10;&#10;- clear problem statement or user pain&#10;- target user or persona&#10;- expected outcome or success criteria&#10;- dependencies on other features or systems&#10;- constraints, scale, or performance requirements&#10;- ambiguous terminology or unclear scope&#10;&#10;You should **think about these missing pieces**, but in the final Slack message reflect them only in a concise, action-oriented way under the \&#34;Action\&#34; section (for example, as a short hint on what needs to be clarified). If nothing important appears to be missing, you can omit mentioning missing information explicitly.&#10;&#10;Output format (Slack markdown):&#10;&#10;- The final answer must be a **single Slack message**, formatted using **Slack markdown**, **not** JSON and **not** inside a code block.&#10;- Use Slack link syntax: &#38;lt;URL|link text&#38;gt; instead of regular markdown links.&#10;- Use the following structure and order **exactly**:&#10;&#10;- New idea submitted  &#10;  - {idea title}  &#10;  - &#38;lt;{idea.web}|Idea link&#38;gt;  &#10;&#10;- Similar ideas found:  &#10;  - If one or more similar/duplicate ideas are found:&#10;    - For each similar/duplicate item, add a bullet:&#10;      - {item title} + &#38;lt;{item.web}|link&#38;gt;&#10;  - If no similar/duplicate items are found:&#10;    - Write a single bullet:&#10;      - None&#10;&#10;- Submitted by - {company.name}+{user.name}  &#10;&#10;- Suggested PM - {tag the PM}  &#10;  - Use the Slack mention format for the chosen PM:&#10;    - Example: \&#34;- Suggested PM - &#38;lt;@U123ABC456&#38;gt;\&#34;&#10;&#10;- Action  &#10;  - change assignee  &#10;  - Optionally, add **one or two very short, concrete hints** if important information is missing, for example:&#10;    - clarify target user/persona&#10;    - confirm expected outcome/success criteria&#10;&#10;General rules:&#10;&#10;- Do not return JSON.&#10;- Do not wrap the response in any code block.&#10;- Use Slack markdown (bullets, line breaks, and Slack-style links and mentions).&#10;- Always include all of the following top-level sections in this order:  &#10;  - \&#34;New idea submitted\&#34;  &#10;  - \&#34;Similar ideas found:\&#34;  &#10;  - \&#34;Submitted by\&#34;  &#10;  - \&#34;Suggested PM\&#34;  &#10;  - \&#34;Action\&#34;&#10;- When suggesting the PM, always prefer:&#10;  - the PM matched via a similar note/feature owner and the \&#34;pms\&#34; array, if available&#10;  - otherwise, the single best-fitting PM from \&#34;pms\&#34; based on their \&#34;topic\&#34;.&#34;" target="data.systemPrompt.prompt" />
+          <zeebe:input source="={&#10;  pms: pms,&#10;  notes: notes,&#10;  featurers: features,&#10;  idea: newNote,&#10;  company: company,&#10;  user: user&#10;}" target="data.userPrompt.prompt" />
+          <zeebe:input source="=toolResults" target="data.tools.toolCallResults" />
+          <zeebe:input source="=agent.context" target="data.context" />
+          <zeebe:input source="in-process" target="data.memory.storage.type" />
+          <zeebe:input source="=20" target="data.memory.contextWindowSize" />
+          <zeebe:input source="=10" target="data.limits.maxModelCalls" />
+          <zeebe:input source="text" target="data.response.format.type" />
+          <zeebe:input source="=false" target="data.response.format.parseJson" />
+          <zeebe:input source="=false" target="data.response.includeAssistantMessage" />
+        </zeebe:ioMapping>
+        <zeebe:taskHeaders>
+          <zeebe:header key="elementTemplateVersion" value="5" />
+          <zeebe:header key="elementTemplateId" value="io.camunda.connectors.agenticai.aiagent.v1" />
+          <zeebe:header key="resultVariable" value="agent" />
+          <zeebe:header key="retryBackoff" value="PT0S" />
+        </zeebe:taskHeaders>
+      </bpmn:extensionElements>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="Activity_10vkij6" name="Post review to slack channel" zeebe:modelerTemplate="04d4114d-0202-4107-8c5e-a1acc66387f9" zeebe:modelerTemplateVersion="1730992012092" zeebe:modelerTemplateIcon="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTI3IiBoZWlnaHQ9IjEyNyIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cGF0aCBkPSJNMjcuMiA4MGMwIDcuMy01LjkgMTMuMi0xMy4yIDEzLjJDNi43IDkzLjIuOCA4Ny4zLjggODBjMC03LjMgNS45LTEzLjIgMTMuMi0xMy4yaDEzLjJWODB6bTYuNiAwYzAtNy4zIDUuOS0xMy4yIDEzLjItMTMuMiA3LjMgMCAxMy4yIDUuOSAxMy4yIDEzLjJ2MzNjMCA3LjMtNS45IDEzLjItMTMuMiAxMy4yLTcuMyAwLTEzLjItNS45LTEzLjItMTMuMlY4MHoiIGZpbGw9IiNFMDFFNUEiLz4KICA8cGF0aCBkPSJNNDcgMjdjLTcuMyAwLTEzLjItNS45LTEzLjItMTMuMkMzMy44IDYuNSAzOS43LjYgNDcgLjZjNy4zIDAgMTMuMiA1LjkgMTMuMiAxMy4yVjI3SDQ3em0wIDYuN2M3LjMgMCAxMy4yIDUuOSAxMy4yIDEzLjIgMCA3LjMtNS45IDEzLjItMTMuMiAxMy4ySDEzLjlDNi42IDYwLjEuNyA1NC4yLjcgNDYuOWMwLTcuMyA1LjktMTMuMiAxMy4yLTEzLjJINDd6IiBmaWxsPSIjMzZDNUYwIi8+CiAgPHBhdGggZD0iTTk5LjkgNDYuOWMwLTcuMyA1LjktMTMuMiAxMy4yLTEzLjIgNy4zIDAgMTMuMiA1LjkgMTMuMiAxMy4yIDAgNy4zLTUuOSAxMy4yLTEzLjIgMTMuMkg5OS45VjQ2Ljl6bS02LjYgMGMwIDcuMy01LjkgMTMuMi0xMy4yIDEzLjItNy4zIDAtMTMuMi01LjktMTMuMi0xMy4yVjEzLjhDNjYuOSA2LjUgNzIuOC42IDgwLjEuNmM3LjMgMCAxMy4yIDUuOSAxMy4yIDEzLjJ2MzMuMXoiIGZpbGw9IiMyRUI2N0QiLz4KICA8cGF0aCBkPSJNODAuMSA5OS44YzcuMyAwIDEzLjIgNS45IDEzLjIgMTMuMiAwIDcuMy01LjkgMTMuMi0xMy4yIDEzLjItNy4zIDAtMTMuMi01LjktMTMuMi0xMy4yVjk5LjhoMTMuMnptMC02LjZjLTcuMyAwLTEzLjItNS45LTEzLjItMTMuMiAwLTcuMyA1LjktMTMuMiAxMy4yLTEzLjJoMzMuMWM3LjMgMCAxMy4yIDUuOSAxMy4yIDEzLjIgMCA3LjMtNS45IDEzLjItMTMuMiAxMy4ySDgwLjF6IiBmaWxsPSIjRUNCMjJFIi8+Cjwvc3ZnPgo=">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="io.camunda:slack:1" retries="3" />
+        <zeebe:ioMapping>
+          <zeebe:input source="{{secrets.PDP_SLACK_CAMUNDA}}" target="token" />
+          <zeebe:input source="chat.postMessage" target="method" />
+          <zeebe:input source="messageBlock" target="data.messageType" />
+          <zeebe:input source="=[&#10;	{&#10;			&#34;type&#34;: &#34;section&#34;,&#10;			&#34;text&#34;: {&#10;				&#34;type&#34;: &#34;mrkdwn&#34;,&#10;				&#34;text&#34;: agent.responseText&#10;			}&#10;		}&#10;]" target="data.blockContent" />
+          <zeebe:input source="=&#34;C0ACC04PVP0&#34;" target="data.channel" />
+        </zeebe:ioMapping>
+        <zeebe:taskHeaders>
+          <zeebe:header key="retryBackoff" value="PT0S" />
+        </zeebe:taskHeaders>
+      </bpmn:extensionElements>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="Gateway_1xd2ut4" name="Test?" default="Flow_0fi7dxj">
+      <bpmn:incoming>Flow_0uhivv4</bpmn:incoming>
+      <bpmn:outgoing>Flow_0fi7dxj</bpmn:outgoing>
+      <bpmn:outgoing>Flow_1id3z2o</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:sequenceFlow id="Flow_0fi7dxj" sourceRef="Gateway_1xd2ut4" targetRef="Event_03tzjr7" />
+    <bpmn:endEvent id="Event_1eci49c">
+      <bpmn:incoming>Flow_1id3z2o</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flow_1id3z2o" sourceRef="Gateway_1xd2ut4" targetRef="Event_1eci49c">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=webhook.request.body.test = true or webhook.request.body.data.eventType != "note.created"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:intermediateCatchEvent id="Event_03tzjr7" name="Wait for 1min until Note is finalized">
+      <bpmn:incoming>Flow_0fi7dxj</bpmn:incoming>
+      <bpmn:outgoing>Flow_065y8kw</bpmn:outgoing>
+      <bpmn:timerEventDefinition id="TimerEventDefinition_0a4exog">
+        <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">PT1M</bpmn:timeDuration>
+      </bpmn:timerEventDefinition>
+    </bpmn:intermediateCatchEvent>
+    <bpmn:sequenceFlow id="Flow_065y8kw" sourceRef="Event_03tzjr7" targetRef="Activity_0ijhb6l" />
+    <bpmn:serviceTask id="Activity_0ijhb6l" name="Fetch new Note" zeebe:modelerTemplate="io.camunda.connectors.HttpJson.v2" zeebe:modelerTemplateVersion="12" zeebe:modelerTemplateIcon="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTgiIGhlaWdodD0iMTgiIHZpZXdCb3g9IjAgMCAxOCAxOCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTE3LjAzMzUgOC45OTk5N0MxNy4wMzM1IDEzLjQ0NzUgMTMuNDI4MSAxNy4wNTI5IDguOTgwNjUgMTcuMDUyOUM0LjUzMzE2IDE3LjA1MjkgMC45Mjc3NjUgMTMuNDQ3NSAwLjkyNzc2NSA4Ljk5OTk3QzAuOTI3NzY1IDQuNTUyNDggNC41MzMxNiAwLjk0NzA4MyA4Ljk4MDY1IDAuOTQ3MDgzQzEzLjQyODEgMC45NDcwODMgMTcuMDMzNSA0LjU1MjQ4IDE3LjAzMzUgOC45OTk5N1oiIGZpbGw9IiM1MDU1NjIiLz4KPHBhdGggZD0iTTQuOTMxMjYgMTQuMTU3MUw2Ljc4MTA2IDMuNzE0NzFIMTAuMTM3NUMxMS4xOTE3IDMuNzE0NzEgMTEuOTgyNCAzLjk4MzIzIDEyLjUwOTUgNC41MjAyN0MxMy4wNDY1IDUuMDQ3MzYgMTMuMzE1IDUuNzMzNTggMTMuMzE1IDYuNTc4OTJDMTMuMzE1IDcuNDQ0MTQgMTMuMDcxNCA4LjE1NTIyIDEyLjU4NDEgOC43MTIxNUMxMi4xMDY3IDkuMjU5MTMgMTEuNDU1MyA5LjYzNzA1IDEwLjYyOTggOS44NDU5TDEyLjA2MTkgMTQuMTU3MUgxMC4zMzE1TDkuMDMzNjQgMTAuMDI0OUg3LjI0MzUxTDYuNTEyNTQgMTQuMTU3MUg0LjkzMTI2Wk03LjQ5NzExIDguNTkyODFIOS4yNDI0OEM5Ljk5ODMyIDguNTkyODEgMTAuNTkwMSA4LjQyMzc0IDExLjAxNzcgOC4wODU2MUMxMS40NTUzIDcuNzM3NTMgMTEuNjc0MSA3LjI2NTEzIDExLjY3NDEgNi42Njg0MkMxMS42NzQxIDYuMTkxMDYgMTEuNTI0OSA1LjgxODExIDExLjIyNjUgNS41NDk1OUMxMC45MjgyIDUuMjcxMTMgMTAuNDU1OCA1LjEzMTkgOS44MDkzNiA1LjEzMTlIOC4xMDg3NEw3LjQ5NzExIDguNTkyODFaIiBmaWxsPSJ3aGl0ZSIvPgo8L3N2Zz4K">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="io.camunda:http-json:1" retries="3" />
+        <zeebe:ioMapping>
+          <zeebe:input source="bearer" target="authentication.type" />
+          <zeebe:input source="{{secrets.PDP_PRODUCT_BOARD}}" target="authentication.token" />
+          <zeebe:input source="GET" target="method" />
+          <zeebe:input source="=webhook.request.body.data.links.target" target="url" />
+          <zeebe:input source="=false" target="storeResponse" />
+          <zeebe:input source="=20" target="connectionTimeoutInSeconds" />
+          <zeebe:input source="=20" target="readTimeoutInSeconds" />
+          <zeebe:input source="=false" target="ignoreNullValues" />
+        </zeebe:ioMapping>
+        <zeebe:taskHeaders>
+          <zeebe:header key="elementTemplateVersion" value="12" />
+          <zeebe:header key="elementTemplateId" value="io.camunda.connectors.HttpJson.v2" />
+          <zeebe:header key="resultExpression" value="={&#10;  &#34;newNote&#34;: {&#10;    id: response.body.data.id,&#10;    title: response.body.data.title,&#10;    content: response.body.data.content,&#10;    web: response.body.data.displayUrl,&#10;    companyId: response.body.data.company.id,&#10;    userId: response.body.data.user.id&#10;  }&#10;}" />
+          <zeebe:header key="retryBackoff" value="PT0S" />
+        </zeebe:taskHeaders>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_065y8kw</bpmn:incoming>
+      <bpmn:outgoing>Flow_0mpxzn7</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:sequenceFlow id="Flow_0mpxzn7" sourceRef="Activity_0ijhb6l" targetRef="Gateway_0wuxqen" />
+    <bpmn:exclusiveGateway id="Gateway_0wuxqen" name="Vote?" default="Flow_19h01an">
+      <bpmn:incoming>Flow_0mpxzn7</bpmn:incoming>
+      <bpmn:outgoing>Flow_19h01an</bpmn:outgoing>
+      <bpmn:outgoing>Flow_0uj6a32</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:sequenceFlow id="Flow_19h01an" name="Idea" sourceRef="Gateway_0wuxqen" targetRef="Gateway_0l0cwlw" />
+    <bpmn:endEvent id="Event_01b9nwp">
+      <bpmn:incoming>Flow_0uj6a32</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flow_0uj6a32" name="Yes" sourceRef="Gateway_0wuxqen" targetRef="Event_01b9nwp">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=matches(newNote.title, "vote for")</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:scriptTask id="Activity_1uy9kvn" name="PM List">
+      <bpmn:extensionElements>
+        <zeebe:script expression="=[&#10;  {&#10;    name: &#34;Aleksander Dytko&#34;,&#10;    topic: &#34;Core - Orchestration&#34;,&#10;    email: &#34;aleksander.dytko@camunda.com&#34;,&#10;    slack: &#34;U0378N0MQDV&#34;&#10;  },&#10;  {&#10;    name: &#34;Ian Kavanagh&#34;,&#10;    topic: &#34;Core - Platform&#34;,&#10;    email: &#34;ian.kavanagh@camunda.com&#34;,&#10;    slack: &#34;U093GJQ0AC8&#34;&#10;  },&#10;  {&#10;    name: &#34;Markus Hafellner&#34;,&#10;    topic: &#34;Modeling &#38; Task Automation&#34;,&#10;    email: &#34;markus.hafellner@camunda.com&#34;,&#10;    slack: &#34;U0A3SMRP3L0&#34;&#10;  },&#10;  {&#10;    name: &#34;Kunal Nagi&#34;,&#10;    topic: &#34;Embedded Intelligence&#34;,&#10;    email: &#34;kunal.nagi@camunda.com&#34;,&#10;    slack: &#34;U095HCWHDPD&#34;&#10;  },&#10;  {&#10;    name: &#34;Tobias Conz&#34;,&#10;    topic: &#34;Solutions&#34;,&#10;    email: &#34;tobias.conz@camunda.com&#34;,&#10;    slack: &#34;U017XDF5QEP&#34;&#10;  },&#10;  {&#10;    name: &#34;Peter Bojtos&#34;,&#10;    topic: &#34;Onboarding &#38; Migration&#34;,&#10;    email: &#34;peter.bojtos@camunda.com&#34;,&#10;    slack: &#34;U08Q31GGFNW&#34;&#10;  },&#10;  {&#10;    name: &#34;Tally Eting&#34;,&#10;    topic: &#34;Camunda Hub&#34;,&#10;    email: &#34;tally.eting@camunda.com&#34;,&#10;    slack: &#34;U0A55TPR2CV&#34;&#10;  }&#10;]" resultVariable="pms" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_0w1mmyx</bpmn:incoming>
+      <bpmn:outgoing>Flow_0fxvhw2</bpmn:outgoing>
+    </bpmn:scriptTask>
+    <bpmn:parallelGateway id="Gateway_1cjq6ee">
+      <bpmn:incoming>Flow_1dhbhdi</bpmn:incoming>
+      <bpmn:outgoing>Flow_0e0a3d6</bpmn:outgoing>
+      <bpmn:outgoing>Flow_1ft8o7y</bpmn:outgoing>
+    </bpmn:parallelGateway>
+    <bpmn:sequenceFlow id="Flow_0w1mmyx" sourceRef="Gateway_0xc29hu" targetRef="Activity_1uy9kvn" />
+    <bpmn:parallelGateway id="Gateway_0xc29hu">
+      <bpmn:incoming>Flow_0c0ki6b</bpmn:incoming>
+      <bpmn:incoming>Flow_11zpeog</bpmn:incoming>
+      <bpmn:outgoing>Flow_0w1mmyx</bpmn:outgoing>
+    </bpmn:parallelGateway>
+    <bpmn:exclusiveGateway id="Gateway_02r9qh8" default="Flow_1pjou4u">
+      <bpmn:incoming>Flow_0e0a3d6</bpmn:incoming>
+      <bpmn:outgoing>Flow_1uloclt</bpmn:outgoing>
+      <bpmn:outgoing>Flow_1pjou4u</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:exclusiveGateway id="Gateway_1jktycy">
+      <bpmn:incoming>Flow_1pjou4u</bpmn:incoming>
+      <bpmn:incoming>Flow_0tdx03m</bpmn:incoming>
+      <bpmn:incoming>Flow_1x1dbwz</bpmn:incoming>
+      <bpmn:outgoing>Flow_0c0ki6b</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="Activity_1nsogqd" name="Fetch Company" zeebe:modelerTemplate="io.camunda.connectors.HttpJson.v2" zeebe:modelerTemplateVersion="12" zeebe:modelerTemplateIcon="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTgiIGhlaWdodD0iMTgiIHZpZXdCb3g9IjAgMCAxOCAxOCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTE3LjAzMzUgOC45OTk5N0MxNy4wMzM1IDEzLjQ0NzUgMTMuNDI4MSAxNy4wNTI5IDguOTgwNjUgMTcuMDUyOUM0LjUzMzE2IDE3LjA1MjkgMC45Mjc3NjUgMTMuNDQ3NSAwLjkyNzc2NSA4Ljk5OTk3QzAuOTI3NzY1IDQuNTUyNDggNC41MzMxNiAwLjk0NzA4MyA4Ljk4MDY1IDAuOTQ3MDgzQzEzLjQyODEgMC45NDcwODMgMTcuMDMzNSA0LjU1MjQ4IDE3LjAzMzUgOC45OTk5N1oiIGZpbGw9IiM1MDU1NjIiLz4KPHBhdGggZD0iTTQuOTMxMjYgMTQuMTU3MUw2Ljc4MTA2IDMuNzE0NzFIMTAuMTM3NUMxMS4xOTE3IDMuNzE0NzEgMTEuOTgyNCAzLjk4MzIzIDEyLjUwOTUgNC41MjAyN0MxMy4wNDY1IDUuMDQ3MzYgMTMuMzE1IDUuNzMzNTggMTMuMzE1IDYuNTc4OTJDMTMuMzE1IDcuNDQ0MTQgMTMuMDcxNCA4LjE1NTIyIDEyLjU4NDEgOC43MTIxNUMxMi4xMDY3IDkuMjU5MTMgMTEuNDU1MyA5LjYzNzA1IDEwLjYyOTggOS44NDU5TDEyLjA2MTkgMTQuMTU3MUgxMC4zMzE1TDkuMDMzNjQgMTAuMDI0OUg3LjI0MzUxTDYuNTEyNTQgMTQuMTU3MUg0LjkzMTI2Wk03LjQ5NzExIDguNTkyODFIOS4yNDI0OEM5Ljk5ODMyIDguNTkyODEgMTAuNTkwMSA4LjQyMzc0IDExLjAxNzcgOC4wODU2MUMxMS40NTUzIDcuNzM3NTMgMTEuNjc0MSA3LjI2NTEzIDExLjY3NDEgNi42Njg0MkMxMS42NzQxIDYuMTkxMDYgMTEuNTI0OSA1LjgxODExIDExLjIyNjUgNS41NDk1OUMxMC45MjgyIDUuMjcxMTMgMTAuNDU1OCA1LjEzMTkgOS44MDkzNiA1LjEzMTlIOC4xMDg3NEw3LjQ5NzExIDguNTkyODFaIiBmaWxsPSJ3aGl0ZSIvPgo8L3N2Zz4K">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="io.camunda:http-json:1" retries="3" />
+        <zeebe:ioMapping>
+          <zeebe:input source="bearer" target="authentication.type" />
+          <zeebe:input source="{{secrets.PDP_PRODUCT_BOARD}}" target="authentication.token" />
+          <zeebe:input source="GET" target="method" />
+          <zeebe:input source="=&#34;https://api.productboard.com/companies/&#34; + newNote.companyId" target="url" />
+          <zeebe:input source="=false" target="storeResponse" />
+          <zeebe:input source="=20" target="connectionTimeoutInSeconds" />
+          <zeebe:input source="=20" target="readTimeoutInSeconds" />
+          <zeebe:input source="=false" target="ignoreNullValues" />
+        </zeebe:ioMapping>
+        <zeebe:taskHeaders>
+          <zeebe:header key="elementTemplateVersion" value="12" />
+          <zeebe:header key="elementTemplateId" value="io.camunda.connectors.HttpJson.v2" />
+          <zeebe:header key="resultVariable" value="company" />
+          <zeebe:header key="retryBackoff" value="PT0S" />
+        </zeebe:taskHeaders>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_1uloclt</bpmn:incoming>
+      <bpmn:outgoing>Flow_0tdx03m</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:sequenceFlow id="Flow_1uloclt" sourceRef="Gateway_02r9qh8" targetRef="Activity_1nsogqd">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=newNote.companyId != null</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_1pjou4u" sourceRef="Gateway_02r9qh8" targetRef="Gateway_1jktycy" />
+    <bpmn:sequenceFlow id="Flow_0tdx03m" sourceRef="Activity_1nsogqd" targetRef="Gateway_1jktycy" />
+    <bpmn:exclusiveGateway id="Gateway_0k5lr6c" default="Flow_0o0ek82">
+      <bpmn:incoming>Flow_1ft8o7y</bpmn:incoming>
+      <bpmn:outgoing>Flow_0ylfo3t</bpmn:outgoing>
+      <bpmn:outgoing>Flow_0o0ek82</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:exclusiveGateway id="Gateway_0u65iud">
+      <bpmn:incoming>Flow_0o0ek82</bpmn:incoming>
+      <bpmn:incoming>Flow_0w1iw8i</bpmn:incoming>
+      <bpmn:incoming>Flow_19buhif</bpmn:incoming>
+      <bpmn:outgoing>Flow_11zpeog</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="Activity_0fsam5t" name="Fetch User" zeebe:modelerTemplate="io.camunda.connectors.HttpJson.v2" zeebe:modelerTemplateVersion="12" zeebe:modelerTemplateIcon="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTgiIGhlaWdodD0iMTgiIHZpZXdCb3g9IjAgMCAxOCAxOCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTE3LjAzMzUgOC45OTk5N0MxNy4wMzM1IDEzLjQ0NzUgMTMuNDI4MSAxNy4wNTI5IDguOTgwNjUgMTcuMDUyOUM0LjUzMzE2IDE3LjA1MjkgMC45Mjc3NjUgMTMuNDQ3NSAwLjkyNzc2NSA4Ljk5OTk3QzAuOTI3NzY1IDQuNTUyNDggNC41MzMxNiAwLjk0NzA4MyA4Ljk4MDY1IDAuOTQ3MDgzQzEzLjQyODEgMC45NDcwODMgMTcuMDMzNSA0LjU1MjQ4IDE3LjAzMzUgOC45OTk5N1oiIGZpbGw9IiM1MDU1NjIiLz4KPHBhdGggZD0iTTQuOTMxMjYgMTQuMTU3MUw2Ljc4MTA2IDMuNzE0NzFIMTAuMTM3NUMxMS4xOTE3IDMuNzE0NzEgMTEuOTgyNCAzLjk4MzIzIDEyLjUwOTUgNC41MjAyN0MxMy4wNDY1IDUuMDQ3MzYgMTMuMzE1IDUuNzMzNTggMTMuMzE1IDYuNTc4OTJDMTMuMzE1IDcuNDQ0MTQgMTMuMDcxNCA4LjE1NTIyIDEyLjU4NDEgOC43MTIxNUMxMi4xMDY3IDkuMjU5MTMgMTEuNDU1MyA5LjYzNzA1IDEwLjYyOTggOS44NDU5TDEyLjA2MTkgMTQuMTU3MUgxMC4zMzE1TDkuMDMzNjQgMTAuMDI0OUg3LjI0MzUxTDYuNTEyNTQgMTQuMTU3MUg0LjkzMTI2Wk03LjQ5NzExIDguNTkyODFIOS4yNDI0OEM5Ljk5ODMyIDguNTkyODEgMTAuNTkwMSA4LjQyMzc0IDExLjAxNzcgOC4wODU2MUMxMS40NTUzIDcuNzM3NTMgMTEuNjc0MSA3LjI2NTEzIDExLjY3NDEgNi42Njg0MkMxMS42NzQxIDYuMTkxMDYgMTEuNTI0OSA1LjgxODExIDExLjIyNjUgNS41NDk1OUMxMC45MjgyIDUuMjcxMTMgMTAuNDU1OCA1LjEzMTkgOS44MDkzNiA1LjEzMTlIOC4xMDg3NEw3LjQ5NzExIDguNTkyODFaIiBmaWxsPSJ3aGl0ZSIvPgo8L3N2Zz4K">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="io.camunda:http-json:1" retries="3" />
+        <zeebe:ioMapping>
+          <zeebe:input source="bearer" target="authentication.type" />
+          <zeebe:input source="{{secrets.PDP_PRODUCT_BOARD}}" target="authentication.token" />
+          <zeebe:input source="GET" target="method" />
+          <zeebe:input source="=&#34;https://api.productboard.com/users/&#34; + newNote.userId" target="url" />
+          <zeebe:input source="={&#10;  &#34;accept&#34;: &#34;application/json&#34;&#10;}" target="headers" />
+          <zeebe:input source="=false" target="storeResponse" />
+          <zeebe:input source="=20" target="connectionTimeoutInSeconds" />
+          <zeebe:input source="=20" target="readTimeoutInSeconds" />
+          <zeebe:input source="=false" target="ignoreNullValues" />
+        </zeebe:ioMapping>
+        <zeebe:taskHeaders>
+          <zeebe:header key="elementTemplateVersion" value="12" />
+          <zeebe:header key="elementTemplateId" value="io.camunda.connectors.HttpJson.v2" />
+          <zeebe:header key="resultVariable" value="user" />
+          <zeebe:header key="errorExpression" value="=null" />
+          <zeebe:header key="retryBackoff" value="PT0S" />
+        </zeebe:taskHeaders>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_0ylfo3t</bpmn:incoming>
+      <bpmn:outgoing>Flow_0w1iw8i</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:sequenceFlow id="Flow_0ylfo3t" sourceRef="Gateway_0k5lr6c" targetRef="Activity_0fsam5t">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=newNote.userId != null</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_0o0ek82" sourceRef="Gateway_0k5lr6c" targetRef="Gateway_0u65iud" />
+    <bpmn:sequenceFlow id="Flow_0w1iw8i" sourceRef="Activity_0fsam5t" targetRef="Gateway_0u65iud" />
+    <bpmn:sequenceFlow id="Flow_0e0a3d6" sourceRef="Gateway_1cjq6ee" targetRef="Gateway_02r9qh8" />
+    <bpmn:sequenceFlow id="Flow_1ft8o7y" sourceRef="Gateway_1cjq6ee" targetRef="Gateway_0k5lr6c" />
+    <bpmn:sequenceFlow id="Flow_0c0ki6b" sourceRef="Gateway_1jktycy" targetRef="Gateway_0xc29hu" />
+    <bpmn:sequenceFlow id="Flow_11zpeog" sourceRef="Gateway_0u65iud" targetRef="Gateway_0xc29hu" />
+    <bpmn:boundaryEvent id="Event_1klgljj" attachedToRef="Activity_0fsam5t">
+      <bpmn:outgoing>Flow_19buhif</bpmn:outgoing>
+      <bpmn:errorEventDefinition id="ErrorEventDefinition_16vdtlg" />
+    </bpmn:boundaryEvent>
+    <bpmn:sequenceFlow id="Flow_19buhif" sourceRef="Event_1klgljj" targetRef="Gateway_0u65iud" />
+    <bpmn:boundaryEvent id="Event_16xyj1i" attachedToRef="Activity_1nsogqd">
+      <bpmn:outgoing>Flow_1x1dbwz</bpmn:outgoing>
+      <bpmn:errorEventDefinition id="ErrorEventDefinition_064a3xc" />
+    </bpmn:boundaryEvent>
+    <bpmn:sequenceFlow id="Flow_1x1dbwz" sourceRef="Event_16xyj1i" targetRef="Gateway_1jktycy" />
+    <bpmn:adHocSubProcess id="Activity_1pft81d" name="Review new Note" zeebe:modelerTemplate="io.camunda.connectors.agenticai.aiagent.jobworker.v1" zeebe:modelerTemplateVersion="5" zeebe:modelerTemplateIcon="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzIiIGhlaWdodD0iMzIiIHZpZXdCb3g9IjAgMCAzMiAzMiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPGNpcmNsZSBjeD0iMTYiIGN5PSIxNiIgcj0iMTYiIGZpbGw9IiNBNTZFRkYiLz4KPG1hc2sgaWQ9InBhdGgtMi1vdXRzaWRlLTFfMTg1XzYiIG1hc2tVbml0cz0idXNlclNwYWNlT25Vc2UiIHg9IjQiIHk9IjQiIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgZmlsbD0iYmxhY2siPgo8cmVjdCBmaWxsPSJ3aGl0ZSIgeD0iNCIgeT0iNCIgd2lkdGg9IjI0IiBoZWlnaHQ9IjI0Ii8+CjxwYXRoIGZpbGwtcnVsZT0iZXZlbm9kZCIgY2xpcC1ydWxlPSJldmVub2RkIiBkPSJNMjAuMDEwNSAxMi4wOTg3QzE4LjQ5IDEwLjU4OTQgMTcuMTU5NCA4LjEwODE0IDE2LjE3OTkgNi4wMTEwM0MxNi4xNTIgNi4wMDQ1MSAxNi4xMTc2IDYgMTYuMDc5NCA2QzE2LjA0MTEgNiAxNi4wMDY2IDYuMDA0NTEgMTUuOTc4OCA2LjAxMTA0QzE0Ljk5OTQgOC4xMDgxNCAxMy42Njk3IDEwLjU4ODkgMTIuMTQ4MSAxMi4wOTgxQzEwLjYyNjkgMTMuNjA3MSA4LjEyNTY4IDE0LjkyNjQgNi4wMTE1NyAxNS44OTgxQzYuMDA0NzQgMTUuOTI2MSA2IDE1Ljk2MTEgNiAxNkM2IDE2LjAzODcgNi4wMDQ2OCAxNi4wNzM2IDYuMDExNDQgMTYuMTAxNEM4LjEyNTE5IDE3LjA3MjkgMTAuNjI2MiAxOC4zOTE5IDEyLjE0NzcgMTkuOTAxNkMxMy42Njk3IDIxLjQxMDcgMTQuOTk5NiAyMy44OTIgMTUuOTc5MSAyNS45ODlDMTYuMDA2OCAyNS45OTU2IDE2LjA0MTEgMjYgMTYuMDc5MyAyNkMxNi4xMTc1IDI2IDE2LjE1MTkgMjUuOTk1NCAxNi4xNzk2IDI1Ljk4OUMxNy4xNTkxIDIzLjg5MiAxOC40ODg4IDIxLjQxMSAyMC4wMDk5IDE5LjkwMjFNMjAuMDA5OSAxOS45MDIxQzIxLjUyNTMgMTguMzk4NyAyMy45NDY1IDE3LjA2NjkgMjUuOTkxNSAxNi4wODI0QzI1Ljk5NjUgMTYuMDU5MyAyNiAxNi4wMzEgMjYgMTUuOTk5N0MyNiAxNS45Njg0IDI1Ljk5NjUgMTUuOTQwMyAyNS45OTE1IDE1LjkxNzFDMjMuOTQ3NCAxNC45MzI3IDIxLjUyNTkgMTMuNjAxIDIwLjAxMDUgMTIuMDk4NyIvPgo8L21hc2s+CjxwYXRoIGZpbGwtcnVsZT0iZXZlbm9kZCIgY2xpcC1ydWxlPSJldmVub2RkIiBkPSJNMjAuMDEwNSAxMi4wOTg3QzE4LjQ5IDEwLjU4OTQgMTcuMTU5NCA4LjEwODE0IDE2LjE3OTkgNi4wMTEwM0MxNi4xNTIgNi4wMDQ1MSAxNi4xMTc2IDYgMTYuMDc5NCA2QzE2LjA0MTEgNiAxNi4wMDY2IDYuMDA0NTEgMTUuOTc4OCA2LjAxMTA0QzE0Ljk5OTQgOC4xMDgxNCAxMy42Njk3IDEwLjU4ODkgMTIuMTQ4MSAxMi4wOTgxQzEwLjYyNjkgMTMuNjA3MSA4LjEyNTY4IDE0LjkyNjQgNi4wMTE1NyAxNS44OTgxQzYuMDA0NzQgMTUuOTI2MSA2IDE1Ljk2MTEgNiAxNkM2IDE2LjAzODcgNi4wMDQ2OCAxNi4wNzM2IDYuMDExNDQgMTYuMTAxNEM4LjEyNTE5IDE3LjA3MjkgMTAuNjI2MiAxOC4zOTE5IDEyLjE0NzcgMTkuOTAxNkMxMy42Njk3IDIxLjQxMDcgMTQuOTk5NiAyMy44OTIgMTUuOTc5MSAyNS45ODlDMTYuMDA2OCAyNS45OTU2IDE2LjA0MTEgMjYgMTYuMDc5MyAyNkMxNi4xMTc1IDI2IDE2LjE1MTkgMjUuOTk1NCAxNi4xNzk2IDI1Ljk4OUMxNy4xNTkxIDIzLjg5MiAxOC40ODg4IDIxLjQxMSAyMC4wMDk5IDE5LjkwMjFNMjAuMDA5OSAxOS45MDIxQzIxLjUyNTMgMTguMzk4NyAyMy45NDY1IDE3LjA2NjkgMjUuOTkxNSAxNi4wODI0QzI1Ljk5NjUgMTYuMDU5MyAyNiAxNi4wMzEgMjYgMTUuOTk5N0MyNiAxNS45Njg0IDI1Ljk5NjUgMTUuOTQwMyAyNS45OTE1IDE1LjkxNzFDMjMuOTQ3NCAxNC45MzI3IDIxLjUyNTkgMTMuNjAxIDIwLjAxMDUgMTIuMDk4NyIgZmlsbD0id2hpdGUiLz4KPHBhdGggZmlsbC1ydWxlPSJldmVub2RkIiBjbGlwLXJ1bGU9ImV2ZW5vZGQiIGQ9Ik0yMC4wMTA1IDEyLjA5ODdDMTguNDkgMTAuNTg5NCAxNy4xNTk0IDguMTA4MTQgMTYuMTc5OSA2LjAxMTAzQzE2LjE1MiA2LjAwNDUxIDE2LjExNzYgNiAxNi4wNzk0IDZDMTYuMDQxMSA2IDE2LjAwNjYgNi4wMDQ1MSAxNS45Nzg4IDYuMDExMDRDMTQuOTk5NCA4LjEwODE0IDEzLjY2OTcgMTAuNTg4OSAxMi4xNDgxIDEyLjA5ODFDMTAuNjI2OSAxMy42MDcxIDguMTI1NjggMTQuOTI2NCA2LjAxMTU3IDE1Ljg5ODFDNi4wMDQ3NCAxNS45MjYxIDYgMTUuOTYxMSA2IDE2QzYgMTYuMDM4NyA2LjAwNDY4IDE2LjA3MzYgNi4wMTE0NCAxNi4xMDE0QzguMTI1MTkgMTcuMDcyOSAxMC42MjYyIDE4LjM5MTkgMTIuMTQ3NyAxOS45MDE2QzEzLjY2OTcgMjEuNDEwNyAxNC45OTk2IDIzLjg5MiAxNS45NzkxIDI1Ljk4OUMxNi4wMDY4IDI1Ljk5NTYgMTYuMDQxMSAyNiAxNi4wNzkzIDI2QzE2LjExNzUgMjYgMTYuMTUxOSAyNS45OTU0IDE2LjE3OTYgMjUuOTg5QzE3LjE1OTEgMjMuODkyIDE4LjQ4ODggMjEuNDExIDIwLjAwOTkgMTkuOTAyMU0yMC4wMDk5IDE5LjkwMjFDMjEuNTI1MyAxOC4zOTg3IDIzLjk0NjUgMTcuMDY2OSAyNS45OTE1IDE2LjA4MjRDMjUuOTk2NSAxNi4wNTkzIDI2IDE2LjAzMSAyNiAxNS45OTk3QzI2IDE1Ljk2ODQgMjUuOTk2NSAxNS45NDAzIDI1Ljk5MTUgMTUuOTE3MUMyMy45NDc0IDE0LjkzMjcgMjEuNTI1OSAxMy42MDEgMjAuMDEwNSAxMi4wOTg3IiBzdHJva2U9IiM0OTFEOEIiIHN0cm9rZS13aWR0aD0iNCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIgbWFzaz0idXJsKCNwYXRoLTItb3V0c2lkZS0xXzE4NV82KSIvPgo8L3N2Zz4K">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="io.camunda.agenticai:aiagent-job-worker:1" retries="3" />
+        <zeebe:ioMapping>
+          <zeebe:input source="bedrock" target="provider.type" />
+          <zeebe:input source="us-east-1" target="provider.bedrock.region" />
+          <zeebe:input source="credentials" target="provider.bedrock.authentication.type" />
+          <zeebe:input source="{{secrets.PDP_CAMUNDAAGENT_AWS_ACCESS_KEY}}" target="provider.bedrock.authentication.accessKey" />
+          <zeebe:input source="{{secrets.PDP_CAMUNDAAGENT_AWS_SECRET_KEY}}" target="provider.bedrock.authentication.secretKey" />
+          <zeebe:input source="anthropic.claude-3-5-sonnet-20240620-v1:0" target="provider.bedrock.model.model" />
+          <zeebe:input source="=&#34;You are an experienced Product Manager reviewing a newly submitted product note which contains Feature Request details. Your goal is to analyze the new note in the context of existing notes and planned features, assign a responsible owner, and identify missing information.&#10;&#10;You receive the following inputs:&#10;&#10;newNote: an object describing the newly submitted product note, including at least:&#10;&#10;title: short title of the newNote&#10;&#10;content: detailed description of the newNote&#10;&#10;web: URL linking to the newNote in the product tool&#10;&#10;notes: a list of customer ideas/notes. Each item has:&#10;&#10;title: short title of the item&#10;&#10;content: detailed description of the item&#10;&#10;web: URL to the related topic&#10;&#10;owner: the responsible contact for this item (can be empty)&#10;&#10;features: a list of already validated and planned items. Each item has:&#10;&#10;title: short title of the item&#10;&#10;content: detailed description of the item&#10;&#10;web: URL to the related topic&#10;&#10;owner: the responsible contact for this item (can be empty)&#10;&#10;pms: a JSON array of Product Manager contacts. Each item has:&#10;&#10;name: full name of the PM&#10;&#10;topic: a short description of their responsibility area(s)&#10;&#10;email: their email address&#10;&#10;slack_user_id: their Slack user id used for tagging&#10;&#10;Important distinctions:&#10;&#10;notes are ideas from customers that are not yet validated or planned&#10;&#10;features are items that are already validated and planned&#10;&#10;Matching responsible PM rules:&#10;&#10;If you find at least one similar or duplicate note or feature:&#10;&#10;Check whether that item has an owner field set (non-empty).&#10;&#10;Try to match this owner to a PM in pms by comparing the owner name with name case-insensitively, or by matching emails if available.&#10;&#10;If a matching PM is found in pms, use this PM as the responsible person, even if another PM might also fit by responsibility topic.&#10;&#10;If no suitable owner match is found in the similar items:&#10;&#10;Choose the best fitting PM from pms based on the newNote’s main topic and the topic fields in pms.&#10;&#10;When you mention the responsible person in the final Slack message, tag them using their slack_user_id in Slack mention format.&#10;&#10;Your tasks:&#10;&#10;Find similar or duplicate items&#10;&#10;Compare the newNote against all items in both notes and features.&#10;&#10;Identify items that are:&#10;&#10;the same as the newNote (duplicate), or&#10;&#10;substantially similar or overlapping (same problem, user need, or solution, even if phrased differently)&#10;&#10;Consider similarity based on:&#10;&#10;problem or use case&#10;&#10;target user or persona&#10;&#10;proposed solution or behavior&#10;&#10;domain or topic suggested by the web URL, if helpful&#10;&#10;For each match, determine:&#10;&#10;whether it is a duplicate or similar&#10;&#10;whether it comes from notes or features&#10;&#10;the item title and web URL&#10;&#10;a brief internal explanation of why it is considered a duplicate or similar&#10;&#10;If you find no similar or duplicate items, you must clearly indicate that none were found in the final Slack message.&#10;&#10;Assign a responsible person (PM)&#10;&#10;Using the rules above:&#10;&#10;If any similar or duplicate note or feature has an owner that can be matched to an entry in pms, select that PM as the responsible person.&#10;&#10;Otherwise, select exactly one PM from pms whose topic best fits the newNote’s main theme.&#10;&#10;In the final Slack message, show the responsible PM as a Slack mention using their slack_user_id.&#10;&#10;Identify missing information&#10;&#10;Identify important gaps in the newNote description that prevent proper evaluation, scoping, or confident ownership assignment.&#10;&#10;Possible missing aspects can include:&#10;&#10;clear problem statement or user pain&#10;&#10;target user or persona&#10;&#10;expected outcome or success criteria&#10;&#10;dependencies on other features or systems&#10;&#10;constraints, scale, or performance requirements&#10;&#10;ambiguous terminology or unclear scope&#10;&#10;Think about these missing pieces, but in the final Slack message reflect them only in a concise, action-oriented way under the Action section. If nothing important appears to be missing, you can omit mentioning missing information explicitly.&#10;&#10;Output format (Slack markdown):&#10;&#10;The final answer must be a single Slack message.&#10;&#10;Do not return JSON.&#10;&#10;Do not wrap the response in a code block.&#10;&#10;Use Slack markdown.&#10;&#10;Use Slack link syntax.&#10;&#10;All section headers must be bold in Slack.&#10;&#10;Use the following structure and order exactly:&#10;&#10;New note submitted&#10;&#10;{newNote title}&#10;&#10;{newNote.web as Slack link}&#10;&#10;Similar ideas found:&#10;&#10;If one or more similar or duplicate items are found:&#10;&#10;{item title} + {item.web as Slack link}&#10;&#10;If no similar or duplicate items are found:&#10;&#10;None&#10;&#10;Submitted by&#10;&#10;{company}+{user_name}&#10;&#10;Suggested PM&#10;&#10;{Slack mention of the chosen PM}&#10;&#10;Action&#10;&#10;Consider changing assignee&#10;&#10;Mark the note as processed&#10;&#10;Suggestion to link the note to:&#10;&#10;If relevant to an existing planned feature:&#10;&#10;{feature title} + {feature.web as Slack link}&#10;&#10;If not relevant to a planned feature but relevant for the PM backlog:&#10;&#10;link to the PM backlog&#10;&#10;If not relevant for the backlog either:&#10;&#10;link to the rejected Productboard feature placeholder&#10;&#10;Optionally add one or two short hints if important information is missing&#10;&#10;Tool actions:&#10;&#10;After identifying the responsible PM, use the available tool to assign this PM as the assignee of the newNote.&#10;&#10;After generating the Slack-formatted message, use the appropriate tool to post this message to the designated Slack channel.&#34;" target="data.systemPrompt.prompt" />
+          <zeebe:input source="={&#10;  pms: pms,&#10;  notes: notes,&#10;  featurers: features,&#10;  newNote: newNote,&#10;  company: company,&#10;  user: user&#10;}" target="data.userPrompt.prompt" />
+          <zeebe:input target="agentContext" />
+          <zeebe:input source="in-process" target="data.memory.storage.type" />
+          <zeebe:input source="=20" target="data.memory.contextWindowSize" />
+          <zeebe:input source="=10" target="data.limits.maxModelCalls" />
+          <zeebe:input source="WAIT_FOR_TOOL_CALL_RESULTS" target="data.events.behavior" />
+          <zeebe:input source="text" target="data.response.format.type" />
+          <zeebe:input source="=false" target="data.response.format.parseJson" />
+          <zeebe:input source="=false" target="data.response.includeAssistantMessage" />
+          <zeebe:input source="=false" target="data.response.includeAgentContext" />
+          <zeebe:output source="=agent" target="agent" />
+        </zeebe:ioMapping>
+        <zeebe:taskHeaders>
+          <zeebe:header key="elementTemplateVersion" value="5" />
+          <zeebe:header key="elementTemplateId" value="io.camunda.connectors.agenticai.aiagent.jobworker.v1" />
+          <zeebe:header key="retryBackoff" value="PT0S" />
+        </zeebe:taskHeaders>
+        <zeebe:adHoc outputCollection="toolCallResults" outputElement="={&#10;  id: toolCall._meta.id,&#10;  name: toolCall._meta.name,&#10;  content: toolCallResult&#10;}" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_0fxvhw2</bpmn:incoming>
+      <bpmn:outgoing>Flow_19oql0c</bpmn:outgoing>
+      <bpmn:serviceTask id="Activity_1sfpkg7" name="Assign responsible PM to new note" zeebe:modelerTemplate="io.camunda.connectors.HttpJson.v2" zeebe:modelerTemplateVersion="12" zeebe:modelerTemplateIcon="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTgiIGhlaWdodD0iMTgiIHZpZXdCb3g9IjAgMCAxOCAxOCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTE3LjAzMzUgOC45OTk5N0MxNy4wMzM1IDEzLjQ0NzUgMTMuNDI4MSAxNy4wNTI5IDguOTgwNjUgMTcuMDUyOUM0LjUzMzE2IDE3LjA1MjkgMC45Mjc3NjUgMTMuNDQ3NSAwLjkyNzc2NSA4Ljk5OTk3QzAuOTI3NzY1IDQuNTUyNDggNC41MzMxNiAwLjk0NzA4MyA4Ljk4MDY1IDAuOTQ3MDgzQzEzLjQyODEgMC45NDcwODMgMTcuMDMzNSA0LjU1MjQ4IDE3LjAzMzUgOC45OTk5N1oiIGZpbGw9IiM1MDU1NjIiLz4KPHBhdGggZD0iTTQuOTMxMjYgMTQuMTU3MUw2Ljc4MTA2IDMuNzE0NzFIMTAuMTM3NUMxMS4xOTE3IDMuNzE0NzEgMTEuOTgyNCAzLjk4MzIzIDEyLjUwOTUgNC41MjAyN0MxMy4wNDY1IDUuMDQ3MzYgMTMuMzE1IDUuNzMzNTggMTMuMzE1IDYuNTc4OTJDMTMuMzE1IDcuNDQ0MTQgMTMuMDcxNCA4LjE1NTIyIDEyLjU4NDEgOC43MTIxNUMxMi4xMDY3IDkuMjU5MTMgMTEuNDU1MyA5LjYzNzA1IDEwLjYyOTggOS44NDU5TDEyLjA2MTkgMTQuMTU3MUgxMC4zMzE1TDkuMDMzNjQgMTAuMDI0OUg3LjI0MzUxTDYuNTEyNTQgMTQuMTU3MUg0LjkzMTI2Wk03LjQ5NzExIDguNTkyODFIOS4yNDI0OEM5Ljk5ODMyIDguNTkyODEgMTAuNTkwMSA4LjQyMzc0IDExLjAxNzcgOC4wODU2MUMxMS40NTUzIDcuNzM3NTMgMTEuNjc0MSA3LjI2NTEzIDExLjY3NDEgNi42Njg0MkMxMS42NzQxIDYuMTkxMDYgMTEuNTI0OSA1LjgxODExIDExLjIyNjUgNS41NDk1OUMxMC45MjgyIDUuMjcxMTMgMTAuNDU1OCA1LjEzMTkgOS44MDkzNiA1LjEzMTlIOC4xMDg3NEw3LjQ5NzExIDguNTkyODFaIiBmaWxsPSJ3aGl0ZSIvPgo8L3N2Zz4K">
+        <bpmn:extensionElements>
+          <zeebe:taskDefinition type="io.camunda:http-json:1" retries="3" />
+          <zeebe:ioMapping>
+            <zeebe:input source="bearer" target="authentication.type" />
+            <zeebe:input source="{{secrets.PDP_PRODUCT_BOARD}}" target="authentication.token" />
+            <zeebe:input source="PATCH" target="method" />
+            <zeebe:input source="=&#34;https://api.productboard.com/notes/&#34; + newNote.id" target="url" />
+            <zeebe:input source="={&#10;  &#34;accept&#34;: &#34;application/json&#34;&#10;}" target="headers" />
+            <zeebe:input source="=false" target="storeResponse" />
+            <zeebe:input source="=20" target="connectionTimeoutInSeconds" />
+            <zeebe:input source="=20" target="readTimeoutInSeconds" />
+            <zeebe:input source="={&#10;  data: {&#10;    owner: {&#10;      email: fromAi(toolCall.suggestedPM, &#34;The email of the suggested responsible PM&#34;, &#34;string&#34;)&#10;    }&#10;  }&#10;}" target="body" />
+            <zeebe:input source="=false" target="ignoreNullValues" />
+          </zeebe:ioMapping>
+          <zeebe:taskHeaders>
+            <zeebe:header key="elementTemplateVersion" value="12" />
+            <zeebe:header key="elementTemplateId" value="io.camunda.connectors.HttpJson.v2" />
+            <zeebe:header key="resultVariable" value="noteAssignment" />
+            <zeebe:header key="errorExpression" value="=null" />
+            <zeebe:header key="retryBackoff" value="PT0S" />
+          </zeebe:taskHeaders>
+        </bpmn:extensionElements>
+      </bpmn:serviceTask>
+      <bpmn:serviceTask id="Activity_0v9d62k" name="Post review to slack channel" zeebe:modelerTemplate="04d4114d-0202-4107-8c5e-a1acc66387f9" zeebe:modelerTemplateVersion="1730992012092" zeebe:modelerTemplateIcon="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTI3IiBoZWlnaHQ9IjEyNyIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cGF0aCBkPSJNMjcuMiA4MGMwIDcuMy01LjkgMTMuMi0xMy4yIDEzLjJDNi43IDkzLjIuOCA4Ny4zLjggODBjMC03LjMgNS45LTEzLjIgMTMuMi0xMy4yaDEzLjJWODB6bTYuNiAwYzAtNy4zIDUuOS0xMy4yIDEzLjItMTMuMiA3LjMgMCAxMy4yIDUuOSAxMy4yIDEzLjJ2MzNjMCA3LjMtNS45IDEzLjItMTMuMiAxMy4yLTcuMyAwLTEzLjItNS45LTEzLjItMTMuMlY4MHoiIGZpbGw9IiNFMDFFNUEiLz4KICA8cGF0aCBkPSJNNDcgMjdjLTcuMyAwLTEzLjItNS45LTEzLjItMTMuMkMzMy44IDYuNSAzOS43LjYgNDcgLjZjNy4zIDAgMTMuMiA1LjkgMTMuMiAxMy4yVjI3SDQ3em0wIDYuN2M3LjMgMCAxMy4yIDUuOSAxMy4yIDEzLjIgMCA3LjMtNS45IDEzLjItMTMuMiAxMy4ySDEzLjlDNi42IDYwLjEuNyA1NC4yLjcgNDYuOWMwLTcuMyA1LjktMTMuMiAxMy4yLTEzLjJINDd6IiBmaWxsPSIjMzZDNUYwIi8+CiAgPHBhdGggZD0iTTk5LjkgNDYuOWMwLTcuMyA1LjktMTMuMiAxMy4yLTEzLjIgNy4zIDAgMTMuMiA1LjkgMTMuMiAxMy4yIDAgNy4zLTUuOSAxMy4yLTEzLjIgMTMuMkg5OS45VjQ2Ljl6bS02LjYgMGMwIDcuMy01LjkgMTMuMi0xMy4yIDEzLjItNy4zIDAtMTMuMi01LjktMTMuMi0xMy4yVjEzLjhDNjYuOSA2LjUgNzIuOC42IDgwLjEuNmM3LjMgMCAxMy4yIDUuOSAxMy4yIDEzLjJ2MzMuMXoiIGZpbGw9IiMyRUI2N0QiLz4KICA8cGF0aCBkPSJNODAuMSA5OS44YzcuMyAwIDEzLjIgNS45IDEzLjIgMTMuMiAwIDcuMy01LjkgMTMuMi0xMy4yIDEzLjItNy4zIDAtMTMuMi01LjktMTMuMi0xMy4yVjk5LjhoMTMuMnptMC02LjZjLTcuMyAwLTEzLjItNS45LTEzLjItMTMuMiAwLTcuMyA1LjktMTMuMiAxMy4yLTEzLjJoMzMuMWM3LjMgMCAxMy4yIDUuOSAxMy4yIDEzLjIgMCA3LjMtNS45IDEzLjItMTMuMiAxMy4ySDgwLjF6IiBmaWxsPSIjRUNCMjJFIi8+Cjwvc3ZnPgo=">
+        <bpmn:extensionElements>
+          <zeebe:taskDefinition type="io.camunda:slack:1" retries="3" />
+          <zeebe:ioMapping>
+            <zeebe:input source="{{secrets.PDP_SLACK_CAMUNDA}}" target="token" />
+            <zeebe:input source="chat.postMessage" target="method" />
+            <zeebe:input source="messageBlock" target="data.messageType" />
+            <zeebe:input source="=[&#10;	{&#10;			&#34;type&#34;: &#34;section&#34;,&#10;			&#34;text&#34;: {&#10;				&#34;type&#34;: &#34;mrkdwn&#34;,&#10;				&#34;text&#34;: fromAi(toolCall.slackAnswer, &#34;The slack markdown that was prepared after the analysis&#34;)&#10;			}&#10;		}&#10;]" target="data.blockContent" />
+            <zeebe:input source="=&#34;C0ACC04PVP0&#34;" target="data.channel" />
+          </zeebe:ioMapping>
+          <zeebe:taskHeaders>
+            <zeebe:header key="retryBackoff" value="PT0S" />
+          </zeebe:taskHeaders>
+        </bpmn:extensionElements>
+      </bpmn:serviceTask>
+    </bpmn:adHocSubProcess>
+    <bpmn:sequenceFlow id="Flow_0fxvhw2" sourceRef="Activity_1uy9kvn" targetRef="Activity_1pft81d" />
+    <bpmn:sequenceFlow id="Flow_19oql0c" sourceRef="Activity_1pft81d" targetRef="Event_0gun2jc" />
+  </bpmn:process>
+  <bpmn:message id="Message_02rx26p" name="d7443b90-4995-46e9-991c-d90b085eb2ae" zeebe:modelerTemplate="io.camunda.connectors.webhook.WebhookConnectorStartMessage.v1" />
+  <bpmndi:BPMNDiagram id="BPMNDiagram_1">
+    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="Process_0ouiedg">
+      <bpmndi:BPMNShape id="Event_0uxgdre_di" bpmnElement="StartEvent_1">
+        <dc:Bounds x="142" y="100" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="143" y="143" width="35" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_0gun2jc_di" bpmnElement="Event_0gun2jc">
+        <dc:Bounds x="2952" y="100" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_1u6racs_di" bpmnElement="Gateway_0l0cwlw">
+        <dc:Bounds x="815" y="93" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_1nqb47f_di" bpmnElement="Gateway_1ccpblt">
+        <dc:Bounds x="1325" y="93" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_1jnci6i_di" bpmnElement="Activity_1h7415w">
+        <dc:Bounds x="1030" y="-30" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="BPMNShape_1g1e5po" bpmnElement="Activity_0f8xnpr">
+        <dc:Bounds x="1030" y="180" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_0raxkbi_di" bpmnElement="Activity_0o2ra2b">
+        <dc:Bounds x="2410" y="-170" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_154peh7_di" bpmnElement="Activity_10vkij6">
+        <dc:Bounds x="2600" y="-170" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_1xd2ut4_di" bpmnElement="Gateway_1xd2ut4" isMarkerVisible="true">
+        <dc:Bounds x="275" y="93" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="287" y="63" width="27" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_1eci49c_di" bpmnElement="Event_1eci49c">
+        <dc:Bounds x="362" y="372" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_065j8c0_di" bpmnElement="Event_03tzjr7">
+        <dc:Bounds x="392" y="100" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="367" y="143" width="88" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="BPMNShape_1rrzyjm" bpmnElement="Activity_0ijhb6l">
+        <dc:Bounds x="510" y="78" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_0wuxqen_di" bpmnElement="Gateway_0wuxqen" isMarkerVisible="true">
+        <dc:Bounds x="665" y="93" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="676" y="63" width="29" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_01b9nwp_di" bpmnElement="Event_01b9nwp">
+        <dc:Bounds x="742" y="372" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_1nbs9dn_di" bpmnElement="Activity_1uy9kvn">
+        <dc:Bounds x="2100" y="78" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_0kl0k40_di" bpmnElement="Gateway_1cjq6ee">
+        <dc:Bounds x="1405" y="93" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_0ygrrbu_di" bpmnElement="Gateway_0xc29hu">
+        <dc:Bounds x="1945" y="93" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="BPMNShape_0jf659i" bpmnElement="Gateway_02r9qh8" isMarkerVisible="true">
+        <dc:Bounds x="1485" y="-15" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="BPMNShape_09h4i9q" bpmnElement="Gateway_1jktycy" isMarkerVisible="true">
+        <dc:Bounds x="1855" y="-15" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="BPMNShape_1hsmhms" bpmnElement="Activity_1nsogqd">
+        <dc:Bounds x="1640" y="-30" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="BPMNShape_1efnfwf" bpmnElement="Gateway_0k5lr6c" isMarkerVisible="true">
+        <dc:Bounds x="1485" y="285" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="BPMNShape_0b0uw3t" bpmnElement="Gateway_0u65iud" isMarkerVisible="true">
+        <dc:Bounds x="1855" y="285" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="BPMNShape_1dfc83p" bpmnElement="Activity_0fsam5t">
+        <dc:Bounds x="1640" y="270" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_0czkseu_di" bpmnElement="Activity_1pft81d" isExpanded="true">
+        <dc:Bounds x="2290" y="-27" width="420" height="290" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="BPMNShape_0n8m9sh" bpmnElement="Activity_1sfpkg7">
+        <dc:Bounds x="2360" y="110" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="BPMNShape_0umq7s4" bpmnElement="Activity_0v9d62k">
+        <dc:Bounds x="2530" y="110" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_0qtnwxp_di" bpmnElement="Event_16xyj1i">
+        <dc:Bounds x="1722" y="32" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_0cxawgv_di" bpmnElement="Event_1klgljj">
+        <dc:Bounds x="1722" y="332" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_0uhivv4_di" bpmnElement="Flow_0uhivv4">
+        <di:waypoint x="178" y="118" />
+        <di:waypoint x="275" y="118" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_1vsfov8_di" bpmnElement="Flow_1vsfov8">
+        <di:waypoint x="840" y="93" />
+        <di:waypoint x="840" y="10" />
+        <di:waypoint x="1030" y="10" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_1dhbhdi_di" bpmnElement="Flow_1dhbhdi">
+        <di:waypoint x="1375" y="118" />
+        <di:waypoint x="1405" y="118" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_1xb5886_di" bpmnElement="Flow_1xb5886">
+        <di:waypoint x="1130" y="10" />
+        <di:waypoint x="1350" y="10" />
+        <di:waypoint x="1350" y="93" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_0dzaa3m_di" bpmnElement="Flow_0dzaa3m">
+        <di:waypoint x="840" y="143" />
+        <di:waypoint x="840" y="220" />
+        <di:waypoint x="1030" y="220" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_1jo1lng_di" bpmnElement="Flow_1jo1lng">
+        <di:waypoint x="1130" y="220" />
+        <di:waypoint x="1350" y="220" />
+        <di:waypoint x="1350" y="143" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_0fi7dxj_di" bpmnElement="Flow_0fi7dxj">
+        <di:waypoint x="325" y="118" />
+        <di:waypoint x="392" y="118" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_1id3z2o_di" bpmnElement="Flow_1id3z2o">
+        <di:waypoint x="300" y="143" />
+        <di:waypoint x="300" y="390" />
+        <di:waypoint x="362" y="390" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_065y8kw_di" bpmnElement="Flow_065y8kw">
+        <di:waypoint x="428" y="118" />
+        <di:waypoint x="510" y="118" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_0mpxzn7_di" bpmnElement="Flow_0mpxzn7">
+        <di:waypoint x="610" y="118" />
+        <di:waypoint x="665" y="118" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_19h01an_di" bpmnElement="Flow_19h01an">
+        <di:waypoint x="715" y="118" />
+        <di:waypoint x="815" y="118" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="755" y="100" width="23" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_0uj6a32_di" bpmnElement="Flow_0uj6a32">
+        <di:waypoint x="690" y="143" />
+        <di:waypoint x="690" y="390" />
+        <di:waypoint x="742" y="390" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="696" y="264" width="19" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_0w1mmyx_di" bpmnElement="Flow_0w1mmyx">
+        <di:waypoint x="1995" y="118" />
+        <di:waypoint x="2100" y="118" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="BPMNEdge_0ta435q" bpmnElement="Flow_1uloclt">
+        <di:waypoint x="1535" y="10" />
+        <di:waypoint x="1640" y="10" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="BPMNEdge_0860llc" bpmnElement="Flow_1pjou4u">
+        <di:waypoint x="1510" y="-15" />
+        <di:waypoint x="1510" y="-80" />
+        <di:waypoint x="1880" y="-80" />
+        <di:waypoint x="1880" y="-15" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="BPMNEdge_1l6v42f" bpmnElement="Flow_0tdx03m">
+        <di:waypoint x="1740" y="10" />
+        <di:waypoint x="1855" y="10" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="BPMNEdge_15fl5bi" bpmnElement="Flow_0ylfo3t">
+        <di:waypoint x="1535" y="310" />
+        <di:waypoint x="1640" y="310" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="BPMNEdge_156vkwr" bpmnElement="Flow_0o0ek82">
+        <di:waypoint x="1510" y="285" />
+        <di:waypoint x="1510" y="210" />
+        <di:waypoint x="1880" y="210" />
+        <di:waypoint x="1880" y="285" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="BPMNEdge_0uree67" bpmnElement="Flow_0w1iw8i">
+        <di:waypoint x="1740" y="310" />
+        <di:waypoint x="1855" y="310" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_0e0a3d6_di" bpmnElement="Flow_0e0a3d6">
+        <di:waypoint x="1430" y="93" />
+        <di:waypoint x="1430" y="10" />
+        <di:waypoint x="1485" y="10" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_1ft8o7y_di" bpmnElement="Flow_1ft8o7y">
+        <di:waypoint x="1430" y="143" />
+        <di:waypoint x="1430" y="310" />
+        <di:waypoint x="1485" y="310" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_0c0ki6b_di" bpmnElement="Flow_0c0ki6b">
+        <di:waypoint x="1905" y="10" />
+        <di:waypoint x="1970" y="10" />
+        <di:waypoint x="1970" y="93" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_11zpeog_di" bpmnElement="Flow_11zpeog">
+        <di:waypoint x="1905" y="310" />
+        <di:waypoint x="1970" y="310" />
+        <di:waypoint x="1970" y="143" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_19buhif_di" bpmnElement="Flow_19buhif">
+        <di:waypoint x="1758" y="350" />
+        <di:waypoint x="1880" y="350" />
+        <di:waypoint x="1880" y="335" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_1x1dbwz_di" bpmnElement="Flow_1x1dbwz">
+        <di:waypoint x="1758" y="50" />
+        <di:waypoint x="1880" y="50" />
+        <di:waypoint x="1880" y="35" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_0fxvhw2_di" bpmnElement="Flow_0fxvhw2">
+        <di:waypoint x="2200" y="118" />
+        <di:waypoint x="2290" y="118" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_19oql0c_di" bpmnElement="Flow_19oql0c">
+        <di:waypoint x="2710" y="118" />
+        <di:waypoint x="2952" y="118" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

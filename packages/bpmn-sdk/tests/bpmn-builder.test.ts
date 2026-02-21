@@ -902,11 +902,22 @@ describe("BpmnProcessBuilder", () => {
 					.build(),
 			);
 
+			// Auto-join inserts gw_join before end
+			const joinGw = process.flowElements.find((e) => e.id === "gw_join");
+			expect(joinGw).toBeDefined();
+			expect(joinGw?.type).toBe("exclusiveGateway");
+
 			const skipFlow = defined(
-				process.sequenceFlows.find((f) => f.sourceRef === "gw" && f.targetRef === "end"),
+				process.sequenceFlows.find((f) => f.sourceRef === "gw" && f.targetRef === "gw_join"),
 			);
 			expect(skipFlow.conditionExpression).toBeDefined();
 			expect(skipFlow.conditionExpression?.text).toBe("= skip");
+
+			// Verify join → end flow exists
+			const joinToEnd = process.sequenceFlows.find(
+				(f) => f.sourceRef === "gw_join" && f.targetRef === "end",
+			);
+			expect(joinToEnd).toBeDefined();
 		});
 	});
 
@@ -1542,6 +1553,275 @@ describe("BpmnProcessBuilder", () => {
 
 			// XML output is stable (idempotent serialization)
 			expect(xml2).toBe(xml1);
+		});
+	});
+
+	// -----------------------------------------------------------------------
+	// Message start event with root bpmn:message
+	// -----------------------------------------------------------------------
+
+	describe("message start event", () => {
+		it("creates a root bpmn:message element when messageName is provided on start event", () => {
+			const defs = Bpmn.createProcess("proc")
+				.startEvent("s", { name: "Webhook", messageName: "webhook-trigger" })
+				.endEvent("e")
+				.build();
+
+			expect(defs.messages).toHaveLength(1);
+			const msg = defs.messages[0];
+			expect(msg).toBeDefined();
+			expect(msg?.name).toBe("webhook-trigger");
+
+			const start = defs.processes[0]?.flowElements.find((n) => n.id === "s");
+			expect(start).toBeDefined();
+			if (start?.type === "startEvent") {
+				expect(start.eventDefinitions).toHaveLength(1);
+				const msgDef = start.eventDefinitions[0];
+				expect(msgDef?.type).toBe("message");
+				if (msgDef?.type === "message") {
+					expect(msgDef.messageRef).toBe(msg?.id);
+				}
+			}
+		});
+
+		it("supports zeebe:properties on start events", () => {
+			const defs = Bpmn.createProcess("proc")
+				.startEvent("s", {
+					name: "Trigger",
+					messageName: "wh-trigger",
+					zeebeProperties: [
+						{ name: "inbound.type", value: "io.camunda:webhook:1" },
+						{ name: "inbound.method", value: "any" },
+					],
+				})
+				.endEvent("e")
+				.build();
+
+			const start = defs.processes[0]?.flowElements.find((n) => n.id === "s");
+			expect(start).toBeDefined();
+			const propsExt = start?.extensionElements.find((e) => e.name === "zeebe:properties");
+			expect(propsExt).toBeDefined();
+			expect(propsExt?.children).toHaveLength(2);
+			expect(propsExt?.children[0]?.attributes.name).toBe("inbound.type");
+			expect(propsExt?.children[0]?.attributes.value).toBe("io.camunda:webhook:1");
+		});
+
+		it("supports modeler template attributes on start events", () => {
+			const defs = Bpmn.createProcess("proc")
+				.startEvent("s", {
+					name: "Trigger",
+					modelerTemplate: "io.camunda.connectors.webhook.v1",
+					modelerTemplateVersion: "13",
+				})
+				.endEvent("e")
+				.build();
+
+			const start = defs.processes[0]?.flowElements.find((n) => n.id === "s");
+			expect(start).toBeDefined();
+			expect(start?.unknownAttributes["zeebe:modelerTemplate"]).toBe(
+				"io.camunda.connectors.webhook.v1",
+			);
+			expect(start?.unknownAttributes["zeebe:modelerTemplateVersion"]).toBe("13");
+		});
+	});
+
+	// -----------------------------------------------------------------------
+	// Enhanced ad-hoc sub-process (agentic AI pattern)
+	// -----------------------------------------------------------------------
+
+	describe("ad-hoc sub-process (agentic AI)", () => {
+		it("creates an ad-hoc sub-process with taskDefinition, ioMapping, taskHeaders", () => {
+			const defs = Bpmn.createProcess("proc")
+				.startEvent("s")
+				.adHocSubProcess(
+					"agent",
+					(b) => {
+						b.serviceTask("tool1", { name: "Tool 1", taskType: "http:1" });
+						b.serviceTask("tool2", { name: "Tool 2", taskType: "slack:1" });
+					},
+					{
+						name: "AI Agent",
+						taskDefinition: { type: "io.camunda.agenticai:aiagent-job-worker:1", retries: "3" },
+						ioMapping: {
+							inputs: [
+								{ source: "bedrock", target: "provider.type" },
+								{ source: "us-east-1", target: "provider.bedrock.region" },
+							],
+							outputs: [{ source: "=agent", target: "agent" }],
+						},
+						taskHeaders: {
+							elementTemplateVersion: "5",
+							elementTemplateId: "io.camunda.connectors.agenticai.v1",
+						},
+						outputCollection: "toolCallResults",
+						outputElement: "={id: toolCall._meta.id, name: toolCall._meta.name}",
+					},
+				)
+				.endEvent("e")
+				.build();
+
+			const process = firstProcess(defs);
+			const agent = defined(process.flowElements.find((n) => n.id === "agent"));
+			expect(agent.type).toBe("adHocSubProcess");
+
+			// Check zeebe:taskDefinition
+			const taskDef = agent.extensionElements.find((e) => e.name === "zeebe:taskDefinition");
+			expect(taskDef).toBeDefined();
+			expect(taskDef?.attributes.type).toBe("io.camunda.agenticai:aiagent-job-worker:1");
+
+			// Check zeebe:ioMapping
+			const ioMapping = agent.extensionElements.find((e) => e.name === "zeebe:ioMapping");
+			expect(ioMapping).toBeDefined();
+			expect(ioMapping?.children.filter((c) => c.name === "zeebe:input")).toHaveLength(2);
+			expect(ioMapping?.children.filter((c) => c.name === "zeebe:output")).toHaveLength(1);
+
+			// Check zeebe:taskHeaders
+			const headers = agent.extensionElements.find((e) => e.name === "zeebe:taskHeaders");
+			expect(headers).toBeDefined();
+			expect(headers?.children).toHaveLength(2);
+
+			// Check zeebe:adHoc
+			const adHoc = agent.extensionElements.find((e) => e.name === "zeebe:adHoc");
+			expect(adHoc).toBeDefined();
+			expect(adHoc?.attributes.outputCollection).toBe("toolCallResults");
+			expect(adHoc?.attributes.outputElement).toBe(
+				"={id: toolCall._meta.id, name: toolCall._meta.name}",
+			);
+
+			// Check child elements
+			if (agent.type === "adHocSubProcess") {
+				expect(agent.flowElements).toHaveLength(2);
+			}
+		});
+
+		it("supports modeler template attributes on ad-hoc sub-process", () => {
+			const defs = Bpmn.createProcess("proc")
+				.startEvent("s")
+				.adHocSubProcess(
+					"agent",
+					(b) => {
+						b.serviceTask("tool1", { name: "Tool", taskType: "test:1" });
+					},
+					{
+						name: "Agent",
+						modelerTemplate: "io.camunda.connectors.agenticai.v1",
+						modelerTemplateVersion: "5",
+						modelerTemplateIcon: "data:image/svg+xml;base64,abc",
+					},
+				)
+				.endEvent("e")
+				.build();
+
+			const agent = defined(firstProcess(defs).flowElements.find((n) => n.id === "agent"));
+			expect(agent.unknownAttributes["zeebe:modelerTemplate"]).toBe(
+				"io.camunda.connectors.agenticai.v1",
+			);
+			expect(agent.unknownAttributes["zeebe:modelerTemplateVersion"]).toBe("5");
+			expect(agent.unknownAttributes["zeebe:modelerTemplateIcon"]).toBe(
+				"data:image/svg+xml;base64,abc",
+			);
+		});
+	});
+
+	// -----------------------------------------------------------------------
+	// zeebe:properties round-trip
+	// -----------------------------------------------------------------------
+
+	describe("zeebe:properties", () => {
+		it("round-trips zeebe:properties through export and parse", () => {
+			const defs = Bpmn.createProcess("proc")
+				.startEvent("s", {
+					name: "Webhook",
+					messageName: "wh-123",
+					zeebeProperties: [
+						{ name: "inbound.type", value: "io.camunda:webhook:1" },
+						{ name: "inbound.method", value: "POST" },
+					],
+				})
+				.endEvent("e")
+				.build();
+
+			const xml = Bpmn.export(defs);
+			const parsed = Bpmn.parse(xml);
+
+			// Message should round-trip
+			expect(parsed.messages).toHaveLength(1);
+			expect(parsed.messages[0]?.name).toBe("wh-123");
+
+			// zeebe:properties should round-trip
+			const start = parsed.processes[0]?.flowElements.find((n) => n.id === "s");
+			const propsExt = start?.extensionElements.find((e) => e.name === "zeebe:properties");
+			expect(propsExt).toBeDefined();
+			expect(propsExt?.children).toHaveLength(2);
+		});
+	});
+
+	// -----------------------------------------------------------------------
+	// Auto-join gateways
+	// -----------------------------------------------------------------------
+
+	describe("auto-join gateways", () => {
+		it("inserts a matching exclusive join gateway when branches converge", () => {
+			const process = firstProcess(
+				Bpmn.createProcess("proc")
+					.startEvent("s")
+					.exclusiveGateway("gw")
+					.branch("a", (b) =>
+						b.condition("= a").serviceTask("t1", { name: "A", taskType: "x" }).connectTo("end"),
+					)
+					.branch("b", (b) => b.defaultFlow().connectTo("end"))
+					.endEvent("end")
+					.build(),
+			);
+
+			const join = process.flowElements.find((e) => e.id === "gw_join");
+			expect(join).toBeDefined();
+			expect(join?.type).toBe("exclusiveGateway");
+
+			// Both branches should target the join
+			expect(
+				process.sequenceFlows.some((f) => f.sourceRef === "t1" && f.targetRef === "gw_join"),
+			).toBe(true);
+			expect(
+				process.sequenceFlows.some((f) => f.sourceRef === "gw" && f.targetRef === "gw_join"),
+			).toBe(true);
+
+			// Join should flow to end
+			expect(
+				process.sequenceFlows.some((f) => f.sourceRef === "gw_join" && f.targetRef === "end"),
+			).toBe(true);
+		});
+
+		it("does not insert a join if one already exists with matching type", () => {
+			const process = firstProcess(
+				Bpmn.createProcess("proc")
+					.startEvent("s")
+					.parallelGateway("split")
+					.branch("a", (b) => b.serviceTask("t1", { name: "A", taskType: "x" }).connectTo("join"))
+					.branch("b", (b) => b.serviceTask("t2", { name: "B", taskType: "y" }).connectTo("join"))
+					.parallelGateway("join")
+					.endEvent("end")
+					.build(),
+			);
+
+			// No auto-join should be created since "join" is already a parallelGateway
+			expect(process.flowElements.find((e) => e.id === "split_join")).toBeUndefined();
+		});
+
+		it("does not insert a join for early-return branches with different targets", () => {
+			const process = firstProcess(
+				Bpmn.createProcess("proc")
+					.startEvent("s")
+					.exclusiveGateway("gw")
+					.branch("err", (b) => b.condition("= err").endEvent("errEnd"))
+					.branch("ok", (b) => b.defaultFlow().connectTo("next"))
+					.serviceTask("next", { name: "Next", taskType: "x" })
+					.endEvent("end")
+					.build(),
+			);
+
+			// No auto-join needed since branches go to different targets
+			expect(process.flowElements.find((e) => e.id === "gw_join")).toBeUndefined();
 		});
 	});
 });

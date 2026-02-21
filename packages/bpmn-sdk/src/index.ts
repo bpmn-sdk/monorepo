@@ -48,6 +48,7 @@ export type {
 	BpmnParticipant,
 	BpmnError,
 	BpmnEscalation,
+	BpmnMessage,
 	BpmnTextAnnotation,
 	BpmnAssociation,
 	BpmnConditionExpression,
@@ -78,6 +79,8 @@ export type {
 	ZeebeIoMappingEntry,
 	ZeebeTaskHeaders,
 	ZeebeTaskHeaderEntry,
+	ZeebeProperties,
+	ZeebePropertyEntry,
 } from "./bpmn/zeebe-extensions.js";
 export { Dmn } from "./dmn/index.js";
 export { Form } from "./form/index.js";

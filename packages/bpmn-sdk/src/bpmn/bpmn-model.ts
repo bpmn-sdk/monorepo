@@ -349,6 +349,12 @@ export interface BpmnEscalation {
 	escalationCode?: string;
 }
 
+export interface BpmnMessage {
+	id: string;
+	name?: string;
+	unknownAttributes: Record<string, string>;
+}
+
 // ---------------------------------------------------------------------------
 // Diagram interchange
 // ---------------------------------------------------------------------------
@@ -402,6 +408,7 @@ export interface BpmnDefinitions {
 	unknownAttributes: Record<string, string>;
 	errors: BpmnError[];
 	escalations: BpmnEscalation[];
+	messages: BpmnMessage[];
 	collaborations: BpmnCollaboration[];
 	processes: BpmnProcess[];
 	diagrams: BpmnDiagram[];

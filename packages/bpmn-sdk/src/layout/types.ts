@@ -68,6 +68,8 @@ export interface LayoutNode {
 	label?: string;
 	/** Label bounds for overlap checking. */
 	labelBounds?: Bounds;
+	/** Whether this node is an expanded sub-process container. */
+	isExpanded?: boolean;
 }
 
 /** A routed edge in the layout. */

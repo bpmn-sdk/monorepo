@@ -13,6 +13,7 @@ import type {
 	BpmnEscalation,
 	BpmnEventDefinition,
 	BpmnFlowElement,
+	BpmnMessage,
 	BpmnMultiInstanceLoopCharacteristics,
 	BpmnParticipant,
 	BpmnProcess,
@@ -371,6 +372,12 @@ function serializeEscalation(e: BpmnEscalation, bp: string): XmlElement {
 	return el(`${bp}:escalation`, attrs, []);
 }
 
+function serializeMessage(m: BpmnMessage, bp: string): XmlElement {
+	const attrs: Record<string, string> = { id: m.id, ...m.unknownAttributes };
+	if (m.name !== undefined) attrs.name = m.name;
+	return el(`${bp}:message`, attrs, []);
+}
+
 // ---------------------------------------------------------------------------
 // Diagram interchange
 // ---------------------------------------------------------------------------
@@ -510,12 +517,15 @@ export function serializeBpmn(definitions: BpmnDefinitions): string {
 
 	const children: XmlElement[] = [];
 
-	// Root elements: errors, escalations first
+	// Root elements: errors, escalations, messages first
 	for (const e of definitions.escalations) {
 		children.push(serializeEscalation(e, bp));
 	}
 	for (const e of definitions.errors) {
 		children.push(serializeError(e, bp));
+	}
+	for (const m of definitions.messages) {
+		children.push(serializeMessage(m, bp));
 	}
 
 	// Collaborations

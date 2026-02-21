@@ -52,8 +52,13 @@ export function layoutSubProcesses(
 		const contentHeight = maxY - minY;
 
 		// Size the sub-process to fit content with padding
+		const originalCenterY = layoutNode.bounds.y + layoutNode.bounds.height / 2;
 		layoutNode.bounds.width = contentWidth + SUBPROCESS_PADDING * 2;
 		layoutNode.bounds.height = contentHeight + SUBPROCESS_PADDING * 2;
+		layoutNode.isExpanded = true;
+
+		// Re-center vertically on the original baseline position
+		layoutNode.bounds.y = originalCenterY - layoutNode.bounds.height / 2;
 
 		// Translate child coordinates into parent space
 		const offsetX = layoutNode.bounds.x + SUBPROCESS_PADDING - minX;

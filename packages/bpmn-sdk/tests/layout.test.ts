@@ -760,7 +760,7 @@ describe("Layout engine (integration)", () => {
 		expect(gwNode.labelBounds?.y).toBeLessThan(gwNode.bounds.y);
 	});
 
-	it("lays out a sub-process as collapsed (same size as a task)", () => {
+	it("lays out a sub-process expanded with children inside", () => {
 		const subprocess = node("sub", "adHocSubProcess") as BpmnFlowElement & {
 			flowElements: BpmnFlowElement[];
 			sequenceFlows: BpmnSequenceFlow[];
@@ -779,15 +779,16 @@ describe("Layout engine (integration)", () => {
 		const parentNode = result.nodes.find((n) => n.id === "sub");
 		expect(parentNode).toBeDefined();
 		if (!parentNode) return;
-		// Collapsed sub-process should be same size as a task
-		expect(parentNode.bounds.width).toBe(100);
-		expect(parentNode.bounds.height).toBe(80);
+		// Expanded sub-process is larger than a regular task
+		expect(parentNode.bounds.width).toBeGreaterThan(100);
+		expect(parentNode.bounds.height).toBeGreaterThan(80);
+		expect(parentNode.isExpanded).toBe(true);
 
-		// No child nodes in the layout result
+		// Child nodes are in the layout result
 		const child1 = result.nodes.find((n) => n.id === "child1");
 		const child2 = result.nodes.find((n) => n.id === "child2");
-		expect(child1).toBeUndefined();
-		expect(child2).toBeUndefined();
+		expect(child1).toBeDefined();
+		expect(child2).toBeDefined();
 	});
 
 	it("handles an empty process", () => {

@@ -13,6 +13,7 @@ import { buildGraph, detectBackEdges, reverseBackEdges } from "./graph.js";
 import { assignLayers, groupByLayer } from "./layers.js";
 import { assertNoOverlap } from "./overlap.js";
 import { routeEdges } from "./routing.js";
+import { layoutSubProcesses } from "./subprocess.js";
 import type { LayoutNode, LayoutResult } from "./types.js";
 /**
  * Auto-layout a BPMN process using the Sugiyama/layered algorithm.
@@ -83,7 +84,13 @@ export function layoutFlowNodes(
 	// Phase 4g: Resolve any layer overlaps from redistribution
 	resolveLayerOverlaps(layoutNodes);
 
-	// Phase 5: Edge routing (uses original back-edges for routing, not reversed)
+	// Phase 5: Sub-process layout — expand containers and lay out children
+	const childResults = layoutSubProcesses(layoutNodes, nodeIndex);
+
+	// After subprocess expansion, push nodes that now overlap with expanded containers
+	resolveSubProcessOverlaps(layoutNodes);
+
+	// Phase 6: Edge routing (uses original back-edges for routing, not reversed)
 	const nodeMap = new Map<string, LayoutNode>();
 	for (const node of layoutNodes) {
 		nodeMap.set(node.id, node);
@@ -91,5 +98,73 @@ export function layoutFlowNodes(
 
 	const edges = routeEdges(sequenceFlows, nodeMap, backEdges);
 
-	return { nodes: layoutNodes, edges };
+	// Flatten child results into the main layout
+	const allNodes = [...layoutNodes];
+	const allEdges = [...edges];
+	for (const child of childResults) {
+		for (const cn of child.result.nodes) {
+			allNodes.push(cn);
+		}
+		for (const ce of child.result.edges) {
+			allEdges.push(ce);
+		}
+	}
+
+	return { nodes: allNodes, edges: allEdges };
+}
+
+/**
+ * After subprocess expansion, cascade-shift all subsequent layers
+ * so that inter-layer spacing is preserved.
+ */
+function resolveSubProcessOverlaps(nodes: LayoutNode[]): void {
+	const expanded = nodes.filter((n) => n.isExpanded);
+	if (expanded.length === 0) return;
+
+	// Group nodes by layer
+	const byLayer = new Map<number, LayoutNode[]>();
+	for (const n of nodes) {
+		const arr = byLayer.get(n.layer);
+		if (arr) arr.push(n);
+		else byLayer.set(n.layer, [n]);
+	}
+
+	const layers = [...byLayer.keys()].sort((a, b) => a - b);
+	const MIN_GAP = 50;
+
+	// Cascade: ensure each layer starts after previous layer's rightmost edge
+	for (let i = 1; i < layers.length; i++) {
+		const prevKey = layers[i - 1];
+		const curKey = layers[i];
+		if (prevKey === undefined || curKey === undefined) continue;
+		const prevNodes = byLayer.get(prevKey);
+		const curNodes = byLayer.get(curKey);
+		if (!prevNodes || !curNodes) continue;
+
+		// Find rightmost edge in previous layer (including labels)
+		let prevRight = 0;
+		for (const n of prevNodes) {
+			prevRight = Math.max(prevRight, n.bounds.x + n.bounds.width);
+			if (n.labelBounds) {
+				prevRight = Math.max(prevRight, n.labelBounds.x + n.labelBounds.width);
+			}
+		}
+
+		// Find leftmost edge in current layer
+		let curLeft = Number.POSITIVE_INFINITY;
+		for (const n of curNodes) {
+			curLeft = Math.min(curLeft, n.bounds.x);
+		}
+
+		const gap = curLeft - prevRight;
+		if (gap < MIN_GAP) {
+			const dx = MIN_GAP - gap;
+			for (const n of curNodes) {
+				n.bounds.x += dx;
+				if (n.labelBounds) {
+					n.labelBounds.x += dx;
+				}
+			}
+		}
+	}
 }

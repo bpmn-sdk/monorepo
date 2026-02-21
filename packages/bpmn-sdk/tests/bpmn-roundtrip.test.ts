@@ -136,6 +136,7 @@ function compareDefinitions(a: BpmnDefinitions, b: BpmnDefinitions): void {
 	// Root elements
 	expect(a.errors.length).toBe(b.errors.length);
 	expect(a.escalations.length).toBe(b.escalations.length);
+	expect(a.messages.length).toBe(b.messages.length);
 
 	// Collaborations
 	expect(a.collaborations.length).toBe(b.collaborations.length);
@@ -305,5 +306,138 @@ describe("BPMN serializer", () => {
 		const exported = serializeBpmn(model);
 		expect(exported).toContain("xmlns:bpmn=");
 		expect(exported).toContain("xmlns:zeebe=");
+	});
+});
+
+// ---------------------------------------------------------------------------
+// examples2/ roundtrip tests
+// ---------------------------------------------------------------------------
+
+const EXAMPLES2_DIR = join(__dirname, "../../..", "examples2");
+
+const bpmnFiles2 = readdirSync(EXAMPLES2_DIR)
+	.filter((f) => f.endsWith(".bpmn"))
+	.sort();
+
+describe("examples2 roundtrip", () => {
+	it(`found ${bpmnFiles2.length} examples2 BPMN files`, () => {
+		expect(bpmnFiles2.length).toBeGreaterThanOrEqual(3);
+	});
+
+	for (const file of bpmnFiles2) {
+		it(`roundtrips ${file}`, () => {
+			const xml = readFileSync(join(EXAMPLES2_DIR, file), "utf-8");
+			const modelA = parseBpmn(xml);
+			const exportedXml = serializeBpmn(modelA);
+			const modelB = parseBpmn(exportedXml);
+			compareDefinitions(modelA, modelB);
+		});
+	}
+});
+
+describe("examples2 element parsing", () => {
+	it("parses bpmn:message root element from PDP", () => {
+		const xml = readFileSync(join(EXAMPLES2_DIR, "PDP Product Board Filtering.bpmn"), "utf-8");
+		const model = parseBpmn(xml);
+		expect(model.messages.length).toBeGreaterThan(0);
+		expect(model.messages[0]?.name).toBeDefined();
+	});
+
+	it("parses message start event from PDP", () => {
+		const xml = readFileSync(join(EXAMPLES2_DIR, "PDP Product Board Filtering.bpmn"), "utf-8");
+		const model = parseBpmn(xml);
+		const process = model.processes[0];
+		expect(process).toBeDefined();
+		if (!process) return;
+
+		const start = process.flowElements.find(
+			(e) => e.type === "startEvent" && e.eventDefinitions.some((d) => d.type === "message"),
+		);
+		expect(start).toBeDefined();
+		if (start?.type === "startEvent") {
+			const msgDef = start.eventDefinitions.find((d) => d.type === "message");
+			expect(msgDef).toBeDefined();
+			if (msgDef?.type === "message") {
+				expect(msgDef.messageRef).toBeDefined();
+			}
+		}
+	});
+
+	it("parses callActivity from PDP", () => {
+		const xml = readFileSync(join(EXAMPLES2_DIR, "PDP Product Board Filtering.bpmn"), "utf-8");
+		const model = parseBpmn(xml);
+		const process = model.processes[0];
+		expect(process).toBeDefined();
+		if (!process) return;
+
+		const callActivities = process.flowElements.filter((e) => e.type === "callActivity");
+		expect(callActivities.length).toBeGreaterThan(0);
+	});
+
+	it("parses adHocSubProcess with agentic AI config from PDP", () => {
+		const xml = readFileSync(join(EXAMPLES2_DIR, "PDP Product Board Filtering.bpmn"), "utf-8");
+		const model = parseBpmn(xml);
+		const process = model.processes[0];
+		expect(process).toBeDefined();
+		if (!process) return;
+
+		const adHoc = process.flowElements.find((e) => e.type === "adHocSubProcess");
+		expect(adHoc).toBeDefined();
+		if (adHoc?.type === "adHocSubProcess") {
+			// Should have child service tasks (tools)
+			expect(adHoc.flowElements.length).toBeGreaterThan(0);
+
+			// Should have zeebe:taskDefinition in extension elements
+			const taskDef = adHoc.extensionElements.find((e) => e.name === "zeebe:taskDefinition");
+			expect(taskDef).toBeDefined();
+
+			// Should have zeebe:adHoc
+			const adHocExt = adHoc.extensionElements.find((e) => e.name === "zeebe:adHoc");
+			expect(adHocExt).toBeDefined();
+		}
+	});
+
+	it("parses zeebe:properties from PDP webhook start event", () => {
+		const xml = readFileSync(join(EXAMPLES2_DIR, "PDP Product Board Filtering.bpmn"), "utf-8");
+		const model = parseBpmn(xml);
+		const process = model.processes[0];
+		expect(process).toBeDefined();
+		if (!process) return;
+
+		const start = process.flowElements.find((e) => e.id === "StartEvent_1");
+		expect(start).toBeDefined();
+		const propsExt = start?.extensionElements.find(
+			(e) => e.name === "zeebe:properties" || e.name.endsWith(":properties"),
+		);
+		expect(propsExt).toBeDefined();
+		expect(propsExt?.children.length).toBeGreaterThan(0);
+	});
+
+	it("parses default sequence flow on exclusive gateways from PDP", () => {
+		const xml = readFileSync(join(EXAMPLES2_DIR, "PDP Product Board Filtering.bpmn"), "utf-8");
+		const model = parseBpmn(xml);
+		const process = model.processes[0];
+		expect(process).toBeDefined();
+		if (!process) return;
+
+		const xorGateway = process.flowElements.find(
+			(e) => e.type === "exclusiveGateway" && e.default !== undefined,
+		);
+		expect(xorGateway).toBeDefined();
+	});
+
+	it("parses loop patterns from Fetch Features", () => {
+		const xml = readFileSync(join(EXAMPLES2_DIR, "Fetch Features.bpmn"), "utf-8");
+		const model = parseBpmn(xml);
+		const process = model.processes[0];
+		expect(process).toBeDefined();
+		if (!process) return;
+
+		// Should have script tasks and service tasks
+		const scriptTasks = process.flowElements.filter((e) => e.type === "scriptTask");
+		expect(scriptTasks.length).toBeGreaterThan(0);
+
+		const serviceTasks = process.flowElements.filter((e) => e.type === "serviceTask");
+		expect(serviceTasks.length).toBeGreaterThan(0);
 	});
 });

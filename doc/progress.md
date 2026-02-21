@@ -2,6 +2,30 @@
 
 ## 2026-02-20
 
+### Auto-Join Gateways (BPMN Best Practice)
+- **Automatic join gateway insertion**: When multiple branches from the same split gateway converge on a non-gateway target, a matching join gateway is automatically inserted before the target. For example, an exclusive gateway split automatically gets a matching exclusive join gateway.
+- The algorithm traces back from targets with 2+ incoming flows to identify which split gateway they belong to, then inserts a join of the same type.
+- Existing manually-created join gateways are detected and not duplicated.
+- Early-return branches (with distinct targets) are not affected.
+- `ServiceTaskOptions.name` is now mandatory — all service tasks must have a name.
+- Vertical center-Y alignment fix: expanded sub-processes are re-centered on their original baseline after expansion.
+- Verification: `pnpm verify` — 308 tests pass, zero errors
+
+### Expanded Sub-Processes & modelerTemplateIcon Support
+- **Expanded sub-process layout**: Sub-processes with child elements are now expanded on the canvas — children are recursively laid out inside the container using the full Sugiyama layout pipeline. The `layoutSubProcesses()` function (previously unused) is now integrated into the layout engine after phase 4g. Expanded sub-processes have `isExpanded="true"` in the BPMN diagram.
+- **Post-expansion cascade**: After subprocess expansion, a cascade pass ensures all subsequent layers maintain minimum 50px horizontal gap, preventing element/label overlaps.
+- **`modelerTemplateIcon` on all builders**: Fixed `SubProcessContentBuilder.serviceTask()` to set `zeebe:modelerTemplate`, `zeebe:modelerTemplateVersion`, and `zeebe:modelerTemplateIcon` attributes (was missing — `ProcessBuilder` and `BranchBuilder` already had this support).
+- **Updated agent workflow example**: Added `modelerTemplateIcon` to all template-bearing elements (webhook start event, AI agent ad-hoc subprocess, Slack service tasks, HTTP JSON tool tasks). Tool service tasks inside the ad-hoc subprocess now render with proper icons and are visible on the expanded canvas.
+- Verification: `pnpm verify` — 305 tests pass, zero errors
+
+### New Element Support from examples2/
+- **`bpmn:message` root element**: Added `BpmnMessage` model type, `messages` array on `BpmnDefinitions`, parser/serializer support for `<bpmn:message>` at definitions level. Messages are now preserved during parse→export roundtrip.
+- **`zeebe:properties` extension**: Added `ZeebeProperties`/`ZeebePropertyEntry` interfaces to `ZeebeExtensions`. Builder support via `zeebeProperties` option on `StartEventOptions`. Used for webhook/connector configuration.
+- **Enhanced message start events**: `startEvent()` with `messageName` now creates a proper root-level `<bpmn:message>` element and references it by ID. Also supports `zeebeProperties`, `modelerTemplate`, `modelerTemplateVersion`, `modelerTemplateIcon` options.
+- **Enhanced `adHocSubProcess` for AI agent pattern**: Added `taskDefinition`, `ioMapping`, `taskHeaders`, `outputCollection`, `outputElement`, and modeler template options to `AdHocSubProcessOptions`. Supports the agentic AI subprocess pattern (e.g., Camunda AI Agent with tool tasks).
+- **Roundtrip tests for examples2/**: 3 example files (Fetch Features, Fetch Notes, PDP Product Board Filtering) all roundtrip correctly. Added 11 new roundtrip tests and 7 element parsing tests.
+- Verification: `pnpm verify` — 305 tests pass, zero errors
+
 ### Minimum Row Gap Between Elements & Gateway Label Position
 - **Minimum row gap**: `distributeSplitBranches()` now uses two-pass processing (multi-branch first, single-branch second) with peer-aware gap enforcement. Single-branch gateways check all chain nodes against layer peers and push further away if any gap would be less than `GRID_CELL_HEIGHT/2` (80px).
 - **Gateway labels**: Labels moved from centered-above to **top-right** position (`x = bounds.right + 4, y = bounds.top - labelHeight - 4`), preventing overlap with upward edge paths.
