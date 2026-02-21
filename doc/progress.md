@@ -2,6 +2,11 @@
 
 ## 2026-02-21
 
+### XML Output Tabs on Landing Page
+- Each example panel now has Diagram / XML Output sub-tabs.
+- Users can switch between the live rendered BPMN diagram and the raw XML source.
+- XML content is populated from the examples data and HTML-escaped for display.
+
 ### Landing Page
 - **Landing page app**: Created `apps/landing/` — a Vite-built static site showcasing the SDK.
 - Hero section with strong AI-native hook, feature cards (zero deps, auto-layout, type-safe, roundtrip fidelity, Camunda 8 ready).
