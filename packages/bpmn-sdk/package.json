@@ -17,7 +17,5 @@
 		"check": "biome check .",
 		"test": "vitest run"
 	},
-	"dependencies": {
-		"fast-xml-parser": "^5.2.0"
-	}
+	"dependencies": {}
 }

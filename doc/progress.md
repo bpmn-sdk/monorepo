@@ -1,5 +1,15 @@
 # Progress
 
+## 2026-02-21
+
+### Remove fast-xml-parser dependency (zero runtime dependencies)
+- **Custom XML parser/serializer**: Replaced the `fast-xml-parser` dependency with a lightweight custom implementation (~200 lines) in `packages/bpmn-sdk/src/xml/xml-parser.ts`. The SDK now has **zero runtime dependencies**.
+- The custom parser handles namespaced elements/attributes, self-closing tags, text content, CDATA sections, and skips processing instructions/comments — everything needed for BPMN and DMN XML.
+- The serializer produces formatted XML with 2-space indentation, self-closing empty elements, and `&quot;` escaping in attributes.
+- Entity/character references are passed through unchanged (matching the previous `processEntities: false` behavior).
+- Public API (`parseXml`, `serializeXml`, `XmlElement` type) unchanged.
+- Verification: `pnpm verify` — 308 tests pass, zero errors
+
 ## 2026-02-20
 
 ### Auto-Join Gateways (BPMN Best Practice)

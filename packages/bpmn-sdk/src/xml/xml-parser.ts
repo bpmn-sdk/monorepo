@@ -1,31 +1,8 @@
-import { XMLBuilder, XMLParser } from "fast-xml-parser";
 import type { XmlElement } from "../types/xml-element.js";
 
-const ATTRS_KEY = ":@";
-const TEXT_KEY = "#text";
-
-const parserOptions = {
-	preserveOrder: true,
-	ignoreAttributes: false,
-	attributeNamePrefix: "",
-	textNodeName: TEXT_KEY,
-	trimValues: false,
-	parseTagValue: false,
-	parseAttributeValue: false,
-	processEntities: false,
-	ignorePiTags: true,
-} as const;
-
-const builderOptions = {
-	preserveOrder: true,
-	ignoreAttributes: false,
-	attributeNamePrefix: "",
-	textNodeName: TEXT_KEY,
-	format: true,
-	indentBy: "  ",
-	suppressEmptyNode: true,
-	processEntities: false,
-} as const;
+// ---------------------------------------------------------------------------
+// Parser
+// ---------------------------------------------------------------------------
 
 /**
  * Parse an XML string into an XmlElement tree.
@@ -33,86 +10,257 @@ const builderOptions = {
  * @throws Error if the XML has no root element.
  */
 export function parseXml(xml: string): XmlElement {
-	const parser = new XMLParser(parserOptions);
-	const parsed: unknown[] = parser.parse(xml);
-
-	if (!Array.isArray(parsed) || parsed.length === 0) {
-		throw new Error("Failed to parse XML: empty result");
-	}
-
-	for (const node of parsed) {
-		const element = nodeToXmlElement(node as Record<string, unknown>);
-		if (element) return element;
-	}
-
-	throw new Error("Failed to parse XML: no root element found");
+	const p = new XmlReader(xml);
+	const root = p.parseDocument();
+	if (!root) throw new Error("Failed to parse XML: no root element found");
+	return root;
 }
 
-function nodeToXmlElement(node: Record<string, unknown>): XmlElement | undefined {
-	const attrs = (node[ATTRS_KEY] as Record<string, string> | undefined) ?? {};
+class XmlReader {
+	private s: string;
+	private i = 0;
 
-	for (const key of Object.keys(node)) {
-		if (key === ATTRS_KEY) continue;
+	constructor(source: string) {
+		this.s = source;
+	}
 
-		const childNodes = node[key] as Record<string, unknown>[];
+	parseDocument(): XmlElement | undefined {
+		let root: XmlElement | undefined;
+		while (this.i < this.s.length) {
+			this.skipWhitespace();
+			if (this.i >= this.s.length) break;
+			if (this.s[this.i] !== "<") {
+				// text outside root — skip
+				this.i++;
+				continue;
+			}
+			if (this.startsWith("<?")) {
+				this.skipPi();
+			} else if (this.startsWith("<!--")) {
+				this.skipComment();
+			} else if (this.startsWith("<!")) {
+				this.skipBang();
+			} else {
+				root = this.parseElement();
+				break;
+			}
+		}
+		return root;
+	}
+
+	private parseElement(): XmlElement {
+		this.expect("<");
+		const name = this.readName();
+		const attributes: Record<string, string> = {};
+		this.readAttributes(attributes);
+		this.skipWhitespace();
+
+		if (this.s[this.i] === "/" && this.s[this.i + 1] === ">") {
+			// self-closing
+			this.i += 2;
+			return { name, attributes, children: [] };
+		}
+
+		this.expect(">");
+
 		const children: XmlElement[] = [];
 		let text: string | undefined;
 
-		for (const child of childNodes) {
-			if (TEXT_KEY in child) {
-				const t = String(child[TEXT_KEY]);
+		while (this.i < this.s.length) {
+			if (this.startsWith("</")) break;
+
+			if (this.s[this.i] === "<") {
+				if (this.startsWith("<!--")) {
+					this.skipComment();
+				} else if (this.startsWith("<![CDATA[")) {
+					const cd = this.readCData();
+					text = text === undefined ? cd : text + cd;
+				} else if (this.startsWith("<?")) {
+					this.skipPi();
+				} else {
+					children.push(this.parseElement());
+				}
+			} else {
+				const t = this.readText();
 				if (t.length > 0) {
 					text = text === undefined ? t : text + t;
 				}
-				continue;
 			}
-			const converted = nodeToXmlElement(child);
-			if (converted) children.push(converted);
 		}
 
-		return {
-			name: key,
-			attributes: { ...attrs },
-			children,
-			...(text !== undefined ? { text } : {}),
-		};
+		// closing tag </name>
+		this.expect("</");
+		const closing = this.readName();
+		if (closing !== name) {
+			throw new Error(`Mismatched closing tag: expected </${name}>, got </${closing}>`);
+		}
+		this.skipWhitespace();
+		this.expect(">");
+
+		const el: XmlElement = { name, attributes, children };
+		if (text !== undefined) el.text = text;
+		return el;
 	}
 
-	return undefined;
+	private readAttributes(attrs: Record<string, string>): void {
+		while (this.i < this.s.length) {
+			this.skipWhitespace();
+			const ch = this.s[this.i];
+			if (ch === ">" || ch === "/") return;
+			const key = this.readName();
+			this.skipWhitespace();
+			this.expect("=");
+			this.skipWhitespace();
+			const value = this.readAttrValue();
+			attrs[key] = value;
+		}
+	}
+
+	private readAttrValue(): string {
+		const quote = this.s[this.i];
+		if (quote !== '"' && quote !== "'") {
+			throw new Error(`Expected quote at position ${this.i}`);
+		}
+		this.i++;
+		const start = this.i;
+		while (this.i < this.s.length && this.s[this.i] !== quote) {
+			this.i++;
+		}
+		const value = this.s.substring(start, this.i);
+		this.i++; // skip closing quote
+		return value;
+	}
+
+	private readText(): string {
+		const start = this.i;
+		while (this.i < this.s.length && this.s[this.i] !== "<") {
+			this.i++;
+		}
+		return this.s.substring(start, this.i);
+	}
+
+	private readName(): string {
+		const start = this.i;
+		while (this.i < this.s.length) {
+			const c = this.s[this.i];
+			if (
+				c === " " ||
+				c === "\t" ||
+				c === "\n" ||
+				c === "\r" ||
+				c === ">" ||
+				c === "/" ||
+				c === "="
+			)
+				break;
+			this.i++;
+		}
+		return this.s.substring(start, this.i);
+	}
+
+	private readCData(): string {
+		this.i += 9; // skip <![CDATA[
+		const end = this.s.indexOf("]]>", this.i);
+		if (end === -1) throw new Error("Unterminated CDATA section");
+		const text = this.s.substring(this.i, end);
+		this.i = end + 3;
+		return text;
+	}
+
+	private skipPi(): void {
+		this.i += 2; // skip <?
+		const end = this.s.indexOf("?>", this.i);
+		this.i = end === -1 ? this.s.length : end + 2;
+	}
+
+	private skipComment(): void {
+		this.i += 4; // skip <!--
+		const end = this.s.indexOf("-->", this.i);
+		this.i = end === -1 ? this.s.length : end + 3;
+	}
+
+	private skipBang(): void {
+		// Skip <!DOCTYPE ...> and similar
+		this.i += 2;
+		let depth = 1;
+		while (this.i < this.s.length && depth > 0) {
+			if (this.s[this.i] === "<") depth++;
+			else if (this.s[this.i] === ">") depth--;
+			this.i++;
+		}
+	}
+
+	private skipWhitespace(): void {
+		while (this.i < this.s.length) {
+			const c = this.s[this.i];
+			if (c !== " " && c !== "\t" && c !== "\n" && c !== "\r") break;
+			this.i++;
+		}
+	}
+
+	private expect(str: string): void {
+		if (!this.s.startsWith(str, this.i)) {
+			throw new Error(`Expected "${str}" at position ${this.i}`);
+		}
+		this.i += str.length;
+	}
+
+	private startsWith(prefix: string): boolean {
+		return this.s.startsWith(prefix, this.i);
+	}
 }
+
+// ---------------------------------------------------------------------------
+// Serializer
+// ---------------------------------------------------------------------------
 
 /**
  * Serialize an XmlElement tree to an XML string.
  * Produces a well-formed XML document with declaration.
  */
 export function serializeXml(element: XmlElement): string {
-	const builder = new XMLBuilder(builderOptions);
-	const data = [xmlElementToNode(element)];
-	const xmlBody = (builder.build(data) as string).trimEnd();
-	return `<?xml version="1.0" encoding="UTF-8"?>\n${xmlBody}\n`;
+	const parts: string[] = ['<?xml version="1.0" encoding="UTF-8"?>\n'];
+	writeElement(parts, element, 0);
+	parts.push("\n");
+	return parts.join("");
 }
 
-function xmlElementToNode(element: XmlElement): Record<string, unknown> {
-	const children: unknown[] = [];
+function writeElement(parts: string[], el: XmlElement, depth: number): void {
+	const indent = "  ".repeat(depth);
+	parts.push(indent, "<", el.name);
 
-	if (element.text !== undefined) {
-		children.push({ [TEXT_KEY]: element.text });
+	for (const [key, value] of Object.entries(el.attributes)) {
+		parts.push(" ", key, '="', escapeAttr(value), '"');
 	}
 
-	for (const child of element.children) {
-		children.push(xmlElementToNode(child));
+	const hasChildren = el.children.length > 0;
+	const hasText = el.text !== undefined;
+
+	if (!hasChildren && !hasText) {
+		parts.push("/>\n");
+		return;
 	}
 
-	const node: Record<string, unknown> = { [element.name]: children };
+	parts.push(">");
 
-	if (Object.keys(element.attributes).length > 0) {
-		// Escape double quotes in attribute values since processEntities is disabled
-		const escaped: Record<string, string> = {};
-		for (const [key, value] of Object.entries(element.attributes)) {
-			escaped[key] = value.replaceAll('"', "&quot;");
+	if (hasText) {
+		parts.push(el.text as string);
+	}
+
+	if (hasChildren) {
+		parts.push("\n");
+		for (const child of el.children) {
+			writeElement(parts, child, depth + 1);
 		}
-		node[ATTRS_KEY] = escaped;
+		parts.push(indent);
 	}
 
-	return node;
+	parts.push("</", el.name, ">\n");
+}
+
+// Matches the original processEntities:false behaviour — text and attribute
+// values are passed through unchanged except for quotes in attributes, which
+// must be escaped to produce well-formed XML attribute syntax.
+function escapeAttr(value: string): string {
+	return value.replaceAll('"', "&quot;");
 }
