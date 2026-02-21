@@ -114,8 +114,58 @@ function setupOutputTabs(): void {
 	}
 }
 
+function setupPkgTabs(): void {
+	const tabs = document.querySelectorAll<HTMLElement>(".pkg-tab");
+	for (const tab of tabs) {
+		tab.addEventListener("click", () => {
+			const pkg = tab.dataset.pkg;
+			if (!pkg) return;
+			const step = tab.closest(".step");
+			if (!step) return;
+
+			for (const t of step.querySelectorAll<HTMLElement>(".pkg-tab")) t.classList.remove("active");
+			for (const c of step.querySelectorAll<HTMLElement>(".pkg-cmd")) c.classList.remove("active");
+
+			tab.classList.add("active");
+			const cmd = step.querySelector<HTMLElement>(`.pkg-cmd[data-pkg="${pkg}"]`);
+			if (cmd) cmd.classList.add("active");
+		});
+	}
+}
+
+function setupCopyButtons(): void {
+	const blocks = document.querySelectorAll<HTMLElement>("pre");
+	for (const pre of blocks) {
+		const wrapper = document.createElement("div");
+		wrapper.className = "copy-wrapper";
+		pre.parentNode?.insertBefore(wrapper, pre);
+		wrapper.appendChild(pre);
+
+		const btn = document.createElement("button");
+		btn.className = "copy-btn";
+		btn.textContent = "Copy";
+		btn.type = "button";
+		wrapper.appendChild(btn);
+
+		btn.addEventListener("click", () => {
+			const code = pre.querySelector("code");
+			const text = (code ?? pre).textContent ?? "";
+			navigator.clipboard.writeText(text.trim()).then(() => {
+				btn.textContent = "Copied!";
+				btn.classList.add("copied");
+				setTimeout(() => {
+					btn.textContent = "Copy";
+					btn.classList.remove("copied");
+				}, 1500);
+			});
+		});
+	}
+}
+
 // Init
+setupCopyButtons();
 populateXmlPanels();
 setupTabs();
 setupOutputTabs();
+setupPkgTabs();
 renderDiagram("simple");

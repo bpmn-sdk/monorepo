@@ -454,6 +454,85 @@ a:hover {
 	color: #546e7a;
 }
 
+/* ---- Package manager tabs ---- */
+.step-content {
+	flex: 1;
+	min-width: 0;
+}
+
+.pkg-tabs {
+	display: flex;
+	gap: 4px;
+	margin-bottom: 8px;
+}
+
+.pkg-tab {
+	background: transparent;
+	border: 1px solid var(--border);
+	border-radius: 6px;
+	color: var(--text-muted);
+	font-family: var(--font-mono);
+	font-size: 12px;
+	padding: 4px 12px;
+	cursor: pointer;
+	transition: all 0.2s;
+}
+
+.pkg-tab:hover {
+	color: var(--text);
+	border-color: var(--text-muted);
+}
+
+.pkg-tab.active {
+	color: var(--accent-bright);
+	border-color: var(--accent-bright);
+	background: rgba(100, 255, 218, 0.08);
+}
+
+.pkg-cmd {
+	display: none;
+}
+
+.pkg-cmd.active {
+	display: block;
+}
+
+/* ---- Copy button ---- */
+.copy-wrapper {
+	position: relative;
+}
+
+.copy-btn {
+	position: absolute;
+	top: 8px;
+	right: 8px;
+	background: rgba(255, 255, 255, 0.08);
+	border: 1px solid var(--border);
+	border-radius: 6px;
+	color: var(--text-muted);
+	font-family: var(--font-mono);
+	font-size: 11px;
+	padding: 4px 10px;
+	cursor: pointer;
+	opacity: 0;
+	transition: all 0.2s;
+	z-index: 2;
+}
+
+.copy-wrapper:hover .copy-btn {
+	opacity: 1;
+}
+
+.copy-btn:hover {
+	background: rgba(255, 255, 255, 0.15);
+	color: var(--text);
+}
+
+.copy-btn.copied {
+	color: var(--accent-bright);
+	border-color: var(--accent-bright);
+}
+
 /* ---- Footer ---- */
 footer {
 	padding: 48px 0;

@@ -149,7 +149,14 @@ const xml = Bpmn.export(defs);
 
 <span class="kw">const</span> xml = Bpmn.export(defs);</code></pre>
           </div>
-          <div class="example-diagram" id="diagram-simple"></div>
+          <div class="example-output">
+            <div class="output-tabs">
+              <button class="output-tab active" data-view="diagram">Diagram</button>
+              <button class="output-tab" data-view="xml">XML Output</button>
+            </div>
+            <div class="example-diagram output-view active" data-view="diagram" id="diagram-simple"></div>
+            <div class="example-xml output-view" data-view="xml" data-example="simple"></div>
+          </div>
         </div>
 
         <!-- Decision Gateway -->
@@ -182,7 +189,14 @@ const xml = Bpmn.export(defs);
   .withAutoLayout()
   .build();</code></pre>
           </div>
-          <div class="example-diagram" id="diagram-gateway"></div>
+          <div class="example-output">
+            <div class="output-tabs">
+              <button class="output-tab active" data-view="diagram">Diagram</button>
+              <button class="output-tab" data-view="xml">XML Output</button>
+            </div>
+            <div class="example-diagram output-view active" data-view="diagram" id="diagram-gateway"></div>
+            <div class="example-xml output-view" data-view="xml" data-example="gateway"></div>
+          </div>
         </div>
 
         <!-- Parallel -->
@@ -218,7 +232,14 @@ const xml = Bpmn.export(defs);
   .withAutoLayout()
   .build();</code></pre>
           </div>
-          <div class="example-diagram" id="diagram-parallel"></div>
+          <div class="example-output">
+            <div class="output-tabs">
+              <button class="output-tab active" data-view="diagram">Diagram</button>
+              <button class="output-tab" data-view="xml">XML Output</button>
+            </div>
+            <div class="example-diagram output-view active" data-view="diagram" id="diagram-parallel"></div>
+            <div class="example-xml output-view" data-view="xml" data-example="parallel"></div>
+          </div>
         </div>
 
         <!-- AI Agent -->
@@ -267,7 +288,14 @@ const xml = Bpmn.export(defs);
   .withAutoLayout()
   .build();</code></pre>
           </div>
-          <div class="example-diagram" id="diagram-ai-agent"></div>
+          <div class="example-output">
+            <div class="output-tabs">
+              <button class="output-tab active" data-view="diagram">Diagram</button>
+              <button class="output-tab" data-view="xml">XML Output</button>
+            </div>
+            <div class="example-diagram output-view active" data-view="diagram" id="diagram-ai-agent"></div>
+            <div class="example-xml output-view" data-view="xml" data-example="ai-agent"></div>
+          </div>
         </div>
       </div>
     </div>
@@ -280,7 +308,18 @@ const xml = Bpmn.export(defs);
       <div class="steps">
         <div class="step">
           <div class="step-num">1</div>
-          <pre><code>npm install @urbanisierung/bpmn-sdk</code></pre>
+          <div class="step-content">
+            <div class="pkg-tabs">
+              <button class="pkg-tab active" data-pkg="npm">npm</button>
+              <button class="pkg-tab" data-pkg="yarn">yarn</button>
+              <button class="pkg-tab" data-pkg="pnpm">pnpm</button>
+              <button class="pkg-tab" data-pkg="bun">bun</button>
+            </div>
+            <pre data-pkg="npm" class="pkg-cmd active"><code>npm install @urbanisierung/bpmn-sdk</code></pre>
+            <pre data-pkg="yarn" class="pkg-cmd"><code>yarn add @urbanisierung/bpmn-sdk</code></pre>
+            <pre data-pkg="pnpm" class="pkg-cmd"><code>pnpm add @urbanisierung/bpmn-sdk</code></pre>
+            <pre data-pkg="bun" class="pkg-cmd"><code>bun add @urbanisierung/bpmn-sdk</code></pre>
+          </div>
         </div>
         <div class="step">
           <div class="step-num">2</div>
