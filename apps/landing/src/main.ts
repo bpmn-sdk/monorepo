@@ -4,7 +4,17 @@ import "bpmn-js/dist/assets/bpmn-js.css";
 import "bpmn-js/dist/assets/bpmn-font/css/bpmn-embedded.css";
 import { examples } from "./examples";
 
+interface BpmnCanvas {
+	zoom(mode: "fit-viewport", center?: boolean): void;
+	zoom(level: number): void;
+}
+
 const viewers = new Map<string, InstanceType<typeof Viewer>>();
+
+function fitAndCenter(viewer: InstanceType<typeof Viewer>): void {
+	const canvas = viewer.get("canvas") as BpmnCanvas;
+	canvas.zoom("fit-viewport", true);
+}
 
 async function renderDiagram(key: string): Promise<void> {
 	const container = document.getElementById(`diagram-${key}`);
@@ -13,8 +23,7 @@ async function renderDiagram(key: string): Promise<void> {
 	if (viewers.has(key)) {
 		const viewer = viewers.get(key);
 		if (!viewer) return;
-		const canvas = viewer.get("canvas") as { zoom: (mode: string) => void };
-		canvas.zoom("fit-viewport");
+		fitAndCenter(viewer);
 		return;
 	}
 
@@ -23,8 +32,7 @@ async function renderDiagram(key: string): Promise<void> {
 
 	try {
 		await viewer.importXML(examples[key]);
-		const canvas = viewer.get("canvas") as { zoom: (mode: string) => void };
-		canvas.zoom("fit-viewport");
+		fitAndCenter(viewer);
 	} catch (err) {
 		console.error(`Failed to render ${key}:`, err);
 	}
@@ -97,10 +105,7 @@ function setupOutputTabs(): void {
 						const key = id.replace("diagram-", "");
 						const viewer = viewers.get(key);
 						if (viewer) {
-							const canvas = viewer.get("canvas") as {
-								zoom: (mode: string) => void;
-							};
-							canvas.zoom("fit-viewport");
+							fitAndCenter(viewer);
 						}
 					}
 				}
