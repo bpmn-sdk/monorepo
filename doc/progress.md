@@ -2,6 +2,17 @@
 
 ## 2026-02-21
 
+### Landing Page
+- **Landing page app**: Created `apps/landing/` — a Vite-built static site showcasing the SDK.
+- Hero section with strong AI-native hook, feature cards (zero deps, auto-layout, type-safe, roundtrip fidelity, Camunda 8 ready).
+- Side-by-side comparison: raw BPMN XML vs fluent SDK API.
+- Interactive examples with tabbed code snippets and live BPMN diagram rendering via bpmn-js (bpmn.io).
+- Four examples: Simple Process, Decision Gateway, Parallel Execution, AI Agent (with adHocSubProcess).
+- Getting Started section with 3-step quick start.
+- Added `apps/*` to pnpm workspace, `vite` as root devDependency.
+- GitHub Actions workflow (`.github/workflows/deploy-pages.yml`) for automatic deployment to GitHub Pages.
+- Verification: `pnpm verify` — all tasks pass (SDK 308 tests + landing build/typecheck/check).
+
 ### Remove fast-xml-parser dependency (zero runtime dependencies)
 - **Custom XML parser/serializer**: Replaced the `fast-xml-parser` dependency with a lightweight custom implementation (~200 lines) in `packages/bpmn-sdk/src/xml/xml-parser.ts`. The SDK now has **zero runtime dependencies**.
 - The custom parser handles namespaced elements/attributes, self-closing tags, text content, CDATA sections, and skips processing instructions/comments — everything needed for BPMN and DMN XML.

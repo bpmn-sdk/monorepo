@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BPMN SDK — Generate BPMN diagrams with code</title>
+  <meta name="description" content="A TypeScript SDK for generating production-ready BPMN diagrams programmatically. Built for AI agents, automation platforms, and workflow builders." />
+  <link rel="stylesheet" href="/src/style.css" />
+</head>
+<body>
+  <!-- Hero -->
+  <section class="hero">
+    <div class="container">
+      <div class="badge">Zero dependencies · TypeScript · Auto-layout</div>
+      <h1>BPMN diagrams<br/><span class="gradient">from code, not clicks</span></h1>
+      <p class="subtitle">
+        A fluent TypeScript API that generates production-ready BPMN 2.0 diagrams with auto-layout.
+        Built for <strong>AI agents</strong>, automation platforms, and workflow builders.
+      </p>
+      <div class="hero-actions">
+        <a href="https://www.npmjs.com/package/@urbanisierung/bpmn-sdk" class="btn btn-primary">npm install @urbanisierung/bpmn-sdk</a>
+        <a href="https://github.com/urbanisierung/bpmn-sdk" class="btn btn-secondary">GitHub →</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Why -->
+  <section class="why">
+    <div class="container">
+      <h2>Why this SDK?</h2>
+      <div class="cards">
+        <div class="card">
+          <div class="card-icon">🤖</div>
+          <h3>AI-Native</h3>
+          <p>LLMs can call a simple fluent API instead of wrestling with raw XML. Generate correct BPMN from natural language prompts — no XML knowledge required.</p>
+        </div>
+        <div class="card">
+          <div class="card-icon">📐</div>
+          <h3>Auto-Layout</h3>
+          <p>Built-in Sugiyama layout engine produces clean, readable diagrams with orthogonal edge routing. No manual coordinate math.</p>
+        </div>
+        <div class="card">
+          <div class="card-icon">🔒</div>
+          <h3>Type-Safe</h3>
+          <p>Full TypeScript strict mode with discriminated unions. Invalid processes fail at compile time, not runtime.</p>
+        </div>
+        <div class="card">
+          <div class="card-icon">🪶</div>
+          <h3>Zero Dependencies</h3>
+          <p>No runtime dependencies. Lightweight, tree-shakeable ESM. Works in Node.js, Deno, Bun, and edge runtimes.</p>
+        </div>
+        <div class="card">
+          <div class="card-icon">🔄</div>
+          <h3>Roundtrip Fidelity</h3>
+          <p>Parse → modify → export preserves Zeebe extensions, diagram info, and custom namespaces. Tested on 34 production files.</p>
+        </div>
+        <div class="card">
+          <div class="card-icon">⚡</div>
+          <h3>Camunda 8 Ready</h3>
+          <p>Native Zeebe task definitions, IO mappings, connectors, forms, and modeler templates. Deploy directly to Camunda Cloud.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- AI Section -->
+  <section class="ai-section">
+    <div class="container">
+      <h2>Built for AI agents</h2>
+      <p class="section-subtitle">LLMs struggle with raw BPMN XML — thousands of lines, complex namespaces, coordinate geometry. This SDK gives AI a simple, chainable API that produces valid diagrams every time.</p>
+      <div class="ai-comparison">
+        <div class="comparison-col comparison-bad">
+          <div class="comparison-label">❌ What AI has to generate without the SDK</div>
+          <pre><code>&lt;bpmn:definitions xmlns:bpmn="http://..."
+  xmlns:bpmndi="http://..." xmlns:dc="..."
+  xmlns:di="..." xmlns:zeebe="..."&gt;
+  &lt;bpmn:process id="p" isExecutable="true"&gt;
+    &lt;bpmn:startEvent id="s"&gt;
+      &lt;bpmn:outgoing&gt;Flow_1&lt;/bpmn:outgoing&gt;
+    &lt;/bpmn:startEvent&gt;
+    &lt;bpmn:serviceTask id="t"&gt;
+      &lt;bpmn:extensionElements&gt;
+        &lt;zeebe:taskDefinition type="..."/&gt;
+      &lt;/bpmn:extensionElements&gt;
+      &lt;bpmn:incoming&gt;Flow_1&lt;/bpmn:incoming&gt;
+      &lt;bpmn:outgoing&gt;Flow_2&lt;/bpmn:outgoing&gt;
+    &lt;/bpmn:serviceTask&gt;
+    &lt;!-- ... 200+ more lines of XML ... --&gt;
+  &lt;/bpmn:process&gt;
+  &lt;bpmndi:BPMNDiagram&gt;
+    &lt;!-- ... manual coordinates ... --&gt;
+  &lt;/bpmndi:BPMNDiagram&gt;
+&lt;/bpmn:definitions&gt;</code></pre>
+        </div>
+        <div class="comparison-col comparison-good">
+          <div class="comparison-label">✅ What AI generates with the SDK</div>
+          <pre><code>import { Bpmn } from "@urbanisierung/bpmn-sdk";
+
+const defs = Bpmn.createProcess("my-flow")
+  .startEvent("start")
+  .serviceTask("task", {
+    name: "Do Something",
+    taskType: "my-worker",
+  })
+  .endEvent("end")
+  .withAutoLayout()
+  .build();
+
+const xml = Bpmn.export(defs);
+// → valid BPMN 2.0 XML with full diagram</code></pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Examples -->
+  <section class="examples">
+    <div class="container">
+      <h2>See it in action</h2>
+      <p class="section-subtitle">Each code snippet below generates a complete, renderable BPMN diagram. Click the tabs to see different examples.</p>
+
+      <div class="example-tabs">
+        <button class="tab active" data-example="simple">Simple Process</button>
+        <button class="tab" data-example="gateway">Decision Gateway</button>
+        <button class="tab" data-example="parallel">Parallel Execution</button>
+        <button class="tab" data-example="ai-agent">AI Agent</button>
+      </div>
+
+      <div class="example-panels">
+        <!-- Simple Process -->
+        <div class="example-panel active" data-example="simple">
+          <div class="example-code">
+            <pre><code><span class="kw">import</span> { Bpmn } <span class="kw">from</span> <span class="str">"@urbanisierung/bpmn-sdk"</span>;
+
+<span class="kw">const</span> defs = Bpmn.createProcess(<span class="str">"order-validation"</span>)
+  .name(<span class="str">"Order Validation"</span>)
+  .startEvent(<span class="str">"start"</span>, { name: <span class="str">"Order Received"</span> })
+  .serviceTask(<span class="str">"validate"</span>, {
+    name: <span class="str">"Validate Order"</span>,
+    taskType: <span class="str">"validate-order"</span>,
+  })
+  .serviceTask(<span class="str">"notify"</span>, {
+    name: <span class="str">"Send Confirmation"</span>,
+    taskType: <span class="str">"send-email"</span>,
+  })
+  .endEvent(<span class="str">"end"</span>, { name: <span class="str">"Done"</span> })
+  .withAutoLayout()
+  .build();
+
+<span class="kw">const</span> xml = Bpmn.export(defs);</code></pre>
+          </div>
+          <div class="example-diagram" id="diagram-simple"></div>
+        </div>
+
+        <!-- Decision Gateway -->
+        <div class="example-panel" data-example="gateway">
+          <div class="example-code">
+            <pre><code><span class="kw">const</span> defs = Bpmn.createProcess(<span class="str">"approval-flow"</span>)
+  .name(<span class="str">"Approval Workflow"</span>)
+  .startEvent(<span class="str">"start"</span>, { name: <span class="str">"Request Submitted"</span> })
+  .serviceTask(<span class="str">"review"</span>, {
+    name: <span class="str">"Auto Review"</span>,
+    taskType: <span class="str">"auto-review"</span>,
+  })
+  .exclusiveGateway(<span class="str">"decision"</span>, { name: <span class="str">"Approved?"</span> })
+    .branch(<span class="str">"approved"</span>, (b) =&gt;
+      b.condition(<span class="str">"= approved = true"</span>)
+        .serviceTask(<span class="str">"process"</span>, {
+          name: <span class="str">"Process Request"</span>,
+          taskType: <span class="str">"process"</span>,
+        })
+        .endEvent(<span class="str">"done"</span>, { name: <span class="str">"Completed"</span> })
+    )
+    .branch(<span class="str">"rejected"</span>, (b) =&gt;
+      b.defaultFlow()
+        .serviceTask(<span class="str">"reject"</span>, {
+          name: <span class="str">"Send Rejection"</span>,
+          taskType: <span class="str">"reject"</span>,
+        })
+        .endEvent(<span class="str">"rejected"</span>, { name: <span class="str">"Rejected"</span> })
+    )
+  .withAutoLayout()
+  .build();</code></pre>
+          </div>
+          <div class="example-diagram" id="diagram-gateway"></div>
+        </div>
+
+        <!-- Parallel -->
+        <div class="example-panel" data-example="parallel">
+          <div class="example-code">
+            <pre><code><span class="kw">const</span> defs = Bpmn.createProcess(<span class="str">"order-fulfillment"</span>)
+  .name(<span class="str">"Order Fulfillment"</span>)
+  .startEvent(<span class="str">"start"</span>, { name: <span class="str">"Order Placed"</span> })
+  .parallelGateway(<span class="str">"fork"</span>)
+    .branch(<span class="str">"payment"</span>, (b) =&gt;
+      b.serviceTask(<span class="str">"pay"</span>, {
+        name: <span class="str">"Process Payment"</span>,
+        taskType: <span class="str">"payment-service"</span>,
+      })
+    )
+    .branch(<span class="str">"inventory"</span>, (b) =&gt;
+      b.serviceTask(<span class="str">"stock"</span>, {
+        name: <span class="str">"Reserve Inventory"</span>,
+        taskType: <span class="str">"inventory-service"</span>,
+      })
+    )
+    .branch(<span class="str">"notifications"</span>, (b) =&gt;
+      b.serviceTask(<span class="str">"email"</span>, {
+        name: <span class="str">"Send Confirmation"</span>,
+        taskType: <span class="str">"email-service"</span>,
+      })
+    )
+  .serviceTask(<span class="str">"ship"</span>, {
+    name: <span class="str">"Ship Order"</span>,
+    taskType: <span class="str">"shipping-service"</span>,
+  })
+  .endEvent(<span class="str">"end"</span>, { name: <span class="str">"Order Complete"</span> })
+  .withAutoLayout()
+  .build();</code></pre>
+          </div>
+          <div class="example-diagram" id="diagram-parallel"></div>
+        </div>
+
+        <!-- AI Agent -->
+        <div class="example-panel" data-example="ai-agent">
+          <div class="example-code">
+            <pre><code><span class="kw">const</span> defs = Bpmn.createProcess(<span class="str">"ai-support-agent"</span>)
+  .name(<span class="str">"AI Support Agent"</span>)
+  .startEvent(<span class="str">"start"</span>, { name: <span class="str">"Ticket Created"</span> })
+  .serviceTask(<span class="str">"enrich"</span>, {
+    name: <span class="str">"Fetch Context"</span>,
+    taskType: <span class="str">"fetch-customer-data"</span>,
+  })
+  .adHocSubProcess(<span class="str">"agent"</span>, (sub) =&gt; {
+    sub
+      .serviceTask(<span class="str">"search"</span>, {
+        name: <span class="str">"Search KB"</span>,
+        taskType: <span class="str">"knowledge-search"</span>,
+      })
+      .serviceTask(<span class="str">"draft"</span>, {
+        name: <span class="str">"Draft Response"</span>,
+        taskType: <span class="str">"draft-reply"</span>,
+      });
+  }, {
+    name: <span class="str">"AI Agent"</span>,
+    taskDefinition: {
+      type: <span class="str">"io.camunda:ai-agent:1"</span>,
+    },
+  })
+  .exclusiveGateway(<span class="str">"check"</span>, { name: <span class="str">"Confidence?"</span> })
+    .branch(<span class="str">"high"</span>, (b) =&gt;
+      b.condition(<span class="str">"= confidence > 0.9"</span>)
+        .serviceTask(<span class="str">"send"</span>, {
+          name: <span class="str">"Auto-Reply"</span>,
+          taskType: <span class="str">"send-reply"</span>,
+        })
+        .endEvent(<span class="str">"resolved"</span>, { name: <span class="str">"Resolved"</span> })
+    )
+    .branch(<span class="str">"low"</span>, (b) =&gt;
+      b.defaultFlow()
+        .userTask(<span class="str">"escalate"</span>, {
+          name: <span class="str">"Human Review"</span>,
+          formId: <span class="str">"review-form"</span>,
+        })
+        .endEvent(<span class="str">"escalated"</span>, { name: <span class="str">"Escalated"</span> })
+    )
+  .withAutoLayout()
+  .build();</code></pre>
+          </div>
+          <div class="example-diagram" id="diagram-ai-agent"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Getting Started -->
+  <section class="getting-started">
+    <div class="container">
+      <h2>Get started in 30 seconds</h2>
+      <div class="steps">
+        <div class="step">
+          <div class="step-num">1</div>
+          <pre><code>npm install @urbanisierung/bpmn-sdk</code></pre>
+        </div>
+        <div class="step">
+          <div class="step-num">2</div>
+          <pre><code><span class="kw">import</span> { Bpmn } <span class="kw">from</span> <span class="str">"@urbanisierung/bpmn-sdk"</span>;
+
+<span class="kw">const</span> xml = Bpmn.export(
+  Bpmn.createProcess(<span class="str">"hello"</span>)
+    .startEvent(<span class="str">"start"</span>)
+    .serviceTask(<span class="str">"task"</span>, {
+      name: <span class="str">"Hello World"</span>,
+      taskType: <span class="str">"greet"</span>,
+    })
+    .endEvent(<span class="str">"end"</span>)
+    .withAutoLayout()
+    .build()
+);</code></pre>
+        </div>
+        <div class="step">
+          <div class="step-num">3</div>
+          <pre><code>console.log(xml);
+<span class="comment">// → Complete BPMN 2.0 XML with diagram</span></code></pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer>
+    <div class="container">
+      <p>
+        <a href="https://github.com/urbanisierung/bpmn-sdk">GitHub</a> ·
+        <a href="https://www.npmjs.com/package/@urbanisierung/bpmn-sdk">npm</a> ·
+        MIT License
+      </p>
+    </div>
+  </footer>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
