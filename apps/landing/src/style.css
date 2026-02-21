@@ -322,19 +322,79 @@ a:hover {
 	color: #546e7a;
 }
 
-.example-diagram {
-	background: #fff;
+.example-output {
+	display: flex;
+	flex-direction: column;
 	border: 1px solid var(--border);
 	border-radius: 12px;
 	overflow: hidden;
 	min-height: 380px;
+}
+
+.output-tabs {
+	display: flex;
+	background: var(--bg-card);
+	border-bottom: 1px solid var(--border);
+	flex-shrink: 0;
+}
+
+.output-tab {
+	flex: 1;
+	background: transparent;
+	border: none;
+	color: var(--text-muted);
+	font-family: var(--font-sans);
+	font-size: 13px;
+	font-weight: 500;
+	padding: 10px 16px;
+	cursor: pointer;
+	transition: all 0.2s;
+	border-bottom: 2px solid transparent;
+}
+
+.output-tab:hover {
+	color: var(--text);
+}
+
+.output-tab.active {
+	color: var(--accent-bright);
+	border-bottom-color: var(--accent-bright);
+}
+
+.output-view {
+	display: none;
+}
+
+.output-view.active {
+	display: block;
+	flex: 1;
+}
+
+.example-diagram {
+	background: #fff;
+	min-height: 340px;
 	position: relative;
 }
 
-/* bpmn-js container styles */
 .example-diagram .bjs-container {
 	width: 100% !important;
 	height: 100% !important;
+}
+
+.example-xml {
+	background: var(--bg-code);
+	overflow: auto;
+	max-height: 520px;
+}
+
+.example-xml pre {
+	margin: 0;
+	padding: 20px;
+	font-family: var(--font-mono);
+	font-size: 12px;
+	line-height: 1.6;
+	color: var(--text-muted);
+	white-space: pre;
 }
 
 /* ---- Getting Started ---- */
