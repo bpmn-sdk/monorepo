@@ -188,5 +188,4 @@ describe("Dmn", () => {
 			expect(table.rules[0]?.description).toBe("test rule");
 		});
 	});
-
 });
