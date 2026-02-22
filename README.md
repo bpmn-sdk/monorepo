@@ -421,8 +421,41 @@ packages/
       xml/           # Generic XML parser/serializer
       types/         # Shared types (XmlElement, ID generator)
     tests/           # Vitest test suites
+apps/
+  examples/          # Runnable example workflows (see Examples section)
 examples/            # 34 real-world BPMN, DMN, and Form files for roundtrip testing
 ```
+
+## Examples
+
+The `apps/examples` package contains five runnable example workflows that demonstrate the SDK's core features.
+
+| File | Demonstrates |
+|---|---|
+| `01-employee-onboarding.ts` | Parallel gateway, business rule task, user tasks, IO mapping |
+| `02-incident-response.ts` | Exclusive gateways, sub-process, multiple end events |
+| `03-loan-approval.ts` | REST connector, chained gateways, `connectTo()` for merging paths |
+| `04-invoice-processing.ts` | Sub-process, inclusive gateway, script task, call activity |
+| `05-content-publishing.ts` | Event-based gateway, intermediate events, parallel post-actions |
+| `06-ai-code-review-agent.ts` | **Ad-hoc sub-process** as Camunda AI agent, tool tasks, webhook start, confidence routing |
+
+### Running the examples
+
+Build the SDK once, then run any example:
+
+```bash
+pnpm install
+pnpm build                                    # build @bpmn-sdk/core first
+
+# Run all five examples (writes BPMN files to apps/examples/output/)
+pnpm --filter @bpmn-sdk/examples all
+
+# Or run a single example
+pnpm --filter @bpmn-sdk/examples 01           # employee onboarding
+pnpm --filter @bpmn-sdk/examples 03           # loan approval
+```
+
+Each script writes a `.bpmn` file to `apps/examples/output/`. Open any file in [Camunda Modeler](https://camunda.com/download/modeler/) or paste the XML into [bpmn.io](https://demo.bpmn.io/) to visualise the generated diagram.
 
 ## Development
 
