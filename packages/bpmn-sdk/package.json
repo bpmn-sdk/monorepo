@@ -1,5 +1,5 @@
 {
-	"name": "@urbanisierung/bpmn-sdk",
+	"name": "@bpmn-sdk/core",
 	"version": "0.0.1",
 	"type": "module",
 	"main": "./dist/index.js",

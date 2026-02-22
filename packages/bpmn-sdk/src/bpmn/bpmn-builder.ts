@@ -1439,7 +1439,7 @@ export class ProcessBuilder {
 		return {
 			id: "Definitions_1",
 			targetNamespace: "http://bpmn.io/schema/bpmn",
-			exporter: "@urbanisierung/bpmn-sdk",
+			exporter: "@bpmn-sdk/core",
 			exporterVersion: "0.0.1",
 			namespaces: {
 				bpmn: "http://www.omg.org/spec/BPMN/20100524/MODEL",

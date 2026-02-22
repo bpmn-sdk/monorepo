@@ -1,5 +1,5 @@
 /**
- * Example: Create a BPMN workflow programmatically using @urbanisierung/bpmn-sdk
+ * Example: Create a BPMN workflow programmatically using @bpmn-sdk/core
  *
  * This script builds an order-processing workflow with:
  * - A start event triggered by an incoming order

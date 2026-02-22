@@ -1,5 +1,5 @@
 {
-	"name": "@urbanisierung/bpmn-sdk-landing",
+	"name": "@bpmn-sdk/landing",
 	"private": true,
 	"version": "0.0.1",
 	"type": "module",

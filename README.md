@@ -1,6 +1,6 @@
-# @urbanisierung/bpmn-sdk
+# @bpmn-sdk/core
 
-[![npm version](https://img.shields.io/npm/v/@urbanisierung/bpmn-sdk)](https://www.npmjs.com/package/@urbanisierung/bpmn-sdk)
+[![npm version](https://img.shields.io/npm/v/@bpmn-sdk/core)](https://www.npmjs.com/package/@bpmn-sdk/core)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-blue)](https://www.typescriptlang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 
@@ -47,15 +47,15 @@ A TypeScript SDK for working with Camunda 8 process automation artifacts — BPM
 ## Installation
 
 ```bash
-npm install @urbanisierung/bpmn-sdk
+npm install @bpmn-sdk/core
 ```
 
 ```bash
-pnpm add @urbanisierung/bpmn-sdk
+pnpm add @bpmn-sdk/core
 ```
 
 ```bash
-yarn add @urbanisierung/bpmn-sdk
+yarn add @bpmn-sdk/core
 ```
 
 ## Quick Start
@@ -63,7 +63,7 @@ yarn add @urbanisierung/bpmn-sdk
 ### BPMN — Build a Process
 
 ```typescript
-import { Bpmn } from "@urbanisierung/bpmn-sdk";
+import { Bpmn } from "@bpmn-sdk/core";
 
 const definitions = Bpmn.createProcess("order-process")
   .name("Order Process")
@@ -91,7 +91,7 @@ const xml = Bpmn.export(definitions);
 ### BPMN — Parse and Inspect
 
 ```typescript
-import { Bpmn } from "@urbanisierung/bpmn-sdk";
+import { Bpmn } from "@bpmn-sdk/core";
 
 const definitions = Bpmn.parse(xml);
 const process = definitions.processes[0];
@@ -111,7 +111,7 @@ for (const element of process.flowElements) {
 ### DMN
 
 ```typescript
-import { Dmn } from "@urbanisierung/bpmn-sdk";
+import { Dmn } from "@bpmn-sdk/core";
 
 // Build a decision table
 const definitions = Dmn.createDecisionTable("risk-level")
@@ -133,7 +133,7 @@ console.log(`${parsed.decisions[0].decisionTable.rules.length} rules`);
 ### Forms
 
 ```typescript
-import { Form } from "@urbanisierung/bpmn-sdk";
+import { Form } from "@bpmn-sdk/core";
 
 const form = Form.create("onboarding")
   .textField({ key: "name", label: "Full Name" })
@@ -158,7 +158,7 @@ const json = Form.export(form);
 Build HTTP connector service tasks with a dedicated convenience API:
 
 ```typescript
-import { Bpmn } from "@urbanisierung/bpmn-sdk";
+import { Bpmn } from "@bpmn-sdk/core";
 
 const definitions = Bpmn.createProcess("api-call")
   .startEvent("start")
@@ -263,8 +263,8 @@ Without `.withAutoLayout()`, the exported XML contains valid BPMN semantics but 
 ### Roundtrip — Parse, Modify, Export
 
 ```typescript
-import { Bpmn } from "@urbanisierung/bpmn-sdk";
-import type { BpmnDefinitions } from "@urbanisierung/bpmn-sdk";
+import { Bpmn } from "@bpmn-sdk/core";
+import type { BpmnDefinitions } from "@bpmn-sdk/core";
 
 // Parse existing BPMN XML
 const definitions: BpmnDefinitions = Bpmn.parse(existingXml);
@@ -286,7 +286,7 @@ import type {
   BpmnDefinitions,
   BpmnServiceTask,
   BpmnFlowElement,
-} from "@urbanisierung/bpmn-sdk";
+} from "@bpmn-sdk/core";
 
 // Use discriminated unions to narrow element types
 function getServiceTasks(definitions: BpmnDefinitions): BpmnServiceTask[] {
@@ -412,7 +412,7 @@ const definitions = Bpmn.createProcess("main")
 
 ```
 packages/
-  bpmn-sdk/          # Main SDK package (@urbanisierung/bpmn-sdk)
+  bpmn-sdk/          # Main SDK package — @bpmn-sdk/core
     src/
       bpmn/          # BPMN parser, serializer, builder, model
       dmn/           # DMN parser, serializer, builder, model
@@ -434,8 +434,8 @@ examples/            # 34 real-world BPMN, DMN, and Form files for roundtrip tes
 ### Setup
 
 ```bash
-git clone https://github.com/urbanisierung/bpmn-sdk.git
-cd bpmn-sdk
+git clone https://github.com/bpmn-sdk/monorepo.git
+cd monorepo
 pnpm install
 ```
 
