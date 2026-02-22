@@ -1,0 +1,22 @@
+{
+	"name": "@bpmn-sdk/examples",
+	"private": true,
+	"version": "0.0.1",
+	"type": "module",
+	"scripts": {
+		"01": "tsx src/01-employee-onboarding.ts",
+		"02": "tsx src/02-incident-response.ts",
+		"03": "tsx src/03-loan-approval.ts",
+		"04": "tsx src/04-invoice-processing.ts",
+		"05": "tsx src/05-content-publishing.ts",
+		"06": "tsx src/06-ai-code-review-agent.ts",
+		"all": "tsx src/run-all.ts"
+	},
+	"dependencies": {
+		"@bpmn-sdk/core": "workspace:*"
+	},
+	"devDependencies": {
+		"@types/node": "^22.0.0",
+		"tsx": "^4.0.0"
+	}
+}
