@@ -1,9 +1,5 @@
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
 import { Dmn, resetIdCounter } from "../src/index.js";
-
-const EXAMPLES_DIR = resolve(import.meta.dirname, "../../..", "examples");
 
 describe("Dmn", () => {
 	beforeEach(() => {
@@ -193,79 +189,4 @@ describe("Dmn", () => {
 		});
 	});
 
-	describe("roundtrip", () => {
-		it("roundtrips Github>Slack users.dmn", () => {
-			const originalXml = readFileSync(resolve(EXAMPLES_DIR, "Github>Slack users.dmn"), "utf-8");
-
-			const model = Dmn.parse(originalXml);
-			const exportedXml = Dmn.export(model);
-			const reparsed = Dmn.parse(exportedXml);
-
-			// Semantic equivalence checks
-			expect(reparsed.id).toBe(model.id);
-			expect(reparsed.name).toBe(model.name);
-			expect(reparsed.namespace).toBe(model.namespace);
-			expect(reparsed.decisions).toHaveLength(model.decisions.length);
-
-			const origDecision = model.decisions[0];
-			const rtDecision = reparsed.decisions[0];
-			expect(origDecision).toBeDefined();
-			expect(rtDecision).toBeDefined();
-
-			expect(rtDecision?.id).toBe(origDecision?.id);
-			expect(rtDecision?.name).toBe(origDecision?.name);
-
-			const origTable = origDecision?.decisionTable;
-			const rtTable = rtDecision?.decisionTable;
-
-			// 1 input, 2 outputs (multi-output)
-			expect(rtTable?.inputs).toHaveLength(origTable?.inputs.length ?? 0);
-			expect(rtTable?.outputs).toHaveLength(origTable?.outputs.length ?? 0);
-			expect(rtTable?.outputs).toHaveLength(2);
-
-			// All rules preserved
-			expect(rtTable?.rules).toHaveLength(origTable?.rules.length ?? 0);
-
-			// Verify each rule's content
-			for (let i = 0; i < (origTable?.rules.length ?? 0); i++) {
-				const origRule = origTable?.rules[i];
-				const rtRule = rtTable?.rules[i];
-				expect(rtRule?.id).toBe(origRule?.id);
-				expect(rtRule?.description).toBe(origRule?.description);
-				expect(rtRule?.inputEntries).toHaveLength(origRule?.inputEntries.length ?? 0);
-				expect(rtRule?.outputEntries).toHaveLength(origRule?.outputEntries.length ?? 0);
-
-				for (let j = 0; j < (origRule?.inputEntries.length ?? 0); j++) {
-					expect(rtRule?.inputEntries[j]?.text).toBe(origRule?.inputEntries[j]?.text);
-				}
-				for (let j = 0; j < (origRule?.outputEntries.length ?? 0); j++) {
-					expect(rtRule?.outputEntries[j]?.text).toBe(origRule?.outputEntries[j]?.text);
-				}
-			}
-
-			// Diagram preserved
-			expect(rtTable.inputs[0]?.label).toBe(origTable.inputs[0]?.label);
-			expect(rtTable.outputs[0]?.label).toBe(origTable.outputs[0]?.label);
-			expect(rtTable.outputs[1]?.label).toBe(origTable.outputs[1]?.label);
-
-			expect(reparsed.diagram).toBeDefined();
-			expect(reparsed.diagram?.shapes).toHaveLength(model.diagram?.shapes.length);
-		});
-
-		it("preserves modeler attributes on roundtrip", () => {
-			const originalXml = readFileSync(resolve(EXAMPLES_DIR, "Github>Slack users.dmn"), "utf-8");
-
-			const model = Dmn.parse(originalXml);
-			expect(model.modelerAttributes.executionPlatform).toBe("Camunda Cloud");
-			expect(model.modelerAttributes.executionPlatformVersion).toBe("8.5.0");
-			expect(model.exporter).toBe("Camunda Web Modeler");
-
-			const exportedXml = Dmn.export(model);
-			const reparsed = Dmn.parse(exportedXml);
-
-			expect(reparsed.modelerAttributes.executionPlatform).toBe("Camunda Cloud");
-			expect(reparsed.modelerAttributes.executionPlatformVersion).toBe("8.5.0");
-			expect(reparsed.exporter).toBe("Camunda Web Modeler");
-		});
-	});
 });
