@@ -76,3 +76,9 @@ export type {
 	Theme,
 	ViewportState,
 } from "./types.js";
+
+// Internal exports for use by @bpmn-sdk/editor
+export { ViewportController } from "./viewport.js";
+export { render, computeDiagramBounds, createDefs, createGrid } from "./renderer.js";
+export { KeyboardHandler } from "./keyboard.js";
+export { injectStyles, CANVAS_CSS, STYLE_ID } from "./css.js";

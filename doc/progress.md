@@ -1,5 +1,29 @@
 # Progress
 
+## 2026-02-23 (3)
+
+### `@bpmn-sdk/editor` package — BPMN diagram editor
+- New package `packages/editor` (`@bpmn-sdk/editor`) — a full BPMN 2.0 diagram editor built on top of `@bpmn-sdk/canvas` internals
+- **Create shapes**: start/end events, service/user tasks, exclusive/parallel gateways via `setTool("create:serviceTask")` etc.
+- **Connect shapes**: drag from shape port to draw sequence flows with auto-computed waypoints
+- **Move shapes**: drag to reposition; multi-select moves all selected shapes together
+- **Resize shapes**: 8-handle resize with minimum size enforcement (20×20)
+- **Delete elements**: removes shapes and all connected sequence flows; cleans up incoming/outgoing references
+- **Undo/redo**: snapshot-based `CommandStack` (up to 100 snapshots); `undo()`, `redo()`, `canUndo()`, `canRedo()`
+- **Selection**: click to select, shift-click to add/remove, rubber-band drag to box-select, `setSelection(ids)` API
+- **Label editing**: double-click shape → `contenteditable` div positioned over SVG; commits on blur/Enter, cancels on Escape
+- **Copy/paste**: `Ctrl+C` / `Ctrl+V` with offset; all IDs regenerated on paste
+- **Export**: `exportXml()` returns BPMN XML via `Bpmn.export()`; load via `load(xml)` or `loadDefinitions(defs)`
+- **Events**: `diagram:change`, `editor:select`, `editor:tool` (all extend `CanvasEvents`); `on()` returns unsubscribe fn
+- **Plugin compatibility**: identical `CanvasApi` for plugins; minimap plugin works unchanged
+- **Keyboard shortcuts**: Delete/Backspace (delete), Ctrl+Z/Y (undo/redo), Ctrl+A (select all), Ctrl+C/V (copy/paste), Escape (cancel/deselect)
+- **Architecture**: 15 source files — `id.ts`, `types.ts`, `rules.ts`, `geometry.ts`, `modeling.ts`, `command-stack.ts`, `css.ts`, `overlay.ts`, `label-editor.ts`, `state-machine.ts`, `editor.ts`, `index.ts`
+- **45 tests** across 3 test files: `modeling.test.ts` (15), `command-stack.test.ts` (13), `editor.test.ts` (17)
+- Modified `packages/canvas/src/viewport.ts`: added `lock(locked: boolean)` method (prevents panning during drags/resizes)
+- Modified `packages/canvas/src/index.ts`: exported internals (`ViewportController`, `render`, `KeyboardHandler`, `injectStyles`, etc.)
+- Modified root `tsconfig.json`: added `packages/editor` reference
+- Verification: `pnpm turbo build typecheck check test` — 6/6 tasks pass, 45 tests pass, zero errors
+
 ## 2026-02-23 (2)
 
 ### `canvas-plugins/` workspace — minimap extracted as a plugin

@@ -30,6 +30,7 @@ export class ViewportController {
 	private _lastX = 0;
 	private _lastY = 0;
 	private _dragDist = 0;
+	private _locked = false;
 
 	// Pinch state
 	private _activePointers = new Map<number, PointerEvent>();
@@ -53,6 +54,14 @@ export class ViewportController {
 	/** Current viewport state snapshot. */
 	get state(): ViewportState {
 		return { tx: this._tx, ty: this._ty, scale: this._scale };
+	}
+
+	/**
+	 * When locked, pointer-down is ignored (no new pan starts) and pointer-move
+	 * does not continue any in-progress pan. Scroll-wheel zoom is unaffected.
+	 */
+	lock(locked: boolean): void {
+		this._locked = locked;
 	}
 
 	/**
@@ -128,6 +137,7 @@ export class ViewportController {
 	private readonly _onPointerDown = (e: PointerEvent): void => {
 		// Only pan with left mouse button (button=0) or touch/pen
 		if (e.pointerType === "mouse" && e.button !== 0) return;
+		if (this._locked) return;
 		this._activePointers.set(e.pointerId, e);
 		this._svg.setPointerCapture(e.pointerId);
 		this._dragDist = 0;
@@ -141,6 +151,7 @@ export class ViewportController {
 
 	private readonly _onPointerMove = (e: PointerEvent): void => {
 		this._activePointers.set(e.pointerId, e);
+		if (this._locked) return;
 
 		if (this._activePointers.size >= 2) {
 			// Two-finger pinch-to-zoom

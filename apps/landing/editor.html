@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>BPMN Editor — bpmn-sdk</title>
+    <style>
+      *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+      body {
+        display: flex;
+        flex-direction: column;
+        height: 100dvh;
+        background: #1a1a2e;
+        color: #e0e0e0;
+        font-family: system-ui, sans-serif;
+        font-size: 13px;
+      }
+
+      /* ── Toolbar ── */
+      #toolbar {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        padding: 6px 10px;
+        background: #12122a;
+        border-bottom: 1px solid #2a2a4a;
+        flex-shrink: 0;
+      }
+
+      #toolbar .sep {
+        width: 1px;
+        height: 22px;
+        background: #2a2a4a;
+        margin: 0 4px;
+      }
+
+      #toolbar button {
+        padding: 4px 10px;
+        background: transparent;
+        border: 1px solid transparent;
+        border-radius: 4px;
+        color: #b0b0c8;
+        cursor: pointer;
+        font-size: 12px;
+        transition: background 0.1s, color 0.1s;
+        white-space: nowrap;
+      }
+
+      #toolbar button:hover { background: #2a2a4a; color: #fff; }
+      #toolbar button.active { background: #0055cc; border-color: #0066ee; color: #fff; }
+      #toolbar button:disabled { opacity: 0.35; cursor: default; }
+      #toolbar button:disabled:hover { background: transparent; color: #b0b0c8; }
+
+      #toolbar .title {
+        font-weight: 600;
+        color: #fff;
+        margin-right: 8px;
+        font-size: 13px;
+      }
+
+      /* ── Canvas ── */
+      #editor-container {
+        flex: 1;
+        overflow: hidden;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="toolbar">
+      <span class="title">BPMN Editor</span>
+      <div class="sep"></div>
+      <button id="btn-select" class="active" title="Select / Move (V)">Select</button>
+      <button id="btn-pan" title="Pan (P)">Pan</button>
+      <div class="sep"></div>
+      <button id="btn-start" title="Create Start Event">Start</button>
+      <button id="btn-end" title="Create End Event">End</button>
+      <button id="btn-service" title="Create Service Task">Service Task</button>
+      <button id="btn-user" title="Create User Task">User Task</button>
+      <button id="btn-xgw" title="Create Exclusive Gateway">X Gateway</button>
+      <button id="btn-pgw" title="Create Parallel Gateway">+ Gateway</button>
+      <div class="sep"></div>
+      <button id="btn-undo" disabled title="Undo (Ctrl+Z)">Undo</button>
+      <button id="btn-redo" disabled title="Redo (Ctrl+Y)">Redo</button>
+      <div class="sep"></div>
+      <button id="btn-fit" title="Fit view (0)">Fit</button>
+    </div>
+    <div id="editor-container"></div>
+    <script type="module" src="/src/editor.ts"></script>
+  </body>
+</html>

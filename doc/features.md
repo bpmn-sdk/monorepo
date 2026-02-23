@@ -1,5 +1,17 @@
 # Features
 
+## BPMN Diagram Editor (2026-02-23) — `@bpmn-sdk/editor`
+- **Full diagram editing** — create, move, resize, connect, delete, label-edit, undo/redo, copy/paste
+- **Tool system** — `setTool("select" | "pan" | "create:serviceTask" | ...)` with `editor:tool` event
+- **Selection** — click, shift-click, rubber-band box-select; `setSelection(ids)` API; `editor:select` event
+- **Undo/redo** — snapshot-based `CommandStack` (100 entries); `canUndo()` / `canRedo()` queries
+- **Inline label editing** — double-click activates `contenteditable` div positioned over the shape
+- **Copy/paste** — clipboard preserves inter-element flows; all IDs regenerated on paste with configurable offset
+- **Export** — `exportXml()` returns BPMN 2.0 XML; `loadDefinitions(defs)` for programmatic model loading
+- **Plugin compatibility** — identical `CanvasApi`; minimap and other canvas plugins work unchanged
+- **Keyboard shortcuts** — Delete, Ctrl+Z/Y, Ctrl+A, Ctrl+C/V, Escape
+- **Events** — `diagram:change`, `editor:select`, `editor:tool` extend `CanvasEvents`
+
 ## Canvas Plugins Workspace (2026-02-23) — `canvas-plugins/*`
 - New pnpm workspace `canvas-plugins/*` for first-party canvas plugin packages
 - **`@bpmn-sdk/canvas-plugin-minimap`** — minimap as an opt-in plugin; install via `plugins: [createMinimapPlugin()]`; handles `diagram:load`, `viewport:change`, `diagram:clear`; navigates via `CanvasApi.setViewport()`; fully self-contained CSS injection
