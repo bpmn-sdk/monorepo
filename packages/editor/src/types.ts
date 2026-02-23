@@ -9,6 +9,9 @@ export type CreateShapeType =
 	| "exclusiveGateway"
 	| "parallelGateway";
 
+/** Element types that support resize handles. */
+export const RESIZABLE_TYPES: ReadonlySet<string> = new Set(["serviceTask", "userTask"]);
+
 export type Tool = "select" | "pan" | `create:${CreateShapeType}`;
 
 export type HandleDir = "nw" | "n" | "ne" | "e" | "se" | "s" | "sw" | "w";

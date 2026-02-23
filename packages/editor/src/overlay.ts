@@ -57,7 +57,7 @@ export class OverlayRenderer {
 
 	// ── Selection + handles ───────────────────────────────────────────
 
-	setSelection(ids: string[], shapes: RenderedShape[]): void {
+	setSelection(ids: string[], shapes: RenderedShape[], resizableIds?: ReadonlySet<string>): void {
 		this._selectionG.innerHTML = "";
 
 		const selected = shapes.filter((s) => ids.includes(s.id));
@@ -81,8 +81,8 @@ export class OverlayRenderer {
 			});
 			this._selectionG.appendChild(outline);
 
-			// Resize handles only for single selection
-			if (isSingle) {
+			// Resize handles only for single selection of resizable elements
+			if (isSingle && resizableIds?.has(shape.id)) {
 				const positions = handlePositions(shape.shape.bounds);
 				for (const dir of ALL_HANDLES) {
 					const pos = positions[dir];

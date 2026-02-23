@@ -6,86 +6,175 @@
     <title>BPMN Editor — bpmn-sdk</title>
     <style>
       *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+      body { height: 100dvh; overflow: hidden; font-family: system-ui, sans-serif; font-size: 13px; }
 
-      body {
-        display: flex;
-        flex-direction: column;
-        height: 100dvh;
-        background: #1a1a2e;
-        color: #e0e0e0;
-        font-family: system-ui, sans-serif;
-        font-size: 13px;
-      }
+      /* Canvas fills the full viewport */
+      #editor-container { position: fixed; inset: 0; }
+      /* Hide the default zoom controls added by the editor */
+      #editor-container .bpmn-controls { display: none; }
 
-      /* ── Toolbar ── */
-      #toolbar {
+      /* ── HUD base ──────────────────────────────────────────────────────── */
+      .hud { position: fixed; z-index: 100; }
+
+      .panel {
         display: flex;
         align-items: center;
-        gap: 4px;
-        padding: 6px 10px;
-        background: #12122a;
-        border-bottom: 1px solid #2a2a4a;
-        flex-shrink: 0;
+        gap: 2px;
+        padding: 4px;
+        background: rgba(22, 22, 30, 0.88);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 10px;
+        box-shadow: 0 2px 16px rgba(0, 0, 0, 0.4);
       }
 
-      #toolbar .sep {
-        width: 1px;
-        height: 22px;
-        background: #2a2a4a;
-        margin: 0 4px;
-      }
+      /* ── HUD positions ─────────────────────────────────────────────────── */
+      #hud-top-center { top: 10px; left: 50%; transform: translateX(-50%); }
+      #hud-top-right  { top: 10px; right: 10px; align-items: center; }
+      #hud-bottom-left   { bottom: 10px; left: 10px; }
+      #hud-bottom-center { bottom: 10px; left: 50%; transform: translateX(-50%); }
+      #ctx-toolbar { display: none; transform: translateX(-50%); }
 
-      #toolbar button {
-        padding: 4px 10px;
+      /* ── Icon buttons ──────────────────────────────────────────────────── */
+      .hud-btn {
+        display: flex; align-items: center; justify-content: center;
+        width: 32px; height: 32px;
         background: transparent;
         border: 1px solid transparent;
-        border-radius: 4px;
-        color: #b0b0c8;
+        border-radius: 6px;
+        color: rgba(255, 255, 255, 0.65);
         cursor: pointer;
-        font-size: 12px;
+        transition: background 0.1s, color 0.1s, border-color 0.1s;
+        padding: 0; flex-shrink: 0;
+      }
+      .hud-btn:hover  { background: rgba(255,255,255,0.08); color: #fff; }
+      .hud-btn.active { background: rgba(255,255,255,0.12); color: #fff; border-color: rgba(255,255,255,0.2); }
+      .hud-btn:disabled { opacity: 0.28; cursor: default; }
+      .hud-btn:disabled:hover { background: transparent; color: rgba(255,255,255,0.65); }
+      .hud-btn svg { width: 16px; height: 16px; pointer-events: none; }
+
+      /* ── Separator ─────────────────────────────────────────────────────── */
+      .hud-sep { width: 1px; height: 20px; background: rgba(255,255,255,0.1); margin: 0 2px; flex-shrink: 0; }
+
+      /* ── Logo ──────────────────────────────────────────────────────────── */
+      #logo-text {
+        padding: 0 6px 0 8px;
+        font-weight: 700; font-size: 12px; letter-spacing: 0.04em;
+        color: rgba(255,255,255,0.75); white-space: nowrap; user-select: none;
+      }
+
+      /* ── Zoom widget ───────────────────────────────────────────────────── */
+      #btn-zoom-current {
+        padding: 0 10px; height: 32px;
+        background: transparent; border: 1px solid transparent; border-radius: 7px;
+        color: rgba(255,255,255,0.65); cursor: pointer;
+        font-size: 12px; font-weight: 600;
         transition: background 0.1s, color 0.1s;
         white-space: nowrap;
       }
+      #btn-zoom-current:hover { background: rgba(255,255,255,0.08); color: #fff; }
 
-      #toolbar button:hover { background: #2a2a4a; color: #fff; }
-      #toolbar button.active { background: #0055cc; border-color: #0066ee; color: #fff; }
-      #toolbar button:disabled { opacity: 0.35; cursor: default; }
-      #toolbar button:disabled:hover { background: transparent; color: #b0b0c8; }
+      #zoom-expanded { display: none; align-items: center; gap: 2px; }
+      #zoom-expanded.open { display: flex; }
 
-      #toolbar .title {
-        font-weight: 600;
-        color: #fff;
-        margin-right: 8px;
-        font-size: 13px;
+      #btn-zoom-pct {
+        padding: 0 8px; height: 30px;
+        background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px;
+        color: rgba(255,255,255,0.8); cursor: pointer;
+        font-size: 12px; font-weight: 600;
+        transition: background 0.1s;
+        white-space: nowrap; min-width: 60px; text-align: center;
       }
+      #btn-zoom-pct:hover { background: rgba(255,255,255,0.12); }
 
-      /* ── Canvas ── */
-      #editor-container {
-        flex: 1;
-        overflow: hidden;
+      /* ── Dropdown menus ────────────────────────────────────────────────── */
+      .dropdown {
+        position: fixed; display: none; flex-direction: column;
+        gap: 1px; padding: 4px;
+        background: rgba(20, 20, 28, 0.96);
+        backdrop-filter: blur(12px);
+        border: 1px solid rgba(255,255,255,0.1);
+        border-radius: 9px;
+        box-shadow: 0 6px 24px rgba(0,0,0,0.5);
+        z-index: 200; min-width: 150px;
+      }
+      .dropdown.open { display: flex; }
+
+      .drop-item {
+        display: flex; align-items: center; gap: 8px;
+        padding: 7px 10px;
+        border: none; background: transparent;
+        color: rgba(255,255,255,0.75); cursor: pointer;
+        border-radius: 6px; font-size: 12px; text-align: left; width: 100%;
+        transition: background 0.1s;
+      }
+      .drop-item:hover { background: rgba(255,255,255,0.08); color: #fff; }
+      .drop-item .di-check { width: 14px; height: 14px; flex-shrink: 0; color: #4c8ef7; }
+      .drop-item .di-icon  { width: 14px; height: 14px; flex-shrink: 0; opacity: 0.7; }
+      .drop-item svg { width: 14px; height: 14px; }
+      .drop-sep { height: 1px; background: rgba(255,255,255,0.08); margin: 3px 0; }
+
+      /* Theme submenu label */
+      .drop-label {
+        padding: 4px 10px 2px;
+        font-size: 10px; font-weight: 600; letter-spacing: 0.06em;
+        color: rgba(255,255,255,0.3); text-transform: uppercase;
       }
     </style>
   </head>
   <body>
-    <div id="toolbar">
-      <span class="title">BPMN Editor</span>
-      <div class="sep"></div>
-      <button id="btn-select" class="active" title="Select / Move (V)">Select</button>
-      <button id="btn-pan" title="Pan (P)">Pan</button>
-      <div class="sep"></div>
-      <button id="btn-start" title="Create Start Event">Start</button>
-      <button id="btn-end" title="Create End Event">End</button>
-      <button id="btn-service" title="Create Service Task">Service Task</button>
-      <button id="btn-user" title="Create User Task">User Task</button>
-      <button id="btn-xgw" title="Create Exclusive Gateway">X Gateway</button>
-      <button id="btn-pgw" title="Create Parallel Gateway">+ Gateway</button>
-      <div class="sep"></div>
-      <button id="btn-undo" disabled title="Undo (Ctrl+Z)">Undo</button>
-      <button id="btn-redo" disabled title="Redo (Ctrl+Y)">Redo</button>
-      <div class="sep"></div>
-      <button id="btn-fit" title="Fit view (0)">Fit</button>
-    </div>
+    <!-- Canvas fills viewport -->
     <div id="editor-container"></div>
+
+    <!-- Top center: action bar -->
+    <div id="hud-top-center" class="hud panel">
+      <button id="btn-undo"      class="hud-btn" title="Undo (Ctrl+Z)"></button>
+      <button id="btn-redo"      class="hud-btn" title="Redo (Ctrl+Y)"></button>
+      <div class="hud-sep"></div>
+      <button id="btn-delete"    class="hud-btn" title="Delete"></button>
+      <button id="btn-duplicate" class="hud-btn" title="Duplicate (Ctrl+D)"></button>
+      <div class="hud-sep"></div>
+      <button id="btn-top-more"  class="hud-btn" title="More actions"></button>
+    </div>
+
+    <!-- Top right: logo + main menu -->
+    <div id="hud-top-right" class="hud panel">
+      <span id="logo-text">BPMN SDK</span>
+      <div class="hud-sep"></div>
+      <button id="btn-menu" class="hud-btn" title="Main menu"></button>
+    </div>
+
+    <!-- Bottom left: zoom control -->
+    <div id="hud-bottom-left" class="hud panel">
+      <button id="btn-zoom-current">100%</button>
+      <div id="zoom-expanded">
+        <button id="btn-zoom-out" class="hud-btn" title="Zoom out (−)"></button>
+        <button id="btn-zoom-pct">100% ▾</button>
+        <button id="btn-zoom-in"  class="hud-btn" title="Zoom in (+)"></button>
+      </div>
+    </div>
+
+    <!-- Bottom center: tool bar -->
+    <div id="hud-bottom-center" class="hud panel">
+      <button class="hud-btn active" data-tool="select"                 title="Select (V)"></button>
+      <button class="hud-btn"        data-tool="pan"                    title="Hand (H)"></button>
+      <div class="hud-sep"></div>
+      <button class="hud-btn"        data-tool="create:startEvent"      title="Start Event"></button>
+      <button class="hud-btn"        data-tool="create:endEvent"        title="End Event"></button>
+      <button class="hud-btn"        data-tool="create:serviceTask"     title="Service Task"></button>
+      <button class="hud-btn"        data-tool="create:userTask"        title="User Task"></button>
+      <button class="hud-btn"        data-tool="create:exclusiveGateway" title="Exclusive Gateway"></button>
+      <button class="hud-btn"        data-tool="create:parallelGateway"  title="Parallel Gateway"></button>
+    </div>
+
+    <!-- Contextual quick-add toolbar -->
+    <div id="ctx-toolbar" class="hud panel"></div>
+
+    <!-- Dropdown menus -->
+    <div id="main-menu"  class="dropdown"></div>
+    <div id="zoom-menu"  class="dropdown"></div>
+    <div id="more-menu"  class="dropdown"></div>
+
     <script type="module" src="/src/editor.ts"></script>
   </body>
 </html>

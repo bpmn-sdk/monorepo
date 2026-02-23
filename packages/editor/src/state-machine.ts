@@ -43,6 +43,7 @@ export interface Callbacks {
 	getSelectedIds(): string[];
 	getViewport(): ViewportState;
 	viewportDidPan(): boolean;
+	isResizable(id: string): boolean;
 	lockViewport(lock: boolean): void;
 	setSelection(ids: string[]): void;
 	previewTranslate(dx: number, dy: number): void;
@@ -111,6 +112,7 @@ export class EditorStateMachine {
 
 		switch (hit.type) {
 			case "handle": {
+				if (!this._cb.isResizable(hit.shapeId)) break;
 				const shapes = this._cb.getShapes();
 				const shape = shapes.find((s) => s.id === hit.shapeId);
 				if (!shape) return;

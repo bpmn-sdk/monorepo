@@ -20,7 +20,7 @@ import { Bpmn } from "@bpmn-sdk/core";
 import type { BpmnDefinitions } from "@bpmn-sdk/core";
 import { CommandStack } from "./command-stack.js";
 import { injectEditorStyles } from "./css.js";
-import { computeWaypoints, screenToDiagram } from "./geometry.js";
+import { computeWaypoints, diagramToScreen, screenToDiagram } from "./geometry.js";
 import { LabelEditor } from "./label-editor.js";
 import {
 	copyElements,
@@ -38,6 +38,7 @@ import { OverlayRenderer } from "./overlay.js";
 import { canConnect } from "./rules.js";
 import { EditorStateMachine } from "./state-machine.js";
 import type { Callbacks } from "./state-machine.js";
+import { RESIZABLE_TYPES } from "./types.js";
 import type {
 	CreateShapeType,
 	DiagPoint,
@@ -173,6 +174,7 @@ export class BpmnEditor {
 			getSelectedIds: () => [...this._selectedIds],
 			getViewport: () => this._viewport.state,
 			viewportDidPan: () => this._viewport.didPan,
+			isResizable: (id) => this._isResizable(id),
 			lockViewport: (lock) => this._viewport.lock(lock),
 			setSelection: (ids) => this._setSelection(ids),
 			previewTranslate: (dx, dy) => this._previewTranslate(dx, dy),
@@ -368,6 +370,18 @@ export class BpmnEditor {
 		this._viewport.zoomAt(width / 2, height / 2, 0.8);
 	}
 
+	setZoom(scale: number): void {
+		const { width, height } = this._svg.getBoundingClientRect();
+		const vp = this._viewport.state;
+		const cx = (width / 2 - vp.tx) / vp.scale;
+		const cy = (height / 2 - vp.ty) / vp.scale;
+		this._viewport.set({ tx: width / 2 - cx * scale, ty: height / 2 - cy * scale, scale });
+	}
+
+	selectAll(): void {
+		this._setSelection(this._shapes.map((s) => s.id));
+	}
+
 	on<K extends keyof EditorEvents>(event: K, handler: EditorEvents[K]): () => void {
 		let set = this._listeners.get(event);
 		if (!set) {
@@ -415,7 +429,7 @@ export class BpmnEditor {
 		this._edges = result.edges;
 		this._defs = defs;
 		this._keyboard.setShapes(this._shapes);
-		this._overlay.setSelection(this._selectedIds, this._shapes);
+		this._overlay.setSelection(this._selectedIds, this._shapes, this._getResizableIds());
 		this._emit("diagram:load", defs);
 	}
 
@@ -429,7 +443,7 @@ export class BpmnEditor {
 
 	private _setSelection(ids: string[]): void {
 		this._selectedIds = ids;
-		this._overlay.setSelection(ids, this._shapes);
+		this._overlay.setSelection(ids, this._shapes, this._getResizableIds());
 		this._emit("editor:select", ids);
 	}
 
@@ -524,6 +538,86 @@ export class BpmnEditor {
 		if (!sourceId) return null;
 		const shape = this._shapes.find((s) => s.id === sourceId);
 		return shape ? shape.shape.bounds : null;
+	}
+
+	// ── New public helpers ─────────────────────────────────────────────
+
+	/** Returns screen-space bounds of a shape (for positioning overlays). */
+	getShapeBounds(id: string): { x: number; y: number; width: number; height: number } | null {
+		const shape = this._shapes.find((s) => s.id === id);
+		if (!shape) return null;
+		const b = shape.shape.bounds;
+		const vp = this._viewport.state;
+		const svgRect = this._svg.getBoundingClientRect();
+		const { x, y } = diagramToScreen(b.x, b.y, vp, svgRect);
+		return { x, y, width: b.width * vp.scale, height: b.height * vp.scale };
+	}
+
+	/** Returns the BPMN element type for a given id, or null if not found. */
+	getElementType(id: string): string | null {
+		return this._shapes.find((s) => s.id === id)?.flowElement?.type ?? null;
+	}
+
+	/**
+	 * Creates a new element of the given type connected to the source shape,
+	 * positioned to its right. Returns the new element's id.
+	 */
+	addConnectedElement(sourceId: string, type: CreateShapeType): string | null {
+		if (!this._defs) return null;
+		const srcShape = this._shapes.find((s) => s.id === sourceId);
+		if (!srcShape) return null;
+		const srcBounds = srcShape.shape.bounds;
+
+		const GAP = 60;
+		let w = 100;
+		let h = 80;
+		if (type === "startEvent" || type === "endEvent") {
+			w = 36;
+			h = 36;
+		} else if (type === "exclusiveGateway" || type === "parallelGateway") {
+			w = 50;
+			h = 50;
+		}
+
+		const newBounds = {
+			x: srcBounds.x + srcBounds.width + GAP,
+			y: srcBounds.y + (srcBounds.height - h) / 2,
+			width: w,
+			height: h,
+		};
+		const r1 = createShape(this._defs, type, newBounds);
+		const waypoints = computeWaypoints(srcBounds, newBounds);
+		const r2 = createConnection(r1.defs, sourceId, r1.id, waypoints);
+
+		this._selectedIds = [r1.id];
+		this._commandStack.push(r2.defs);
+		this._renderDefs(r2.defs);
+		this._emit("diagram:change", r2.defs);
+		this._emit("editor:select", [r1.id]);
+		return r1.id;
+	}
+
+	/** Copies then pastes the current selection with a small offset. */
+	duplicate(): void {
+		this._doCopy();
+		this._doPaste();
+	}
+
+	// ── Private helpers ────────────────────────────────────────────────
+
+	private _isResizable(id: string): boolean {
+		const el = this._shapes.find((s) => s.id === id)?.flowElement;
+		return el !== undefined && RESIZABLE_TYPES.has(el.type);
+	}
+
+	private _getResizableIds(): Set<string> {
+		const ids = new Set<string>();
+		for (const shape of this._shapes) {
+			if (shape.flowElement && RESIZABLE_TYPES.has(shape.flowElement.type)) {
+				ids.add(shape.id);
+			}
+		}
+		return ids;
 	}
 
 	// ── Pointer event handlers ─────────────────────────────────────────
