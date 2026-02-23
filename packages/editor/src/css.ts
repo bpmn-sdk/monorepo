@@ -77,6 +77,14 @@ export const EDITOR_CSS = `
   pointer-events: none;
 }
 
+/* Alignment guide lines (snap helpers) */
+.bpmn-align-guide {
+  stroke: #4c8ef7;
+  stroke-width: 1;
+  stroke-dasharray: 4 2;
+  pointer-events: none;
+}
+
 /* Label editor */
 .bpmn-label-editor {
   position: absolute;

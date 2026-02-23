@@ -2,6 +2,9 @@
 
 ## BPMN Diagram Editor (2026-02-23) — `@bpmn-sdk/editor`
 - **Full diagram editing** — create, move, resize, connect, delete, label-edit, undo/redo, copy/paste
+- **Orthogonal edges** — all sequence flows rendered as H/V-only Z-shaped paths; routes recomputed on shape move
+- **Magnet snap** — shapes snap to aligned edges/centers of neighbors during drag; blue dashed guide lines shown
+- **Contextual toolbar** — arrow icon to draw freehand connections; quick-add buttons for connected elements
 - **Tool system** — `setTool("select" | "pan" | "create:serviceTask" | ...)` with `editor:tool` event
 - **Selection** — click, shift-click, rubber-band box-select; `setSelection(ids)` API; `editor:select` event
 - **Undo/redo** — snapshot-based `CommandStack` (100 entries); `canUndo()` / `canRedo()` queries

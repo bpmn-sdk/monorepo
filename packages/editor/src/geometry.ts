@@ -146,73 +146,43 @@ export function applyResize(
 // ── Waypoints ─────────────────────────────────────────────────────────────────
 
 /**
- * Computes straight-line waypoints connecting the nearest edges of two bounds.
+ * Computes orthogonal (H/V only) waypoints between two shapes.
+ * Produces a Z-shaped path: exit right of source → mid-x column → enter left of target.
+ * When centers share the same Y, produces a straight horizontal segment.
  */
 export function computeWaypoints(src: BpmnBounds, tgt: BpmnBounds): BpmnWaypoint[] {
-	const srcCx = src.x + src.width / 2;
+	const srcRight = src.x + src.width;
 	const srcCy = src.y + src.height / 2;
-	const tgtCx = tgt.x + tgt.width / 2;
+	const tgtLeft = tgt.x;
 	const tgtCy = tgt.y + tgt.height / 2;
 
-	// Find exit point on source boundary
-	const srcPt = boundaryPoint(src, srcCx, srcCy, tgtCx, tgtCy);
-	// Find entry point on target boundary
-	const tgtPt = boundaryPoint(tgt, tgtCx, tgtCy, srcCx, srcCy);
-
-	return [srcPt, tgtPt];
-}
-
-/** Returns the point where the line from (cx, cy) toward (tx, ty) exits bounds. */
-function boundaryPoint(
-	b: BpmnBounds,
-	cx: number,
-	cy: number,
-	tx: number,
-	ty: number,
-): BpmnWaypoint {
-	const dx = tx - cx;
-	const dy = ty - cy;
-	if (dx === 0 && dy === 0) return { x: cx, y: cy };
-
-	const hw = b.width / 2;
-	const hh = b.height / 2;
-
-	// Intersect with each edge; pick closest intersection in the direction of travel
-	let tBest = Number.POSITIVE_INFINITY;
-	let best = { x: cx, y: cy };
-
-	const tryT = (t: number, px: number, py: number): void => {
-		if (t < 0 || t > 1 + 1e-9) return;
-		if (t < tBest) {
-			tBest = t;
-			best = { x: px, y: py };
-		}
-	};
-
-	// Right edge: cx + hw
-	if (dx !== 0) {
-		const t = hw / Math.abs(dx);
-		if (dx > 0) tryT(t, cx + hw, cy + dy * t);
-		else tryT(-hw / dx, cx - hw, cy - dy * (hw / dx) * -1);
-	}
-	// Left edge: cx - hw
-	if (dx !== 0) {
-		const tL = -hw / dx;
-		if (tL >= 0) tryT(tL, cx - hw, cy + dy * tL);
-	}
-	// Bottom edge: cy + hh
-	if (dy !== 0) {
-		const t = hh / Math.abs(dy);
-		if (dy > 0) tryT(t, cx + dx * t, cy + hh);
-		else tryT(-hh / dy, cx + dx * (-hh / dy), cy - hh);
-	}
-	// Top edge: cy - hh
-	if (dy !== 0) {
-		const tT = -hh / dy;
-		if (tT >= 0) tryT(tT, cx + dx * tT, cy - hh);
+	// Same Y center → straight horizontal
+	if (Math.abs(srcCy - tgtCy) < 2) {
+		return [
+			{ x: srcRight, y: srcCy },
+			{ x: tgtLeft, y: tgtCy },
+		];
 	}
 
-	return best;
+	// Target to the right (normal layout) → Z-shape through midpoint column
+	if (tgtLeft >= srcRight - 20) {
+		const midX = Math.round((srcRight + tgtLeft) / 2);
+		return [
+			{ x: srcRight, y: srcCy },
+			{ x: midX, y: srcCy },
+			{ x: midX, y: tgtCy },
+			{ x: tgtLeft, y: tgtCy },
+		];
+	}
+
+	// Target to the left or overlapping → loop out to the right
+	const loopX = Math.max(srcRight, tgt.x + tgt.width) + 50;
+	return [
+		{ x: srcRight, y: srcCy },
+		{ x: loopX, y: srcCy },
+		{ x: loopX, y: tgtCy },
+		{ x: tgtLeft, y: tgtCy },
+	];
 }
 
 // ── Selection bounds ──────────────────────────────────────────────────────────

@@ -1,7 +1,7 @@
 import type { RenderedShape } from "@bpmn-sdk/canvas";
 import type { BpmnBounds } from "@bpmn-sdk/core";
-import { handlePositions, portPositions } from "./geometry.js";
-import type { CreateShapeType, DiagPoint, HandleDir, PortDir } from "./types.js";
+import { handlePositions } from "./geometry.js";
+import type { CreateShapeType, DiagPoint, HandleDir } from "./types.js";
 
 const NS = "http://www.w3.org/2000/svg";
 
@@ -14,10 +14,8 @@ function attr(el: Element, attrs: Record<string, string | number>): void {
 }
 
 const HANDLE_SIZE = 7;
-const PORT_RADIUS = 6;
 
 const ALL_HANDLES: HandleDir[] = ["nw", "n", "ne", "e", "se", "s", "sw", "w"];
-const ALL_PORTS: PortDir[] = ["top", "right", "bottom", "left"];
 
 /**
  * Renders editor overlays (selection handles, connection ports, rubber-band,
@@ -35,6 +33,7 @@ export class OverlayRenderer {
 	private readonly _resizePreviewG: SVGGElement;
 	private readonly _ghostConnG: SVGGElement;
 	private readonly _ghostCreateG: SVGGElement;
+	private readonly _alignG: SVGGElement;
 
 	constructor(overlayGroup: SVGGElement, markerId: string) {
 		this._g = overlayGroup;
@@ -46,11 +45,13 @@ export class OverlayRenderer {
 		this._resizePreviewG = svgEl("g");
 		this._ghostConnG = svgEl("g");
 		this._ghostCreateG = svgEl("g");
+		this._alignG = svgEl("g");
 
 		this._g.appendChild(this._ghostCreateG);
 		this._g.appendChild(this._ghostConnG);
 		this._g.appendChild(this._rubberG);
 		this._g.appendChild(this._resizePreviewG);
+		this._g.appendChild(this._alignG);
 		this._g.appendChild(this._selectionG);
 		this._g.appendChild(this._portsG);
 	}
@@ -104,25 +105,25 @@ export class OverlayRenderer {
 
 	// ── Hover ports ───────────────────────────────────────────────────
 
-	setHovered(id: string | null, shapes: RenderedShape[]): void {
+	setHovered(_id: string | null, _shapes: RenderedShape[]): void {
+		// Port balls removed — connections are initiated via the contextual toolbar
 		this._portsG.innerHTML = "";
-		if (!id) return;
+	}
 
-		const shape = shapes.find((s) => s.id === id);
-		if (!shape) return;
+	// ── Alignment guides ──────────────────────────────────────────────
 
-		const ports = portPositions(shape.shape.bounds);
-		for (const port of ports) {
-			const circle = svgEl("circle");
-			attr(circle, {
-				class: "bpmn-conn-port",
-				"data-bpmn-port": port.dir,
-				"data-bpmn-id": id,
-				cx: port.x,
-				cy: port.y,
-				r: PORT_RADIUS,
+	setAlignmentGuides(guides: Array<{ x1: number; y1: number; x2: number; y2: number }>): void {
+		this._alignG.innerHTML = "";
+		for (const guide of guides) {
+			const line = svgEl("line");
+			attr(line, {
+				class: "bpmn-align-guide",
+				x1: guide.x1,
+				y1: guide.y1,
+				x2: guide.x2,
+				y2: guide.y2,
 			});
-			this._portsG.appendChild(circle);
+			this._alignG.appendChild(line);
 		}
 	}
 

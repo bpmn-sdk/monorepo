@@ -107,6 +107,18 @@ export class EditorStateMachine {
 		// Pan mode: viewport handles this
 		if (mode.mode === "pan") return;
 
+		// If already in connecting mode (entered from contextual toolbar), a click commits or cancels
+		if (mode.sub.name === "connecting") {
+			this._cb.lockViewport(false);
+			if (hit.type === "shape" && hit.id !== mode.sub.sourceId) {
+				this._cb.commitConnect(mode.sub.sourceId, hit.id);
+			} else {
+				this._cb.cancelConnect();
+			}
+			this._mode = { mode: "select", sub: { name: "idle", hoveredId: null } };
+			return;
+		}
+
 		// In label-editing mode: clicking elsewhere commits label (via blur) — do nothing here
 		if (mode.sub.name === "editing-label") return;
 

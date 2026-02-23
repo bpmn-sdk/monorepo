@@ -245,24 +245,19 @@ export function moveShapes(
 
 		const newWps = [...edge.waypoints];
 		if (srcMove && tgtMove) {
-			// Both endpoints moving — translate all waypoints by source delta (same since both move together)
+			// Both endpoints moving — translate all waypoints together
 			return {
 				...edge,
 				waypoints: newWps.map((wp) => ({ x: wp.x + srcMove.dx, y: wp.y + srcMove.dy })),
 			};
 		}
-		if (srcMove) {
-			const first = newWps[0];
-			if (first) {
-				newWps[0] = { x: first.x + srcMove.dx, y: first.y + srcMove.dy };
-			}
-		} else if (tgtMove) {
-			const last = newWps[newWps.length - 1];
-			if (last) {
-				newWps[newWps.length - 1] = { x: last.x + tgtMove.dx, y: last.y + tgtMove.dy };
-			}
+		// Only one endpoint moves — recompute orthogonal route from updated shape positions
+		const srcShape = newShapes.find((s) => s.bpmnElement === flow.sourceRef);
+		const tgtShape = newShapes.find((s) => s.bpmnElement === flow.targetRef);
+		if (srcShape && tgtShape) {
+			return { ...edge, waypoints: computeWaypoints(srcShape.bounds, tgtShape.bounds) };
 		}
-		return { ...edge, waypoints: newWps };
+		return edge;
 	});
 
 	return {

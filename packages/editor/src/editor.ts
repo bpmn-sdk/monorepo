@@ -104,6 +104,7 @@ export class BpmnEditor {
 	private _theme: Theme;
 	private _fit: FitMode;
 	private _clipboard: Clipboard | null = null;
+	private _snapDelta: { dx: number; dy: number } | null = null;
 
 	// ── Events ─────────────────────────────────────────────────────────
 	private readonly _listeners = new Map<string, Set<(...args: unknown[]) => void>>();
@@ -448,15 +449,20 @@ export class BpmnEditor {
 	}
 
 	private _previewTranslate(dx: number, dy: number): void {
+		const snapped = this._computeSnap(dx, dy);
+		this._snapDelta = snapped;
 		for (const id of this._selectedIds) {
 			const shape = this._shapes.find((s) => s.id === id);
 			if (!shape) continue;
 			const { x, y } = shape.shape.bounds;
-			shape.element.setAttribute("transform", `translate(${x + dx} ${y + dy})`);
+			shape.element.setAttribute("transform", `translate(${x + snapped.dx} ${y + snapped.dy})`);
 		}
+		this._overlay.setAlignmentGuides(this._computeAlignGuides(snapped.dx, snapped.dy));
 	}
 
 	private _cancelTranslate(): void {
+		this._snapDelta = null;
+		this._overlay.setAlignmentGuides([]);
 		for (const id of this._selectedIds) {
 			const shape = this._shapes.find((s) => s.id === id);
 			if (!shape) continue;
@@ -466,7 +472,10 @@ export class BpmnEditor {
 	}
 
 	private _commitTranslate(dx: number, dy: number): void {
-		const moves = this._selectedIds.map((id) => ({ id, dx, dy }));
+		const snap = this._snapDelta ?? { dx, dy };
+		this._snapDelta = null;
+		this._overlay.setAlignmentGuides([]);
+		const moves = this._selectedIds.map((id) => ({ id, dx: snap.dx, dy: snap.dy }));
 		this._executeCommand((d) => moveShapes(d, moves));
 	}
 
@@ -603,6 +612,20 @@ export class BpmnEditor {
 		this._doPaste();
 	}
 
+	/**
+	 * Enters connection-drawing mode with the given shape as source.
+	 * The user then moves the mouse and clicks a target shape to complete the connection.
+	 */
+	startConnectionFrom(sourceId: string): void {
+		const shape = this._shapes.find((s) => s.id === sourceId);
+		if (!shape) return;
+		this._viewport.lock(true);
+		this._stateMachine.setMode({
+			mode: "select",
+			sub: { name: "connecting", sourceId, ghostEnd: { x: 0, y: 0 } },
+		});
+	}
+
 	// ── Private helpers ────────────────────────────────────────────────
 
 	private _isResizable(id: string): boolean {
@@ -618,6 +641,103 @@ export class BpmnEditor {
 			}
 		}
 		return ids;
+	}
+
+	// ── Snap / alignment guides ───────────────────────────────────────
+
+	private _computeSnap(dx: number, dy: number): { dx: number; dy: number } {
+		const selectedSet = new Set(this._selectedIds);
+		const movingShapes = this._shapes.filter((s) => selectedSet.has(s.id));
+		const staticShapes = this._shapes.filter((s) => !selectedSet.has(s.id));
+		if (movingShapes.length === 0 || staticShapes.length === 0) return { dx, dy };
+
+		const scale = this._viewport.state.scale;
+		const threshold = 8 / scale;
+
+		const movingXVals: number[] = [];
+		const movingYVals: number[] = [];
+		for (const s of movingShapes) {
+			const b = s.shape.bounds;
+			movingXVals.push(b.x + dx, b.x + dx + b.width / 2, b.x + dx + b.width);
+			movingYVals.push(b.y + dy, b.y + dy + b.height / 2, b.y + dy + b.height);
+		}
+
+		const staticXVals: number[] = [];
+		const staticYVals: number[] = [];
+		for (const s of staticShapes) {
+			const b = s.shape.bounds;
+			staticXVals.push(b.x, b.x + b.width / 2, b.x + b.width);
+			staticYVals.push(b.y, b.y + b.height / 2, b.y + b.height);
+		}
+
+		let bestDx = dx;
+		let bestDy = dy;
+		let minDistX = threshold;
+		let minDistY = threshold;
+
+		for (const mx of movingXVals) {
+			for (const sx of staticXVals) {
+				const dist = Math.abs(mx - sx);
+				if (dist < minDistX) {
+					minDistX = dist;
+					bestDx = dx + (sx - mx);
+				}
+			}
+		}
+
+		for (const my of movingYVals) {
+			for (const sy of staticYVals) {
+				const dist = Math.abs(my - sy);
+				if (dist < minDistY) {
+					minDistY = dist;
+					bestDy = dy + (sy - my);
+				}
+			}
+		}
+
+		return { dx: bestDx, dy: bestDy };
+	}
+
+	private _computeAlignGuides(
+		dx: number,
+		dy: number,
+	): Array<{ x1: number; y1: number; x2: number; y2: number }> {
+		const selectedSet = new Set(this._selectedIds);
+		const movingShapes = this._shapes.filter((s) => selectedSet.has(s.id));
+		const staticShapes = this._shapes.filter((s) => !selectedSet.has(s.id));
+		if (movingShapes.length === 0 || staticShapes.length === 0) return [];
+
+		const guides: Array<{ x1: number; y1: number; x2: number; y2: number }> = [];
+		const EXT = 2000;
+
+		for (const ms of movingShapes) {
+			const mb = ms.shape.bounds;
+			const mxVals = [mb.x + dx, mb.x + dx + mb.width / 2, mb.x + dx + mb.width];
+			const myVals = [mb.y + dy, mb.y + dy + mb.height / 2, mb.y + dy + mb.height];
+
+			for (const ss of staticShapes) {
+				const sb = ss.shape.bounds;
+				const sxVals = [sb.x, sb.x + sb.width / 2, sb.x + sb.width];
+				const syVals = [sb.y, sb.y + sb.height / 2, sb.y + sb.height];
+
+				for (const mx of mxVals) {
+					for (const sx of sxVals) {
+						if (Math.abs(mx - sx) < 1) {
+							guides.push({ x1: mx, y1: -EXT, x2: mx, y2: EXT });
+						}
+					}
+				}
+				for (const my of myVals) {
+					for (const sy of syVals) {
+						if (Math.abs(my - sy) < 1) {
+							guides.push({ x1: -EXT, y1: my, x2: EXT, y2: my });
+						}
+					}
+				}
+			}
+		}
+
+		return guides;
 	}
 
 	// ── Pointer event handlers ─────────────────────────────────────────

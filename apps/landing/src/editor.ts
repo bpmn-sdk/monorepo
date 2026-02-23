@@ -25,6 +25,7 @@ const IC = {
 	moon: `<svg viewBox="0 0 16 16" fill="currentColor"><path d="M13 9.5a6 6 0 1 1-7.5-7.5 7 7 0 0 0 7.5 7.5z"/></svg>`,
 	sun: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="8" cy="8" r="2.8"/><line x1="8" y1="1.5" x2="8" y2="3"/><line x1="8" y1="13" x2="8" y2="14.5"/><line x1="1.5" y1="8" x2="3" y2="8"/><line x1="13" y1="8" x2="14.5" y2="8"/><line x1="3.3" y1="3.3" x2="4.4" y2="4.4"/><line x1="11.6" y1="11.6" x2="12.7" y2="12.7"/><line x1="3.3" y1="12.7" x2="4.4" y2="11.6"/><line x1="11.6" y1="4.4" x2="12.7" y2="3.3"/></svg>`,
 	auto: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="8" cy="8" r="5.5"/><path d="M8 8V3.5"/><path d="M8 8l3.2 2"/></svg>`,
+	arrow: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="2" y1="8" x2="11" y2="8"/><polyline points="8,5 12,8 8,11"/></svg>`,
 };
 
 // ── Sample XML ────────────────────────────────────────────────────────────────
@@ -88,7 +89,7 @@ const editor = new BpmnEditor({
 	xml: SAMPLE_XML,
 	theme: currentTheme,
 	grid: true,
-	fit: "contain",
+	fit: "center",
 });
 
 // ── DOM refs ──────────────────────────────────────────────────────────────────
@@ -360,9 +361,24 @@ const CTX_OPTIONS: Array<{ type: CreateShapeType; icon: string; title: string }>
 
 function buildCtxToolbar(sourceId: string, sourceType: string): void {
 	ctxToolbar.innerHTML = "";
+	if (sourceType === "endEvent") return;
+
+	// Arrow: manually draw a connection to any target
+	const arrowBtn = document.createElement("button");
+	arrowBtn.className = "hud-btn";
+	arrowBtn.innerHTML = IC.arrow;
+	arrowBtn.title = "Connect to element (click target)";
+	arrowBtn.addEventListener("click", () => {
+		editor.startConnectionFrom(sourceId);
+		hideCtxToolbar();
+	});
+	ctxToolbar.appendChild(arrowBtn);
+
+	const sep = document.createElement("div");
+	sep.className = "hud-sep";
+	ctxToolbar.appendChild(sep);
+
 	for (const opt of CTX_OPTIONS) {
-		// Don't offer to connect from endEvent or add another gateway to a gateway
-		if (sourceType === "endEvent") continue;
 		if (
 			(sourceType === "exclusiveGateway" || sourceType === "parallelGateway") &&
 			opt.type === "exclusiveGateway"
