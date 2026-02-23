@@ -371,14 +371,8 @@ a:hover {
 }
 
 .example-diagram {
-	background: #fff;
 	min-height: 340px;
 	position: relative;
-}
-
-.example-diagram .bjs-container {
-	width: 100% !important;
-	height: 100% !important;
 }
 
 .example-xml {

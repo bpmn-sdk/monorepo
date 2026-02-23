@@ -1,5 +1,105 @@
 # Progress
 
+## 2026-02-23 (6)
+
+### `@bpmn-sdk/editor` — Configure bar, edge split, label fix, scriptTask
+- **Fix: label moves with shape** — `moveShapes` now also translates `BpmnDiShape.label.bounds` by `(dx, dy)` when present; previously external labels on events/gateways stayed behind when the shape was moved
+- **Edge split on drop** — dragging a shape over an existing sequence flow highlights the edge in green; dropping inserts the shape between source and target (original edge removed, two new connections created); edges connected to the dragged shape are excluded; `insertShapeOnEdge(defs, edgeId, shapeId)` new modeling function
+- **Configure bar above element** — a new HUD panel appears above the selected element with type-switching buttons and label-position picker; replaces label position from the below bar
+  - Tasks: service task / user task / script task type switcher (active button shows current type)
+  - Gateways: exclusive gateway / parallel gateway type switcher + label position
+  - Events: label position only
+- **`changeElementType(id, newType)`** — new `BpmnEditor` public method; preserves element id, name, incoming, and outgoing; uses new `changeElementType(defs, id, newType)` modeling function
+- **`scriptTask` added** to `CreateShapeType`; added to `RESIZABLE_TYPES`; `makeFlowElement` handles it; ghost create shape renders as rectangle (correct for tasks)
+- **5 new tests** in `tests/modeling.test.ts`: label-bounds translation, changeElementType (gateway, task, scriptTask), insertShapeOnEdge split
+
+## 2026-02-23 (5)
+
+### `@bpmn-sdk/editor` — Label positions and edge endpoint repositioning
+- **External labels for events/gateways**: canvas renderer always renders external labels for startEvent, endEvent, intermediateEvents, boundaryEvent, exclusiveGateway, parallelGateway, inclusiveGateway, eventBasedGateway when the element has a name; default position is bottom-centered (80×20px, 6px gap)
+- **`setLabelPosition(shapeId, position)`**: new `BpmnEditor` public method; accepts 8 positions: `"bottom" | "top" | "left" | "right" | "bottom-left" | "bottom-right" | "top-left" | "top-right"`; persists label bounds in BPMN DI
+- **Label position dropdown**: contextual toolbar now shows a compass icon for events and gateways; clicking opens a dropdown with 4 options (events) or 8 options (gateways)
+- **End event in contextual toolbar**: end events now show a contextual toolbar with the label position option (previously hidden entirely)
+- **`LabelPosition` type exported** from `@bpmn-sdk/editor`
+- **Edge selection**: clicking on a sequence flow line selects it and shows draggable endpoint balls at start and end; edge and shape selection are mutually exclusive
+- **Edge endpoint repositioning**: dragging an endpoint ball snaps it to the nearest port (top/right/bottom/left) of the source or target shape; route is recomputed orthogonally via `computeWaypointsWithPorts`
+- **Transparent edge hit areas**: invisible 12px-wide stroke polylines added to each edge group for easier clicking
+- **Delete edge**: pressing Delete/Backspace while an edge is selected removes it
+- **`deleteElements` handles flow IDs**: `deleteElements` now also removes sequence flows when their own ID is in the `ids` array (not just when their source/target is deleted)
+- **Port-aware waypoint routing** (`computeWaypointsWithPorts`): H+H (Z or U), V+V (Z or U), H+V / V+H (L-route) — all combinations handled orthogonally
+
+## 2026-02-23 (4)
+
+### `@bpmn-sdk/editor` — UX improvements
+- **Orthogonal edges**: `computeWaypoints` now produces H/V-only paths (Z-shape with 4 waypoints or straight horizontal); `boundaryPoint` diagonal routing removed
+- **Edge recompute on move**: `moveShapes` recomputes orthogonal waypoints from updated shape bounds when only one endpoint moves
+- **Hover port balls removed**: `OverlayRenderer.setHovered` no longer renders connection port circles — connections are initiated exclusively via the contextual toolbar
+- **Arrow button in contextual toolbar**: clicking the arrow icon enters connection-drawing mode; user then clicks any target shape to complete the connection
+- **`startConnectionFrom(sourceId)`**: new `BpmnEditor` public method to programmatically enter connecting mode from a specific source shape
+- **Click-to-connect state machine**: `EditorStateMachine.onPointerDown` now handles the `connecting` sub-state — a click commits or cancels the in-progress connection (supports ctx-toolbar flow alongside existing drag-from-port flow)
+- **Magnet snap helpers**: during shape translate, cursor snaps to aligned edges/centers of non-selected shapes within 8 screen pixels; blue dashed alignment guides rendered in overlay while dragging
+- **Landing page 100% zoom**: editor now opens at `fit: "center"` (1:1 scale) instead of `fit: "contain"`
+
+## 2026-02-23 (3)
+
+### `@bpmn-sdk/editor` package — BPMN diagram editor
+- New package `packages/editor` (`@bpmn-sdk/editor`) — a full BPMN 2.0 diagram editor built on top of `@bpmn-sdk/canvas` internals
+- **Create shapes**: start/end events, service/user tasks, exclusive/parallel gateways via `setTool("create:serviceTask")` etc.
+- **Connect shapes**: drag from shape port to draw sequence flows with auto-computed waypoints
+- **Move shapes**: drag to reposition; multi-select moves all selected shapes together
+- **Resize shapes**: 8-handle resize with minimum size enforcement (20×20)
+- **Delete elements**: removes shapes and all connected sequence flows; cleans up incoming/outgoing references
+- **Undo/redo**: snapshot-based `CommandStack` (up to 100 snapshots); `undo()`, `redo()`, `canUndo()`, `canRedo()`
+- **Selection**: click to select, shift-click to add/remove, rubber-band drag to box-select, `setSelection(ids)` API
+- **Label editing**: double-click shape → `contenteditable` div positioned over SVG; commits on blur/Enter, cancels on Escape
+- **Copy/paste**: `Ctrl+C` / `Ctrl+V` with offset; all IDs regenerated on paste
+- **Export**: `exportXml()` returns BPMN XML via `Bpmn.export()`; load via `load(xml)` or `loadDefinitions(defs)`
+- **Events**: `diagram:change`, `editor:select`, `editor:tool` (all extend `CanvasEvents`); `on()` returns unsubscribe fn
+- **Plugin compatibility**: identical `CanvasApi` for plugins; minimap plugin works unchanged
+- **Keyboard shortcuts**: Delete/Backspace (delete), Ctrl+Z/Y (undo/redo), Ctrl+A (select all), Ctrl+C/V (copy/paste), Escape (cancel/deselect)
+- **Architecture**: 15 source files — `id.ts`, `types.ts`, `rules.ts`, `geometry.ts`, `modeling.ts`, `command-stack.ts`, `css.ts`, `overlay.ts`, `label-editor.ts`, `state-machine.ts`, `editor.ts`, `index.ts`
+- **45 tests** across 3 test files: `modeling.test.ts` (15), `command-stack.test.ts` (13), `editor.test.ts` (17)
+- Modified `packages/canvas/src/viewport.ts`: added `lock(locked: boolean)` method (prevents panning during drags/resizes)
+- Modified `packages/canvas/src/index.ts`: exported internals (`ViewportController`, `render`, `KeyboardHandler`, `injectStyles`, etc.)
+- Modified root `tsconfig.json`: added `packages/editor` reference
+- Verification: `pnpm turbo build typecheck check test` — 6/6 tasks pass, 45 tests pass, zero errors
+
+## 2026-02-23 (2)
+
+### `canvas-plugins/` workspace — minimap extracted as a plugin
+- New pnpm workspace glob `canvas-plugins/*` added to `pnpm-workspace.yaml`
+- New package `canvas-plugins/minimap` → `@bpmn-sdk/canvas-plugin-minimap`
+  - `Minimap` class moved from `packages/canvas/src/minimap.ts` — import `ViewportState` from `@bpmn-sdk/canvas`, `BpmnDefinitions` from `@bpmn-sdk/core`
+  - Added `Minimap.clear()` method (clears shapes, edges, resets viewport rect)
+  - Minimap CSS extracted to `canvas-plugins/minimap/src/css.ts` with its own `injectMinimapStyles()` / `MINIMAP_STYLE_ID`
+  - `createMinimapPlugin()` factory returns a `CanvasPlugin` that: installs minimap into `api.container`, subscribes to `diagram:load` / `viewport:change` / `diagram:clear`, navigates by calling `api.setViewport()`, and tears everything down on `uninstall()`
+  - 9 tests in `canvas-plugins/minimap/tests/minimap-plugin.test.ts`
+- Removed from `packages/canvas`: `minimap.ts`, `CanvasOptions.minimap`, minimap CSS, `_minimap` field, `_showMinimap` field, `_syncMinimap()` method, minimap construction and update calls, `--bpmn-viewport-fill`/`--bpmn-viewport-stroke` CSS vars
+- Landing page updated: imports `createMinimapPlugin` from `@bpmn-sdk/canvas-plugin-minimap`, passes it via `plugins: [createMinimapPlugin()]`; removed `minimap: true` option
+- Verification: `pnpm turbo build typecheck check test` — 15/15 tasks pass, zero errors
+
+## 2026-02-23
+
+### `@bpmn-sdk/canvas` package — BPMN diagram viewer
+- New package `packages/canvas` (`@bpmn-sdk/canvas`) — a zero-dependency, framework-agnostic SVG BPMN viewer
+- **SVG rendering**: shapes (events, tasks, gateways, annotations), edges with arrowheads, text labels — all layered (edges → shapes → labels)
+- **Viewport**: pan (pointer drag), zoom (wheel + pinch), click-vs-drag discrimination (4px threshold), RAF-batched transforms for 60fps
+- **Infinite dot-grid** via SVG `<pattern>` with `patternTransform` synced to viewport
+- **Minimap**: 160×100px overview in bottom-right corner; simplified rects/circles + polylines; click-to-pan
+- **Themes**: light (default), dark (`data-theme="dark"` attribute), auto (follows `prefers-color-scheme`)
+- **Fit modes**: `"contain"` (scale to fit), `"center"` (1:1 zoom, centred), `"none"` (no auto-fit)
+- **Accessibility**: `role="application"`, focusable shape elements (`tabindex="-1"`), Tab/Shift+Tab navigation, Enter/Space to click, arrow keys to pan, +/- to zoom, 0 to fit
+- **Plugin system**: `CanvasPlugin` interface with `install(api: CanvasApi)` / `uninstall()` lifecycle; `CanvasApi` exposes shapes, edges, viewport, events
+- **Events**: `diagram:load`, `diagram:clear`, `element:click`, `element:focus`, `element:blur`, `viewport:change`; `on()` returns unsubscribe function
+- **CSS injection**: `injectStyles()` idempotently injects styles once; all CSS via custom properties for easy theming
+- **ResizeObserver**: auto re-fits on container resize
+- **Zoom controls**: +/−/⊡ buttons injected into DOM
+- **14 tests** in `packages/canvas/tests/canvas.test.ts` (happy-dom environment)
+- **Landing page updated**: replaced `bpmn-js` with `@bpmn-sdk/canvas`; removed bpmn.io CSS; diagrams render in dark theme with grid + minimap
+- **Bundle size**: 112KB JS / 25.95KB gzip (vs bpmn-js which is ~500KB+)
+- **GitHub Actions fix**: `.github/workflows/deploy-pages.yml` — changed `actions/upload-pages-artifact@v3` to `actions/upload-artifact@v4` (required by `actions/deploy-pages@v4`)
+- Verification: `pnpm turbo build typecheck check test` — 11/11 tasks pass, zero errors
+
 ## 2026-02-21
 
 ### XML Output Tabs on Landing Page

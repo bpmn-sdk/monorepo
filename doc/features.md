@@ -1,5 +1,44 @@
 # Features
 
+## BPMN Diagram Editor (2026-02-23) — `@bpmn-sdk/editor`
+- **Full diagram editing** — create, move, resize, connect, delete, label-edit, undo/redo, copy/paste; type switching (task/gateway subtypes)
+- **Edge split on drop** — drag a shape over a sequence flow to highlight it (green); release to insert the shape between source and target, splitting the edge
+- **Configure bar (above element)** — type switcher for tasks and gateways; label position picker for events and gateways; positioned above the selected shape
+- **`changeElementType(id, newType)`** — changes a flow element's type while preserving id, name, and connections
+- **Orthogonal edges** — all sequence flows rendered as H/V-only Z-shaped paths; routes recomputed on shape move; endpoint repositioning via drag
+- **Edge endpoint repositioning** — click edge to select; drag start/end balls to reposition on source/target port (top/right/bottom/left); route recomputed via port-aware orthogonal routing
+- **External label positions** — events and gateways show labels outside the shape; 8 positions via `setLabelPosition(id, pos)`; contextual toolbar compass icon to choose
+- **Magnet snap** — shapes snap to aligned edges/centers of neighbors during drag; blue dashed guide lines shown
+- **Contextual toolbar** — arrow icon to draw freehand connections; quick-add buttons for connected elements; label position picker for events/gateways
+- **Tool system** — `setTool("select" | "pan" | "create:serviceTask" | ...)` with `editor:tool` event
+- **Selection** — click, shift-click, rubber-band box-select; `setSelection(ids)` API; `editor:select` event; edge selection independent of shape selection
+- **Undo/redo** — snapshot-based `CommandStack` (100 entries); `canUndo()` / `canRedo()` queries
+- **Inline label editing** — double-click activates `contenteditable` div positioned over the shape
+- **Copy/paste** — clipboard preserves inter-element flows; all IDs regenerated on paste with configurable offset
+- **Export** — `exportXml()` returns BPMN 2.0 XML; `loadDefinitions(defs)` for programmatic model loading
+- **Plugin compatibility** — identical `CanvasApi`; minimap and other canvas plugins work unchanged
+- **Keyboard shortcuts** — Delete (shapes and edges), Ctrl+Z/Y, Ctrl+A, Ctrl+C/V, Escape
+- **Events** — `diagram:change`, `editor:select`, `editor:tool` extend `CanvasEvents`
+
+## Canvas Plugins Workspace (2026-02-23) — `canvas-plugins/*`
+- New pnpm workspace `canvas-plugins/*` for first-party canvas plugin packages
+- **`@bpmn-sdk/canvas-plugin-minimap`** — minimap as an opt-in plugin; install via `plugins: [createMinimapPlugin()]`; handles `diagram:load`, `viewport:change`, `diagram:clear`; navigates via `CanvasApi.setViewport()`; fully self-contained CSS injection
+
+## BPMN Canvas Viewer (2026-02-23) — `@bpmn-sdk/canvas`
+- **Zero-dependency SVG viewer** — renders BPMN diagrams parsed by `@bpmn-sdk/core` with no external runtime deps
+- **Framework-agnostic** — plain TypeScript/DOM; works in React, Vue, Svelte, or vanilla JS
+- **Pan & zoom** — pointer-drag panning, mouse-wheel / two-finger pinch zoom, zoom-toward-cursor; RAF-batched at 60fps
+- **Infinite dot-grid** — SVG `<pattern>` background that scrolls with the viewport
+- **Minimap** — 160×100px overview; click-to-pan; synced viewport indicator rectangle
+- **Themes** — `"light"` / `"dark"` / `"auto"` (follows `prefers-color-scheme`); implemented via CSS custom properties
+- **Fit modes** — `"contain"` (scale to fit), `"center"` (1:1 centred), `"none"` (no auto-fit)
+- **Accessibility** — `role="application"`, focusable shapes (Tab/Shift+Tab), keyboard pan/zoom/fit, Enter/Space to activate
+- **Plugin system** — `CanvasPlugin` with `install(CanvasApi)` / `uninstall()` lifecycle
+- **Events** — `diagram:load`, `diagram:clear`, `element:click`, `element:focus`, `element:blur`, `viewport:change`; `on()` returns unsubscribe fn
+- **Zoom controls** — built-in +/−/⊡ buttons
+- **Auto-refit** — ResizeObserver re-fits diagram on container resize
+- **Small bundle** — 112KB JS / 25.95KB gzip
+
 ## Roundtrip Tests (2026-02-18)
 - **34 example files tested** — 30 BPMN, 1 DMN, 3 Form files roundtrip through parse→export→re-parse
 - **Typed model comparison** — validates semantic equivalence at the model level, not byte-level XML
