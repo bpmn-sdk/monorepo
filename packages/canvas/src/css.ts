@@ -1,0 +1,254 @@
+/** ID used to prevent duplicate style injection. */
+export const STYLE_ID = "bpmn-canvas-styles-v1";
+
+/** Complete CSS for the BpmnCanvas component, injected once into `<head>`. */
+export const CANVAS_CSS = `
+.bpmn-canvas-host {
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: none;
+  background: var(--bpmn-bg, #f8f9fa);
+}
+.bpmn-canvas-host *,
+.bpmn-canvas-host *::before,
+.bpmn-canvas-host *::after {
+  box-sizing: border-box;
+}
+.bpmn-canvas-host > svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: default;
+}
+.bpmn-canvas-host.is-panning > svg {
+  cursor: grabbing;
+}
+.bpmn-canvas-host > svg:focus {
+  outline: none;
+}
+
+/* ── Shapes ─────────────────────────────────────────────────────── */
+.bpmn-shape {
+  cursor: pointer;
+  outline: none;
+}
+.bpmn-shape:focus .bpmn-shape-body,
+.bpmn-shape:focus .bpmn-event-body,
+.bpmn-shape:focus .bpmn-gw-body {
+  stroke: var(--bpmn-focus, #0066cc);
+  stroke-width: 2.5;
+}
+.bpmn-shape.bpmn-selected .bpmn-shape-body,
+.bpmn-shape.bpmn-selected .bpmn-event-body,
+.bpmn-shape.bpmn-selected .bpmn-gw-body {
+  stroke: var(--bpmn-highlight, #0066cc);
+  stroke-width: 2.5;
+}
+
+.bpmn-shape-body,
+.bpmn-event-body,
+.bpmn-gw-body {
+  fill: var(--bpmn-shape-fill, #ffffff);
+  stroke: var(--bpmn-shape-stroke, #404040);
+  stroke-width: 1.5;
+}
+.bpmn-end-body {
+  fill: var(--bpmn-shape-fill, #ffffff);
+  stroke: var(--bpmn-shape-stroke, #404040);
+  stroke-width: 3;
+}
+.bpmn-event-inner {
+  fill: none;
+  stroke: var(--bpmn-shape-stroke, #404040);
+  stroke-width: 1.5;
+}
+.bpmn-eventsubprocess-body {
+  fill: var(--bpmn-shape-fill, #ffffff);
+  stroke: var(--bpmn-shape-stroke, #404040);
+  stroke-width: 1.5;
+  stroke-dasharray: 5 3;
+}
+.bpmn-callactivity-body {
+  fill: var(--bpmn-shape-fill, #ffffff);
+  stroke: var(--bpmn-shape-stroke, #404040);
+  stroke-width: 3;
+}
+
+/* ── Icons ───────────────────────────────────────────────────────── */
+.bpmn-icon {
+  fill: none;
+  stroke: var(--bpmn-shape-stroke, #404040);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+.bpmn-icon-solid {
+  fill: var(--bpmn-shape-stroke, #404040);
+  stroke: none;
+  pointer-events: none;
+}
+.bpmn-gw-marker {
+  fill: var(--bpmn-shape-stroke, #404040);
+  stroke: none;
+  pointer-events: none;
+}
+.bpmn-gw-marker-stroke {
+  fill: none;
+  stroke: var(--bpmn-shape-stroke, #404040);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  pointer-events: none;
+}
+
+/* ── Edges ───────────────────────────────────────────────────────── */
+.bpmn-edge {
+  cursor: default;
+}
+.bpmn-edge-path {
+  fill: none;
+  stroke: var(--bpmn-flow-stroke, #404040);
+  stroke-width: 1.5;
+}
+.bpmn-edge-assoc {
+  fill: none;
+  stroke: var(--bpmn-flow-stroke, #404040);
+  stroke-width: 1.5;
+  stroke-dasharray: 5 3;
+}
+.bpmn-arrow-fill {
+  fill: var(--bpmn-flow-stroke, #404040);
+}
+
+/* ── Labels ─────────────────────────────────────────────────────── */
+.bpmn-label {
+  fill: var(--bpmn-text, #333333);
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: 11px;
+  text-anchor: middle;
+  dominant-baseline: central;
+  pointer-events: none;
+}
+
+/* ── Minimap ─────────────────────────────────────────────────────── */
+.bpmn-minimap {
+  position: absolute;
+  bottom: 12px;
+  right: 12px;
+  width: 160px;
+  height: 100px;
+  background: var(--bpmn-overlay-bg, rgba(248, 249, 250, 0.92));
+  border: 1px solid var(--bpmn-overlay-border, rgba(0, 0, 0, 0.12));
+  border-radius: 6px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  cursor: crosshair;
+}
+.bpmn-minimap > svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.bpmn-minimap-shape {
+  fill: var(--bpmn-shape-stroke, #404040);
+  opacity: 0.45;
+}
+.bpmn-minimap-edge {
+  stroke: var(--bpmn-shape-stroke, #404040);
+  stroke-width: 0.5;
+  fill: none;
+  opacity: 0.35;
+}
+.bpmn-minimap-viewport {
+  fill: var(--bpmn-viewport-fill, rgba(0, 102, 204, 0.1));
+  stroke: var(--bpmn-viewport-stroke, rgba(0, 102, 204, 0.5));
+  stroke-width: 1;
+}
+
+/* ── Controls ────────────────────────────────────────────────────── */
+.bpmn-controls {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.bpmn-control-btn {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  line-height: 1;
+  font-size: 16px;
+  font-family: system-ui, sans-serif;
+  background: var(--bpmn-overlay-bg, rgba(248, 249, 250, 0.92));
+  border: 1px solid var(--bpmn-overlay-border, rgba(0, 0, 0, 0.12));
+  border-radius: 4px;
+  color: var(--bpmn-text, #333333);
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s;
+}
+.bpmn-control-btn:hover {
+  background: var(--bpmn-highlight, #0066cc);
+  color: #fff;
+  border-color: transparent;
+}
+.bpmn-control-btn:focus {
+  outline: 2px solid var(--bpmn-focus, #0066cc);
+  outline-offset: 1px;
+}
+
+/* ── Light theme (default) ───────────────────────────────────────── */
+.bpmn-canvas-host {
+  --bpmn-bg: #f8f9fa;
+  --bpmn-grid: rgba(0, 0, 0, 0.14);
+  --bpmn-shape-fill: #ffffff;
+  --bpmn-shape-stroke: #404040;
+  --bpmn-flow-stroke: #404040;
+  --bpmn-text: #333333;
+  --bpmn-highlight: #0066cc;
+  --bpmn-focus: #0066cc;
+  --bpmn-overlay-bg: rgba(248, 249, 250, 0.92);
+  --bpmn-overlay-border: rgba(0, 0, 0, 0.12);
+  --bpmn-viewport-fill: rgba(0, 102, 204, 0.1);
+  --bpmn-viewport-stroke: rgba(0, 102, 204, 0.5);
+}
+
+/* ── Dark theme ──────────────────────────────────────────────────── */
+.bpmn-canvas-host[data-theme="dark"] {
+  --bpmn-bg: #1e1e2e;
+  --bpmn-grid: rgba(255, 255, 255, 0.07);
+  --bpmn-shape-fill: #2a2a3e;
+  --bpmn-shape-stroke: #8888bb;
+  --bpmn-flow-stroke: #7777aa;
+  --bpmn-text: #cdd6f4;
+  --bpmn-highlight: #89b4fa;
+  --bpmn-focus: #89b4fa;
+  --bpmn-overlay-bg: rgba(30, 30, 46, 0.92);
+  --bpmn-overlay-border: rgba(255, 255, 255, 0.1);
+  --bpmn-viewport-fill: rgba(137, 180, 250, 0.12);
+  --bpmn-viewport-stroke: rgba(137, 180, 250, 0.5);
+}
+`;
+
+/**
+ * Injects the canvas stylesheet into `<head>` if not already present.
+ * Safe to call multiple times — only one `<style>` tag is ever inserted.
+ */
+export function injectStyles(): void {
+	if (typeof document === "undefined") return;
+	if (document.getElementById(STYLE_ID)) return;
+	const style = document.createElement("style");
+	style.id = STYLE_ID;
+	style.textContent = CANVAS_CSS;
+	document.head.appendChild(style);
+}

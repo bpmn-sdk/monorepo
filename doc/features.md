@@ -1,5 +1,20 @@
 # Features
 
+## BPMN Canvas Viewer (2026-02-23) — `@bpmn-sdk/canvas`
+- **Zero-dependency SVG viewer** — renders BPMN diagrams parsed by `@bpmn-sdk/core` with no external runtime deps
+- **Framework-agnostic** — plain TypeScript/DOM; works in React, Vue, Svelte, or vanilla JS
+- **Pan & zoom** — pointer-drag panning, mouse-wheel / two-finger pinch zoom, zoom-toward-cursor; RAF-batched at 60fps
+- **Infinite dot-grid** — SVG `<pattern>` background that scrolls with the viewport
+- **Minimap** — 160×100px overview; click-to-pan; synced viewport indicator rectangle
+- **Themes** — `"light"` / `"dark"` / `"auto"` (follows `prefers-color-scheme`); implemented via CSS custom properties
+- **Fit modes** — `"contain"` (scale to fit), `"center"` (1:1 centred), `"none"` (no auto-fit)
+- **Accessibility** — `role="application"`, focusable shapes (Tab/Shift+Tab), keyboard pan/zoom/fit, Enter/Space to activate
+- **Plugin system** — `CanvasPlugin` with `install(CanvasApi)` / `uninstall()` lifecycle
+- **Events** — `diagram:load`, `diagram:clear`, `element:click`, `element:focus`, `element:blur`, `viewport:change`; `on()` returns unsubscribe fn
+- **Zoom controls** — built-in +/−/⊡ buttons
+- **Auto-refit** — ResizeObserver re-fits diagram on container resize
+- **Small bundle** — 112KB JS / 25.95KB gzip
+
 ## Roundtrip Tests (2026-02-18)
 - **34 example files tested** — 30 BPMN, 1 DMN, 3 Form files roundtrip through parse→export→re-parse
 - **Typed model comparison** — validates semantic equivalence at the model level, not byte-level XML

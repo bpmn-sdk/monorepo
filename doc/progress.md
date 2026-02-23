@@ -1,5 +1,27 @@
 # Progress
 
+## 2026-02-23
+
+### `@bpmn-sdk/canvas` package — BPMN diagram viewer
+- New package `packages/canvas` (`@bpmn-sdk/canvas`) — a zero-dependency, framework-agnostic SVG BPMN viewer
+- **SVG rendering**: shapes (events, tasks, gateways, annotations), edges with arrowheads, text labels — all layered (edges → shapes → labels)
+- **Viewport**: pan (pointer drag), zoom (wheel + pinch), click-vs-drag discrimination (4px threshold), RAF-batched transforms for 60fps
+- **Infinite dot-grid** via SVG `<pattern>` with `patternTransform` synced to viewport
+- **Minimap**: 160×100px overview in bottom-right corner; simplified rects/circles + polylines; click-to-pan
+- **Themes**: light (default), dark (`data-theme="dark"` attribute), auto (follows `prefers-color-scheme`)
+- **Fit modes**: `"contain"` (scale to fit), `"center"` (1:1 zoom, centred), `"none"` (no auto-fit)
+- **Accessibility**: `role="application"`, focusable shape elements (`tabindex="-1"`), Tab/Shift+Tab navigation, Enter/Space to click, arrow keys to pan, +/- to zoom, 0 to fit
+- **Plugin system**: `CanvasPlugin` interface with `install(api: CanvasApi)` / `uninstall()` lifecycle; `CanvasApi` exposes shapes, edges, viewport, events
+- **Events**: `diagram:load`, `diagram:clear`, `element:click`, `element:focus`, `element:blur`, `viewport:change`; `on()` returns unsubscribe function
+- **CSS injection**: `injectStyles()` idempotently injects styles once; all CSS via custom properties for easy theming
+- **ResizeObserver**: auto re-fits on container resize
+- **Zoom controls**: +/−/⊡ buttons injected into DOM
+- **14 tests** in `packages/canvas/tests/canvas.test.ts` (happy-dom environment)
+- **Landing page updated**: replaced `bpmn-js` with `@bpmn-sdk/canvas`; removed bpmn.io CSS; diagrams render in dark theme with grid + minimap
+- **Bundle size**: 112KB JS / 25.95KB gzip (vs bpmn-js which is ~500KB+)
+- **GitHub Actions fix**: `.github/workflows/deploy-pages.yml` — changed `actions/upload-pages-artifact@v3` to `actions/upload-artifact@v4` (required by `actions/deploy-pages@v4`)
+- Verification: `pnpm turbo build typecheck check test` — 11/11 tasks pass, zero errors
+
 ## 2026-02-21
 
 ### XML Output Tabs on Landing Page

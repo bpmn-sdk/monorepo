@@ -1,41 +1,26 @@
-import Viewer from "bpmn-js/lib/NavigatedViewer";
-import "bpmn-js/dist/assets/diagram-js.css";
-import "bpmn-js/dist/assets/bpmn-js.css";
-import "bpmn-js/dist/assets/bpmn-font/css/bpmn-embedded.css";
-import { examples } from "./examples";
+import { BpmnCanvas } from "@bpmn-sdk/canvas";
+import { examples } from "./examples.js";
 
-interface BpmnCanvas {
-	zoom(mode: "fit-viewport", center?: boolean): void;
-	zoom(level: number): void;
-}
+const canvases = new Map<string, BpmnCanvas>();
 
-const viewers = new Map<string, InstanceType<typeof Viewer>>();
-
-function fitAndCenter(viewer: InstanceType<typeof Viewer>): void {
-	const canvas = viewer.get("canvas") as BpmnCanvas;
-	canvas.zoom("fit-viewport", true);
-}
-
-async function renderDiagram(key: string): Promise<void> {
+function renderDiagram(key: string): void {
 	const container = document.getElementById(`diagram-${key}`);
 	if (!container || !examples[key]) return;
 
-	if (viewers.has(key)) {
-		const viewer = viewers.get(key);
-		if (!viewer) return;
-		fitAndCenter(viewer);
+	if (canvases.has(key)) {
+		canvases.get(key)?.fitView();
 		return;
 	}
 
-	const viewer = new Viewer({ container });
-	viewers.set(key, viewer);
-
-	try {
-		await viewer.importXML(examples[key]);
-		fitAndCenter(viewer);
-	} catch (err) {
-		console.error(`Failed to render ${key}:`, err);
-	}
+	const canvas = new BpmnCanvas({
+		container,
+		xml: examples[key],
+		theme: "dark",
+		grid: true,
+		minimap: true,
+		fit: "contain",
+	});
+	canvases.set(key, canvas);
 }
 
 function escapeHtml(str: string): string {
@@ -49,7 +34,6 @@ function populateXmlPanels(): void {
 		if (!key || !examples[key]) continue;
 		const pre = document.createElement("pre");
 		const code = document.createElement("code");
-		code.textContent = "";
 		code.innerHTML = escapeHtml(examples[key]);
 		pre.appendChild(code);
 		panel.appendChild(pre);
@@ -98,15 +82,9 @@ function setupOutputTabs(): void {
 				const target = panel.querySelector<HTMLElement>(`.output-view[data-view="${view}"]`);
 				if (target) {
 					target.classList.add("active");
-					// Re-fit diagram if switching back to it
 					if (view === "diagram") {
-						const diagramEl = target as HTMLElement;
-						const id = diagramEl.id;
-						const key = id.replace("diagram-", "");
-						const viewer = viewers.get(key);
-						if (viewer) {
-							fitAndCenter(viewer);
-						}
+						const id = target.id.replace("diagram-", "");
+						canvases.get(id)?.fitView();
 					}
 				}
 			});
