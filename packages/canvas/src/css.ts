@@ -135,42 +135,6 @@ export const CANVAS_CSS = `
   pointer-events: none;
 }
 
-/* ── Minimap ─────────────────────────────────────────────────────── */
-.bpmn-minimap {
-  position: absolute;
-  bottom: 12px;
-  right: 12px;
-  width: 160px;
-  height: 100px;
-  background: var(--bpmn-overlay-bg, rgba(248, 249, 250, 0.92));
-  border: 1px solid var(--bpmn-overlay-border, rgba(0, 0, 0, 0.12));
-  border-radius: 6px;
-  overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
-  cursor: crosshair;
-}
-.bpmn-minimap > svg {
-  display: block;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-}
-.bpmn-minimap-shape {
-  fill: var(--bpmn-shape-stroke, #404040);
-  opacity: 0.45;
-}
-.bpmn-minimap-edge {
-  stroke: var(--bpmn-shape-stroke, #404040);
-  stroke-width: 0.5;
-  fill: none;
-  opacity: 0.35;
-}
-.bpmn-minimap-viewport {
-  fill: var(--bpmn-viewport-fill, rgba(0, 102, 204, 0.1));
-  stroke: var(--bpmn-viewport-stroke, rgba(0, 102, 204, 0.5));
-  stroke-width: 1;
-}
-
 /* ── Controls ────────────────────────────────────────────────────── */
 .bpmn-controls {
   position: absolute;
@@ -219,8 +183,6 @@ export const CANVAS_CSS = `
   --bpmn-focus: #0066cc;
   --bpmn-overlay-bg: rgba(248, 249, 250, 0.92);
   --bpmn-overlay-border: rgba(0, 0, 0, 0.12);
-  --bpmn-viewport-fill: rgba(0, 102, 204, 0.1);
-  --bpmn-viewport-stroke: rgba(0, 102, 204, 0.5);
 }
 
 /* ── Dark theme ──────────────────────────────────────────────────── */
@@ -235,8 +197,6 @@ export const CANVAS_CSS = `
   --bpmn-focus: #89b4fa;
   --bpmn-overlay-bg: rgba(30, 30, 46, 0.92);
   --bpmn-overlay-border: rgba(255, 255, 255, 0.1);
-  --bpmn-viewport-fill: rgba(137, 180, 250, 0.12);
-  --bpmn-viewport-stroke: rgba(137, 180, 250, 0.5);
 }
 `;
 

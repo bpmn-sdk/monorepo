@@ -10,6 +10,7 @@
 		"check": "biome check ."
 	},
 	"dependencies": {
-		"@bpmn-sdk/canvas": "workspace:*"
+		"@bpmn-sdk/canvas": "workspace:*",
+		"@bpmn-sdk/canvas-plugin-minimap": "workspace:*"
 	}
 }

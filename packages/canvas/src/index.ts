@@ -5,11 +5,10 @@
  * - **Zero external dependencies** (only `@bpmn-sdk/core` for XML parsing)
  * - **Infinite canvas** with pan and zoom (mouse, touch, keyboard)
  * - **Dot-grid background** for visual orientation
- * - **Minimap** for navigation on large diagrams
  * - **Light / dark / auto theming** via CSS custom properties
  * - **First-class accessibility** — ARIA roles, keyboard navigation, focus management
  * - **Framework-agnostic** — plain DOM, works in React, Vue, Svelte, Angular, or vanilla JS
- * - **Plugin system** — extend with editing, tooltips, custom shapes, and more
+ * - **Plugin system** — extend with editing, tooltips, minimap, custom shapes, and more
  *
  * ## Quick start
  * ```typescript
@@ -20,7 +19,6 @@
  *   xml: myBpmnXml,       // BPMN 2.0 XML string
  *   theme: "auto",        // follows OS preference
  *   grid: true,           // dot-grid background
- *   minimap: true,        // navigation minimap
  *   fit: "contain",       // scale to fit on load
  * });
  *

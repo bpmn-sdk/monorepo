@@ -1,5 +1,9 @@
 # Features
 
+## Canvas Plugins Workspace (2026-02-23) — `canvas-plugins/*`
+- New pnpm workspace `canvas-plugins/*` for first-party canvas plugin packages
+- **`@bpmn-sdk/canvas-plugin-minimap`** — minimap as an opt-in plugin; install via `plugins: [createMinimapPlugin()]`; handles `diagram:load`, `viewport:change`, `diagram:clear`; navigates via `CanvasApi.setViewport()`; fully self-contained CSS injection
+
 ## BPMN Canvas Viewer (2026-02-23) — `@bpmn-sdk/canvas`
 - **Zero-dependency SVG viewer** — renders BPMN diagrams parsed by `@bpmn-sdk/core` with no external runtime deps
 - **Framework-agnostic** — plain TypeScript/DOM; works in React, Vue, Svelte, or vanilla JS

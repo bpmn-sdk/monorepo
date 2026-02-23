@@ -2,7 +2,6 @@ import { Bpmn } from "@bpmn-sdk/core";
 import type { BpmnDefinitions } from "@bpmn-sdk/core";
 import { injectStyles } from "./css.js";
 import { KeyboardHandler } from "./keyboard.js";
-import { Minimap } from "./minimap.js";
 import { computeDiagramBounds, createDefs, createGrid, render } from "./renderer.js";
 import type {
 	CanvasApi,
@@ -81,7 +80,6 @@ export class BpmnCanvas {
 
 	// ── Sub-systems ───────────────────────────────────────────────────
 	private readonly _viewport: ViewportController;
-	private _minimap: Minimap | null = null;
 	private readonly _keyboard: KeyboardHandler;
 	private readonly _plugins: CanvasPlugin[] = [];
 
@@ -91,7 +89,6 @@ export class BpmnCanvas {
 	private _currentDefs: BpmnDefinitions | null = null;
 	private _theme: Theme;
 	private _fit: FitMode;
-	private _showMinimap: boolean;
 
 	// ── Event emitter ─────────────────────────────────────────────────
 	private _listeners = new Map<keyof CanvasEvents, Set<(...args: unknown[]) => void>>();
@@ -102,7 +99,6 @@ export class BpmnCanvas {
 		this._id = String(_instanceCounter++);
 		this._theme = options.theme ?? "auto";
 		this._fit = options.fit ?? "contain";
-		this._showMinimap = options.minimap !== false;
 
 		// ── Build DOM ────────────────────────────────────────────────
 		const container = options.container;
@@ -149,23 +145,8 @@ export class BpmnCanvas {
 			this._gridPattern,
 			(state) => {
 				this._emit("viewport:change", state);
-				this._syncMinimap();
 			},
 		);
-
-		// ── Minimap ───────────────────────────────────────────────────
-		if (this._showMinimap) {
-			this._minimap = new Minimap(this._host, (diagX, diagY) => {
-				// Pan so that `diagX,diagY` is centred in the SVG
-				const { scale } = this._viewport.state;
-				const svgW = this._svg.clientWidth;
-				const svgH = this._svg.clientHeight;
-				this._viewport.set({
-					tx: svgW / 2 - diagX * scale,
-					ty: svgH / 2 - diagY * scale,
-				});
-			});
-		}
 
 		// ── Zoom controls ─────────────────────────────────────────────
 		this._addZoomControls();
@@ -254,8 +235,6 @@ export class BpmnCanvas {
 		this._edges = result.edges;
 
 		this._keyboard.setShapes(this._shapes);
-
-		if (this._minimap) this._minimap.update(defs);
 
 		if (this._fit !== "none") {
 			// Defer fit to next frame so the SVG has been laid out
@@ -354,7 +333,6 @@ export class BpmnCanvas {
 		this._ro.disconnect();
 		this._viewport.destroy();
 		this._keyboard.destroy();
-		this._minimap?.destroy();
 		for (const plugin of this._plugins) plugin.uninstall?.();
 		this._plugins.length = 0;
 		this._listeners.clear();
@@ -425,13 +403,5 @@ export class BpmnCanvas {
 		for (const h of handlers) {
 			(h as (...a: typeof args) => void)(...args);
 		}
-	}
-
-	private _syncMinimap(): void {
-		if (!this._minimap) return;
-		const state = this._viewport.state;
-		const svgW = this._svg.clientWidth;
-		const svgH = this._svg.clientHeight;
-		this._minimap.syncViewport(state, svgW, svgH);
 	}
 }

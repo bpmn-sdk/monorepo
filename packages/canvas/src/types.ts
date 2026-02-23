@@ -32,12 +32,6 @@ export interface CanvasOptions {
 	grid?: boolean;
 
 	/**
-	 * Show a minimap in the bottom-right corner.
-	 * @default true
-	 */
-	minimap?: boolean;
-
-	/**
 	 * How to position the diagram when first rendered.
 	 * @default "contain"
 	 */

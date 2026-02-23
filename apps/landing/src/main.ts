@@ -1,4 +1,5 @@
 import { BpmnCanvas } from "@bpmn-sdk/canvas";
+import { createMinimapPlugin } from "@bpmn-sdk/canvas-plugin-minimap";
 import { examples } from "./examples.js";
 
 const canvases = new Map<string, BpmnCanvas>();
@@ -17,8 +18,8 @@ function renderDiagram(key: string): void {
 		xml: examples[key],
 		theme: "dark",
 		grid: true,
-		minimap: true,
 		fit: "contain",
+		plugins: [createMinimapPlugin()],
 	});
 	canvases.set(key, canvas);
 }

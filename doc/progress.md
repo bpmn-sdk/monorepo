@@ -1,5 +1,19 @@
 # Progress
 
+## 2026-02-23 (2)
+
+### `canvas-plugins/` workspace — minimap extracted as a plugin
+- New pnpm workspace glob `canvas-plugins/*` added to `pnpm-workspace.yaml`
+- New package `canvas-plugins/minimap` → `@bpmn-sdk/canvas-plugin-minimap`
+  - `Minimap` class moved from `packages/canvas/src/minimap.ts` — import `ViewportState` from `@bpmn-sdk/canvas`, `BpmnDefinitions` from `@bpmn-sdk/core`
+  - Added `Minimap.clear()` method (clears shapes, edges, resets viewport rect)
+  - Minimap CSS extracted to `canvas-plugins/minimap/src/css.ts` with its own `injectMinimapStyles()` / `MINIMAP_STYLE_ID`
+  - `createMinimapPlugin()` factory returns a `CanvasPlugin` that: installs minimap into `api.container`, subscribes to `diagram:load` / `viewport:change` / `diagram:clear`, navigates by calling `api.setViewport()`, and tears everything down on `uninstall()`
+  - 9 tests in `canvas-plugins/minimap/tests/minimap-plugin.test.ts`
+- Removed from `packages/canvas`: `minimap.ts`, `CanvasOptions.minimap`, minimap CSS, `_minimap` field, `_showMinimap` field, `_syncMinimap()` method, minimap construction and update calls, `--bpmn-viewport-fill`/`--bpmn-viewport-stroke` CSS vars
+- Landing page updated: imports `createMinimapPlugin` from `@bpmn-sdk/canvas-plugin-minimap`, passes it via `plugins: [createMinimapPlugin()]`; removed `minimap: true` option
+- Verification: `pnpm turbo build typecheck check test` — 15/15 tasks pass, zero errors
+
 ## 2026-02-23
 
 ### `@bpmn-sdk/canvas` package — BPMN diagram viewer

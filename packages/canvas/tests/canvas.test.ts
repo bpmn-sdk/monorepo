@@ -70,7 +70,7 @@ describe("BpmnCanvas", () => {
 
 	beforeEach(() => {
 		container = makeContainer();
-		canvas = new BpmnCanvas({ container, xml: SIMPLE_XML, minimap: false });
+		canvas = new BpmnCanvas({ container, xml: SIMPLE_XML, grid: false });
 	});
 
 	it("mounts a host element inside the container", () => {
@@ -91,7 +91,7 @@ describe("BpmnCanvas", () => {
 
 	it("fires diagram:load event with the parsed definitions", () => {
 		const cb = vi.fn();
-		const c = new BpmnCanvas({ container: makeContainer(), minimap: false });
+		const c = new BpmnCanvas({ container: makeContainer(), grid: false });
 		c.on("diagram:load", cb);
 		c.load(SIMPLE_XML);
 		expect(cb).toHaveBeenCalledOnce();
@@ -119,7 +119,7 @@ describe("BpmnCanvas", () => {
 	it("installs plugins and provides the API", () => {
 		const install = vi.fn();
 		const plugin: CanvasPlugin = { name: "test", install };
-		const c = new BpmnCanvas({ container: makeContainer(), plugins: [plugin], minimap: false });
+		const c = new BpmnCanvas({ container: makeContainer(), plugins: [plugin], grid: false });
 		expect(install).toHaveBeenCalledOnce();
 		const api = install.mock.calls[0]?.[0];
 		expect(typeof api.getShapes).toBe("function");
@@ -131,7 +131,7 @@ describe("BpmnCanvas", () => {
 	it("calls plugin uninstall on destroy()", () => {
 		const uninstall = vi.fn();
 		const plugin: CanvasPlugin = { name: "test2", install: () => {}, uninstall };
-		const c = new BpmnCanvas({ container: makeContainer(), plugins: [plugin], minimap: false });
+		const c = new BpmnCanvas({ container: makeContainer(), plugins: [plugin], grid: false });
 		c.destroy();
 		expect(uninstall).toHaveBeenCalledOnce();
 	});

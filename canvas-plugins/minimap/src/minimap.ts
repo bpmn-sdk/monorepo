@@ -1,5 +1,5 @@
+import type { ViewportState } from "@bpmn-sdk/canvas";
 import type { BpmnDefinitions } from "@bpmn-sdk/core";
-import type { ViewportState } from "./types.js";
 
 const NS = "http://www.w3.org/2000/svg";
 
@@ -29,12 +29,6 @@ export class Minimap {
 	private _offsetX = 0;
 	private _offsetY = 0;
 
-	// Diagram bounding box
-	private _diagramMinX = 0;
-	private _diagramMinY = 0;
-	private _diagramW = 1;
-	private _diagramH = 1;
-
 	// Minimap pixel dimensions
 	private readonly _mmW = 160;
 	private readonly _mmH = 100;
@@ -42,7 +36,7 @@ export class Minimap {
 	constructor(
 		container: HTMLElement,
 		/** Invoked when the user clicks the minimap to request a viewport pan. */
-		private readonly _onNavigate: (tx: number, ty: number) => void,
+		private readonly _onNavigate: (diagX: number, diagY: number) => void,
 	) {
 		this._host = document.createElement("div");
 		this._host.className = "bpmn-minimap";
@@ -108,11 +102,6 @@ export class Minimap {
 		this._offsetX = padding + (this._mmW - padding * 2 - dW * this._scale) / 2 - minX * this._scale;
 		this._offsetY = padding + (this._mmH - padding * 2 - dH * this._scale) / 2 - minY * this._scale;
 
-		this._diagramMinX = minX;
-		this._diagramMinY = minY;
-		this._diagramW = dW;
-		this._diagramH = dH;
-
 		// Render simplified shapes (just rects/circles)
 		for (const s of plane.shapes) {
 			const x = s.bounds.x * this._scale + this._offsetX;
@@ -157,6 +146,13 @@ export class Minimap {
 		}
 	}
 
+	/** Clears the minimap content. */
+	clear(): void {
+		this._edgesG.innerHTML = "";
+		this._shapesG.innerHTML = "";
+		attr(this._viewportRect, { x: 0, y: 0, width: 0, height: 0 });
+	}
+
 	/** Syncs the viewport indicator rectangle with the current pan/zoom state. */
 	syncViewport(state: ViewportState, svgWidth: number, svgHeight: number): void {
 		// Visible diagram area in diagram coordinates
@@ -189,8 +185,6 @@ export class Minimap {
 		const diagX = (mmX - this._offsetX) / this._scale;
 		const diagY = (mmY - this._offsetY) / this._scale;
 
-		// The requested diagram point should be centred in the SVG
-		// The caller determines the SVG size and computes the correct translation
 		this._onNavigate(diagX, diagY);
 	};
 }
