@@ -20,18 +20,30 @@ import { Bpmn } from "@bpmn-sdk/core";
 import type { BpmnDefinitions } from "@bpmn-sdk/core";
 import { CommandStack } from "./command-stack.js";
 import { injectEditorStyles } from "./css.js";
-import { computeWaypoints, diagramToScreen, screenToDiagram } from "./geometry.js";
+import {
+	closestPort,
+	computeWaypoints,
+	computeWaypointsWithPorts,
+	diagramToScreen,
+	labelBoundsForPosition,
+	portFromWaypoint,
+	screenToDiagram,
+} from "./geometry.js";
 import { LabelEditor } from "./label-editor.js";
 import {
+	changeElementType as changeElementTypeFn,
 	copyElements,
 	createConnection,
 	createEmptyDefinitions,
 	createShape,
 	deleteElements,
+	insertShapeOnEdge,
 	moveShapes,
 	pasteElements,
 	resizeShape,
+	updateEdgeEndpoint,
 	updateLabel,
+	updateLabelPosition,
 } from "./modeling.js";
 import type { Clipboard } from "./modeling.js";
 import { OverlayRenderer } from "./overlay.js";
@@ -46,6 +58,7 @@ import type {
 	EditorOptions,
 	HandleDir,
 	HitResult,
+	LabelPosition,
 	PortDir,
 	Tool,
 } from "./types.js";
@@ -105,6 +118,8 @@ export class BpmnEditor {
 	private _fit: FitMode;
 	private _clipboard: Clipboard | null = null;
 	private _snapDelta: { dx: number; dy: number } | null = null;
+	private _selectedEdgeId: string | null = null;
+	private _edgeDropTarget: string | null = null;
 
 	// ── Events ─────────────────────────────────────────────────────────
 	private readonly _listeners = new Map<string, Set<(...args: unknown[]) => void>>();
@@ -207,6 +222,19 @@ export class BpmnEditor {
 			executeCopy: () => this._doCopy(),
 			executePaste: () => this._doPaste(),
 			setTool: (tool) => this.setTool(tool),
+			getSelectedEdgeId: () => this._selectedEdgeId,
+			setEdgeSelected: (edgeId) => this._setEdgeSelected(edgeId),
+			previewEndpointMove: (edgeId, isStart, diagPoint) =>
+				this._previewEndpointMove(edgeId, isStart, diagPoint),
+			commitEndpointMove: (edgeId, isStart, diagPoint) =>
+				this._commitEndpointMove(edgeId, isStart, diagPoint),
+			cancelEndpointMove: () => {
+				this._overlay.setEndpointDragGhost(null);
+				if (this._selectedEdgeId) {
+					const edge = this._edges.find((e) => e.id === this._selectedEdgeId);
+					this._overlay.setEdgeEndpoints(edge?.edge.waypoints ?? null, this._selectedEdgeId);
+				}
+			},
 		};
 
 		this._stateMachine = new EditorStateMachine(callbacks);
@@ -429,8 +457,33 @@ export class BpmnEditor {
 		this._shapes = result.shapes;
 		this._edges = result.edges;
 		this._defs = defs;
+
+		// Add transparent hit-area polylines for edge clicking
+		for (const edge of this._edges) {
+			const waypoints = edge.edge.waypoints;
+			if (waypoints.length < 2) continue;
+			const points = waypoints.map((wp) => `${wp.x},${wp.y}`).join(" ");
+			const hitArea = document.createElementNS(NS, "polyline") as SVGPolylineElement;
+			hitArea.setAttribute("class", "bpmn-edge-hitarea");
+			hitArea.setAttribute("data-bpmn-edge-hit", edge.id);
+			hitArea.setAttribute("points", points);
+			edge.element.appendChild(hitArea);
+		}
+
 		this._keyboard.setShapes(this._shapes);
 		this._overlay.setSelection(this._selectedIds, this._shapes, this._getResizableIds());
+
+		// Restore edge selection if the edge still exists after re-render
+		if (this._selectedEdgeId) {
+			const edge = this._edges.find((e) => e.id === this._selectedEdgeId);
+			if (edge) {
+				this._overlay.setEdgeEndpoints(edge.edge.waypoints, this._selectedEdgeId);
+			} else {
+				this._selectedEdgeId = null;
+				this._overlay.setEdgeEndpoints(null, "");
+			}
+		}
+
 		this._emit("diagram:load", defs);
 	}
 
@@ -444,6 +497,11 @@ export class BpmnEditor {
 
 	private _setSelection(ids: string[]): void {
 		this._selectedIds = ids;
+		// Clear edge selection whenever shape selection changes
+		if (this._selectedEdgeId) {
+			this._selectedEdgeId = null;
+			this._overlay.setEdgeEndpoints(null, "");
+		}
 		this._overlay.setSelection(ids, this._shapes, this._getResizableIds());
 		this._emit("editor:select", ids);
 	}
@@ -458,11 +516,13 @@ export class BpmnEditor {
 			shape.element.setAttribute("transform", `translate(${x + snapped.dx} ${y + snapped.dy})`);
 		}
 		this._overlay.setAlignmentGuides(this._computeAlignGuides(snapped.dx, snapped.dy));
+		this._setEdgeDropHighlight(this._findEdgeDropTarget(snapped.dx, snapped.dy));
 	}
 
 	private _cancelTranslate(): void {
 		this._snapDelta = null;
 		this._overlay.setAlignmentGuides([]);
+		this._setEdgeDropHighlight(null);
 		for (const id of this._selectedIds) {
 			const shape = this._shapes.find((s) => s.id === id);
 			if (!shape) continue;
@@ -475,8 +535,15 @@ export class BpmnEditor {
 		const snap = this._snapDelta ?? { dx, dy };
 		this._snapDelta = null;
 		this._overlay.setAlignmentGuides([]);
+		const edgeDropId = this._edgeDropTarget;
+		this._setEdgeDropHighlight(null);
 		const moves = this._selectedIds.map((id) => ({ id, dx: snap.dx, dy: snap.dy }));
-		this._executeCommand((d) => moveShapes(d, moves));
+		const shapeId = this._selectedIds.length === 1 ? this._selectedIds[0] : undefined;
+		if (edgeDropId && shapeId) {
+			this._executeCommand((d) => insertShapeOnEdge(moveShapes(d, moves), edgeDropId, shapeId));
+		} else {
+			this._executeCommand((d) => moveShapes(d, moves));
+		}
 	}
 
 	private _doCreate(type: CreateShapeType, diagPoint: DiagPoint): void {
@@ -606,6 +673,16 @@ export class BpmnEditor {
 		return r1.id;
 	}
 
+	/**
+	 * Sets the external label position for an event or gateway shape.
+	 */
+	setLabelPosition(shapeId: string, position: LabelPosition): void {
+		const shape = this._shapes.find((s) => s.id === shapeId);
+		if (!shape) return;
+		const labelBounds = labelBoundsForPosition(shape.shape.bounds, position);
+		this._executeCommand((d) => updateLabelPosition(d, shapeId, labelBounds));
+	}
+
 	/** Copies then pastes the current selection with a small offset. */
 	duplicate(): void {
 		this._doCopy();
@@ -627,6 +704,125 @@ export class BpmnEditor {
 	}
 
 	// ── Private helpers ────────────────────────────────────────────────
+
+	private _setEdgeSelected(edgeId: string | null): void {
+		// Clear shape selection when edge is selected
+		if (edgeId && this._selectedIds.length > 0) {
+			this._selectedIds = [];
+			this._overlay.setSelection([], this._shapes);
+			this._emit("editor:select", []);
+		}
+		this._selectedEdgeId = edgeId;
+		if (edgeId) {
+			const edge = this._edges.find((e) => e.id === edgeId);
+			this._overlay.setEdgeEndpoints(edge?.edge.waypoints ?? null, edgeId);
+		} else {
+			this._overlay.setEdgeEndpoints(null, "");
+		}
+	}
+
+	/** Changes a flow element's type (e.g. exclusiveGateway → parallelGateway). */
+	changeElementType(id: string, newType: CreateShapeType): void {
+		this._executeCommand((d) => changeElementTypeFn(d, id, newType));
+	}
+
+	private _findEdgeDropTarget(dx: number, dy: number): string | null {
+		if (this._selectedIds.length !== 1) return null;
+		const id = this._selectedIds[0];
+		if (!id || !this._defs) return null;
+		const shape = this._shapes.find((s) => s.id === id);
+		if (!shape) return null;
+
+		const b = shape.shape.bounds;
+		const cx = b.x + dx + b.width / 2;
+		const cy = b.y + dy + b.height / 2;
+
+		const process = this._defs.processes[0];
+		if (!process) return null;
+
+		const TOLERANCE = 20;
+
+		for (const edge of this._edges) {
+			const flow = process.sequenceFlows.find((sf) => sf.id === edge.id);
+			if (!flow) continue;
+			// Skip edges that are already connected to the shape being moved
+			if (flow.sourceRef === id || flow.targetRef === id) continue;
+
+			const wps = edge.edge.waypoints;
+			for (let i = 0; i < wps.length - 1; i++) {
+				const a = wps[i];
+				const b2 = wps[i + 1];
+				if (!a || !b2) continue;
+
+				const minX = Math.min(a.x, b2.x) - TOLERANCE;
+				const maxX = Math.max(a.x, b2.x) + TOLERANCE;
+				const minY = Math.min(a.y, b2.y) - TOLERANCE;
+				const maxY = Math.max(a.y, b2.y) + TOLERANCE;
+
+				if (cx >= minX && cx <= maxX && cy >= minY && cy <= maxY) {
+					return edge.id;
+				}
+			}
+		}
+		return null;
+	}
+
+	private _setEdgeDropHighlight(edgeId: string | null): void {
+		if (this._edgeDropTarget) {
+			const prev = this._edges.find((e) => e.id === this._edgeDropTarget);
+			prev?.element.classList.remove("bpmn-edge-split-highlight");
+		}
+		this._edgeDropTarget = edgeId;
+		if (edgeId) {
+			const edge = this._edges.find((e) => e.id === edgeId);
+			edge?.element.classList.add("bpmn-edge-split-highlight");
+		}
+	}
+
+	private _previewEndpointMove(edgeId: string, isStart: boolean, diagPoint: DiagPoint): void {
+		if (!this._defs) return;
+		const edge = this._edges.find((e) => e.id === edgeId);
+		if (!edge) return;
+		const flow = this._defs.processes[0]?.sequenceFlows.find((sf) => sf.id === edgeId);
+		if (!flow) return;
+		const plane = this._defs.diagrams[0]?.plane;
+		if (!plane) return;
+		const srcDi = plane.shapes.find((s) => s.bpmnElement === flow.sourceRef);
+		const tgtDi = plane.shapes.find((s) => s.bpmnElement === flow.targetRef);
+		if (!srcDi || !tgtDi) return;
+		const waypoints = edge.edge.waypoints;
+		let srcPort: PortDir;
+		let tgtPort: PortDir;
+		if (isStart) {
+			srcPort = closestPort(diagPoint, srcDi.bounds);
+			const lastWp = waypoints[waypoints.length - 1];
+			tgtPort = lastWp ? portFromWaypoint(lastWp, tgtDi.bounds) : "left";
+		} else {
+			const firstWp = waypoints[0];
+			srcPort = firstWp ? portFromWaypoint(firstWp, srcDi.bounds) : "right";
+			tgtPort = closestPort(diagPoint, tgtDi.bounds);
+		}
+		const newWaypoints = computeWaypointsWithPorts(srcDi.bounds, srcPort, tgtDi.bounds, tgtPort);
+		this._overlay.setEndpointDragGhost(newWaypoints);
+	}
+
+	private _commitEndpointMove(edgeId: string, isStart: boolean, diagPoint: DiagPoint): void {
+		if (!this._defs) return;
+		this._overlay.setEndpointDragGhost(null);
+		const edge = this._edges.find((e) => e.id === edgeId);
+		if (!edge) return;
+		const flow = this._defs.processes[0]?.sequenceFlows.find((sf) => sf.id === edgeId);
+		if (!flow) return;
+		const plane = this._defs.diagrams[0]?.plane;
+		if (!plane) return;
+		const srcDi = plane.shapes.find((s) => s.bpmnElement === flow.sourceRef);
+		const tgtDi = plane.shapes.find((s) => s.bpmnElement === flow.targetRef);
+		if (!srcDi || !tgtDi) return;
+		const newPort = isStart
+			? closestPort(diagPoint, srcDi.bounds)
+			: closestPort(diagPoint, tgtDi.bounds);
+		this._executeCommand((d) => updateEdgeEndpoint(d, edgeId, isStart, newPort));
+	}
 
 	private _isResizable(id: string): boolean {
 		const el = this._shapes.find((s) => s.id === id)?.flowElement;
@@ -824,6 +1020,19 @@ export class BpmnEditor {
 			const shapeId = portEl.getAttribute("data-bpmn-id");
 			const port = portEl.getAttribute("data-bpmn-port") as PortDir | null;
 			if (shapeId && port) return { type: "port", shapeId, port };
+		}
+
+		const endpointEl = el.closest("[data-bpmn-endpoint]");
+		if (endpointEl) {
+			const edgeId = endpointEl.getAttribute("data-bpmn-id");
+			const ep = endpointEl.getAttribute("data-bpmn-endpoint");
+			if (edgeId && ep) return { type: "edge-endpoint", edgeId, isStart: ep === "start" };
+		}
+
+		const edgeHitEl = el.closest("[data-bpmn-edge-hit]");
+		if (edgeHitEl) {
+			const id = edgeHitEl.getAttribute("data-bpmn-edge-hit");
+			if (id) return { type: "edge", id };
 		}
 
 		const shapeEl = el.closest("[data-bpmn-id]");

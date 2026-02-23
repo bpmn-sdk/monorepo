@@ -3,6 +3,7 @@ export { createEmptyDefinitions } from "./modeling.js";
 export type {
 	EditorEvents,
 	EditorOptions,
+	LabelPosition,
 	Tool,
 	CreateShapeType,
 	HandleDir,

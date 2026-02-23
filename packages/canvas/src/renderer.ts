@@ -603,9 +603,24 @@ export function render(
 		shapesLayer.appendChild(g);
 		shapes.push({ id: shape.bpmnElement, element: g, shape, flowElement: el });
 
-		// External labels for events, gateways, and edges
-		if (el?.name && shape.label?.bounds) {
-			const lb = shape.label.bounds;
+		// External labels for events and gateways — use stored bounds or default to bottom-centred
+		const isExternalLabelType =
+			type === "startEvent" ||
+			type === "endEvent" ||
+			type === "intermediateCatchEvent" ||
+			type === "intermediateThrowEvent" ||
+			type === "boundaryEvent" ||
+			type === "exclusiveGateway" ||
+			type === "parallelGateway" ||
+			type === "inclusiveGateway" ||
+			type === "eventBasedGateway";
+		if (el?.name && isExternalLabelType) {
+			const lb = shape.label?.bounds ?? {
+				x: shape.bounds.x + shape.bounds.width / 2 - 40,
+				y: shape.bounds.y + shape.bounds.height + 6,
+				width: 80,
+				height: 20,
+			};
 			const labelG = renderExternalLabel(lb.x, lb.y, lb.width, lb.height, el.name);
 			labelsLayer.appendChild(labelG);
 		}

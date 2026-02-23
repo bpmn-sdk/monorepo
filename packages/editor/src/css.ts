@@ -85,6 +85,40 @@ export const EDITOR_CSS = `
   pointer-events: none;
 }
 
+/* Edge transparent hit area (wide stroke for easier clicking) */
+.bpmn-edge-hitarea {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 12;
+  cursor: pointer;
+}
+
+/* Edge endpoint drag handles */
+.bpmn-edge-endpoint {
+  fill: #0066cc;
+  stroke: #fff;
+  stroke-width: 1.5;
+  cursor: grab;
+}
+.bpmn-edge-endpoint:hover {
+  fill: #0052a3;
+}
+
+/* Ghost polyline when dragging an edge endpoint */
+.bpmn-endpoint-ghost {
+  fill: none;
+  stroke: #0066cc;
+  stroke-width: 1.5;
+  stroke-dasharray: 5 3;
+  pointer-events: none;
+}
+
+/* Edge split target highlight (shown while dragging a shape over an edge) */
+.bpmn-edge-split-highlight .bpmn-edge-path {
+  stroke: #22c55e;
+  stroke-width: 2.5;
+}
+
 /* Label editor */
 .bpmn-label-editor {
   position: absolute;

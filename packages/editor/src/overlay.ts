@@ -1,5 +1,5 @@
 import type { RenderedShape } from "@bpmn-sdk/canvas";
-import type { BpmnBounds } from "@bpmn-sdk/core";
+import type { BpmnBounds, BpmnWaypoint } from "@bpmn-sdk/core";
 import { handlePositions } from "./geometry.js";
 import type { CreateShapeType, DiagPoint, HandleDir } from "./types.js";
 
@@ -34,6 +34,8 @@ export class OverlayRenderer {
 	private readonly _ghostConnG: SVGGElement;
 	private readonly _ghostCreateG: SVGGElement;
 	private readonly _alignG: SVGGElement;
+	private readonly _edgeEndpointsG: SVGGElement;
+	private readonly _endpointGhostG: SVGGElement;
 
 	constructor(overlayGroup: SVGGElement, markerId: string) {
 		this._g = overlayGroup;
@@ -46,14 +48,18 @@ export class OverlayRenderer {
 		this._ghostConnG = svgEl("g");
 		this._ghostCreateG = svgEl("g");
 		this._alignG = svgEl("g");
+		this._endpointGhostG = svgEl("g");
+		this._edgeEndpointsG = svgEl("g");
 
 		this._g.appendChild(this._ghostCreateG);
 		this._g.appendChild(this._ghostConnG);
+		this._g.appendChild(this._endpointGhostG);
 		this._g.appendChild(this._rubberG);
 		this._g.appendChild(this._resizePreviewG);
 		this._g.appendChild(this._alignG);
 		this._g.appendChild(this._selectionG);
 		this._g.appendChild(this._portsG);
+		this._g.appendChild(this._edgeEndpointsG);
 	}
 
 	// ── Selection + handles ───────────────────────────────────────────
@@ -179,6 +185,42 @@ export class OverlayRenderer {
 			"marker-end": `url(#${this._markerId})`,
 		});
 		this._ghostConnG.appendChild(line);
+	}
+
+	// ── Edge endpoint balls ────────────────────────────────────────────
+
+	setEdgeEndpoints(waypoints: BpmnWaypoint[] | null, edgeId: string): void {
+		this._edgeEndpointsG.innerHTML = "";
+		if (!waypoints || waypoints.length < 2) return;
+		const first = waypoints[0];
+		const last = waypoints[waypoints.length - 1];
+		if (!first || !last) return;
+		for (const [pt, isStart] of [
+			[first, true],
+			[last, false],
+		] as const) {
+			const circle = svgEl("circle");
+			attr(circle, {
+				class: "bpmn-edge-endpoint",
+				"data-bpmn-endpoint": isStart ? "start" : "end",
+				"data-bpmn-id": edgeId,
+				cx: pt.x,
+				cy: pt.y,
+				r: 5,
+			});
+			this._edgeEndpointsG.appendChild(circle);
+		}
+	}
+
+	// ── Endpoint drag ghost ────────────────────────────────────────────
+
+	setEndpointDragGhost(waypoints: BpmnWaypoint[] | null): void {
+		this._endpointGhostG.innerHTML = "";
+		if (!waypoints || waypoints.length < 2) return;
+		const points = waypoints.map((wp) => `${wp.x},${wp.y}`).join(" ");
+		const poly = svgEl("polyline");
+		attr(poly, { class: "bpmn-endpoint-ghost", points });
+		this._endpointGhostG.appendChild(poly);
 	}
 
 	// ── Ghost create shape ─────────────────────────────────────────────

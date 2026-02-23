@@ -1,6 +1,6 @@
 import type { RenderedShape, ViewportState } from "@bpmn-sdk/canvas";
 import type { BpmnBounds, BpmnWaypoint } from "@bpmn-sdk/core";
-import type { DiagPoint, HandleDir, PortDir } from "./types.js";
+import type { DiagPoint, HandleDir, LabelPosition, PortDir } from "./types.js";
 
 // ── Coordinate conversion ────────────────────────────────────────────────────
 
@@ -183,6 +183,164 @@ export function computeWaypoints(src: BpmnBounds, tgt: BpmnBounds): BpmnWaypoint
 		{ x: loopX, y: tgtCy },
 		{ x: tgtLeft, y: tgtCy },
 	];
+}
+
+// ── Label position ────────────────────────────────────────────────────────────
+
+const LABEL_W = 80;
+const LABEL_H = 20;
+const LABEL_GAP = 6;
+
+/**
+ * Computes the absolute diagram-space bounds for an external label given a
+ * position option and the shape it belongs to.
+ */
+export function labelBoundsForPosition(shape: BpmnBounds, position: LabelPosition): BpmnBounds {
+	const cx = shape.x + shape.width / 2;
+	const cy = shape.y + shape.height / 2;
+	const right = shape.x + shape.width;
+	const bottom = shape.y + shape.height;
+	switch (position) {
+		case "bottom":
+			return { x: cx - LABEL_W / 2, y: bottom + LABEL_GAP, width: LABEL_W, height: LABEL_H };
+		case "top":
+			return {
+				x: cx - LABEL_W / 2,
+				y: shape.y - LABEL_GAP - LABEL_H,
+				width: LABEL_W,
+				height: LABEL_H,
+			};
+		case "left":
+			return {
+				x: shape.x - LABEL_GAP - LABEL_W,
+				y: cy - LABEL_H / 2,
+				width: LABEL_W,
+				height: LABEL_H,
+			};
+		case "right":
+			return { x: right + LABEL_GAP, y: cy - LABEL_H / 2, width: LABEL_W, height: LABEL_H };
+		case "bottom-left":
+			return {
+				x: shape.x - LABEL_GAP - LABEL_W,
+				y: bottom + LABEL_GAP,
+				width: LABEL_W,
+				height: LABEL_H,
+			};
+		case "bottom-right":
+			return { x: right + LABEL_GAP, y: bottom + LABEL_GAP, width: LABEL_W, height: LABEL_H };
+		case "top-left":
+			return {
+				x: shape.x - LABEL_GAP - LABEL_W,
+				y: shape.y - LABEL_GAP - LABEL_H,
+				width: LABEL_W,
+				height: LABEL_H,
+			};
+		case "top-right":
+			return {
+				x: right + LABEL_GAP,
+				y: shape.y - LABEL_GAP - LABEL_H,
+				width: LABEL_W,
+				height: LABEL_H,
+			};
+	}
+}
+
+// ── Port helpers ──────────────────────────────────────────────────────────────
+
+/** Returns the midpoint of a specific port edge in diagram space. */
+export function portPoint(bounds: BpmnBounds, port: PortDir): DiagPoint {
+	const { x, y, width, height } = bounds;
+	switch (port) {
+		case "top":
+			return { x: x + width / 2, y };
+		case "right":
+			return { x: x + width, y: y + height / 2 };
+		case "bottom":
+			return { x: x + width / 2, y: y + height };
+		case "left":
+			return { x, y: y + height / 2 };
+	}
+}
+
+/** Returns which port of `bounds` is nearest to `pos` in diagram space. */
+export function closestPort(pos: DiagPoint, bounds: BpmnBounds): PortDir {
+	const dirs: PortDir[] = ["top", "right", "bottom", "left"];
+	let best: PortDir = "right";
+	let minDist = Number.POSITIVE_INFINITY;
+	for (const dir of dirs) {
+		const pt = portPoint(bounds, dir);
+		const d = Math.hypot(pos.x - pt.x, pos.y - pt.y);
+		if (d < minDist) {
+			minDist = d;
+			best = dir;
+		}
+	}
+	return best;
+}
+
+/**
+ * Derives which port of `bounds` a waypoint exits from / enters at.
+ * Uses the dominant axis between the waypoint and the shape centre.
+ */
+export function portFromWaypoint(wp: BpmnWaypoint, bounds: BpmnBounds): PortDir {
+	const cx = bounds.x + bounds.width / 2;
+	const cy = bounds.y + bounds.height / 2;
+	const dx = wp.x - cx;
+	const dy = wp.y - cy;
+	const hw = bounds.width / 2;
+	const hh = bounds.height / 2;
+	// Normalise to unit aspect ratio so thin shapes behave correctly
+	if (Math.abs(dx / hw) >= Math.abs(dy / hh)) {
+		return dx >= 0 ? "right" : "left";
+	}
+	return dy >= 0 ? "bottom" : "top";
+}
+
+/**
+ * Computes orthogonal waypoints connecting two shapes via explicit exit/entry
+ * ports.  All segments are horizontal or vertical.
+ */
+export function computeWaypointsWithPorts(
+	src: BpmnBounds,
+	srcPort: PortDir,
+	tgt: BpmnBounds,
+	tgtPort: PortDir,
+): BpmnWaypoint[] {
+	const E = portPoint(src, srcPort);
+	const P = portPoint(tgt, tgtPort);
+
+	if (Math.hypot(E.x - P.x, E.y - P.y) < 2) return [E, P];
+
+	const srcH = srcPort === "left" || srcPort === "right";
+	const tgtH = tgtPort === "left" || tgtPort === "right";
+
+	if (srcH && tgtH) {
+		if (Math.abs(E.y - P.y) < 2) return [E, P];
+		if (srcPort === tgtPort) {
+			// Same-direction ports → U-route
+			const loopX = srcPort === "right" ? Math.max(E.x, P.x) + 50 : Math.min(E.x, P.x) - 50;
+			return [E, { x: loopX, y: E.y }, { x: loopX, y: P.y }, P];
+		}
+		const midX = Math.round((E.x + P.x) / 2);
+		return [E, { x: midX, y: E.y }, { x: midX, y: P.y }, P];
+	}
+
+	if (!srcH && !tgtH) {
+		if (Math.abs(E.x - P.x) < 2) return [E, P];
+		if (srcPort === tgtPort) {
+			const loopY = srcPort === "bottom" ? Math.max(E.y, P.y) + 50 : Math.min(E.y, P.y) - 50;
+			return [E, { x: E.x, y: loopY }, { x: P.x, y: loopY }, P];
+		}
+		const midY = Math.round((E.y + P.y) / 2);
+		return [E, { x: E.x, y: midY }, { x: P.x, y: midY }, P];
+	}
+
+	if (srcH && !tgtH) {
+		// Horizontal exit → vertical entry: L-route
+		return [E, { x: P.x, y: E.y }, P];
+	}
+	// Vertical exit → horizontal entry: L-route
+	return [E, { x: E.x, y: P.y }, P];
 }
 
 // ── Selection bounds ──────────────────────────────────────────────────────────

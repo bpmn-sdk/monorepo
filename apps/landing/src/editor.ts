@@ -1,6 +1,6 @@
 import type { ViewportState } from "@bpmn-sdk/canvas";
 import { BpmnEditor } from "@bpmn-sdk/editor";
-import type { CreateShapeType, Tool } from "@bpmn-sdk/editor";
+import type { CreateShapeType, LabelPosition, Tool } from "@bpmn-sdk/editor";
 
 // ── SVG icon strings ──────────────────────────────────────────────────────────
 
@@ -26,6 +26,8 @@ const IC = {
 	sun: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="8" cy="8" r="2.8"/><line x1="8" y1="1.5" x2="8" y2="3"/><line x1="8" y1="13" x2="8" y2="14.5"/><line x1="1.5" y1="8" x2="3" y2="8"/><line x1="13" y1="8" x2="14.5" y2="8"/><line x1="3.3" y1="3.3" x2="4.4" y2="4.4"/><line x1="11.6" y1="11.6" x2="12.7" y2="12.7"/><line x1="3.3" y1="12.7" x2="4.4" y2="11.6"/><line x1="11.6" y1="4.4" x2="12.7" y2="3.3"/></svg>`,
 	auto: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="8" cy="8" r="5.5"/><path d="M8 8V3.5"/><path d="M8 8l3.2 2"/></svg>`,
 	arrow: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="2" y1="8" x2="11" y2="8"/><polyline points="8,5 12,8 8,11"/></svg>`,
+	labelPos: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="8" cy="8" r="1.5" fill="currentColor" stroke="none"/><line x1="8" y1="2" x2="8" y2="5.5"/><line x1="8" y1="10.5" x2="8" y2="14"/><line x1="2" y1="8" x2="5.5" y2="8"/><line x1="10.5" y1="8" x2="14" y2="8"/></svg>`,
+	scriptTask: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="0.5" width="10" height="13" rx="1"/><path d="M4 4h6M4 7h6M4 10h4" stroke-linecap="round"/></svg>`,
 };
 
 // ── Sample XML ────────────────────────────────────────────────────────────────
@@ -105,10 +107,12 @@ const btnZoomOut = document.getElementById("btn-zoom-out") as HTMLButtonElement;
 const btnZoomPct = document.getElementById("btn-zoom-pct") as HTMLButtonElement;
 const btnZoomIn = document.getElementById("btn-zoom-in") as HTMLButtonElement;
 const zoomExpanded = document.getElementById("zoom-expanded") as HTMLDivElement;
+const cfgToolbar = document.getElementById("cfg-toolbar") as HTMLDivElement;
 const ctxToolbar = document.getElementById("ctx-toolbar") as HTMLDivElement;
 const mainMenuEl = document.getElementById("main-menu") as HTMLDivElement;
 const zoomMenuEl = document.getElementById("zoom-menu") as HTMLDivElement;
 const moreMenuEl = document.getElementById("more-menu") as HTMLDivElement;
+const labelPosMenuEl = document.getElementById("label-pos-menu") as HTMLDivElement;
 
 // ── Assign icons ──────────────────────────────────────────────────────────────
 
@@ -359,42 +363,152 @@ const CTX_OPTIONS: Array<{ type: CreateShapeType; icon: string; title: string }>
 	{ type: "endEvent", icon: IC.endEvent, title: "Add End Event" },
 ];
 
-function buildCtxToolbar(sourceId: string, sourceType: string): void {
-	ctxToolbar.innerHTML = "";
-	if (sourceType === "endEvent") return;
+const EXTERNAL_LABEL_TYPES = new Set([
+	"startEvent",
+	"endEvent",
+	"exclusiveGateway",
+	"parallelGateway",
+]);
 
-	// Arrow: manually draw a connection to any target
-	const arrowBtn = document.createElement("button");
-	arrowBtn.className = "hud-btn";
-	arrowBtn.innerHTML = IC.arrow;
-	arrowBtn.title = "Connect to element (click target)";
-	arrowBtn.addEventListener("click", () => {
-		editor.startConnectionFrom(sourceId);
-		hideCtxToolbar();
-	});
-	ctxToolbar.appendChild(arrowBtn);
+const POSITION_LABELS: Record<LabelPosition, string> = {
+	bottom: "Below (centered)",
+	top: "Above (centered)",
+	left: "Left",
+	right: "Right",
+	"bottom-left": "Bottom left",
+	"bottom-right": "Bottom right",
+	"top-left": "Top left",
+	"top-right": "Top right",
+};
 
-	const sep = document.createElement("div");
-	sep.className = "hud-sep";
-	ctxToolbar.appendChild(sep);
+function getPositionsForType(type: string): LabelPosition[] {
+	const base: LabelPosition[] = ["bottom", "top", "left", "right"];
+	if (type === "exclusiveGateway" || type === "parallelGateway") {
+		return [...base, "bottom-left", "bottom-right", "top-left", "top-right"];
+	}
+	return base;
+}
 
-	for (const opt of CTX_OPTIONS) {
-		if (
-			(sourceType === "exclusiveGateway" || sourceType === "parallelGateway") &&
-			opt.type === "exclusiveGateway"
-		)
-			continue;
-
+function buildLabelPosMenu(sourceId: string, sourceType: string): void {
+	labelPosMenuEl.innerHTML = "";
+	for (const pos of getPositionsForType(sourceType)) {
 		const btn = document.createElement("button");
-		btn.className = "hud-btn";
-		btn.innerHTML = opt.icon;
-		btn.title = opt.title;
+		btn.className = "drop-item";
+		btn.textContent = POSITION_LABELS[pos];
 		btn.addEventListener("click", () => {
-			editor.addConnectedElement(sourceId, opt.type);
+			editor.setLabelPosition(sourceId, pos);
 			closeAllDropdowns();
 		});
-		ctxToolbar.appendChild(btn);
+		labelPosMenuEl.appendChild(btn);
 	}
+}
+
+function buildCtxToolbar(sourceId: string, sourceType: string): void {
+	ctxToolbar.innerHTML = "";
+	const canAddElements = sourceType !== "endEvent";
+
+	if (canAddElements) {
+		// Arrow: manually draw a connection to any target
+		const arrowBtn = document.createElement("button");
+		arrowBtn.className = "hud-btn";
+		arrowBtn.innerHTML = IC.arrow;
+		arrowBtn.title = "Connect to element (click target)";
+		arrowBtn.addEventListener("click", () => {
+			editor.startConnectionFrom(sourceId);
+			hideCtxToolbar();
+		});
+		ctxToolbar.appendChild(arrowBtn);
+
+		const sep = document.createElement("div");
+		sep.className = "hud-sep";
+		ctxToolbar.appendChild(sep);
+
+		for (const opt of CTX_OPTIONS) {
+			if (
+				(sourceType === "exclusiveGateway" || sourceType === "parallelGateway") &&
+				opt.type === "exclusiveGateway"
+			)
+				continue;
+
+			const btn = document.createElement("button");
+			btn.className = "hud-btn";
+			btn.innerHTML = opt.icon;
+			btn.title = opt.title;
+			btn.addEventListener("click", () => {
+				editor.addConnectedElement(sourceId, opt.type);
+				closeAllDropdowns();
+			});
+			ctxToolbar.appendChild(btn);
+		}
+	}
+}
+
+const TASK_SWITCHER: Array<{ type: CreateShapeType; icon: string; title: string }> = [
+	{ type: "serviceTask", icon: IC.serviceTask, title: "Service Task" },
+	{ type: "userTask", icon: IC.userTask, title: "User Task" },
+	{ type: "scriptTask", icon: IC.scriptTask, title: "Script Task" },
+];
+
+const GW_SWITCHER: Array<{ type: CreateShapeType; icon: string; title: string }> = [
+	{ type: "exclusiveGateway", icon: IC.exclusiveGateway, title: "Exclusive Gateway" },
+	{ type: "parallelGateway", icon: IC.parallelGateway, title: "Parallel Gateway" },
+];
+
+function buildCfgToolbar(sourceId: string, sourceType: string): void {
+	cfgToolbar.innerHTML = "";
+
+	const isTask = TASK_SWITCHER.some((t) => t.type === sourceType);
+	const isGateway = GW_SWITCHER.some((t) => t.type === sourceType);
+	const switcher = isTask ? TASK_SWITCHER : isGateway ? GW_SWITCHER : null;
+
+	if (switcher) {
+		for (const opt of switcher) {
+			const btn = document.createElement("button");
+			btn.className = opt.type === sourceType ? "hud-btn active" : "hud-btn";
+			btn.innerHTML = opt.icon;
+			btn.title = opt.title;
+			btn.addEventListener("click", () => {
+				if (opt.type !== sourceType) {
+					editor.changeElementType(sourceId, opt.type);
+				}
+			});
+			cfgToolbar.appendChild(btn);
+		}
+	}
+
+	if (EXTERNAL_LABEL_TYPES.has(sourceType)) {
+		if (cfgToolbar.children.length > 0) {
+			const sep = document.createElement("div");
+			sep.className = "hud-sep";
+			cfgToolbar.appendChild(sep);
+		}
+		const labelBtn = document.createElement("button");
+		labelBtn.className = "hud-btn";
+		labelBtn.innerHTML = IC.labelPos;
+		labelBtn.title = "Label position";
+		labelBtn.addEventListener("click", (e) => {
+			e.stopPropagation();
+			buildLabelPosMenu(sourceId, sourceType);
+			showDropdown(labelPosMenuEl, labelBtn, "above");
+		});
+		cfgToolbar.appendChild(labelBtn);
+	}
+}
+
+function positionCfgToolbar(): void {
+	if (!ctxSourceId) {
+		cfgToolbar.style.display = "none";
+		return;
+	}
+	const bounds = editor.getShapeBounds(ctxSourceId);
+	if (!bounds) {
+		cfgToolbar.style.display = "none";
+		return;
+	}
+	const cx = bounds.x + bounds.width / 2;
+	cfgToolbar.style.left = `${cx}px`;
+	cfgToolbar.style.top = `${bounds.y - 10}px`;
+	cfgToolbar.style.display = cfgToolbar.children.length > 0 ? "flex" : "none";
 }
 
 function positionCtxToolbar(): void {
@@ -417,12 +531,15 @@ function positionCtxToolbar(): void {
 function showCtxToolbar(id: string, elemType: string): void {
 	ctxSourceId = id;
 	buildCtxToolbar(id, elemType);
+	buildCfgToolbar(id, elemType);
 	positionCtxToolbar();
+	positionCfgToolbar();
 }
 
 function hideCtxToolbar(): void {
 	ctxSourceId = null;
 	ctxToolbar.style.display = "none";
+	cfgToolbar.style.display = "none";
 }
 
 // ── Editor event handlers ─────────────────────────────────────────────────────
@@ -438,7 +555,7 @@ editor.on("editor:select", (ids: string[]) => {
 			return;
 		}
 		const elemType = editor.getElementType(id);
-		if (elemType && elemType !== "endEvent") {
+		if (elemType) {
 			showCtxToolbar(id, elemType);
 		} else {
 			hideCtxToolbar();
@@ -452,11 +569,22 @@ editor.on("viewport:change", (state: ViewportState) => {
 	currentScale = state.scale;
 	updateZoomDisplay();
 	positionCtxToolbar();
+	positionCfgToolbar();
 });
 
 editor.on("diagram:change", () => {
 	updateActionBar();
-	positionCtxToolbar();
+	if (ctxSourceId) {
+		const elemType = editor.getElementType(ctxSourceId);
+		if (elemType) {
+			buildCtxToolbar(ctxSourceId, elemType);
+			buildCfgToolbar(ctxSourceId, elemType);
+			positionCtxToolbar();
+			positionCfgToolbar();
+		} else {
+			hideCtxToolbar();
+		}
+	}
 });
 
 // Keyboard shortcut: Ctrl+D to duplicate

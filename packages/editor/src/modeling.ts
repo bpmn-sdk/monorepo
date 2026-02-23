@@ -7,9 +7,9 @@ import type {
 	BpmnSequenceFlow,
 	BpmnWaypoint,
 } from "@bpmn-sdk/core";
-import { computeWaypoints } from "./geometry.js";
+import { computeWaypoints, computeWaypointsWithPorts, portFromWaypoint } from "./geometry.js";
 import { genId } from "./id.js";
-import type { CreateShapeType } from "./types.js";
+import type { CreateShapeType, PortDir } from "./types.js";
 
 // ── Empty definitions ─────────────────────────────────────────────────────────
 
@@ -77,6 +77,8 @@ function makeFlowElement(type: CreateShapeType, id: string, name?: string): Bpmn
 			return { ...base, type: "serviceTask" };
 		case "userTask":
 			return { ...base, type: "userTask" };
+		case "scriptTask":
+			return { ...base, type: "scriptTask" };
 		case "exclusiveGateway":
 			return { ...base, type: "exclusiveGateway" };
 		case "parallelGateway":
@@ -215,7 +217,7 @@ export function moveShapes(
 	const diagram = defs.diagrams[0];
 	if (!process || !diagram) return defs;
 
-	// Update DI shape bounds
+	// Update DI shape bounds (and label bounds, if present)
 	const newShapes = diagram.plane.shapes.map((s) => {
 		const m = moveMap.get(s.bpmnElement);
 		if (!m) return s;
@@ -226,6 +228,18 @@ export function moveShapes(
 				x: s.bounds.x + m.dx,
 				y: s.bounds.y + m.dy,
 			},
+			label:
+				s.label?.bounds !== undefined
+					? {
+							...s.label,
+							bounds: {
+								x: s.label.bounds.x + m.dx,
+								y: s.label.bounds.y + m.dy,
+								width: s.label.bounds.width,
+								height: s.label.bounds.height,
+							},
+						}
+					: s.label,
 		};
 	});
 
@@ -331,10 +345,10 @@ export function deleteElements(defs: BpmnDefinitions, ids: string[]): BpmnDefini
 	const diagram = defs.diagrams[0];
 	if (!process || !diagram) return defs;
 
-	// Find sequence flows to remove (those whose source or target is deleted)
+	// Find sequence flows to remove (directly specified, or whose source/target is deleted)
 	const flowsToRemove = new Set(
 		process.sequenceFlows
-			.filter((sf) => idSet.has(sf.sourceRef) || idSet.has(sf.targetRef))
+			.filter((sf) => idSet.has(sf.id) || idSet.has(sf.sourceRef) || idSet.has(sf.targetRef))
 			.map((sf) => sf.id),
 	);
 
@@ -412,6 +426,185 @@ export function updateLabel(defs: BpmnDefinitions, id: string, name: string): Bp
 	}
 
 	return defs;
+}
+
+// ── Update label position ─────────────────────────────────────────────────────
+
+/** Updates the DI label bounds for a shape (sets explicit external label position). */
+export function updateLabelPosition(
+	defs: BpmnDefinitions,
+	shapeId: string,
+	labelBounds: BpmnBounds,
+): BpmnDefinitions {
+	const diagram = defs.diagrams[0];
+	if (!diagram) return defs;
+
+	const newShapes = diagram.plane.shapes.map((s) =>
+		s.bpmnElement === shapeId ? { ...s, label: { bounds: labelBounds } } : s,
+	);
+
+	return {
+		...defs,
+		diagrams: [
+			{ ...diagram, plane: { ...diagram.plane, shapes: newShapes } },
+			...defs.diagrams.slice(1),
+		],
+	};
+}
+
+// ── Update edge endpoint ──────────────────────────────────────────────────────
+
+/**
+ * Reconnects one endpoint of an edge to a different port on the same
+ * source or target shape, recomputing the orthogonal route.
+ */
+export function updateEdgeEndpoint(
+	defs: BpmnDefinitions,
+	edgeId: string,
+	isStart: boolean,
+	newPort: PortDir,
+): BpmnDefinitions {
+	const process = defs.processes[0];
+	const diagram = defs.diagrams[0];
+	if (!process || !diagram) return defs;
+
+	const edge = diagram.plane.edges.find((e) => e.bpmnElement === edgeId);
+	if (!edge || edge.waypoints.length < 2) return defs;
+
+	const flow = process.sequenceFlows.find((sf) => sf.id === edgeId);
+	if (!flow) return defs;
+
+	const srcShape = diagram.plane.shapes.find((s) => s.bpmnElement === flow.sourceRef);
+	const tgtShape = diagram.plane.shapes.find((s) => s.bpmnElement === flow.targetRef);
+	if (!srcShape || !tgtShape) return defs;
+
+	const first = edge.waypoints[0];
+	const last = edge.waypoints[edge.waypoints.length - 1];
+	if (!first || !last) return defs;
+
+	const srcPort = isStart ? newPort : portFromWaypoint(first, srcShape.bounds);
+	const tgtPort = isStart ? portFromWaypoint(last, tgtShape.bounds) : newPort;
+
+	const newWaypoints = computeWaypointsWithPorts(
+		srcShape.bounds,
+		srcPort,
+		tgtShape.bounds,
+		tgtPort,
+	);
+
+	const newEdges = diagram.plane.edges.map((e) =>
+		e.bpmnElement === edgeId ? { ...e, waypoints: newWaypoints } : e,
+	);
+
+	return {
+		...defs,
+		diagrams: [
+			{ ...diagram, plane: { ...diagram.plane, edges: newEdges } },
+			...defs.diagrams.slice(1),
+		],
+	};
+}
+
+// ── Change element type ───────────────────────────────────────────────────────
+
+/**
+ * Replaces a flow element's type while preserving its id, name, and connections.
+ * Use this for gateway type-switching (exclusive ↔ parallel) and task type-switching.
+ */
+export function changeElementType(
+	defs: BpmnDefinitions,
+	id: string,
+	newType: CreateShapeType,
+): BpmnDefinitions {
+	const process = defs.processes[0];
+	if (!process) return defs;
+
+	const elIndex = process.flowElements.findIndex((el) => el.id === id);
+	if (elIndex < 0) return defs;
+	const el = process.flowElements[elIndex];
+	if (!el) return defs;
+
+	const base = {
+		id: el.id,
+		name: el.name,
+		incoming: el.incoming,
+		outgoing: el.outgoing,
+		extensionElements: el.extensionElements,
+		unknownAttributes: el.unknownAttributes,
+	};
+
+	let newEl: BpmnFlowElement;
+	switch (newType) {
+		case "startEvent":
+			newEl = { ...base, type: "startEvent", eventDefinitions: [] };
+			break;
+		case "endEvent":
+			newEl = { ...base, type: "endEvent", eventDefinitions: [] };
+			break;
+		case "serviceTask":
+			newEl = { ...base, type: "serviceTask" };
+			break;
+		case "userTask":
+			newEl = { ...base, type: "userTask" };
+			break;
+		case "scriptTask":
+			newEl = { ...base, type: "scriptTask" };
+			break;
+		case "exclusiveGateway":
+			newEl = { ...base, type: "exclusiveGateway" };
+			break;
+		case "parallelGateway":
+			newEl = { ...base, type: "parallelGateway" };
+			break;
+	}
+
+	const newElements = [...process.flowElements];
+	newElements[elIndex] = newEl;
+
+	return {
+		...defs,
+		processes: [{ ...process, flowElements: newElements }, ...defs.processes.slice(1)],
+	};
+}
+
+// ── Insert shape on edge ──────────────────────────────────────────────────────
+
+/**
+ * Splits an existing sequence flow by inserting a shape between its source and
+ * target: removes the original edge and creates two new connections
+ * (source → shapeId and shapeId → target).
+ */
+export function insertShapeOnEdge(
+	defs: BpmnDefinitions,
+	edgeId: string,
+	shapeId: string,
+): BpmnDefinitions {
+	const process = defs.processes[0];
+	const diagram = defs.diagrams[0];
+	if (!process || !diagram) return defs;
+
+	const flow = process.sequenceFlows.find((sf) => sf.id === edgeId);
+	if (!flow) return defs;
+
+	const srcDi = diagram.plane.shapes.find((s) => s.bpmnElement === flow.sourceRef);
+	const tgtDi = diagram.plane.shapes.find((s) => s.bpmnElement === flow.targetRef);
+	const newDi = diagram.plane.shapes.find((s) => s.bpmnElement === shapeId);
+	if (!srcDi || !tgtDi || !newDi) return defs;
+
+	const withoutEdge = deleteElements(defs, [edgeId]);
+	const r1 = createConnection(
+		withoutEdge,
+		flow.sourceRef,
+		shapeId,
+		computeWaypoints(srcDi.bounds, newDi.bounds),
+	);
+	const r2 = createConnection(
+		r1.defs,
+		shapeId,
+		flow.targetRef,
+		computeWaypoints(newDi.bounds, tgtDi.bounds),
+	);
+	return r2.defs;
 }
 
 // ── Copy / paste ──────────────────────────────────────────────────────────────

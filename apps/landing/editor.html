@@ -34,6 +34,7 @@
       #hud-bottom-left   { bottom: 10px; left: 10px; }
       #hud-bottom-center { bottom: 10px; left: 50%; transform: translateX(-50%); }
       #ctx-toolbar { display: none; transform: translateX(-50%); }
+      #cfg-toolbar { display: none; transform: translate(-50%, -100%); }
 
       /* ── Icon buttons ──────────────────────────────────────────────────── */
       .hud-btn {
@@ -167,13 +168,17 @@
       <button class="hud-btn"        data-tool="create:parallelGateway"  title="Parallel Gateway"></button>
     </div>
 
-    <!-- Contextual quick-add toolbar -->
+    <!-- Configure toolbar (above selected element) -->
+    <div id="cfg-toolbar" class="hud panel"></div>
+
+    <!-- Contextual quick-add toolbar (below selected element) -->
     <div id="ctx-toolbar" class="hud panel"></div>
 
     <!-- Dropdown menus -->
-    <div id="main-menu"  class="dropdown"></div>
-    <div id="zoom-menu"  class="dropdown"></div>
-    <div id="more-menu"  class="dropdown"></div>
+    <div id="main-menu"      class="dropdown"></div>
+    <div id="zoom-menu"      class="dropdown"></div>
+    <div id="more-menu"      class="dropdown"></div>
+    <div id="label-pos-menu" class="dropdown"></div>
 
     <script type="module" src="/src/editor.ts"></script>
   </body>

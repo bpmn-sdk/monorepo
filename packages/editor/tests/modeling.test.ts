@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
+	changeElementType,
 	copyElements,
 	createConnection,
 	createEmptyDefinitions,
 	createShape,
 	deleteElements,
+	insertShapeOnEdge,
 	moveShapes,
 	pasteElements,
 	resizeShape,
@@ -254,6 +256,125 @@ describe("updateLabel", () => {
 		if (!proc) throw new Error("no process");
 		const el = proc.flowElements.find((e) => e.id === id);
 		expect(el?.name).toBe("My Task");
+	});
+});
+
+describe("moveShapes label bounds", () => {
+	it("translates label.bounds when shape has an external label", () => {
+		let defs = createEmptyDefinitions();
+		const { defs: d2, id } = createShape(defs, "startEvent", {
+			x: 100,
+			y: 100,
+			width: 36,
+			height: 36,
+		});
+		defs = d2;
+
+		// Manually set label.bounds on the DI shape
+		const diagram = defs.diagrams[0];
+		if (!diagram) throw new Error("no diagram");
+		const shapes = diagram.plane.shapes.map((s) =>
+			s.bpmnElement === id
+				? { ...s, label: { bounds: { x: 109, y: 144, width: 80, height: 20 } } }
+				: s,
+		);
+		defs = {
+			...defs,
+			diagrams: [{ ...diagram, plane: { ...diagram.plane, shapes } }, ...defs.diagrams.slice(1)],
+		};
+
+		const moved = moveShapes(defs, [{ id, dx: 30, dy: -20 }]);
+		const shape = moved.diagrams[0]?.plane.shapes.find((s) => s.bpmnElement === id);
+		expect(shape?.bounds.x).toBe(130);
+		expect(shape?.bounds.y).toBe(80);
+		expect(shape?.label?.bounds.x).toBe(139); // 109 + 30
+		expect(shape?.label?.bounds.y).toBe(124); // 144 - 20
+	});
+});
+
+describe("changeElementType", () => {
+	it("changes exclusiveGateway to parallelGateway", () => {
+		let defs = createEmptyDefinitions();
+		const { defs: d2, id } = createShape(defs, "exclusiveGateway", {
+			x: 0,
+			y: 0,
+			width: 50,
+			height: 50,
+		});
+		defs = d2;
+
+		const changed = changeElementType(defs, id, "parallelGateway");
+		const proc = changed.processes[0];
+		if (!proc) throw new Error("no process");
+		const el = proc.flowElements.find((e) => e.id === id);
+		expect(el?.type).toBe("parallelGateway");
+	});
+
+	it("preserves id, name, incoming, and outgoing", () => {
+		let defs = createEmptyDefinitions();
+		const r1 = createShape(defs, "startEvent", { x: 0, y: 0, width: 36, height: 36 });
+		defs = r1.defs;
+		const r2 = createShape(defs, "serviceTask", { x: 100, y: 0, width: 100, height: 80 });
+		defs = r2.defs;
+		const { defs: d3 } = createConnection(defs, r1.id, r2.id, [
+			{ x: 36, y: 18 },
+			{ x: 100, y: 40 },
+		]);
+		defs = d3;
+
+		const changed = changeElementType(defs, r2.id, "userTask");
+		const proc = changed.processes[0];
+		if (!proc) throw new Error("no process");
+		const el = proc.flowElements.find((e) => e.id === r2.id);
+		expect(el?.id).toBe(r2.id);
+		expect(el?.type).toBe("userTask");
+		expect(el?.incoming).toHaveLength(1);
+	});
+
+	it("supports scriptTask type", () => {
+		let defs = createEmptyDefinitions();
+		const { defs: d2, id } = createShape(defs, "serviceTask", {
+			x: 0,
+			y: 0,
+			width: 100,
+			height: 80,
+		});
+		defs = d2;
+		const changed = changeElementType(defs, id, "scriptTask");
+		const proc = changed.processes[0];
+		if (!proc) throw new Error("no process");
+		expect(proc.flowElements.find((e) => e.id === id)?.type).toBe("scriptTask");
+	});
+});
+
+describe("insertShapeOnEdge", () => {
+	it("splits the edge into two connections", () => {
+		let defs = createEmptyDefinitions();
+		const r1 = createShape(defs, "startEvent", { x: 0, y: 92, width: 36, height: 36 });
+		defs = r1.defs;
+		const r2 = createShape(defs, "endEvent", { x: 300, y: 92, width: 36, height: 36 });
+		defs = r2.defs;
+		const r3 = createShape(defs, "serviceTask", { x: 130, y: 70, width: 100, height: 80 });
+		defs = r3.defs;
+		const { defs: d4, id: edgeId } = createConnection(defs, r1.id, r2.id, [
+			{ x: 36, y: 110 },
+			{ x: 300, y: 110 },
+		]);
+		defs = d4;
+
+		const result = insertShapeOnEdge(defs, edgeId, r3.id);
+		const proc = result.processes[0];
+		if (!proc) throw new Error("no process");
+
+		// Original edge removed
+		expect(proc.sequenceFlows.find((sf) => sf.id === edgeId)).toBeUndefined();
+		// Two new flows: r1→r3 and r3→r2
+		const flowsFrom1 = proc.sequenceFlows.filter((sf) => sf.sourceRef === r1.id);
+		const flowsTo2 = proc.sequenceFlows.filter((sf) => sf.targetRef === r2.id);
+		expect(flowsFrom1).toHaveLength(1);
+		expect(flowsTo2).toHaveLength(1);
+		expect(flowsFrom1[0]?.targetRef).toBe(r3.id);
+		expect(flowsTo2[0]?.sourceRef).toBe(r3.id);
 	});
 });
 

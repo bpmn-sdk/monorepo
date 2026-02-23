@@ -29,7 +29,16 @@ type SelectSub =
 			screenY: number;
 	  }
 	| { name: "connecting"; sourceId: string; ghostEnd: DiagPoint }
-	| { name: "editing-label"; id: string };
+	| { name: "editing-label"; id: string }
+	| {
+			name: "pointing-edge-endpoint";
+			edgeId: string;
+			isStart: boolean;
+			origin: DiagPoint;
+			screenX: number;
+			screenY: number;
+	  }
+	| { name: "dragging-edge-endpoint"; edgeId: string; isStart: boolean; origin: DiagPoint };
 
 export type EditorMode =
 	| { mode: "select"; sub: SelectSub }
@@ -41,11 +50,13 @@ export type EditorMode =
 export interface Callbacks {
 	getShapes(): RenderedShape[];
 	getSelectedIds(): string[];
+	getSelectedEdgeId(): string | null;
 	getViewport(): ViewportState;
 	viewportDidPan(): boolean;
 	isResizable(id: string): boolean;
 	lockViewport(lock: boolean): void;
 	setSelection(ids: string[]): void;
+	setEdgeSelected(edgeId: string | null): void;
 	previewTranslate(dx: number, dy: number): void;
 	commitTranslate(dx: number, dy: number): void;
 	cancelTranslate(): void;
@@ -63,6 +74,9 @@ export interface Callbacks {
 	executeCopy(): void;
 	executePaste(): void;
 	setTool(tool: Tool): void;
+	previewEndpointMove(edgeId: string, isStart: boolean, diagPoint: DiagPoint): void;
+	commitEndpointMove(edgeId: string, isStart: boolean, diagPoint: DiagPoint): void;
+	cancelEndpointMove(): void;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -185,6 +199,28 @@ export class EditorStateMachine {
 				break;
 			}
 
+			case "edge": {
+				this._cb.setEdgeSelected(hit.id);
+				this._mode = { mode: "select", sub: { name: "idle", hoveredId: null } };
+				break;
+			}
+
+			case "edge-endpoint": {
+				this._cb.lockViewport(true);
+				this._mode = {
+					mode: "select",
+					sub: {
+						name: "pointing-edge-endpoint",
+						edgeId: hit.edgeId,
+						isStart: hit.isStart,
+						origin: diag,
+						screenX: e.clientX,
+						screenY: e.clientY,
+					},
+				};
+				break;
+			}
+
 			case "canvas": {
 				if (e.shiftKey) {
 					this._cb.lockViewport(true);
@@ -302,6 +338,28 @@ export class EditorStateMachine {
 				break;
 			}
 
+			case "pointing-edge-endpoint": {
+				const dist = screenDist(e.clientX, e.clientY, sub.screenX, sub.screenY);
+				if (dist > DRAG_THRESHOLD) {
+					this._mode = {
+						mode: "select",
+						sub: {
+							name: "dragging-edge-endpoint",
+							edgeId: sub.edgeId,
+							isStart: sub.isStart,
+							origin: sub.origin,
+						},
+					};
+					this._cb.previewEndpointMove(sub.edgeId, sub.isStart, diag);
+				}
+				break;
+			}
+
+			case "dragging-edge-endpoint": {
+				this._cb.previewEndpointMove(sub.edgeId, sub.isStart, diag);
+				break;
+			}
+
 			case "rubber-band": {
 				this._mode = { mode: "select", sub: { ...sub, current: diag } };
 				this._cb.previewRubberBand(sub.origin, diag);
@@ -387,6 +445,19 @@ export class EditorStateMachine {
 				break;
 			}
 
+			case "pointing-edge-endpoint": {
+				this._cb.lockViewport(false);
+				this._mode = { mode: "select", sub: { name: "idle", hoveredId: null } };
+				break;
+			}
+
+			case "dragging-edge-endpoint": {
+				this._cb.lockViewport(false);
+				this._cb.commitEndpointMove(sub.edgeId, sub.isStart, diag);
+				this._mode = { mode: "select", sub: { name: "idle", hoveredId: null } };
+				break;
+			}
+
 			case "pointing-canvas": {
 				if (!this._cb.viewportDidPan()) {
 					this._cb.setSelection([]);
@@ -439,6 +510,9 @@ export class EditorStateMachine {
 				sub.name === "pointing-port"
 			) {
 				this._cb.lockViewport(false);
+			} else if (sub.name === "pointing-edge-endpoint" || sub.name === "dragging-edge-endpoint") {
+				this._cb.lockViewport(false);
+				this._cb.cancelEndpointMove();
 			}
 			this._cb.setSelection([]);
 			this._mode = { mode: "select", sub: { name: "idle", hoveredId: null } };
@@ -450,8 +524,10 @@ export class EditorStateMachine {
 			if (sub.name === "editing-label") return;
 			e.preventDefault();
 			const ids = this._cb.getSelectedIds();
-			if (ids.length > 0) {
-				this._cb.executeDelete(ids);
+			const edgeId = this._cb.getSelectedEdgeId();
+			const allIds = edgeId ? [...ids, edgeId] : ids;
+			if (allIds.length > 0) {
+				this._cb.executeDelete(allIds);
 			}
 			return;
 		}
