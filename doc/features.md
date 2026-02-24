@@ -11,7 +11,8 @@
 - **External label positions** — events and gateways show labels outside the shape; 8 positions via `setLabelPosition(id, pos)`; contextual toolbar compass icon to choose
 - **Magnet snap** — shapes snap to aligned edges/centers of neighbors during drag; blue dashed guide lines shown
 - **Contextual toolbar** — arrow icon to draw freehand connections; quick-add buttons for connected elements; label position picker for events/gateways
-- **Tool system** — `setTool("select" | "pan" | "create:serviceTask" | ...)` with `editor:tool` event
+- **Tool system** — `setTool("select" | "pan" | "space" | "create:serviceTask" | ...)` with `editor:tool` event
+- **Space tool** — click-and-drag to push elements apart; drag right/left to move elements in that half, drag up/down to move elements in that half; axis locks after 4px; amber dashed guide line shown; edges remain connected
 - **Selection** — click, shift-click, rubber-band box-select; `setSelection(ids)` API; `editor:select` event; edge selection independent of shape selection
 - **Undo/redo** — snapshot-based `CommandStack` (100 entries); `canUndo()` / `canRedo()` queries
 - **Inline label editing** — double-click activates `contenteditable` div positioned over the shape

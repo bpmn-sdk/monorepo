@@ -237,6 +237,9 @@ export class BpmnEditor {
 					this._overlay.setEdgeEndpoints(edge?.edge.waypoints ?? null, this._selectedEdgeId);
 				}
 			},
+			previewSpace: (origin, current, axis) => this._previewSpace(origin, current, axis),
+			commitSpace: (origin, current, axis) => this._commitSpace(origin, current, axis),
+			cancelSpace: () => this._cancelSpace(),
 		};
 
 		this._stateMachine = new EditorStateMachine(callbacks);
@@ -322,6 +325,8 @@ export class BpmnEditor {
 			this._stateMachine.setMode({ mode: "select", sub: { name: "idle", hoveredId: null } });
 		} else if (tool === "pan") {
 			this._stateMachine.setMode({ mode: "pan" });
+		} else if (tool === "space") {
+			this._stateMachine.setMode({ mode: "space", sub: { name: "idle" } });
 		} else {
 			const elementType = tool.slice(7) as CreateShapeType;
 			this._stateMachine.setMode({ mode: "create", elementType });
@@ -543,6 +548,80 @@ export class BpmnEditor {
 		} else {
 			this._executeCommand((d) => moveShapes(d, moves));
 		}
+	}
+
+	private _previewSpace(origin: DiagPoint, current: DiagPoint, axis: "h" | "v" | null): void {
+		// Reset all shapes to their original positions first
+		for (const shape of this._shapes) {
+			const { x, y } = shape.shape.bounds;
+			shape.element.setAttribute("transform", `translate(${x} ${y})`);
+		}
+		if (!axis) return;
+
+		const dx = current.x - origin.x;
+		const dy = current.y - origin.y;
+
+		for (const shape of this._shapes) {
+			const b = shape.shape.bounds;
+			const cx = b.x + b.width / 2;
+			const cy = b.y + b.height / 2;
+			let moveDx = 0;
+			let moveDy = 0;
+			if (axis === "h") {
+				if (dx > 0 && cx > origin.x) moveDx = dx;
+				else if (dx < 0 && cx < origin.x) moveDx = dx;
+			} else {
+				if (dy > 0 && cy > origin.y) moveDy = dy;
+				else if (dy < 0 && cy < origin.y) moveDy = dy;
+			}
+			if (moveDx !== 0 || moveDy !== 0) {
+				shape.element.setAttribute("transform", `translate(${b.x + moveDx} ${b.y + moveDy})`);
+			}
+		}
+
+		const splitValue = axis === "h" ? origin.x : origin.y;
+		this._overlay.setSpacePreview(axis, splitValue);
+	}
+
+	private _commitSpace(origin: DiagPoint, current: DiagPoint, axis: "h" | "v" | null): void {
+		// Reset visual preview
+		for (const shape of this._shapes) {
+			const { x, y } = shape.shape.bounds;
+			shape.element.setAttribute("transform", `translate(${x} ${y})`);
+		}
+		this._overlay.setSpacePreview(null);
+
+		if (!axis || !this._defs) return;
+
+		const dx = current.x - origin.x;
+		const dy = current.y - origin.y;
+		if (dx === 0 && dy === 0) return;
+
+		const moves: Array<{ id: string; dx: number; dy: number }> = [];
+		for (const shape of this._shapes) {
+			const b = shape.shape.bounds;
+			const cx = b.x + b.width / 2;
+			const cy = b.y + b.height / 2;
+			if (axis === "h") {
+				if (dx > 0 && cx > origin.x) moves.push({ id: shape.id, dx, dy: 0 });
+				else if (dx < 0 && cx < origin.x) moves.push({ id: shape.id, dx, dy: 0 });
+			} else {
+				if (dy > 0 && cy > origin.y) moves.push({ id: shape.id, dx: 0, dy });
+				else if (dy < 0 && cy < origin.y) moves.push({ id: shape.id, dx: 0, dy });
+			}
+		}
+
+		if (moves.length > 0) {
+			this._executeCommand((d) => moveShapes(d, moves));
+		}
+	}
+
+	private _cancelSpace(): void {
+		for (const shape of this._shapes) {
+			const { x, y } = shape.shape.bounds;
+			shape.element.setAttribute("transform", `translate(${x} ${y})`);
+		}
+		this._overlay.setSpacePreview(null);
 	}
 
 	private _doCreate(type: CreateShapeType, diagPoint: DiagPoint): void {

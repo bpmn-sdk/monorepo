@@ -36,6 +36,7 @@ export class OverlayRenderer {
 	private readonly _alignG: SVGGElement;
 	private readonly _edgeEndpointsG: SVGGElement;
 	private readonly _endpointGhostG: SVGGElement;
+	private readonly _spaceG: SVGGElement;
 
 	constructor(overlayGroup: SVGGElement, markerId: string) {
 		this._g = overlayGroup;
@@ -50,7 +51,9 @@ export class OverlayRenderer {
 		this._alignG = svgEl("g");
 		this._endpointGhostG = svgEl("g");
 		this._edgeEndpointsG = svgEl("g");
+		this._spaceG = svgEl("g");
 
+		this._g.appendChild(this._spaceG);
 		this._g.appendChild(this._ghostCreateG);
 		this._g.appendChild(this._ghostConnG);
 		this._g.appendChild(this._endpointGhostG);
@@ -221,6 +224,34 @@ export class OverlayRenderer {
 		const poly = svgEl("polyline");
 		attr(poly, { class: "bpmn-endpoint-ghost", points });
 		this._endpointGhostG.appendChild(poly);
+	}
+
+	// ── Space tool split line ──────────────────────────────────────────
+
+	setSpacePreview(axis: "h" | "v" | null, splitValue?: number): void {
+		this._spaceG.innerHTML = "";
+		if (!axis || splitValue === undefined) return;
+
+		const EXTENT = 10000;
+		const line = svgEl("line");
+		if (axis === "h") {
+			attr(line, {
+				class: "bpmn-space-line",
+				x1: splitValue,
+				y1: -EXTENT,
+				x2: splitValue,
+				y2: EXTENT,
+			});
+		} else {
+			attr(line, {
+				class: "bpmn-space-line",
+				x1: -EXTENT,
+				y1: splitValue,
+				x2: EXTENT,
+				y2: splitValue,
+			});
+		}
+		this._spaceG.appendChild(line);
 	}
 
 	// ── Ghost create shape ─────────────────────────────────────────────

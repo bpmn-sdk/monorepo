@@ -40,10 +40,15 @@ type SelectSub =
 	  }
 	| { name: "dragging-edge-endpoint"; edgeId: string; isStart: boolean; origin: DiagPoint };
 
+type SpaceSub =
+	| { name: "idle" }
+	| { name: "dragging"; origin: DiagPoint; last: DiagPoint; axis: "h" | "v" | null };
+
 export type EditorMode =
 	| { mode: "select"; sub: SelectSub }
 	| { mode: "create"; elementType: CreateShapeType }
-	| { mode: "pan" };
+	| { mode: "pan" }
+	| { mode: "space"; sub: SpaceSub };
 
 // ── Callbacks ─────────────────────────────────────────────────────────────────
 
@@ -77,6 +82,9 @@ export interface Callbacks {
 	previewEndpointMove(edgeId: string, isStart: boolean, diagPoint: DiagPoint): void;
 	commitEndpointMove(edgeId: string, isStart: boolean, diagPoint: DiagPoint): void;
 	cancelEndpointMove(): void;
+	previewSpace(origin: DiagPoint, current: DiagPoint, axis: "h" | "v" | null): void;
+	commitSpace(origin: DiagPoint, current: DiagPoint, axis: "h" | "v" | null): void;
+	cancelSpace(): void;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -115,6 +123,16 @@ export class EditorStateMachine {
 			this._cb.commitCreate(mode.elementType, diag);
 			this._mode = { mode: "select", sub: { name: "idle", hoveredId: null } };
 			this._cb.setTool("select");
+			return;
+		}
+
+		// Space mode: lock viewport and begin drag
+		if (mode.mode === "space") {
+			this._cb.lockViewport(true);
+			this._mode = {
+				mode: "space",
+				sub: { name: "dragging", origin: diag, last: diag, axis: null },
+			};
 			return;
 		}
 
@@ -249,6 +267,20 @@ export class EditorStateMachine {
 	onPointerMove(e: PointerEvent, diag: DiagPoint, hit: HitResult): void {
 		const mode = this._mode;
 
+		// Space mode drag
+		if (mode.mode === "space" && mode.sub.name === "dragging") {
+			const sub = mode.sub;
+			const absDx = Math.abs(diag.x - sub.origin.x);
+			const absDy = Math.abs(diag.y - sub.origin.y);
+			let axis = sub.axis;
+			if (axis === null && (absDx > 4 || absDy > 4)) {
+				axis = absDx >= absDy ? "h" : "v";
+			}
+			this._mode = { mode: "space", sub: { ...sub, last: diag, axis } };
+			this._cb.previewSpace(sub.origin, diag, axis);
+			return;
+		}
+
 		if (mode.mode !== "select") {
 			if (mode.mode === "create") {
 				// Ghost create: update overlay (editor reads state.mode to update ghost)
@@ -375,6 +407,17 @@ export class EditorStateMachine {
 
 	onPointerUp(_e: PointerEvent, diag: DiagPoint, hit: HitResult): void {
 		const mode = this._mode;
+
+		// Space mode commit
+		if (mode.mode === "space") {
+			if (mode.sub.name === "dragging") {
+				this._cb.lockViewport(false);
+				this._cb.commitSpace(mode.sub.origin, diag, mode.sub.axis);
+				this._mode = { mode: "space", sub: { name: "idle" } };
+			}
+			return;
+		}
+
 		if (mode.mode !== "select") return;
 
 		const sub = mode.sub;
@@ -489,6 +532,16 @@ export class EditorStateMachine {
 			e.preventDefault();
 			this._mode = { mode: "select", sub: { name: "idle", hoveredId: null } };
 			this._cb.setTool("select");
+			return;
+		}
+
+		if (mode.mode === "space" && e.key === "Escape") {
+			e.preventDefault();
+			if (mode.sub.name === "dragging") {
+				this._cb.lockViewport(false);
+				this._cb.cancelSpace();
+			}
+			this._mode = { mode: "space", sub: { name: "idle" } };
 			return;
 		}
 

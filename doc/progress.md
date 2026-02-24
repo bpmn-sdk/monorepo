@@ -2,6 +2,19 @@
 
 ## 2026-02-24
 
+### `@bpmn-sdk/editor` — Space tool
+- **Space tool** (`"space"`) added to `Tool` type; `setTool("space")` activates it
+- **Behavior**: click and hold anywhere on the canvas, then drag to push elements apart:
+  - Drag right → all elements whose center is to the right of the click x-position move right by the drag distance
+  - Drag left → all elements to the left of the click x-position move left
+  - Drag down → all elements below the click y-position move down
+  - Drag up → all elements above the click y-position move up
+  - Axis locks after 4 diagram-space pixels of movement (dominant axis wins)
+  - Edges are recomputed on commit via `moveShapes` (existing behavior)
+- **Visual feedback**: amber dashed split-line (`.bpmn-space-line`) drawn at the drag origin during drag
+- **Implementation**: new `SpaceSub` state (`idle` / `dragging`), `{ mode: "space" }` EditorMode variant, `previewSpace`/`commitSpace`/`cancelSpace` callbacks, `setSpacePreview` on `OverlayRenderer`
+- **Landing editor**: space button added to bottom toolbar between Select/Hand buttons and the element groups
+
 ### Editor toolbar — standard BPMN groups, icons, long-press picker
 - **Undo/redo icons** fixed: replaced confusing arc-based icons with clean U-shaped curved-arrow icons (polyline arrowhead + D-shaped arc body), matching standard design-tool conventions
 - **Bottom toolbar redesigned**: replaced individual element buttons with one button per BPMN group (Events, Activities, Gateways); clicking uses the last-selected element type; holding 500ms opens a horizontal group picker showing all element types in that group
