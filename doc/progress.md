@@ -2,6 +2,20 @@
 
 ## 2026-02-24
 
+### Command palette plugins — `@bpmn-sdk/canvas-plugin-command-palette` + `@bpmn-sdk/canvas-plugin-command-palette-editor`
+- **`@bpmn-sdk/canvas-plugin-command-palette`** — base Ctrl+K / ⌘K command palette for both canvas and editor
+  - Built-in commands: toggle theme (dark → light → auto cycle), zoom to 100%, zoom to fit, export as BPMN XML, zen mode
+  - **Zen mode**: adds `bpmn-zen-mode` class to container (hides `.bpmn-zoom-controls` / `.bpmn-main-menu-panel` via CSS), hides dot grid rects in SVG, calls `onZenModeChange` callback for external HUD hiding
+  - `CommandPalettePlugin.addCommands(cmds): () => void` — extension point; returns deregister function
+  - Module-level singleton ensures only one palette open at a time across all instances
+  - Theme-aware: resolves "auto" via `window.matchMedia`; light theme applies `bpmn-palette--light` class
+  - 14 tests in `canvas-plugins/command-palette/tests/index.test.ts`
+- **`@bpmn-sdk/canvas-plugin-command-palette-editor`** — extends base palette with 12 BPMN element creation commands
+  - Commands: Add Start Event, Add End Event, Add Service/User/Script/Send/Receive/Business Rule Task, Add Exclusive/Parallel/Inclusive/Event-based Gateway
+  - Activates via `setTool("create:X")` using lazy `editorRef` pattern (avoids circular dependency at construction time)
+  - Deregisters all commands on `uninstall()`; 4 tests in `canvas-plugins/command-palette-editor/tests/index.test.ts`
+- **Landing page**: palette wired with `onZenModeChange` hiding `.hud` elements; editor plugin uses lazy `editorRef`
+
 ### `@bpmn-sdk/editor` — Space tool
 - **Space tool** (`"space"`) added to `Tool` type; `setTool("space")` activates it
 - **Behavior**: click and hold anywhere on the canvas, then drag to push elements apart:

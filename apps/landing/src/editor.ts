@@ -1,4 +1,6 @@
 import type { ViewportState } from "@bpmn-sdk/canvas";
+import { createCommandPalettePlugin } from "@bpmn-sdk/canvas-plugin-command-palette";
+import { createCommandPaletteEditorPlugin } from "@bpmn-sdk/canvas-plugin-command-palette-editor";
 import { createMainMenuPlugin } from "@bpmn-sdk/canvas-plugin-main-menu";
 import { createZoomControlsPlugin } from "@bpmn-sdk/canvas-plugin-zoom-controls";
 import { BpmnEditor } from "@bpmn-sdk/editor";
@@ -175,14 +177,35 @@ let ctxSourceId: string | null = null;
 const editorContainer = document.getElementById("editor-container");
 if (!editorContainer) throw new Error("missing #editor-container");
 
+// Command palette — zen mode hides all fixed HUD panels on the page
+const palette = createCommandPalettePlugin({
+	onZenModeChange(active) {
+		for (const el of document.querySelectorAll<HTMLElement>(".hud")) {
+			el.style.display = active ? "none" : "";
+		}
+	},
+});
+
+// Editor palette extension — tool reference resolved lazily (after construction)
+let editorRef: BpmnEditor | null = null;
+const paletteEditor = createCommandPaletteEditorPlugin(palette, (tool) => {
+	editorRef?.setTool(tool as Tool);
+});
+
 const editor = new BpmnEditor({
 	container: editorContainer,
 	xml: SAMPLE_XML,
 	theme: "dark",
 	grid: true,
 	fit: "center",
-	plugins: [createMainMenuPlugin({ title: "BPMN SDK" }), createZoomControlsPlugin()],
+	plugins: [
+		createMainMenuPlugin({ title: "BPMN SDK" }),
+		createZoomControlsPlugin(),
+		palette,
+		paletteEditor,
+	],
 });
+editorRef = editor;
 
 // ── DOM refs ──────────────────────────────────────────────────────────────────
 

@@ -14,6 +14,8 @@
 		"@bpmn-sdk/canvas-plugin-main-menu": "workspace:*",
 		"@bpmn-sdk/canvas-plugin-minimap": "workspace:*",
 		"@bpmn-sdk/canvas-plugin-zoom-controls": "workspace:*",
+		"@bpmn-sdk/canvas-plugin-command-palette": "workspace:*",
+		"@bpmn-sdk/canvas-plugin-command-palette-editor": "workspace:*",
 		"@bpmn-sdk/editor": "workspace:*"
 	}
 }
