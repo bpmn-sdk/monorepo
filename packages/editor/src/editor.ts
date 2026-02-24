@@ -525,21 +525,41 @@ export class BpmnEditor {
 	}
 
 	private _previewTranslate(dx: number, dy: number): void {
-		const snapped = this._computeSnap(dx, dy);
-		this._snapDelta = snapped;
+		const alignSnap = this._computeSnap(dx, dy);
+		const spacingResult = this._computeSpacingSnap(dx, dy);
+
+		const alignAdjX = Math.abs(alignSnap.dx - dx);
+		const alignAdjY = Math.abs(alignSnap.dy - dy);
+		const spacingAdjX = Math.abs(spacingResult.dx - dx);
+		const spacingAdjY = Math.abs(spacingResult.dy - dy);
+
+		// Per axis: prefer spacing snap when it fires and is closer than alignment snap
+		const useSpacingX = spacingAdjX > 0 && (!alignAdjX || spacingAdjX < alignAdjX);
+		const useSpacingY = spacingAdjY > 0 && (!alignAdjY || spacingAdjY < alignAdjY);
+		const finalDx = useSpacingX ? spacingResult.dx : alignSnap.dx;
+		const finalDy = useSpacingY ? spacingResult.dy : alignSnap.dy;
+
+		this._snapDelta = { dx: finalDx, dy: finalDy };
 		for (const id of this._selectedIds) {
 			const shape = this._shapes.find((s) => s.id === id);
 			if (!shape) continue;
 			const { x, y } = shape.shape.bounds;
-			shape.element.setAttribute("transform", `translate(${x + snapped.dx} ${y + snapped.dy})`);
+			shape.element.setAttribute("transform", `translate(${x + finalDx} ${y + finalDy})`);
 		}
-		this._overlay.setAlignmentGuides(this._computeAlignGuides(snapped.dx, snapped.dy));
-		this._setEdgeDropHighlight(this._findEdgeDropTarget(snapped.dx, snapped.dy));
+		this._overlay.setAlignmentGuides(this._computeAlignGuides(finalDx, finalDy));
+		this._overlay.setDistanceGuides(
+			spacingResult.guides.filter((g) => {
+				const isH = g.y1 === g.y2;
+				return isH ? useSpacingX : useSpacingY;
+			}),
+		);
+		this._setEdgeDropHighlight(this._findEdgeDropTarget(finalDx, finalDy));
 	}
 
 	private _cancelTranslate(): void {
 		this._snapDelta = null;
 		this._overlay.setAlignmentGuides([]);
+		this._overlay.setDistanceGuides([]);
 		this._setEdgeDropHighlight(null);
 		for (const id of this._selectedIds) {
 			const shape = this._shapes.find((s) => s.id === id);
@@ -553,6 +573,7 @@ export class BpmnEditor {
 		const snap = this._snapDelta ?? { dx, dy };
 		this._snapDelta = null;
 		this._overlay.setAlignmentGuides([]);
+		this._overlay.setDistanceGuides([]);
 		const edgeDropId = this._edgeDropTarget;
 		this._setEdgeDropHighlight(null);
 		const moves = this._selectedIds.map((id) => ({ id, dx: snap.dx, dy: snap.dy }));
@@ -737,7 +758,8 @@ export class BpmnEditor {
 
 	/**
 	 * Creates a new element of the given type connected to the source shape,
-	 * positioned to its right. Returns the new element's id.
+	 * using smart placement (right → bottom → top, avoids overlaps).
+	 * Returns the new element's id.
 	 */
 	addConnectedElement(sourceId: string, type: CreateShapeType): string | null {
 		if (!this._defs) return null;
@@ -745,23 +767,22 @@ export class BpmnEditor {
 		if (!srcShape) return null;
 		const srcBounds = srcShape.shape.bounds;
 
-		const GAP = 60;
 		let w = 100;
 		let h = 80;
 		if (type === "startEvent" || type === "endEvent") {
 			w = 36;
 			h = 36;
-		} else if (type === "exclusiveGateway" || type === "parallelGateway") {
+		} else if (
+			type === "exclusiveGateway" ||
+			type === "parallelGateway" ||
+			type === "inclusiveGateway" ||
+			type === "eventBasedGateway"
+		) {
 			w = 50;
 			h = 50;
 		}
 
-		const newBounds = {
-			x: srcBounds.x + srcBounds.width + GAP,
-			y: srcBounds.y + (srcBounds.height - h) / 2,
-			width: w,
-			height: h,
-		};
+		const newBounds = this._smartPlaceBounds(srcBounds, sourceId, w, h);
 		const r1 = createShape(this._defs, type, newBounds);
 		const waypoints = computeWaypoints(srcBounds, newBounds);
 		const r2 = createConnection(r1.defs, sourceId, r1.id, waypoints);
@@ -772,6 +793,103 @@ export class BpmnEditor {
 		this._emit("diagram:change", r2.defs);
 		this._emit("editor:select", [r1.id]);
 		return r1.id;
+	}
+
+	private _smartPlaceBounds(
+		srcBounds: BpmnBounds,
+		sourceId: string,
+		w: number,
+		h: number,
+	): BpmnBounds {
+		const GAP = 60;
+		const srcCx = srcBounds.x + srcBounds.width / 2;
+		const srcCy = srcBounds.y + srcBounds.height / 2;
+
+		// Find directions already occupied by outgoing connections
+		const takenDirs = new Set<string>();
+		const process = this._defs?.processes[0];
+		if (process) {
+			for (const flow of process.sequenceFlows) {
+				if (flow.sourceRef !== sourceId) continue;
+				const tgt = this._shapes.find((s) => s.id === flow.targetRef);
+				if (!tgt) continue;
+				const tCx = tgt.shape.bounds.x + tgt.shape.bounds.width / 2;
+				const tCy = tgt.shape.bounds.y + tgt.shape.bounds.height / 2;
+				const ddx = tCx - srcCx;
+				const ddy = tCy - srcCy;
+				const dir =
+					Math.abs(ddx) >= Math.abs(ddy)
+						? ddx >= 0
+							? "right"
+							: "left"
+						: ddy >= 0
+							? "bottom"
+							: "top";
+				takenDirs.add(dir);
+			}
+		}
+
+		// Try primary candidates: right → bottom → top
+		const candidates: Array<{ dir: string; bounds: BpmnBounds }> = [
+			{
+				dir: "right",
+				bounds: { x: srcBounds.x + srcBounds.width + GAP, y: srcCy - h / 2, width: w, height: h },
+			},
+			{
+				dir: "bottom",
+				bounds: {
+					x: srcCx - w / 2,
+					y: srcBounds.y + srcBounds.height + GAP,
+					width: w,
+					height: h,
+				},
+			},
+			{
+				dir: "top",
+				bounds: { x: srcCx - w / 2, y: srcBounds.y - GAP - h, width: w, height: h },
+			},
+		];
+
+		for (const { dir, bounds } of candidates) {
+			if (!takenDirs.has(dir) && !this._overlapsAny(bounds)) return bounds;
+		}
+
+		// All primary positions blocked — increase gap for bottom/top
+		for (let extra = GAP * 2; extra <= GAP * 6; extra += GAP) {
+			const bot: BpmnBounds = {
+				x: srcCx - w / 2,
+				y: srcBounds.y + srcBounds.height + extra,
+				width: w,
+				height: h,
+			};
+			if (!this._overlapsAny(bot)) return bot;
+			const top: BpmnBounds = {
+				x: srcCx - w / 2,
+				y: srcBounds.y - extra - h,
+				width: w,
+				height: h,
+			};
+			if (!this._overlapsAny(top)) return top;
+		}
+
+		// Absolute fallback
+		return { x: srcBounds.x + srcBounds.width + GAP * 5, y: srcCy - h / 2, width: w, height: h };
+	}
+
+	private _overlapsAny(bounds: BpmnBounds): boolean {
+		const MARGIN = 10;
+		for (const shape of this._shapes) {
+			const b = shape.shape.bounds;
+			if (
+				bounds.x < b.x + b.width + MARGIN &&
+				bounds.x + bounds.width + MARGIN > b.x &&
+				bounds.y < b.y + b.height + MARGIN &&
+				bounds.y + bounds.height + MARGIN > b.y
+			) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	/**
@@ -1043,6 +1161,118 @@ export class BpmnEditor {
 		}
 
 		return guides;
+	}
+
+	// ── Spacing snap (equal-distance guides) ──────────────────────────
+
+	private _computeSpacingSnap(
+		dx: number,
+		dy: number,
+	): { dx: number; dy: number; guides: Array<{ x1: number; y1: number; x2: number; y2: number }> } {
+		const selectedSet = new Set(this._selectedIds);
+		const movingShapes = this._shapes.filter((s) => selectedSet.has(s.id));
+		const staticShapes = this._shapes.filter((s) => !selectedSet.has(s.id));
+		if (movingShapes.length !== 1 || staticShapes.length < 2) {
+			return { dx, dy, guides: [] };
+		}
+
+		const movingShape = movingShapes[0];
+		if (!movingShape) return { dx, dy, guides: [] };
+		const moving = movingShape.shape.bounds;
+		const scale = this._viewport.state.scale;
+		const threshold = 8 / scale;
+
+		let bestDx = dx;
+		let bestDy = dy;
+		let minDistX = threshold;
+		let minDistY = threshold;
+		const hGuides: Array<{ x1: number; y1: number; x2: number; y2: number }> = [];
+		const vGuides: Array<{ x1: number; y1: number; x2: number; y2: number }> = [];
+
+		const mCy = moving.y + dy + moving.height / 2;
+		const mCx = moving.x + dx + moving.width / 2;
+
+		// Horizontal spacing: for each pair (A, B) where B is to the right of A
+		for (const A of staticShapes) {
+			const aRight = A.shape.bounds.x + A.shape.bounds.width;
+			for (const B of staticShapes) {
+				if (A.id === B.id) continue;
+				const bLeft = B.shape.bounds.x;
+				if (bLeft <= aRight) continue;
+				const gap = bLeft - aRight;
+
+				// Candidate: moving is to the right of B by the same gap
+				const bRight = B.shape.bounds.x + B.shape.bounds.width;
+				const candLeft = bRight + gap;
+				const distX = Math.abs(moving.x + dx - candLeft);
+				if (distX < minDistX) {
+					minDistX = distX;
+					bestDx = dx + (candLeft - (moving.x + dx));
+					hGuides.length = 0;
+					hGuides.push(
+						{ x1: aRight, y1: mCy, x2: bLeft, y2: mCy },
+						{ x1: bRight, y1: mCy, x2: candLeft, y2: mCy },
+					);
+				}
+
+				// Candidate: moving is to the left of A by the same gap
+				const aLeft = A.shape.bounds.x;
+				const candRight = aLeft - gap;
+				const movRight = moving.x + dx + moving.width;
+				const distX2 = Math.abs(movRight - candRight);
+				if (distX2 < minDistX) {
+					minDistX = distX2;
+					bestDx = dx + (candRight - movRight);
+					hGuides.length = 0;
+					hGuides.push(
+						{ x1: candRight, y1: mCy, x2: aLeft, y2: mCy },
+						{ x1: aRight, y1: mCy, x2: bLeft, y2: mCy },
+					);
+				}
+			}
+		}
+
+		// Vertical spacing: for each pair (A, B) where B is below A
+		for (const A of staticShapes) {
+			const aBottom = A.shape.bounds.y + A.shape.bounds.height;
+			for (const B of staticShapes) {
+				if (A.id === B.id) continue;
+				const bTop = B.shape.bounds.y;
+				if (bTop <= aBottom) continue;
+				const gap = bTop - aBottom;
+
+				// Candidate: moving is below B by the same gap
+				const bBottom = B.shape.bounds.y + B.shape.bounds.height;
+				const candTop = bBottom + gap;
+				const distY = Math.abs(moving.y + dy - candTop);
+				if (distY < minDistY) {
+					minDistY = distY;
+					bestDy = dy + (candTop - (moving.y + dy));
+					vGuides.length = 0;
+					vGuides.push(
+						{ x1: mCx, y1: aBottom, x2: mCx, y2: bTop },
+						{ x1: mCx, y1: bBottom, x2: mCx, y2: candTop },
+					);
+				}
+
+				// Candidate: moving is above A by the same gap
+				const aTop = A.shape.bounds.y;
+				const candBottom = aTop - gap;
+				const movBottom = moving.y + dy + moving.height;
+				const distY2 = Math.abs(movBottom - candBottom);
+				if (distY2 < minDistY) {
+					minDistY = distY2;
+					bestDy = dy + (candBottom - movBottom);
+					vGuides.length = 0;
+					vGuides.push(
+						{ x1: mCx, y1: candBottom, x2: mCx, y2: aTop },
+						{ x1: mCx, y1: aBottom, x2: mCx, y2: bTop },
+					);
+				}
+			}
+		}
+
+		return { dx: bestDx, dy: bestDy, guides: [...hGuides, ...vGuides] };
 	}
 
 	// ── Create-mode helpers ────────────────────────────────────────────

@@ -34,6 +34,7 @@ export class OverlayRenderer {
 	private readonly _ghostConnG: SVGGElement;
 	private readonly _ghostCreateG: SVGGElement;
 	private readonly _alignG: SVGGElement;
+	private readonly _distG: SVGGElement;
 	private readonly _edgeEndpointsG: SVGGElement;
 	private readonly _endpointGhostG: SVGGElement;
 	private readonly _spaceG: SVGGElement;
@@ -49,6 +50,7 @@ export class OverlayRenderer {
 		this._ghostConnG = svgEl("g");
 		this._ghostCreateG = svgEl("g");
 		this._alignG = svgEl("g");
+		this._distG = svgEl("g");
 		this._endpointGhostG = svgEl("g");
 		this._edgeEndpointsG = svgEl("g");
 		this._spaceG = svgEl("g");
@@ -60,6 +62,7 @@ export class OverlayRenderer {
 		this._g.appendChild(this._rubberG);
 		this._g.appendChild(this._resizePreviewG);
 		this._g.appendChild(this._alignG);
+		this._g.appendChild(this._distG);
 		this._g.appendChild(this._selectionG);
 		this._g.appendChild(this._portsG);
 		this._g.appendChild(this._edgeEndpointsG);
@@ -133,6 +136,54 @@ export class OverlayRenderer {
 				y2: guide.y2,
 			});
 			this._alignG.appendChild(line);
+		}
+	}
+
+	// ── Distance guides ───────────────────────────────────────────────
+
+	setDistanceGuides(guides: Array<{ x1: number; y1: number; x2: number; y2: number }>): void {
+		this._distG.innerHTML = "";
+		const TICK = 4;
+		for (const g of guides) {
+			const isH = Math.abs(g.y2 - g.y1) < 0.5;
+			const main = svgEl("line");
+			attr(main, { class: "bpmn-dist-guide", x1: g.x1, y1: g.y1, x2: g.x2, y2: g.y2 });
+			this._distG.appendChild(main);
+			const t1 = svgEl("line");
+			const t2 = svgEl("line");
+			if (isH) {
+				attr(t1, {
+					class: "bpmn-dist-guide",
+					x1: g.x1,
+					y1: g.y1 - TICK,
+					x2: g.x1,
+					y2: g.y1 + TICK,
+				});
+				attr(t2, {
+					class: "bpmn-dist-guide",
+					x1: g.x2,
+					y1: g.y2 - TICK,
+					x2: g.x2,
+					y2: g.y2 + TICK,
+				});
+			} else {
+				attr(t1, {
+					class: "bpmn-dist-guide",
+					x1: g.x1 - TICK,
+					y1: g.y1,
+					x2: g.x1 + TICK,
+					y2: g.y1,
+				});
+				attr(t2, {
+					class: "bpmn-dist-guide",
+					x1: g.x2 - TICK,
+					y1: g.y2,
+					x2: g.x2 + TICK,
+					y2: g.y2,
+				});
+			}
+			this._distG.appendChild(t1);
+			this._distG.appendChild(t2);
 		}
 	}
 

@@ -2,6 +2,28 @@
 
 ## 2026-02-24
 
+### Editor improvements (round 3)
+
+#### Smart placement for contextual toolbar "add connected element"
+- `addConnectedElement` now uses `_smartPlaceBounds` to pick the best free direction instead of always placing to the right
+- Priority order: **right → bottom → top**
+- Skips directions that already have an outgoing connection from the source (e.g., gateways that already have a branch going right use bottom/top instead)
+- Skips positions that would overlap any existing element (10 px margin)
+- If all three default positions are blocked, increases the vertical gap in 60 px steps (up to 6×) for bottom/top until a clear spot is found
+- Fallback: very large rightward gap if all attempts fail
+- New private method `_overlapsAny(bounds)` — simple AABB overlap check with margin
+- Fixed: `inclusiveGateway` and `eventBasedGateway` now correctly get 50×50 dimensions (was previously only exclusive/parallel)
+
+#### Distance arrows with spacing magnet snap
+- During element move, equal-spacing positions between elements now snap (magnet) and show orange distance arrows
+- New `_computeSpacingSnap(dx, dy)` method: detects all pairs of static shapes with a horizontal or vertical gap; if the moving element is within the snap threshold of the same gap distance, snaps to that equal-spacing position
+- Horizontal snap: checks if moving element can be placed to the right of B or left of A with the same gap as A↔B
+- Vertical snap: checks if moving element can be placed below B or above A with the same gap as A↔B
+- `_previewTranslate` now combines alignment snap and spacing snap per axis, preferring the one requiring the smaller adjustment; spacing wins when it fires and alignment does not (or spacing is closer)
+- Distance guides rendered as orange lines with perpendicular tick marks at each end (`bpmn-dist-guide` CSS class, `#f97316`)
+- `OverlayRenderer.setDistanceGuides(guides)` — new method rendering H/V guide segments with tick caps into a dedicated `_distG` group
+- Distance guides are cleared on cancel and commit (alongside alignment guides)
+
 ### Editor improvements (round 2)
 
 #### Ghost preview: edge-drop highlight during create
