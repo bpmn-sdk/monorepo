@@ -8,6 +8,8 @@
 		{ "path": "canvas-plugins/zoom-controls" },
 		{ "path": "canvas-plugins/main-menu" },
 		{ "path": "canvas-plugins/command-palette" },
-		{ "path": "canvas-plugins/command-palette-editor" }
+		{ "path": "canvas-plugins/command-palette-editor" },
+		{ "path": "canvas-plugins/config-panel" },
+		{ "path": "canvas-plugins/config-panel-bpmn" }
 	]
 }

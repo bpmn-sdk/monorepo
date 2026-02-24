@@ -1,5 +1,7 @@
 import { createCommandPalettePlugin } from "@bpmn-sdk/canvas-plugin-command-palette";
 import { createCommandPaletteEditorPlugin } from "@bpmn-sdk/canvas-plugin-command-palette-editor";
+import { createConfigPanelPlugin } from "@bpmn-sdk/canvas-plugin-config-panel";
+import { createConfigPanelBpmnPlugin } from "@bpmn-sdk/canvas-plugin-config-panel-bpmn";
 import { createMainMenuPlugin } from "@bpmn-sdk/canvas-plugin-main-menu";
 import { createZoomControlsPlugin } from "@bpmn-sdk/canvas-plugin-zoom-controls";
 import { BpmnEditor, initEditorHud } from "@bpmn-sdk/editor";
@@ -65,6 +67,14 @@ const paletteEditor = createCommandPaletteEditorPlugin(palette, (tool) => {
 	editorRef?.setTool(tool as Tool);
 });
 
+const configPanel = createConfigPanelPlugin({
+	getDefinitions: () => editorRef?.getDefinitions() ?? null,
+	applyChange: (fn) => {
+		editorRef?.applyChange(fn);
+	},
+});
+const configPanelBpmn = createConfigPanelBpmnPlugin(configPanel);
+
 const editor = new BpmnEditor({
 	container: editorContainer,
 	xml: SAMPLE_XML,
@@ -76,6 +86,8 @@ const editor = new BpmnEditor({
 		createZoomControlsPlugin(),
 		palette,
 		paletteEditor,
+		configPanel,
+		configPanelBpmn,
 	],
 });
 editorRef = editor;

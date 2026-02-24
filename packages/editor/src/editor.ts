@@ -404,6 +404,14 @@ export class BpmnEditor {
 		return this._commandStack.canRedo();
 	}
 
+	getDefinitions(): BpmnDefinitions | null {
+		return this._defs;
+	}
+
+	applyChange(fn: (defs: BpmnDefinitions) => BpmnDefinitions): void {
+		this._executeCommand(fn);
+	}
+
 	fitView(padding = 40): void {
 		if (!this._defs) return;
 		const bounds = computeDiagramBounds(this._defs);

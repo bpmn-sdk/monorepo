@@ -2,6 +2,30 @@
 
 ## 2026-02-24
 
+### Config panel plugins
+
+Two new canvas plugin packages for schema-driven element property editing:
+
+- **`@bpmn-sdk/canvas-plugin-config-panel`** — core infrastructure
+  - `createConfigPanelPlugin({ getDefinitions, applyChange })` factory
+  - `ConfigPanelPlugin` extends `CanvasPlugin` with `registerSchema(type, schema, adapter)`
+  - Schema-driven rendering: `FieldSchema` (text, select, textarea, toggle), `GroupSchema`, `PanelSchema`
+  - `PanelAdapter` interface: `read(defs, id) → values`, `write(defs, id, values) → BpmnDefinitions`
+  - Compact panel: `position: fixed; right: 12px; top: 12px; width: 280px` dark glass panel shown when 1 element is selected
+  - Full overlay: 65%-width right panel with dimmed backdrop, tab navigation between groups, full form
+  - Auto-save on field `change` event; `_refreshInputs()` updates values in-place without re-render (preserves focus)
+  - Subscribes to `editor:select` and `diagram:change` via `api.on` type cast
+
+- **`@bpmn-sdk/canvas-plugin-config-panel-bpmn`** — BPMN element schemas
+  - Registers general schema (name + documentation) for: startEvent, endEvent, userTask, scriptTask, sendTask, receiveTask, businessRuleTask, exclusiveGateway, parallelGateway, inclusiveGateway, eventBasedGateway
+  - Full REST connector form for serviceTask: General (name, taskType, retries, documentation), Request (method, url, headers, queryParameters, body, timeouts), Authentication (authType, authToken), Output (resultVariable, resultExpression, retryBackoff)
+  - Zeebe extension parsing and serialization via `parseZeebeExtensions` / `zeebeExtensionsToXmlElements`
+  - Immutable `updateFlowElement(defs, id, fn)` helper for model updates
+
+- **`BpmnEditor`** — added `getDefinitions()` and `applyChange(fn)` public methods
+- **`@bpmn-sdk/core`** — now exports `zeebeExtensionsToXmlElements`
+- Both plugins integrated in `apps/landing` with full keyboard/event wiring
+
 ### Zen mode: view-only restriction
 
 - Added `BpmnEditor.setReadOnly(enabled: boolean)` public method
