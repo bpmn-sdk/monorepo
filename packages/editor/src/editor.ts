@@ -274,9 +274,6 @@ export class BpmnEditor {
 		this._svg.addEventListener("pointerup", this._onPointerUp);
 		this._svg.addEventListener("dblclick", this._onDblClick);
 
-		// ── Zoom controls ─────────────────────────────────────────────
-		this._addZoomControls();
-
 		// ── Plugins ───────────────────────────────────────────────────
 		if (options.plugins) {
 			for (const plugin of options.plugins) {
@@ -1058,26 +1055,6 @@ export class BpmnEditor {
 		} else {
 			this._host.removeAttribute("data-theme");
 		}
-	}
-
-	private _addZoomControls(): void {
-		const controls = document.createElement("div");
-		controls.className = "bpmn-controls";
-		controls.setAttribute("aria-label", "Zoom controls");
-		const makeBtn = (label: string, title: string, onClick: () => void): HTMLButtonElement => {
-			const btn = document.createElement("button");
-			btn.className = "bpmn-control-btn";
-			btn.type = "button";
-			btn.textContent = label;
-			btn.setAttribute("aria-label", title);
-			btn.title = title;
-			btn.addEventListener("click", onClick);
-			return btn;
-		};
-		controls.appendChild(makeBtn("+", "Zoom in", () => this.zoomIn()));
-		controls.appendChild(makeBtn("−", "Zoom out", () => this.zoomOut()));
-		controls.appendChild(makeBtn("⊡", "Fit diagram", () => this.fitView()));
-		this._host.appendChild(controls);
 	}
 
 	private _installPlugin(plugin: CanvasPlugin): void {

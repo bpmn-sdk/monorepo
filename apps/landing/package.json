@@ -12,6 +12,7 @@
 	"dependencies": {
 		"@bpmn-sdk/canvas": "workspace:*",
 		"@bpmn-sdk/canvas-plugin-minimap": "workspace:*",
+		"@bpmn-sdk/canvas-plugin-zoom-controls": "workspace:*",
 		"@bpmn-sdk/editor": "workspace:*"
 	}
 }

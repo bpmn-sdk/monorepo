@@ -1,4 +1,5 @@
 import type { ViewportState } from "@bpmn-sdk/canvas";
+import { createZoomControlsPlugin } from "@bpmn-sdk/canvas-plugin-zoom-controls";
 import { BpmnEditor } from "@bpmn-sdk/editor";
 import type { CreateShapeType, LabelPosition, Tool } from "@bpmn-sdk/editor";
 
@@ -92,6 +93,7 @@ const editor = new BpmnEditor({
 	theme: currentTheme,
 	grid: true,
 	fit: "center",
+	plugins: [createZoomControlsPlugin()],
 });
 
 // ── DOM refs ──────────────────────────────────────────────────────────────────
