@@ -2,6 +2,19 @@
 
 ## 2026-02-24
 
+### Zen mode: view-only restriction
+
+- Added `BpmnEditor.setReadOnly(enabled: boolean)` public method
+- When enabled: clears the current selection and all in-progress overlays, forces the state machine into pan mode
+- When disabled: restores select mode via `setTool("select")` (emits `editor:tool` event so HUD updates)
+- Four guard points prevent any editing action while read-only:
+  - `setTool` — returns early so tool cannot be changed from outside
+  - `_executeCommand` — no-ops all diagram mutations (move, resize, delete, connect, paste, etc.)
+  - `_startLabelEdit` — prevents the label editor from opening
+  - `_onKeyDown` — blocks Ctrl+Z/Y/C/V/A and all state-machine keyboard shortcuts
+- Pan and zoom (wheel + pointer drag) continue to work through the viewport controller and pan-mode state machine
+- Wired in `apps/landing/src/editor.ts`: `onZenModeChange` now calls `editorRef?.setReadOnly(active)` alongside hiding the HUD elements
+
 ### Editor improvements (round 3)
 
 #### Smart placement for contextual toolbar "add connected element"

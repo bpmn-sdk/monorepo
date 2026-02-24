@@ -56,6 +56,7 @@ const palette = createCommandPalettePlugin({
 		for (const el of document.querySelectorAll<HTMLElement>(".hud")) {
 			el.style.display = active ? "none" : "";
 		}
+		editorRef?.setReadOnly(active);
 	},
 });
 

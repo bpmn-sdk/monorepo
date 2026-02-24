@@ -124,6 +124,7 @@ export class BpmnEditor {
 	private _edgeDropTarget: string | null = null;
 	private _ghostSnapCenter: DiagPoint | null = null;
 	private _createEdgeDropTarget: string | null = null;
+	private _readOnly = false;
 
 	// ── Events ─────────────────────────────────────────────────────────
 	private readonly _listeners = new Map<string, Set<(...args: unknown[]) => void>>();
@@ -330,7 +331,27 @@ export class BpmnEditor {
 		return Bpmn.export(this._defs ?? createEmptyDefinitions());
 	}
 
+	/**
+	 * Enables or disables read-only mode. In read-only mode the viewport
+	 * (pan + zoom) still works but all editing actions are blocked.
+	 */
+	setReadOnly(enabled: boolean): void {
+		this._readOnly = enabled;
+		if (enabled) {
+			this._setSelection([]);
+			this._overlay.setGhostCreate(null);
+			this._overlay.setAlignmentGuides([]);
+			this._overlay.setDistanceGuides([]);
+			this._setCreateEdgeDropHighlight(null);
+			this._ghostSnapCenter = null;
+			this._stateMachine.setMode({ mode: "pan" });
+		} else {
+			this.setTool("select");
+		}
+	}
+
 	setTool(tool: Tool): void {
+		if (this._readOnly) return;
 		this._overlay.setGhostCreate(null);
 		this._overlay.setAlignmentGuides([]);
 		this._setCreateEdgeDropHighlight(null);
@@ -506,7 +527,7 @@ export class BpmnEditor {
 	}
 
 	private _executeCommand(fn: (d: BpmnDefinitions) => BpmnDefinitions): void {
-		if (!this._defs) return;
+		if (this._readOnly || !this._defs) return;
 		const newDefs = fn(this._defs);
 		this._commandStack.push(newDefs);
 		this._renderDefs(newDefs);
@@ -708,7 +729,7 @@ export class BpmnEditor {
 	}
 
 	private _startLabelEdit(id: string): void {
-		if (!id) return;
+		if (this._readOnly || !id) return;
 		const shape = this._shapes.find((s) => s.id === id);
 		if (!shape) return;
 		const defs = this._defs;
@@ -1431,6 +1452,7 @@ export class BpmnEditor {
 	};
 
 	private readonly _onKeyDown = (e: KeyboardEvent): void => {
+		if (this._readOnly) return;
 		this._stateMachine.onKeyDown(e);
 
 		if (e.ctrlKey || e.metaKey) {
