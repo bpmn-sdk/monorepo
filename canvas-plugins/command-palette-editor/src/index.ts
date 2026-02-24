@@ -23,46 +23,17 @@
 
 import type { CanvasPlugin } from "@bpmn-sdk/canvas";
 import type { CommandPalettePlugin } from "@bpmn-sdk/canvas-plugin-command-palette";
+import { ELEMENT_GROUPS, ELEMENT_TYPE_LABELS } from "@bpmn-sdk/editor";
 
 // ── Element catalogue ─────────────────────────────────────────────────────────
 
-const ELEMENT_COMMANDS: Array<{ type: string; title: string; description: string }> = [
-	// Events
-	{ type: "startEvent", title: "Add Start Event", description: "Events: circle (thin border)" },
-	{ type: "endEvent", title: "Add End Event", description: "Events: circle (thick border)" },
-	// Activities
-	{ type: "serviceTask", title: "Add Service Task", description: "Activities: automated task" },
-	{ type: "userTask", title: "Add User Task", description: "Activities: human task" },
-	{ type: "scriptTask", title: "Add Script Task", description: "Activities: script execution" },
-	{ type: "sendTask", title: "Add Send Task", description: "Activities: sends a message" },
-	{ type: "receiveTask", title: "Add Receive Task", description: "Activities: awaits a message" },
-	{
-		type: "businessRuleTask",
-		title: "Add Business Rule Task",
-		description: "Activities: rule engine evaluation",
-	},
-	// Gateways
-	{
-		type: "exclusiveGateway",
-		title: "Add Exclusive Gateway",
-		description: "Gateways: XOR — one path taken",
-	},
-	{
-		type: "parallelGateway",
-		title: "Add Parallel Gateway",
-		description: "Gateways: AND — all paths taken",
-	},
-	{
-		type: "inclusiveGateway",
-		title: "Add Inclusive Gateway",
-		description: "Gateways: OR — one or more paths taken",
-	},
-	{
-		type: "eventBasedGateway",
-		title: "Add Event-based Gateway",
-		description: "Gateways: route based on event",
-	},
-];
+const ELEMENT_COMMANDS = ELEMENT_GROUPS.flatMap((group) =>
+	group.types.map((type) => ({
+		type,
+		title: `Add ${ELEMENT_TYPE_LABELS[type]}`,
+		description: group.title,
+	})),
+);
 
 // ── Factory ───────────────────────────────────────────────────────────────────
 

@@ -9,5 +9,9 @@
 		"lib": ["ES2022", "DOM"]
 	},
 	"include": ["src"],
-	"references": [{ "path": "../../packages/canvas" }, { "path": "../command-palette" }]
+	"references": [
+		{ "path": "../../packages/canvas" },
+		{ "path": "../command-palette" },
+		{ "path": "../../packages/editor" }
+	]
 }

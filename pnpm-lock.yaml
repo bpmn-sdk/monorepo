@@ -87,6 +87,9 @@ importers:
       '@bpmn-sdk/canvas-plugin-command-palette':
         specifier: workspace:*
         version: link:../command-palette
+      '@bpmn-sdk/editor':
+        specifier: workspace:*
+        version: link:../../packages/editor
 
   canvas-plugins/main-menu:
     dependencies:

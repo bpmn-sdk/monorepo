@@ -2,6 +2,19 @@
 
 ## 2026-02-24
 
+### Refactor: move editor HUD logic to `@bpmn-sdk/editor`
+- Extracted all HUD code (~600 lines) from `apps/landing/src/editor.ts` into `packages/editor`
+- New `packages/editor/src/icons.ts` — `IC` SVG icon object (internal, not re-exported from index)
+- New `packages/editor/src/hud.ts` — `initEditorHud(editor: BpmnEditor): void` — all group buttons, context/configure toolbars, zoom widget, action bar, dropdown management, keyboard shortcuts
+- `@bpmn-sdk/editor` now exports `initEditorHud` from `index.ts`
+- `apps/landing/src/editor.ts` reduced to ~75 lines: imports, SAMPLE_XML, plugin setup, `new BpmnEditor(...)`, `initEditorHud(editor)`
+
+### Refactor: move BPMN domain metadata to `@bpmn-sdk/editor`
+- Extracted element group taxonomy, display names, external-label types, valid label positions, and contextual-add types into `packages/editor/src/element-groups.ts`
+- New exports: `ELEMENT_GROUPS`, `ELEMENT_TYPE_LABELS`, `EXTERNAL_LABEL_TYPES`, `CONTEXTUAL_ADD_TYPES`, `getElementGroup()`, `getValidLabelPositions()`, `ElementGroup` type
+- `apps/landing/src/editor.ts` now imports these from `@bpmn-sdk/editor`; no BPMN semantics defined in landing
+- `@bpmn-sdk/canvas-plugin-command-palette-editor` derives its 12 commands from `ELEMENT_GROUPS` + `ELEMENT_TYPE_LABELS`; all 4 tests pass
+
 ### Command palette plugins — `@bpmn-sdk/canvas-plugin-command-palette` + `@bpmn-sdk/canvas-plugin-command-palette-editor`
 - **`@bpmn-sdk/canvas-plugin-command-palette`** — base Ctrl+K / ⌘K command palette for both canvas and editor
   - Built-in commands: toggle theme (dark → light → auto cycle), zoom to 100%, zoom to fit, export as BPMN XML, zen mode

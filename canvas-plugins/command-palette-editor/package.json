@@ -19,6 +19,7 @@
 	},
 	"dependencies": {
 		"@bpmn-sdk/canvas": "workspace:*",
-		"@bpmn-sdk/canvas-plugin-command-palette": "workspace:*"
+		"@bpmn-sdk/canvas-plugin-command-palette": "workspace:*",
+		"@bpmn-sdk/editor": "workspace:*"
 	}
 }

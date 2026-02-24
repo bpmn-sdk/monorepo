@@ -9,3 +9,13 @@ export type {
 	HandleDir,
 	PortDir,
 } from "./types.js";
+export {
+	ELEMENT_GROUPS,
+	ELEMENT_TYPE_LABELS,
+	EXTERNAL_LABEL_TYPES,
+	CONTEXTUAL_ADD_TYPES,
+	getElementGroup,
+	getValidLabelPositions,
+} from "./element-groups.js";
+export type { ElementGroup } from "./element-groups.js";
+export { initEditorHud } from "./hud.js";
