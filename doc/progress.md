@@ -1,5 +1,168 @@
 # Progress
 
+## 2026-02-24
+
+### Config panel fixes (round 2)
+
+- **z-index**: Overlay and compact panel both raised to `z-index: 9999` — always above HUD toolbars
+- **Centering**: When the full panel opens, the selected element is panned to the horizontal/vertical center of the left 35% darkened area (preserving zoom). Closing the panel re-centers the element at the global screen center
+- **Tabs**: Section navigation replaced with proper underline tabs; only one group's content is visible at a time; active tab highlighted in blue; switching tabs is instant (show/hide, no DOM rebuild)
+- **Conditional REST fields**: Service task REST connector groups (Request, Authentication, Output) are now hidden by default and only shown when `taskType === "io.camunda:http-json:1"`; tabs for hidden groups also disappear; if the active tab becomes hidden (e.g. clearing the task type), the first visible tab is auto-activated
+- `GroupSchema.condition?: (values) => boolean` — new optional field to conditionally show/hide groups and their tabs
+
+### Config panel plugins
+
+Two new canvas plugin packages for schema-driven element property editing:
+
+- **`@bpmn-sdk/canvas-plugin-config-panel`** — core infrastructure
+  - `createConfigPanelPlugin({ getDefinitions, applyChange })` factory
+  - `ConfigPanelPlugin` extends `CanvasPlugin` with `registerSchema(type, schema, adapter)`
+  - Schema-driven rendering: `FieldSchema` (text, select, textarea, toggle), `GroupSchema`, `PanelSchema`
+  - `PanelAdapter` interface: `read(defs, id) → values`, `write(defs, id, values) → BpmnDefinitions`
+  - Compact panel: `position: fixed; right: 12px; top: 12px; width: 280px` dark glass panel shown when 1 element is selected
+  - Full overlay: 65%-width right panel with dimmed backdrop, tab navigation between groups, full form
+  - Auto-save on field `change` event; `_refreshInputs()` updates values in-place without re-render (preserves focus)
+  - Subscribes to `editor:select` and `diagram:change` via `api.on` type cast
+
+- **`@bpmn-sdk/canvas-plugin-config-panel-bpmn`** — BPMN element schemas
+  - Registers general schema (name + documentation) for: startEvent, endEvent, userTask, scriptTask, sendTask, receiveTask, businessRuleTask, exclusiveGateway, parallelGateway, inclusiveGateway, eventBasedGateway
+  - Full REST connector form for serviceTask: General (name, taskType, retries, documentation), Request (method, url, headers, queryParameters, body, timeouts), Authentication (authType, authToken), Output (resultVariable, resultExpression, retryBackoff)
+  - Zeebe extension parsing and serialization via `parseZeebeExtensions` / `zeebeExtensionsToXmlElements`
+  - Immutable `updateFlowElement(defs, id, fn)` helper for model updates
+
+- **`BpmnEditor`** — added `getDefinitions()` and `applyChange(fn)` public methods
+- **`@bpmn-sdk/core`** — now exports `zeebeExtensionsToXmlElements`
+- Both plugins integrated in `apps/landing` with full keyboard/event wiring
+
+### Zen mode: view-only restriction
+
+- Added `BpmnEditor.setReadOnly(enabled: boolean)` public method
+- When enabled: clears the current selection and all in-progress overlays, forces the state machine into pan mode
+- When disabled: restores select mode via `setTool("select")` (emits `editor:tool` event so HUD updates)
+- Four guard points prevent any editing action while read-only:
+  - `setTool` — returns early so tool cannot be changed from outside
+  - `_executeCommand` — no-ops all diagram mutations (move, resize, delete, connect, paste, etc.)
+  - `_startLabelEdit` — prevents the label editor from opening
+  - `_onKeyDown` — blocks Ctrl+Z/Y/C/V/A and all state-machine keyboard shortcuts
+- Pan and zoom (wheel + pointer drag) continue to work through the viewport controller and pan-mode state machine
+- Wired in `apps/landing/src/editor.ts`: `onZenModeChange` now calls `editorRef?.setReadOnly(active)` alongside hiding the HUD elements
+
+### Editor improvements (round 3)
+
+#### Smart placement for contextual toolbar "add connected element"
+- `addConnectedElement` now uses `_smartPlaceBounds` to pick the best free direction instead of always placing to the right
+- Priority order: **right → bottom → top**
+- Skips directions that already have an outgoing connection from the source (e.g., gateways that already have a branch going right use bottom/top instead)
+- Skips positions that would overlap any existing element (10 px margin)
+- If all three default positions are blocked, increases the vertical gap in 60 px steps (up to 6×) for bottom/top until a clear spot is found
+- Fallback: very large rightward gap if all attempts fail
+- New private method `_overlapsAny(bounds)` — simple AABB overlap check with margin
+- Fixed: `inclusiveGateway` and `eventBasedGateway` now correctly get 50×50 dimensions (was previously only exclusive/parallel)
+
+#### Distance arrows with spacing magnet snap
+- During element move, equal-spacing positions between elements now snap (magnet) and show orange distance arrows
+- New `_computeSpacingSnap(dx, dy)` method: detects all pairs of static shapes with a horizontal or vertical gap; if the moving element is within the snap threshold of the same gap distance, snaps to that equal-spacing position
+- Horizontal snap: checks if moving element can be placed to the right of B or left of A with the same gap as A↔B
+- Vertical snap: checks if moving element can be placed below B or above A with the same gap as A↔B
+- `_previewTranslate` now combines alignment snap and spacing snap per axis, preferring the one requiring the smaller adjustment; spacing wins when it fires and alignment does not (or spacing is closer)
+- Distance guides rendered as orange lines with perpendicular tick marks at each end (`bpmn-dist-guide` CSS class, `#f97316`)
+- `OverlayRenderer.setDistanceGuides(guides)` — new method rendering H/V guide segments with tick caps into a dedicated `_distG` group
+- Distance guides are cleared on cancel and commit (alongside alignment guides)
+
+### Editor improvements (round 2)
+
+#### Ghost preview: edge-drop highlight during create
+- When the ghost element's center hovers over an existing sequence flow, the edge changes to the split-highlight color (indicating the element will be inserted into that edge on click)
+- New `_findCreateEdgeDrop(bounds)` method — same proximity check as the drag-move edge drop
+- New `_setCreateEdgeDropHighlight(edgeId)` method — uses existing `.bpmn-edge-split-highlight` CSS class
+- `_doCreate` uses `insertShapeOnEdge` when a target edge is highlighted, same as drag-move commit
+
+#### Ghost preview + move: magnet alignment guides
+- Create mode: ghost element snaps to alignment guides from existing shapes before placement
+  - New `_computeCreateSnap(bounds)` — finds closest alignment in x/y within 8/scale px threshold
+  - New `_computeCreateGuides(bounds)` — generates alignment guide lines at matched coordinates
+  - `_ghostSnapCenter` stores the snapped center; `_doCreate` uses it as the actual placement point
+- Regular move: alignment guides now also compare against the dragging element's **original position** (virtual ghost)
+  - `_computeSnap` and `_computeAlignGuides` add original bounds of moving shapes to the static reference set
+  - A guide appears when the element aligns with where it started, letting users precisely return to the original spot
+
+#### New connections: L-style routing (one bend instead of two)
+- `computeWaypoints` in `geometry.ts` rewritten to pick ports based on relative direction instead of always exiting right/entering left
+- `absDx >= absDy`: exits right/left, enters top/bottom (L-shape) unless same height (straight)
+- `absDy > absDx`: exits bottom/top, enters left/right (L-shape) unless same X (straight vertical)
+- Gateways below/above the source automatically use the bottom/top port instead of the right port
+- Affects new connections, contextual toolbar "add connected element", edge-split insertion, and connection preview
+
+### Editor improvements
+
+#### Ghost/preview on element creation
+- When a create tool is active (e.g. `create:serviceTask`), moving the mouse now shows a translucent shape preview following the cursor
+- Implemented by calling `overlay.setGhostCreate(mode.elementType, diag)` in `_onPointerMove` whenever the state machine is in create mode
+- Ghost is cleared on commit (`_doCreate`) and on cancel/tool-switch (`setTool`)
+- Escape key already cancelled create mode; ghost now also disappears on Escape
+
+#### Orthogonal connection preview
+- The connection ghost line during arrow drawing is now orthogonal (H/V/L/Z segments) instead of a diagonal straight line
+- `overlay.setGhostConnection()` signature changed from `(src: BpmnBounds, end: DiagPoint)` to `(waypoints: BpmnWaypoint[] | null)` — rendered as a `<polyline>` matching committed edge style
+- `previewConnect` callback in `editor.ts` computes waypoints via `computeWaypoints(src, cursor)` before passing to overlay
+
+#### Fix: arrow source port preserved when target is moved
+- **Bug**: manually re-routing an arrow's source endpoint would snap back when the target element was moved
+- **Cause**: `moveShapes` in `modeling.ts` called `computeWaypoints` (always exits right, enters left) when one endpoint moved, discarding user-set ports
+- **Fix**: derive ports from pre-move waypoints using `portFromWaypoint`, then call `computeWaypointsWithPorts` to preserve the user's chosen exit/entry direction while recomputing the route geometry
+
+#### Default theme changed to light
+- `apps/landing/src/editor.ts`: `theme: "dark"` → `theme: "light"`
+
+### Refactor: move editor HUD logic to `@bpmn-sdk/editor`
+- Extracted all HUD code (~600 lines) from `apps/landing/src/editor.ts` into `packages/editor`
+- New `packages/editor/src/icons.ts` — `IC` SVG icon object (internal, not re-exported from index)
+- New `packages/editor/src/hud.ts` — `initEditorHud(editor: BpmnEditor): void` — all group buttons, context/configure toolbars, zoom widget, action bar, dropdown management, keyboard shortcuts
+- `@bpmn-sdk/editor` now exports `initEditorHud` from `index.ts`
+- `apps/landing/src/editor.ts` reduced to ~75 lines: imports, SAMPLE_XML, plugin setup, `new BpmnEditor(...)`, `initEditorHud(editor)`
+
+### Refactor: move BPMN domain metadata to `@bpmn-sdk/editor`
+- Extracted element group taxonomy, display names, external-label types, valid label positions, and contextual-add types into `packages/editor/src/element-groups.ts`
+- New exports: `ELEMENT_GROUPS`, `ELEMENT_TYPE_LABELS`, `EXTERNAL_LABEL_TYPES`, `CONTEXTUAL_ADD_TYPES`, `getElementGroup()`, `getValidLabelPositions()`, `ElementGroup` type
+- `apps/landing/src/editor.ts` now imports these from `@bpmn-sdk/editor`; no BPMN semantics defined in landing
+- `@bpmn-sdk/canvas-plugin-command-palette-editor` derives its 12 commands from `ELEMENT_GROUPS` + `ELEMENT_TYPE_LABELS`; all 4 tests pass
+
+### Command palette plugins — `@bpmn-sdk/canvas-plugin-command-palette` + `@bpmn-sdk/canvas-plugin-command-palette-editor`
+- **`@bpmn-sdk/canvas-plugin-command-palette`** — base Ctrl+K / ⌘K command palette for both canvas and editor
+  - Built-in commands: toggle theme (dark → light → auto cycle), zoom to 100%, zoom to fit, export as BPMN XML, zen mode
+  - **Zen mode**: adds `bpmn-zen-mode` class to container (hides `.bpmn-zoom-controls` / `.bpmn-main-menu-panel` via CSS), hides dot grid rects in SVG, calls `onZenModeChange` callback for external HUD hiding
+  - `CommandPalettePlugin.addCommands(cmds): () => void` — extension point; returns deregister function
+  - Module-level singleton ensures only one palette open at a time across all instances
+  - Theme-aware: resolves "auto" via `window.matchMedia`; light theme applies `bpmn-palette--light` class
+  - 14 tests in `canvas-plugins/command-palette/tests/index.test.ts`
+- **`@bpmn-sdk/canvas-plugin-command-palette-editor`** — extends base palette with 12 BPMN element creation commands
+  - Commands: Add Start Event, Add End Event, Add Service/User/Script/Send/Receive/Business Rule Task, Add Exclusive/Parallel/Inclusive/Event-based Gateway
+  - Activates via `setTool("create:X")` using lazy `editorRef` pattern (avoids circular dependency at construction time)
+  - Deregisters all commands on `uninstall()`; 4 tests in `canvas-plugins/command-palette-editor/tests/index.test.ts`
+- **Landing page**: palette wired with `onZenModeChange` hiding `.hud` elements; editor plugin uses lazy `editorRef`
+
+### `@bpmn-sdk/editor` — Space tool
+- **Space tool** (`"space"`) added to `Tool` type; `setTool("space")` activates it
+- **Behavior**: click and hold anywhere on the canvas, then drag to push elements apart:
+  - Drag right → all elements whose center is to the right of the click x-position move right by the drag distance
+  - Drag left → all elements to the left of the click x-position move left
+  - Drag down → all elements below the click y-position move down
+  - Drag up → all elements above the click y-position move up
+  - Axis locks after 4 diagram-space pixels of movement (dominant axis wins)
+  - Edges are recomputed on commit via `moveShapes` (existing behavior)
+- **Visual feedback**: amber dashed split-line (`.bpmn-space-line`) drawn at the drag origin during drag
+- **Implementation**: new `SpaceSub` state (`idle` / `dragging`), `{ mode: "space" }` EditorMode variant, `previewSpace`/`commitSpace`/`cancelSpace` callbacks, `setSpacePreview` on `OverlayRenderer`
+- **Landing editor**: space button added to bottom toolbar between Select/Hand buttons and the element groups
+
+### Editor toolbar — standard BPMN groups, icons, long-press picker
+- **Undo/redo icons** fixed: replaced confusing arc-based icons with clean U-shaped curved-arrow icons (polyline arrowhead + D-shaped arc body), matching standard design-tool conventions
+- **Bottom toolbar redesigned**: replaced individual element buttons with one button per BPMN group (Events, Activities, Gateways); clicking uses the last-selected element type; holding 500ms opens a horizontal group picker showing all element types in that group
+- **Group picker**: floating panel appears above the button; selecting an element type sets it as the group default and activates the create tool
+- **Extended `CreateShapeType`**: added `sendTask`, `receiveTask`, `businessRuleTask`, `inclusiveGateway`, `eventBasedGateway`; all wired in `makeFlowElement`, `changeElementType`, `defaultBounds`, and `RESIZABLE_TYPES`
+- **Standard BPMN icons**: all toolbar icons follow BPMN 2.0 notation — events as circles (thin=start, thick=end), activities as rounded rectangles with type markers (gear/person/lines/filled-envelope/outlined-envelope/grid), gateways as diamonds with type markers (X/+/O/double-circle)
+- **Configure bar (above element)** now shows all element types in the same BPMN group, using the same full group switcher; previously only showed 2–3 hardcoded options
+- **`EXTERNAL_LABEL_TYPES`** extended to include `inclusiveGateway` and `eventBasedGateway`
+
 ## 2026-02-23 (6)
 
 ### `@bpmn-sdk/editor` — Configure bar, edge split, label fix, scriptTask

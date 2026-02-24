@@ -119,6 +119,22 @@ export const EDITOR_CSS = `
   stroke-width: 2.5;
 }
 
+/* Distance/spacing guide arrows */
+.bpmn-dist-guide {
+  stroke: #f97316;
+  stroke-width: 1;
+  fill: none;
+  pointer-events: none;
+}
+
+/* Space tool split indicator line */
+.bpmn-space-line {
+  stroke: #f59e0b;
+  stroke-width: 1.5;
+  stroke-dasharray: 6 3;
+  pointer-events: none;
+}
+
 /* Label editor */
 .bpmn-label-editor {
   position: absolute;

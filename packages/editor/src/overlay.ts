@@ -34,8 +34,10 @@ export class OverlayRenderer {
 	private readonly _ghostConnG: SVGGElement;
 	private readonly _ghostCreateG: SVGGElement;
 	private readonly _alignG: SVGGElement;
+	private readonly _distG: SVGGElement;
 	private readonly _edgeEndpointsG: SVGGElement;
 	private readonly _endpointGhostG: SVGGElement;
+	private readonly _spaceG: SVGGElement;
 
 	constructor(overlayGroup: SVGGElement, markerId: string) {
 		this._g = overlayGroup;
@@ -48,15 +50,19 @@ export class OverlayRenderer {
 		this._ghostConnG = svgEl("g");
 		this._ghostCreateG = svgEl("g");
 		this._alignG = svgEl("g");
+		this._distG = svgEl("g");
 		this._endpointGhostG = svgEl("g");
 		this._edgeEndpointsG = svgEl("g");
+		this._spaceG = svgEl("g");
 
+		this._g.appendChild(this._spaceG);
 		this._g.appendChild(this._ghostCreateG);
 		this._g.appendChild(this._ghostConnG);
 		this._g.appendChild(this._endpointGhostG);
 		this._g.appendChild(this._rubberG);
 		this._g.appendChild(this._resizePreviewG);
 		this._g.appendChild(this._alignG);
+		this._g.appendChild(this._distG);
 		this._g.appendChild(this._selectionG);
 		this._g.appendChild(this._portsG);
 		this._g.appendChild(this._edgeEndpointsG);
@@ -133,6 +139,54 @@ export class OverlayRenderer {
 		}
 	}
 
+	// ── Distance guides ───────────────────────────────────────────────
+
+	setDistanceGuides(guides: Array<{ x1: number; y1: number; x2: number; y2: number }>): void {
+		this._distG.innerHTML = "";
+		const TICK = 4;
+		for (const g of guides) {
+			const isH = Math.abs(g.y2 - g.y1) < 0.5;
+			const main = svgEl("line");
+			attr(main, { class: "bpmn-dist-guide", x1: g.x1, y1: g.y1, x2: g.x2, y2: g.y2 });
+			this._distG.appendChild(main);
+			const t1 = svgEl("line");
+			const t2 = svgEl("line");
+			if (isH) {
+				attr(t1, {
+					class: "bpmn-dist-guide",
+					x1: g.x1,
+					y1: g.y1 - TICK,
+					x2: g.x1,
+					y2: g.y1 + TICK,
+				});
+				attr(t2, {
+					class: "bpmn-dist-guide",
+					x1: g.x2,
+					y1: g.y2 - TICK,
+					x2: g.x2,
+					y2: g.y2 + TICK,
+				});
+			} else {
+				attr(t1, {
+					class: "bpmn-dist-guide",
+					x1: g.x1 - TICK,
+					y1: g.y1,
+					x2: g.x1 + TICK,
+					y2: g.y1,
+				});
+				attr(t2, {
+					class: "bpmn-dist-guide",
+					x1: g.x2 - TICK,
+					y1: g.y2,
+					x2: g.x2 + TICK,
+					y2: g.y2,
+				});
+			}
+			this._distG.appendChild(t1);
+			this._distG.appendChild(t2);
+		}
+	}
+
 	// ── Rubber-band ────────────────────────────────────────────────────
 
 	setRubberBand(origin: DiagPoint | null, current?: DiagPoint): void {
@@ -168,23 +222,17 @@ export class OverlayRenderer {
 
 	// ── Ghost connection ───────────────────────────────────────────────
 
-	setGhostConnection(src: BpmnBounds | null, end?: DiagPoint): void {
+	setGhostConnection(waypoints: BpmnWaypoint[] | null): void {
 		this._ghostConnG.innerHTML = "";
-		if (!src || !end) return;
-
-		const srcCx = src.x + src.width / 2;
-		const srcCy = src.y + src.height / 2;
-
-		const line = svgEl("line");
-		attr(line, {
+		if (!waypoints || waypoints.length < 2) return;
+		const points = waypoints.map((wp) => `${wp.x},${wp.y}`).join(" ");
+		const poly = svgEl("polyline");
+		attr(poly, {
 			class: "bpmn-ghost-conn",
-			x1: srcCx,
-			y1: srcCy,
-			x2: end.x,
-			y2: end.y,
+			points,
 			"marker-end": `url(#${this._markerId})`,
 		});
-		this._ghostConnG.appendChild(line);
+		this._ghostConnG.appendChild(poly);
 	}
 
 	// ── Edge endpoint balls ────────────────────────────────────────────
@@ -221,6 +269,34 @@ export class OverlayRenderer {
 		const poly = svgEl("polyline");
 		attr(poly, { class: "bpmn-endpoint-ghost", points });
 		this._endpointGhostG.appendChild(poly);
+	}
+
+	// ── Space tool split line ──────────────────────────────────────────
+
+	setSpacePreview(axis: "h" | "v" | null, splitValue?: number): void {
+		this._spaceG.innerHTML = "";
+		if (!axis || splitValue === undefined) return;
+
+		const EXTENT = 10000;
+		const line = svgEl("line");
+		if (axis === "h") {
+			attr(line, {
+				class: "bpmn-space-line",
+				x1: splitValue,
+				y1: -EXTENT,
+				x2: splitValue,
+				y2: EXTENT,
+			});
+		} else {
+			attr(line, {
+				class: "bpmn-space-line",
+				x1: -EXTENT,
+				y1: splitValue,
+				x2: EXTENT,
+				y2: splitValue,
+			});
+		}
+		this._spaceG.appendChild(line);
 	}
 
 	// ── Ghost create shape ─────────────────────────────────────────────

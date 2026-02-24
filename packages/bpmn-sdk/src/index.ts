@@ -82,6 +82,7 @@ export type {
 	ZeebeProperties,
 	ZeebePropertyEntry,
 } from "./bpmn/zeebe-extensions.js";
+export { zeebeExtensionsToXmlElements } from "./bpmn/zeebe-extensions.js";
 export { Dmn } from "./dmn/index.js";
 export { Form } from "./form/index.js";
 export { FormBuilder, GroupBuilder } from "./form/form-builder.js";

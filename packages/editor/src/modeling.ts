@@ -79,10 +79,20 @@ function makeFlowElement(type: CreateShapeType, id: string, name?: string): Bpmn
 			return { ...base, type: "userTask" };
 		case "scriptTask":
 			return { ...base, type: "scriptTask" };
+		case "sendTask":
+			return { ...base, type: "sendTask" };
+		case "receiveTask":
+			return { ...base, type: "receiveTask" };
+		case "businessRuleTask":
+			return { ...base, type: "businessRuleTask" };
 		case "exclusiveGateway":
 			return { ...base, type: "exclusiveGateway" };
 		case "parallelGateway":
 			return { ...base, type: "parallelGateway" };
+		case "inclusiveGateway":
+			return { ...base, type: "inclusiveGateway" };
+		case "eventBasedGateway":
+			return { ...base, type: "eventBasedGateway" };
 	}
 }
 
@@ -265,11 +275,33 @@ export function moveShapes(
 				waypoints: newWps.map((wp) => ({ x: wp.x + srcMove.dx, y: wp.y + srcMove.dy })),
 			};
 		}
-		// Only one endpoint moves — recompute orthogonal route from updated shape positions
+		// Only one endpoint moves — preserve user-adjusted ports, recompute route
 		const srcShape = newShapes.find((s) => s.bpmnElement === flow.sourceRef);
 		const tgtShape = newShapes.find((s) => s.bpmnElement === flow.targetRef);
 		if (srcShape && tgtShape) {
-			return { ...edge, waypoints: computeWaypoints(srcShape.bounds, tgtShape.bounds) };
+			const firstWp = newWps[0];
+			const lastWp = newWps[newWps.length - 1];
+			// Derive ports from pre-move bounds so user-adjusted exit/entry points are preserved
+			const srcOldBounds = srcMove
+				? {
+						...srcShape.bounds,
+						x: srcShape.bounds.x - srcMove.dx,
+						y: srcShape.bounds.y - srcMove.dy,
+					}
+				: srcShape.bounds;
+			const tgtOldBounds = tgtMove
+				? {
+						...tgtShape.bounds,
+						x: tgtShape.bounds.x - tgtMove.dx,
+						y: tgtShape.bounds.y - tgtMove.dy,
+					}
+				: tgtShape.bounds;
+			const srcPort = firstWp ? portFromWaypoint(firstWp, srcOldBounds) : "right";
+			const tgtPort = lastWp ? portFromWaypoint(lastWp, tgtOldBounds) : "left";
+			return {
+				...edge,
+				waypoints: computeWaypointsWithPorts(srcShape.bounds, srcPort, tgtShape.bounds, tgtPort),
+			};
 		}
 		return edge;
 	});
@@ -550,11 +582,26 @@ export function changeElementType(
 		case "scriptTask":
 			newEl = { ...base, type: "scriptTask" };
 			break;
+		case "sendTask":
+			newEl = { ...base, type: "sendTask" };
+			break;
+		case "receiveTask":
+			newEl = { ...base, type: "receiveTask" };
+			break;
+		case "businessRuleTask":
+			newEl = { ...base, type: "businessRuleTask" };
+			break;
 		case "exclusiveGateway":
 			newEl = { ...base, type: "exclusiveGateway" };
 			break;
 		case "parallelGateway":
 			newEl = { ...base, type: "parallelGateway" };
+			break;
+		case "inclusiveGateway":
+			newEl = { ...base, type: "inclusiveGateway" };
+			break;
+		case "eventBasedGateway":
+			newEl = { ...base, type: "eventBasedGateway" };
 			break;
 	}
 

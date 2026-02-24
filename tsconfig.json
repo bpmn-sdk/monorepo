@@ -4,6 +4,12 @@
 		{ "path": "packages/bpmn-sdk" },
 		{ "path": "packages/canvas" },
 		{ "path": "packages/editor" },
-		{ "path": "canvas-plugins/minimap" }
+		{ "path": "canvas-plugins/minimap" },
+		{ "path": "canvas-plugins/zoom-controls" },
+		{ "path": "canvas-plugins/main-menu" },
+		{ "path": "canvas-plugins/command-palette" },
+		{ "path": "canvas-plugins/command-palette-editor" },
+		{ "path": "canvas-plugins/config-panel" },
+		{ "path": "canvas-plugins/config-panel-bpmn" }
 	]
 }

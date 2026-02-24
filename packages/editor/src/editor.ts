@@ -17,7 +17,7 @@ import type {
 	Theme,
 } from "@bpmn-sdk/canvas";
 import { Bpmn } from "@bpmn-sdk/core";
-import type { BpmnDefinitions } from "@bpmn-sdk/core";
+import type { BpmnBounds, BpmnDefinitions } from "@bpmn-sdk/core";
 import { CommandStack } from "./command-stack.js";
 import { injectEditorStyles } from "./css.js";
 import {
@@ -77,6 +77,8 @@ function defaultBounds(
 			return { x: cx - 18, y: cy - 18, width: 36, height: 36 };
 		case "exclusiveGateway":
 		case "parallelGateway":
+		case "inclusiveGateway":
+		case "eventBasedGateway":
 			return { x: cx - 25, y: cy - 25, width: 50, height: 50 };
 		default:
 			return { x: cx - 50, y: cy - 40, width: 100, height: 80 };
@@ -120,6 +122,9 @@ export class BpmnEditor {
 	private _snapDelta: { dx: number; dy: number } | null = null;
 	private _selectedEdgeId: string | null = null;
 	private _edgeDropTarget: string | null = null;
+	private _ghostSnapCenter: DiagPoint | null = null;
+	private _createEdgeDropTarget: string | null = null;
+	private _readOnly = false;
 
 	// ── Events ─────────────────────────────────────────────────────────
 	private readonly _listeners = new Map<string, Set<(...args: unknown[]) => void>>();
@@ -203,7 +208,15 @@ export class BpmnEditor {
 			},
 			previewConnect: (ghostEnd) => {
 				const src = this._connectSourceBounds();
-				if (src) this._overlay.setGhostConnection(src, ghostEnd);
+				if (src) {
+					const wps = computeWaypoints(src, {
+						x: ghostEnd.x - 1,
+						y: ghostEnd.y - 1,
+						width: 2,
+						height: 2,
+					});
+					this._overlay.setGhostConnection(wps);
+				}
 			},
 			cancelConnect: () => this._overlay.setGhostConnection(null),
 			commitConnect: (srcId, tgtId) => {
@@ -235,6 +248,9 @@ export class BpmnEditor {
 					this._overlay.setEdgeEndpoints(edge?.edge.waypoints ?? null, this._selectedEdgeId);
 				}
 			},
+			previewSpace: (origin, current, axis) => this._previewSpace(origin, current, axis),
+			commitSpace: (origin, current, axis) => this._commitSpace(origin, current, axis),
+			cancelSpace: () => this._cancelSpace(),
 		};
 
 		this._stateMachine = new EditorStateMachine(callbacks);
@@ -273,9 +289,6 @@ export class BpmnEditor {
 		this._svg.addEventListener("pointermove", this._onPointerMove);
 		this._svg.addEventListener("pointerup", this._onPointerUp);
 		this._svg.addEventListener("dblclick", this._onDblClick);
-
-		// ── Zoom controls ─────────────────────────────────────────────
-		this._addZoomControls();
 
 		// ── Plugins ───────────────────────────────────────────────────
 		if (options.plugins) {
@@ -318,11 +331,37 @@ export class BpmnEditor {
 		return Bpmn.export(this._defs ?? createEmptyDefinitions());
 	}
 
+	/**
+	 * Enables or disables read-only mode. In read-only mode the viewport
+	 * (pan + zoom) still works but all editing actions are blocked.
+	 */
+	setReadOnly(enabled: boolean): void {
+		this._readOnly = enabled;
+		if (enabled) {
+			this._setSelection([]);
+			this._overlay.setGhostCreate(null);
+			this._overlay.setAlignmentGuides([]);
+			this._overlay.setDistanceGuides([]);
+			this._setCreateEdgeDropHighlight(null);
+			this._ghostSnapCenter = null;
+			this._stateMachine.setMode({ mode: "pan" });
+		} else {
+			this.setTool("select");
+		}
+	}
+
 	setTool(tool: Tool): void {
+		if (this._readOnly) return;
+		this._overlay.setGhostCreate(null);
+		this._overlay.setAlignmentGuides([]);
+		this._setCreateEdgeDropHighlight(null);
+		this._ghostSnapCenter = null;
 		if (tool === "select") {
 			this._stateMachine.setMode({ mode: "select", sub: { name: "idle", hoveredId: null } });
 		} else if (tool === "pan") {
 			this._stateMachine.setMode({ mode: "pan" });
+		} else if (tool === "space") {
+			this._stateMachine.setMode({ mode: "space", sub: { name: "idle" } });
 		} else {
 			const elementType = tool.slice(7) as CreateShapeType;
 			this._stateMachine.setMode({ mode: "create", elementType });
@@ -363,6 +402,14 @@ export class BpmnEditor {
 
 	canRedo(): boolean {
 		return this._commandStack.canRedo();
+	}
+
+	getDefinitions(): BpmnDefinitions | null {
+		return this._defs;
+	}
+
+	applyChange(fn: (defs: BpmnDefinitions) => BpmnDefinitions): void {
+		this._executeCommand(fn);
 	}
 
 	fitView(padding = 40): void {
@@ -488,7 +535,7 @@ export class BpmnEditor {
 	}
 
 	private _executeCommand(fn: (d: BpmnDefinitions) => BpmnDefinitions): void {
-		if (!this._defs) return;
+		if (this._readOnly || !this._defs) return;
 		const newDefs = fn(this._defs);
 		this._commandStack.push(newDefs);
 		this._renderDefs(newDefs);
@@ -507,21 +554,41 @@ export class BpmnEditor {
 	}
 
 	private _previewTranslate(dx: number, dy: number): void {
-		const snapped = this._computeSnap(dx, dy);
-		this._snapDelta = snapped;
+		const alignSnap = this._computeSnap(dx, dy);
+		const spacingResult = this._computeSpacingSnap(dx, dy);
+
+		const alignAdjX = Math.abs(alignSnap.dx - dx);
+		const alignAdjY = Math.abs(alignSnap.dy - dy);
+		const spacingAdjX = Math.abs(spacingResult.dx - dx);
+		const spacingAdjY = Math.abs(spacingResult.dy - dy);
+
+		// Per axis: prefer spacing snap when it fires and is closer than alignment snap
+		const useSpacingX = spacingAdjX > 0 && (!alignAdjX || spacingAdjX < alignAdjX);
+		const useSpacingY = spacingAdjY > 0 && (!alignAdjY || spacingAdjY < alignAdjY);
+		const finalDx = useSpacingX ? spacingResult.dx : alignSnap.dx;
+		const finalDy = useSpacingY ? spacingResult.dy : alignSnap.dy;
+
+		this._snapDelta = { dx: finalDx, dy: finalDy };
 		for (const id of this._selectedIds) {
 			const shape = this._shapes.find((s) => s.id === id);
 			if (!shape) continue;
 			const { x, y } = shape.shape.bounds;
-			shape.element.setAttribute("transform", `translate(${x + snapped.dx} ${y + snapped.dy})`);
+			shape.element.setAttribute("transform", `translate(${x + finalDx} ${y + finalDy})`);
 		}
-		this._overlay.setAlignmentGuides(this._computeAlignGuides(snapped.dx, snapped.dy));
-		this._setEdgeDropHighlight(this._findEdgeDropTarget(snapped.dx, snapped.dy));
+		this._overlay.setAlignmentGuides(this._computeAlignGuides(finalDx, finalDy));
+		this._overlay.setDistanceGuides(
+			spacingResult.guides.filter((g) => {
+				const isH = g.y1 === g.y2;
+				return isH ? useSpacingX : useSpacingY;
+			}),
+		);
+		this._setEdgeDropHighlight(this._findEdgeDropTarget(finalDx, finalDy));
 	}
 
 	private _cancelTranslate(): void {
 		this._snapDelta = null;
 		this._overlay.setAlignmentGuides([]);
+		this._overlay.setDistanceGuides([]);
 		this._setEdgeDropHighlight(null);
 		for (const id of this._selectedIds) {
 			const shape = this._shapes.find((s) => s.id === id);
@@ -535,6 +602,7 @@ export class BpmnEditor {
 		const snap = this._snapDelta ?? { dx, dy };
 		this._snapDelta = null;
 		this._overlay.setAlignmentGuides([]);
+		this._overlay.setDistanceGuides([]);
 		const edgeDropId = this._edgeDropTarget;
 		this._setEdgeDropHighlight(null);
 		const moves = this._selectedIds.map((id) => ({ id, dx: snap.dx, dy: snap.dy }));
@@ -546,14 +614,97 @@ export class BpmnEditor {
 		}
 	}
 
+	private _previewSpace(origin: DiagPoint, current: DiagPoint, axis: "h" | "v" | null): void {
+		// Reset all shapes to their original positions first
+		for (const shape of this._shapes) {
+			const { x, y } = shape.shape.bounds;
+			shape.element.setAttribute("transform", `translate(${x} ${y})`);
+		}
+		if (!axis) return;
+
+		const dx = current.x - origin.x;
+		const dy = current.y - origin.y;
+
+		for (const shape of this._shapes) {
+			const b = shape.shape.bounds;
+			const cx = b.x + b.width / 2;
+			const cy = b.y + b.height / 2;
+			let moveDx = 0;
+			let moveDy = 0;
+			if (axis === "h") {
+				if (dx > 0 && cx > origin.x) moveDx = dx;
+				else if (dx < 0 && cx < origin.x) moveDx = dx;
+			} else {
+				if (dy > 0 && cy > origin.y) moveDy = dy;
+				else if (dy < 0 && cy < origin.y) moveDy = dy;
+			}
+			if (moveDx !== 0 || moveDy !== 0) {
+				shape.element.setAttribute("transform", `translate(${b.x + moveDx} ${b.y + moveDy})`);
+			}
+		}
+
+		const splitValue = axis === "h" ? origin.x : origin.y;
+		this._overlay.setSpacePreview(axis, splitValue);
+	}
+
+	private _commitSpace(origin: DiagPoint, current: DiagPoint, axis: "h" | "v" | null): void {
+		// Reset visual preview
+		for (const shape of this._shapes) {
+			const { x, y } = shape.shape.bounds;
+			shape.element.setAttribute("transform", `translate(${x} ${y})`);
+		}
+		this._overlay.setSpacePreview(null);
+
+		if (!axis || !this._defs) return;
+
+		const dx = current.x - origin.x;
+		const dy = current.y - origin.y;
+		if (dx === 0 && dy === 0) return;
+
+		const moves: Array<{ id: string; dx: number; dy: number }> = [];
+		for (const shape of this._shapes) {
+			const b = shape.shape.bounds;
+			const cx = b.x + b.width / 2;
+			const cy = b.y + b.height / 2;
+			if (axis === "h") {
+				if (dx > 0 && cx > origin.x) moves.push({ id: shape.id, dx, dy: 0 });
+				else if (dx < 0 && cx < origin.x) moves.push({ id: shape.id, dx, dy: 0 });
+			} else {
+				if (dy > 0 && cy > origin.y) moves.push({ id: shape.id, dx: 0, dy });
+				else if (dy < 0 && cy < origin.y) moves.push({ id: shape.id, dx: 0, dy });
+			}
+		}
+
+		if (moves.length > 0) {
+			this._executeCommand((d) => moveShapes(d, moves));
+		}
+	}
+
+	private _cancelSpace(): void {
+		for (const shape of this._shapes) {
+			const { x, y } = shape.shape.bounds;
+			shape.element.setAttribute("transform", `translate(${x} ${y})`);
+		}
+		this._overlay.setSpacePreview(null);
+	}
+
 	private _doCreate(type: CreateShapeType, diagPoint: DiagPoint): void {
+		this._overlay.setGhostCreate(null);
+		this._overlay.setAlignmentGuides([]);
+		const actualCenter = this._ghostSnapCenter ?? diagPoint;
+		this._ghostSnapCenter = null;
+		const edgeDropId = this._createEdgeDropTarget;
+		this._setCreateEdgeDropHighlight(null);
 		if (!this._defs) return;
-		const bounds = defaultBounds(type, diagPoint.x, diagPoint.y);
+		const bounds = defaultBounds(type, actualCenter.x, actualCenter.y);
 		const result = createShape(this._defs, type, bounds);
 		this._selectedIds = [result.id];
-		this._commandStack.push(result.defs);
-		this._renderDefs(result.defs);
-		this._emit("diagram:change", result.defs);
+		const finalDefs = edgeDropId
+			? insertShapeOnEdge(result.defs, edgeDropId, result.id)
+			: result.defs;
+		this._commandStack.push(finalDefs);
+		this._renderDefs(finalDefs);
+		this._emit("diagram:change", finalDefs);
 		this._emit("editor:select", [result.id]);
 	}
 
@@ -586,7 +737,7 @@ export class BpmnEditor {
 	}
 
 	private _startLabelEdit(id: string): void {
-		if (!id) return;
+		if (this._readOnly || !id) return;
 		const shape = this._shapes.find((s) => s.id === id);
 		if (!shape) return;
 		const defs = this._defs;
@@ -636,7 +787,8 @@ export class BpmnEditor {
 
 	/**
 	 * Creates a new element of the given type connected to the source shape,
-	 * positioned to its right. Returns the new element's id.
+	 * using smart placement (right → bottom → top, avoids overlaps).
+	 * Returns the new element's id.
 	 */
 	addConnectedElement(sourceId: string, type: CreateShapeType): string | null {
 		if (!this._defs) return null;
@@ -644,23 +796,22 @@ export class BpmnEditor {
 		if (!srcShape) return null;
 		const srcBounds = srcShape.shape.bounds;
 
-		const GAP = 60;
 		let w = 100;
 		let h = 80;
 		if (type === "startEvent" || type === "endEvent") {
 			w = 36;
 			h = 36;
-		} else if (type === "exclusiveGateway" || type === "parallelGateway") {
+		} else if (
+			type === "exclusiveGateway" ||
+			type === "parallelGateway" ||
+			type === "inclusiveGateway" ||
+			type === "eventBasedGateway"
+		) {
 			w = 50;
 			h = 50;
 		}
 
-		const newBounds = {
-			x: srcBounds.x + srcBounds.width + GAP,
-			y: srcBounds.y + (srcBounds.height - h) / 2,
-			width: w,
-			height: h,
-		};
+		const newBounds = this._smartPlaceBounds(srcBounds, sourceId, w, h);
 		const r1 = createShape(this._defs, type, newBounds);
 		const waypoints = computeWaypoints(srcBounds, newBounds);
 		const r2 = createConnection(r1.defs, sourceId, r1.id, waypoints);
@@ -671,6 +822,103 @@ export class BpmnEditor {
 		this._emit("diagram:change", r2.defs);
 		this._emit("editor:select", [r1.id]);
 		return r1.id;
+	}
+
+	private _smartPlaceBounds(
+		srcBounds: BpmnBounds,
+		sourceId: string,
+		w: number,
+		h: number,
+	): BpmnBounds {
+		const GAP = 60;
+		const srcCx = srcBounds.x + srcBounds.width / 2;
+		const srcCy = srcBounds.y + srcBounds.height / 2;
+
+		// Find directions already occupied by outgoing connections
+		const takenDirs = new Set<string>();
+		const process = this._defs?.processes[0];
+		if (process) {
+			for (const flow of process.sequenceFlows) {
+				if (flow.sourceRef !== sourceId) continue;
+				const tgt = this._shapes.find((s) => s.id === flow.targetRef);
+				if (!tgt) continue;
+				const tCx = tgt.shape.bounds.x + tgt.shape.bounds.width / 2;
+				const tCy = tgt.shape.bounds.y + tgt.shape.bounds.height / 2;
+				const ddx = tCx - srcCx;
+				const ddy = tCy - srcCy;
+				const dir =
+					Math.abs(ddx) >= Math.abs(ddy)
+						? ddx >= 0
+							? "right"
+							: "left"
+						: ddy >= 0
+							? "bottom"
+							: "top";
+				takenDirs.add(dir);
+			}
+		}
+
+		// Try primary candidates: right → bottom → top
+		const candidates: Array<{ dir: string; bounds: BpmnBounds }> = [
+			{
+				dir: "right",
+				bounds: { x: srcBounds.x + srcBounds.width + GAP, y: srcCy - h / 2, width: w, height: h },
+			},
+			{
+				dir: "bottom",
+				bounds: {
+					x: srcCx - w / 2,
+					y: srcBounds.y + srcBounds.height + GAP,
+					width: w,
+					height: h,
+				},
+			},
+			{
+				dir: "top",
+				bounds: { x: srcCx - w / 2, y: srcBounds.y - GAP - h, width: w, height: h },
+			},
+		];
+
+		for (const { dir, bounds } of candidates) {
+			if (!takenDirs.has(dir) && !this._overlapsAny(bounds)) return bounds;
+		}
+
+		// All primary positions blocked — increase gap for bottom/top
+		for (let extra = GAP * 2; extra <= GAP * 6; extra += GAP) {
+			const bot: BpmnBounds = {
+				x: srcCx - w / 2,
+				y: srcBounds.y + srcBounds.height + extra,
+				width: w,
+				height: h,
+			};
+			if (!this._overlapsAny(bot)) return bot;
+			const top: BpmnBounds = {
+				x: srcCx - w / 2,
+				y: srcBounds.y - extra - h,
+				width: w,
+				height: h,
+			};
+			if (!this._overlapsAny(top)) return top;
+		}
+
+		// Absolute fallback
+		return { x: srcBounds.x + srcBounds.width + GAP * 5, y: srcCy - h / 2, width: w, height: h };
+	}
+
+	private _overlapsAny(bounds: BpmnBounds): boolean {
+		const MARGIN = 10;
+		for (const shape of this._shapes) {
+			const b = shape.shape.bounds;
+			if (
+				bounds.x < b.x + b.width + MARGIN &&
+				bounds.x + bounds.width + MARGIN > b.x &&
+				bounds.y < b.y + b.height + MARGIN &&
+				bounds.y + bounds.height + MARGIN > b.y
+			) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	/**
@@ -845,7 +1093,7 @@ export class BpmnEditor {
 		const selectedSet = new Set(this._selectedIds);
 		const movingShapes = this._shapes.filter((s) => selectedSet.has(s.id));
 		const staticShapes = this._shapes.filter((s) => !selectedSet.has(s.id));
-		if (movingShapes.length === 0 || staticShapes.length === 0) return { dx, dy };
+		if (movingShapes.length === 0) return { dx, dy };
 
 		const scale = this._viewport.state.scale;
 		const threshold = 8 / scale;
@@ -861,6 +1109,12 @@ export class BpmnEditor {
 		const staticXVals: number[] = [];
 		const staticYVals: number[] = [];
 		for (const s of staticShapes) {
+			const b = s.shape.bounds;
+			staticXVals.push(b.x, b.x + b.width / 2, b.x + b.width);
+			staticYVals.push(b.y, b.y + b.height / 2, b.y + b.height);
+		}
+		// Include original positions of moving shapes as virtual snap targets
+		for (const s of movingShapes) {
 			const b = s.shape.bounds;
 			staticXVals.push(b.x, b.x + b.width / 2, b.x + b.width);
 			staticYVals.push(b.y, b.y + b.height / 2, b.y + b.height);
@@ -901,17 +1155,19 @@ export class BpmnEditor {
 		const selectedSet = new Set(this._selectedIds);
 		const movingShapes = this._shapes.filter((s) => selectedSet.has(s.id));
 		const staticShapes = this._shapes.filter((s) => !selectedSet.has(s.id));
-		if (movingShapes.length === 0 || staticShapes.length === 0) return [];
+		if (movingShapes.length === 0) return [];
 
 		const guides: Array<{ x1: number; y1: number; x2: number; y2: number }> = [];
 		const EXT = 2000;
+		// Include original positions of moving shapes as virtual reference points
+		const allStaticRef = [...staticShapes, ...movingShapes];
 
 		for (const ms of movingShapes) {
 			const mb = ms.shape.bounds;
 			const mxVals = [mb.x + dx, mb.x + dx + mb.width / 2, mb.x + dx + mb.width];
 			const myVals = [mb.y + dy, mb.y + dy + mb.height / 2, mb.y + dy + mb.height];
 
-			for (const ss of staticShapes) {
+			for (const ss of allStaticRef) {
 				const sb = ss.shape.bounds;
 				const sxVals = [sb.x, sb.x + sb.width / 2, sb.x + sb.width];
 				const syVals = [sb.y, sb.y + sb.height / 2, sb.y + sb.height];
@@ -936,6 +1192,228 @@ export class BpmnEditor {
 		return guides;
 	}
 
+	// ── Spacing snap (equal-distance guides) ──────────────────────────
+
+	private _computeSpacingSnap(
+		dx: number,
+		dy: number,
+	): { dx: number; dy: number; guides: Array<{ x1: number; y1: number; x2: number; y2: number }> } {
+		const selectedSet = new Set(this._selectedIds);
+		const movingShapes = this._shapes.filter((s) => selectedSet.has(s.id));
+		const staticShapes = this._shapes.filter((s) => !selectedSet.has(s.id));
+		if (movingShapes.length !== 1 || staticShapes.length < 2) {
+			return { dx, dy, guides: [] };
+		}
+
+		const movingShape = movingShapes[0];
+		if (!movingShape) return { dx, dy, guides: [] };
+		const moving = movingShape.shape.bounds;
+		const scale = this._viewport.state.scale;
+		const threshold = 8 / scale;
+
+		let bestDx = dx;
+		let bestDy = dy;
+		let minDistX = threshold;
+		let minDistY = threshold;
+		const hGuides: Array<{ x1: number; y1: number; x2: number; y2: number }> = [];
+		const vGuides: Array<{ x1: number; y1: number; x2: number; y2: number }> = [];
+
+		const mCy = moving.y + dy + moving.height / 2;
+		const mCx = moving.x + dx + moving.width / 2;
+
+		// Horizontal spacing: for each pair (A, B) where B is to the right of A
+		for (const A of staticShapes) {
+			const aRight = A.shape.bounds.x + A.shape.bounds.width;
+			for (const B of staticShapes) {
+				if (A.id === B.id) continue;
+				const bLeft = B.shape.bounds.x;
+				if (bLeft <= aRight) continue;
+				const gap = bLeft - aRight;
+
+				// Candidate: moving is to the right of B by the same gap
+				const bRight = B.shape.bounds.x + B.shape.bounds.width;
+				const candLeft = bRight + gap;
+				const distX = Math.abs(moving.x + dx - candLeft);
+				if (distX < minDistX) {
+					minDistX = distX;
+					bestDx = dx + (candLeft - (moving.x + dx));
+					hGuides.length = 0;
+					hGuides.push(
+						{ x1: aRight, y1: mCy, x2: bLeft, y2: mCy },
+						{ x1: bRight, y1: mCy, x2: candLeft, y2: mCy },
+					);
+				}
+
+				// Candidate: moving is to the left of A by the same gap
+				const aLeft = A.shape.bounds.x;
+				const candRight = aLeft - gap;
+				const movRight = moving.x + dx + moving.width;
+				const distX2 = Math.abs(movRight - candRight);
+				if (distX2 < minDistX) {
+					minDistX = distX2;
+					bestDx = dx + (candRight - movRight);
+					hGuides.length = 0;
+					hGuides.push(
+						{ x1: candRight, y1: mCy, x2: aLeft, y2: mCy },
+						{ x1: aRight, y1: mCy, x2: bLeft, y2: mCy },
+					);
+				}
+			}
+		}
+
+		// Vertical spacing: for each pair (A, B) where B is below A
+		for (const A of staticShapes) {
+			const aBottom = A.shape.bounds.y + A.shape.bounds.height;
+			for (const B of staticShapes) {
+				if (A.id === B.id) continue;
+				const bTop = B.shape.bounds.y;
+				if (bTop <= aBottom) continue;
+				const gap = bTop - aBottom;
+
+				// Candidate: moving is below B by the same gap
+				const bBottom = B.shape.bounds.y + B.shape.bounds.height;
+				const candTop = bBottom + gap;
+				const distY = Math.abs(moving.y + dy - candTop);
+				if (distY < minDistY) {
+					minDistY = distY;
+					bestDy = dy + (candTop - (moving.y + dy));
+					vGuides.length = 0;
+					vGuides.push(
+						{ x1: mCx, y1: aBottom, x2: mCx, y2: bTop },
+						{ x1: mCx, y1: bBottom, x2: mCx, y2: candTop },
+					);
+				}
+
+				// Candidate: moving is above A by the same gap
+				const aTop = A.shape.bounds.y;
+				const candBottom = aTop - gap;
+				const movBottom = moving.y + dy + moving.height;
+				const distY2 = Math.abs(movBottom - candBottom);
+				if (distY2 < minDistY) {
+					minDistY = distY2;
+					bestDy = dy + (candBottom - movBottom);
+					vGuides.length = 0;
+					vGuides.push(
+						{ x1: mCx, y1: candBottom, x2: mCx, y2: aTop },
+						{ x1: mCx, y1: aBottom, x2: mCx, y2: bTop },
+					);
+				}
+			}
+		}
+
+		return { dx: bestDx, dy: bestDy, guides: [...hGuides, ...vGuides] };
+	}
+
+	// ── Create-mode helpers ────────────────────────────────────────────
+
+	private _computeCreateSnap(bounds: BpmnBounds): BpmnBounds {
+		if (this._shapes.length === 0) return bounds;
+		const scale = this._viewport.state.scale;
+		const threshold = 8 / scale;
+
+		const bxVals = [bounds.x, bounds.x + bounds.width / 2, bounds.x + bounds.width];
+		const byVals = [bounds.y, bounds.y + bounds.height / 2, bounds.y + bounds.height];
+
+		const sxVals: number[] = [];
+		const syVals: number[] = [];
+		for (const s of this._shapes) {
+			const b = s.shape.bounds;
+			sxVals.push(b.x, b.x + b.width / 2, b.x + b.width);
+			syVals.push(b.y, b.y + b.height / 2, b.y + b.height);
+		}
+
+		let bestDx = 0;
+		let bestDy = 0;
+		let minDistX = threshold;
+		let minDistY = threshold;
+
+		for (const bx of bxVals) {
+			for (const sx of sxVals) {
+				const dist = Math.abs(bx - sx);
+				if (dist < minDistX) {
+					minDistX = dist;
+					bestDx = sx - bx;
+				}
+			}
+		}
+		for (const by of byVals) {
+			for (const sy of syVals) {
+				const dist = Math.abs(by - sy);
+				if (dist < minDistY) {
+					minDistY = dist;
+					bestDy = sy - by;
+				}
+			}
+		}
+
+		return { ...bounds, x: bounds.x + bestDx, y: bounds.y + bestDy };
+	}
+
+	private _computeCreateGuides(
+		bounds: BpmnBounds,
+	): Array<{ x1: number; y1: number; x2: number; y2: number }> {
+		const guides: Array<{ x1: number; y1: number; x2: number; y2: number }> = [];
+		const EXT = 2000;
+		const bxVals = [bounds.x, bounds.x + bounds.width / 2, bounds.x + bounds.width];
+		const byVals = [bounds.y, bounds.y + bounds.height / 2, bounds.y + bounds.height];
+
+		for (const s of this._shapes) {
+			const sb = s.shape.bounds;
+			const sxVals = [sb.x, sb.x + sb.width / 2, sb.x + sb.width];
+			const syVals = [sb.y, sb.y + sb.height / 2, sb.y + sb.height];
+			for (const bx of bxVals) {
+				for (const sx of sxVals) {
+					if (Math.abs(bx - sx) < 1) guides.push({ x1: bx, y1: -EXT, x2: bx, y2: EXT });
+				}
+			}
+			for (const by of byVals) {
+				for (const sy of syVals) {
+					if (Math.abs(by - sy) < 1) guides.push({ x1: -EXT, y1: by, x2: EXT, y2: by });
+				}
+			}
+		}
+
+		return guides;
+	}
+
+	private _findCreateEdgeDrop(bounds: BpmnBounds): string | null {
+		if (!this._defs) return null;
+		const cx = bounds.x + bounds.width / 2;
+		const cy = bounds.y + bounds.height / 2;
+		const process = this._defs.processes[0];
+		if (!process) return null;
+		const TOLERANCE = 20;
+		for (const edge of this._edges) {
+			const flow = process.sequenceFlows.find((sf) => sf.id === edge.id);
+			if (!flow) continue;
+			const wps = edge.edge.waypoints;
+			for (let i = 0; i < wps.length - 1; i++) {
+				const a = wps[i];
+				const b = wps[i + 1];
+				if (!a || !b) continue;
+				const minX = Math.min(a.x, b.x) - TOLERANCE;
+				const maxX = Math.max(a.x, b.x) + TOLERANCE;
+				const minY = Math.min(a.y, b.y) - TOLERANCE;
+				const maxY = Math.max(a.y, b.y) + TOLERANCE;
+				if (cx >= minX && cx <= maxX && cy >= minY && cy <= maxY) return edge.id;
+			}
+		}
+		return null;
+	}
+
+	private _setCreateEdgeDropHighlight(edgeId: string | null): void {
+		if (this._createEdgeDropTarget === edgeId) return;
+		if (this._createEdgeDropTarget) {
+			const prev = this._edges.find((e) => e.id === this._createEdgeDropTarget);
+			prev?.element.classList.remove("bpmn-edge-split-highlight");
+		}
+		this._createEdgeDropTarget = edgeId;
+		if (edgeId) {
+			const edge = this._edges.find((e) => e.id === edgeId);
+			edge?.element.classList.add("bpmn-edge-split-highlight");
+		}
+	}
+
 	// ── Pointer event handlers ─────────────────────────────────────────
 
 	private readonly _onPointerDown = (e: PointerEvent): void => {
@@ -951,6 +1429,19 @@ export class BpmnEditor {
 		const diag = screenToDiagram(e.clientX, e.clientY, this._viewport.state, rect);
 		const hit = this._hitTest(e.clientX, e.clientY);
 		this._stateMachine.onPointerMove(e, diag, hit);
+		const mode = this._stateMachine.mode;
+		if (mode.mode === "create") {
+			const rawBounds = defaultBounds(mode.elementType, diag.x, diag.y);
+			const snapped = this._computeCreateSnap(rawBounds);
+			const snappedCenter: DiagPoint = {
+				x: snapped.x + snapped.width / 2,
+				y: snapped.y + snapped.height / 2,
+			};
+			this._ghostSnapCenter = snappedCenter;
+			this._overlay.setGhostCreate(mode.elementType, snappedCenter);
+			this._overlay.setAlignmentGuides(this._computeCreateGuides(snapped));
+			this._setCreateEdgeDropHighlight(this._findCreateEdgeDrop(snapped));
+		}
 	};
 
 	private readonly _onPointerUp = (e: PointerEvent): void => {
@@ -969,6 +1460,7 @@ export class BpmnEditor {
 	};
 
 	private readonly _onKeyDown = (e: KeyboardEvent): void => {
+		if (this._readOnly) return;
 		this._stateMachine.onKeyDown(e);
 
 		if (e.ctrlKey || e.metaKey) {
@@ -1060,26 +1552,6 @@ export class BpmnEditor {
 		}
 	}
 
-	private _addZoomControls(): void {
-		const controls = document.createElement("div");
-		controls.className = "bpmn-controls";
-		controls.setAttribute("aria-label", "Zoom controls");
-		const makeBtn = (label: string, title: string, onClick: () => void): HTMLButtonElement => {
-			const btn = document.createElement("button");
-			btn.className = "bpmn-control-btn";
-			btn.type = "button";
-			btn.textContent = label;
-			btn.setAttribute("aria-label", title);
-			btn.title = title;
-			btn.addEventListener("click", onClick);
-			return btn;
-		};
-		controls.appendChild(makeBtn("+", "Zoom in", () => this.zoomIn()));
-		controls.appendChild(makeBtn("−", "Zoom out", () => this.zoomOut()));
-		controls.appendChild(makeBtn("⊡", "Fit diagram", () => this.fitView()));
-		this._host.appendChild(controls);
-	}
-
 	private _installPlugin(plugin: CanvasPlugin): void {
 		this._plugins.push(plugin);
 		const self = this;
@@ -1091,6 +1563,8 @@ export class BpmnEditor {
 			setViewport: (s) => this._viewport.set(s),
 			getShapes: () => [...this._shapes],
 			getEdges: () => [...this._edges],
+			getTheme: () => this._theme,
+			setTheme: (theme) => this.setTheme(theme),
 			on<K extends keyof CanvasEvents>(event: K, handler: CanvasEvents[K]) {
 				return self.on(event as keyof EditorEvents, handler as EditorEvents[keyof EditorEvents]);
 			},

@@ -1,16 +1,18 @@
 # Features
 
 ## BPMN Diagram Editor (2026-02-23) — `@bpmn-sdk/editor`
-- **Full diagram editing** — create, move, resize, connect, delete, label-edit, undo/redo, copy/paste; type switching (task/gateway subtypes)
+- **Full diagram editing** — create, move, resize, connect, delete, label-edit, undo/redo, copy/paste; type switching within BPMN groups
 - **Edge split on drop** — drag a shape over a sequence flow to highlight it (green); release to insert the shape between source and target, splitting the edge
-- **Configure bar (above element)** — type switcher for tasks and gateways; label position picker for events and gateways; positioned above the selected shape
+- **Configure bar (above element)** — shows all element types in the same BPMN group for quick type switching; label position picker for events and gateways
+- **Group toolbar** — bottom toolbar shows one button per BPMN group (Events, Activities, Gateways); click to use last-selected type; long-press (500ms) opens a horizontal picker with all types in the group; standard BPMN notation icons throughout
 - **`changeElementType(id, newType)`** — changes a flow element's type while preserving id, name, and connections
 - **Orthogonal edges** — all sequence flows rendered as H/V-only Z-shaped paths; routes recomputed on shape move; endpoint repositioning via drag
 - **Edge endpoint repositioning** — click edge to select; drag start/end balls to reposition on source/target port (top/right/bottom/left); route recomputed via port-aware orthogonal routing
 - **External label positions** — events and gateways show labels outside the shape; 8 positions via `setLabelPosition(id, pos)`; contextual toolbar compass icon to choose
 - **Magnet snap** — shapes snap to aligned edges/centers of neighbors during drag; blue dashed guide lines shown
 - **Contextual toolbar** — arrow icon to draw freehand connections; quick-add buttons for connected elements; label position picker for events/gateways
-- **Tool system** — `setTool("select" | "pan" | "create:serviceTask" | ...)` with `editor:tool` event
+- **Tool system** — `setTool("select" | "pan" | "space" | "create:serviceTask" | ...)` with `editor:tool` event
+- **Space tool** — click-and-drag to push elements apart; drag right/left to move elements in that half, drag up/down to move elements in that half; axis locks after 4px; amber dashed guide line shown; edges remain connected
 - **Selection** — click, shift-click, rubber-band box-select; `setSelection(ids)` API; `editor:select` event; edge selection independent of shape selection
 - **Undo/redo** — snapshot-based `CommandStack` (100 entries); `canUndo()` / `canRedo()` queries
 - **Inline label editing** — double-click activates `contenteditable` div positioned over the shape
@@ -23,6 +25,10 @@
 ## Canvas Plugins Workspace (2026-02-23) — `canvas-plugins/*`
 - New pnpm workspace `canvas-plugins/*` for first-party canvas plugin packages
 - **`@bpmn-sdk/canvas-plugin-minimap`** — minimap as an opt-in plugin; install via `plugins: [createMinimapPlugin()]`; handles `diagram:load`, `viewport:change`, `diagram:clear`; navigates via `CanvasApi.setViewport()`; fully self-contained CSS injection
+- **`@bpmn-sdk/canvas-plugin-command-palette`** (2026-02-24) — Ctrl+K / ⌘K command palette; built-in commands: toggle theme, zoom to 100%/fit, export BPMN XML, zen mode; `addCommands(cmds)` extension point; works with both canvas viewer and editor
+- **`@bpmn-sdk/canvas-plugin-command-palette-editor`** (2026-02-24) — editor extension plugin adding 12 BPMN element creation commands to the palette; requires `@bpmn-sdk/canvas-plugin-command-palette`
+- **`@bpmn-sdk/canvas-plugin-config-panel`** (2026-02-24) — schema-driven property panel; `registerSchema(type, schema, adapter)` for extensible element forms; compact right-rail panel for single-element selection; 65%-wide full overlay with grouped tabs; auto-save on change; in-place value refresh preserves focus
+- **`@bpmn-sdk/canvas-plugin-config-panel-bpmn`** (2026-02-24) — BPMN schemas for all standard element types; full Zeebe REST connector form for service tasks (method, URL, headers, body, auth, output mapping, retries)
 
 ## BPMN Canvas Viewer (2026-02-23) — `@bpmn-sdk/canvas`
 - **Zero-dependency SVG viewer** — renders BPMN diagrams parsed by `@bpmn-sdk/core` with no external runtime deps
