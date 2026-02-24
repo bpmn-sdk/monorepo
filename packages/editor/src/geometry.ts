@@ -147,42 +147,47 @@ export function applyResize(
 
 /**
  * Computes orthogonal (H/V only) waypoints between two shapes.
- * Produces a Z-shaped path: exit right of source → mid-x column → enter left of target.
- * When centers share the same Y, produces a straight horizontal segment.
+ * Picks exit/entry ports based on relative position: prefers L-shaped (one-bend) routes
+ * over Z-shaped (two-bend) routes. For gateways or events below/above the source,
+ * uses the bottom/top port rather than always exiting right.
  */
 export function computeWaypoints(src: BpmnBounds, tgt: BpmnBounds): BpmnWaypoint[] {
-	const srcRight = src.x + src.width;
+	const srcCx = src.x + src.width / 2;
 	const srcCy = src.y + src.height / 2;
-	const tgtLeft = tgt.x;
+	const tgtCx = tgt.x + tgt.width / 2;
 	const tgtCy = tgt.y + tgt.height / 2;
 
-	// Same Y center → straight horizontal
-	if (Math.abs(srcCy - tgtCy) < 2) {
-		return [
-			{ x: srcRight, y: srcCy },
-			{ x: tgtLeft, y: tgtCy },
-		];
+	const dx = tgtCx - srcCx;
+	const dy = tgtCy - srcCy;
+	const absDx = Math.abs(dx);
+	const absDy = Math.abs(dy);
+
+	let srcPort: PortDir;
+	let tgtPort: PortDir;
+
+	if (absDx >= absDy) {
+		// Target is predominantly to the side
+		srcPort = dx >= 0 ? "right" : "left";
+		if (absDy < 2) {
+			// Same height → straight horizontal
+			tgtPort = dx >= 0 ? "left" : "right";
+		} else {
+			// Vertical offset → L-style: enter from top or bottom
+			tgtPort = dy > 0 ? "top" : "bottom";
+		}
+	} else {
+		// Target is predominantly above or below
+		srcPort = dy > 0 ? "bottom" : "top";
+		if (absDx < 2) {
+			// Same X → straight vertical
+			tgtPort = dy > 0 ? "top" : "bottom";
+		} else {
+			// Horizontal offset → L-style: enter from left or right
+			tgtPort = dx > 0 ? "left" : "right";
+		}
 	}
 
-	// Target to the right (normal layout) → Z-shape through midpoint column
-	if (tgtLeft >= srcRight - 20) {
-		const midX = Math.round((srcRight + tgtLeft) / 2);
-		return [
-			{ x: srcRight, y: srcCy },
-			{ x: midX, y: srcCy },
-			{ x: midX, y: tgtCy },
-			{ x: tgtLeft, y: tgtCy },
-		];
-	}
-
-	// Target to the left or overlapping → loop out to the right
-	const loopX = Math.max(srcRight, tgt.x + tgt.width) + 50;
-	return [
-		{ x: srcRight, y: srcCy },
-		{ x: loopX, y: srcCy },
-		{ x: loopX, y: tgtCy },
-		{ x: tgtLeft, y: tgtCy },
-	];
+	return computeWaypointsWithPorts(src, srcPort, tgt, tgtPort);
 }
 
 // ── Label position ────────────────────────────────────────────────────────────

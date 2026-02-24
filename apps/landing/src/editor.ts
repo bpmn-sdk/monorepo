@@ -67,7 +67,7 @@ const paletteEditor = createCommandPaletteEditorPlugin(palette, (tool) => {
 const editor = new BpmnEditor({
 	container: editorContainer,
 	xml: SAMPLE_XML,
-	theme: "dark",
+	theme: "light",
 	grid: true,
 	fit: "center",
 	plugins: [

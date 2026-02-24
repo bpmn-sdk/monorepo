@@ -17,7 +17,7 @@ import type {
 	Theme,
 } from "@bpmn-sdk/canvas";
 import { Bpmn } from "@bpmn-sdk/core";
-import type { BpmnDefinitions } from "@bpmn-sdk/core";
+import type { BpmnBounds, BpmnDefinitions } from "@bpmn-sdk/core";
 import { CommandStack } from "./command-stack.js";
 import { injectEditorStyles } from "./css.js";
 import {
@@ -122,6 +122,8 @@ export class BpmnEditor {
 	private _snapDelta: { dx: number; dy: number } | null = null;
 	private _selectedEdgeId: string | null = null;
 	private _edgeDropTarget: string | null = null;
+	private _ghostSnapCenter: DiagPoint | null = null;
+	private _createEdgeDropTarget: string | null = null;
 
 	// ── Events ─────────────────────────────────────────────────────────
 	private readonly _listeners = new Map<string, Set<(...args: unknown[]) => void>>();
@@ -205,7 +207,15 @@ export class BpmnEditor {
 			},
 			previewConnect: (ghostEnd) => {
 				const src = this._connectSourceBounds();
-				if (src) this._overlay.setGhostConnection(src, ghostEnd);
+				if (src) {
+					const wps = computeWaypoints(src, {
+						x: ghostEnd.x - 1,
+						y: ghostEnd.y - 1,
+						width: 2,
+						height: 2,
+					});
+					this._overlay.setGhostConnection(wps);
+				}
 			},
 			cancelConnect: () => this._overlay.setGhostConnection(null),
 			commitConnect: (srcId, tgtId) => {
@@ -321,6 +331,10 @@ export class BpmnEditor {
 	}
 
 	setTool(tool: Tool): void {
+		this._overlay.setGhostCreate(null);
+		this._overlay.setAlignmentGuides([]);
+		this._setCreateEdgeDropHighlight(null);
+		this._ghostSnapCenter = null;
 		if (tool === "select") {
 			this._stateMachine.setMode({ mode: "select", sub: { name: "idle", hoveredId: null } });
 		} else if (tool === "pan") {
@@ -625,13 +639,22 @@ export class BpmnEditor {
 	}
 
 	private _doCreate(type: CreateShapeType, diagPoint: DiagPoint): void {
+		this._overlay.setGhostCreate(null);
+		this._overlay.setAlignmentGuides([]);
+		const actualCenter = this._ghostSnapCenter ?? diagPoint;
+		this._ghostSnapCenter = null;
+		const edgeDropId = this._createEdgeDropTarget;
+		this._setCreateEdgeDropHighlight(null);
 		if (!this._defs) return;
-		const bounds = defaultBounds(type, diagPoint.x, diagPoint.y);
+		const bounds = defaultBounds(type, actualCenter.x, actualCenter.y);
 		const result = createShape(this._defs, type, bounds);
 		this._selectedIds = [result.id];
-		this._commandStack.push(result.defs);
-		this._renderDefs(result.defs);
-		this._emit("diagram:change", result.defs);
+		const finalDefs = edgeDropId
+			? insertShapeOnEdge(result.defs, edgeDropId, result.id)
+			: result.defs;
+		this._commandStack.push(finalDefs);
+		this._renderDefs(finalDefs);
+		this._emit("diagram:change", finalDefs);
 		this._emit("editor:select", [result.id]);
 	}
 
@@ -923,7 +946,7 @@ export class BpmnEditor {
 		const selectedSet = new Set(this._selectedIds);
 		const movingShapes = this._shapes.filter((s) => selectedSet.has(s.id));
 		const staticShapes = this._shapes.filter((s) => !selectedSet.has(s.id));
-		if (movingShapes.length === 0 || staticShapes.length === 0) return { dx, dy };
+		if (movingShapes.length === 0) return { dx, dy };
 
 		const scale = this._viewport.state.scale;
 		const threshold = 8 / scale;
@@ -939,6 +962,12 @@ export class BpmnEditor {
 		const staticXVals: number[] = [];
 		const staticYVals: number[] = [];
 		for (const s of staticShapes) {
+			const b = s.shape.bounds;
+			staticXVals.push(b.x, b.x + b.width / 2, b.x + b.width);
+			staticYVals.push(b.y, b.y + b.height / 2, b.y + b.height);
+		}
+		// Include original positions of moving shapes as virtual snap targets
+		for (const s of movingShapes) {
 			const b = s.shape.bounds;
 			staticXVals.push(b.x, b.x + b.width / 2, b.x + b.width);
 			staticYVals.push(b.y, b.y + b.height / 2, b.y + b.height);
@@ -979,17 +1008,19 @@ export class BpmnEditor {
 		const selectedSet = new Set(this._selectedIds);
 		const movingShapes = this._shapes.filter((s) => selectedSet.has(s.id));
 		const staticShapes = this._shapes.filter((s) => !selectedSet.has(s.id));
-		if (movingShapes.length === 0 || staticShapes.length === 0) return [];
+		if (movingShapes.length === 0) return [];
 
 		const guides: Array<{ x1: number; y1: number; x2: number; y2: number }> = [];
 		const EXT = 2000;
+		// Include original positions of moving shapes as virtual reference points
+		const allStaticRef = [...staticShapes, ...movingShapes];
 
 		for (const ms of movingShapes) {
 			const mb = ms.shape.bounds;
 			const mxVals = [mb.x + dx, mb.x + dx + mb.width / 2, mb.x + dx + mb.width];
 			const myVals = [mb.y + dy, mb.y + dy + mb.height / 2, mb.y + dy + mb.height];
 
-			for (const ss of staticShapes) {
+			for (const ss of allStaticRef) {
 				const sb = ss.shape.bounds;
 				const sxVals = [sb.x, sb.x + sb.width / 2, sb.x + sb.width];
 				const syVals = [sb.y, sb.y + sb.height / 2, sb.y + sb.height];
@@ -1014,6 +1045,116 @@ export class BpmnEditor {
 		return guides;
 	}
 
+	// ── Create-mode helpers ────────────────────────────────────────────
+
+	private _computeCreateSnap(bounds: BpmnBounds): BpmnBounds {
+		if (this._shapes.length === 0) return bounds;
+		const scale = this._viewport.state.scale;
+		const threshold = 8 / scale;
+
+		const bxVals = [bounds.x, bounds.x + bounds.width / 2, bounds.x + bounds.width];
+		const byVals = [bounds.y, bounds.y + bounds.height / 2, bounds.y + bounds.height];
+
+		const sxVals: number[] = [];
+		const syVals: number[] = [];
+		for (const s of this._shapes) {
+			const b = s.shape.bounds;
+			sxVals.push(b.x, b.x + b.width / 2, b.x + b.width);
+			syVals.push(b.y, b.y + b.height / 2, b.y + b.height);
+		}
+
+		let bestDx = 0;
+		let bestDy = 0;
+		let minDistX = threshold;
+		let minDistY = threshold;
+
+		for (const bx of bxVals) {
+			for (const sx of sxVals) {
+				const dist = Math.abs(bx - sx);
+				if (dist < minDistX) {
+					minDistX = dist;
+					bestDx = sx - bx;
+				}
+			}
+		}
+		for (const by of byVals) {
+			for (const sy of syVals) {
+				const dist = Math.abs(by - sy);
+				if (dist < minDistY) {
+					minDistY = dist;
+					bestDy = sy - by;
+				}
+			}
+		}
+
+		return { ...bounds, x: bounds.x + bestDx, y: bounds.y + bestDy };
+	}
+
+	private _computeCreateGuides(
+		bounds: BpmnBounds,
+	): Array<{ x1: number; y1: number; x2: number; y2: number }> {
+		const guides: Array<{ x1: number; y1: number; x2: number; y2: number }> = [];
+		const EXT = 2000;
+		const bxVals = [bounds.x, bounds.x + bounds.width / 2, bounds.x + bounds.width];
+		const byVals = [bounds.y, bounds.y + bounds.height / 2, bounds.y + bounds.height];
+
+		for (const s of this._shapes) {
+			const sb = s.shape.bounds;
+			const sxVals = [sb.x, sb.x + sb.width / 2, sb.x + sb.width];
+			const syVals = [sb.y, sb.y + sb.height / 2, sb.y + sb.height];
+			for (const bx of bxVals) {
+				for (const sx of sxVals) {
+					if (Math.abs(bx - sx) < 1) guides.push({ x1: bx, y1: -EXT, x2: bx, y2: EXT });
+				}
+			}
+			for (const by of byVals) {
+				for (const sy of syVals) {
+					if (Math.abs(by - sy) < 1) guides.push({ x1: -EXT, y1: by, x2: EXT, y2: by });
+				}
+			}
+		}
+
+		return guides;
+	}
+
+	private _findCreateEdgeDrop(bounds: BpmnBounds): string | null {
+		if (!this._defs) return null;
+		const cx = bounds.x + bounds.width / 2;
+		const cy = bounds.y + bounds.height / 2;
+		const process = this._defs.processes[0];
+		if (!process) return null;
+		const TOLERANCE = 20;
+		for (const edge of this._edges) {
+			const flow = process.sequenceFlows.find((sf) => sf.id === edge.id);
+			if (!flow) continue;
+			const wps = edge.edge.waypoints;
+			for (let i = 0; i < wps.length - 1; i++) {
+				const a = wps[i];
+				const b = wps[i + 1];
+				if (!a || !b) continue;
+				const minX = Math.min(a.x, b.x) - TOLERANCE;
+				const maxX = Math.max(a.x, b.x) + TOLERANCE;
+				const minY = Math.min(a.y, b.y) - TOLERANCE;
+				const maxY = Math.max(a.y, b.y) + TOLERANCE;
+				if (cx >= minX && cx <= maxX && cy >= minY && cy <= maxY) return edge.id;
+			}
+		}
+		return null;
+	}
+
+	private _setCreateEdgeDropHighlight(edgeId: string | null): void {
+		if (this._createEdgeDropTarget === edgeId) return;
+		if (this._createEdgeDropTarget) {
+			const prev = this._edges.find((e) => e.id === this._createEdgeDropTarget);
+			prev?.element.classList.remove("bpmn-edge-split-highlight");
+		}
+		this._createEdgeDropTarget = edgeId;
+		if (edgeId) {
+			const edge = this._edges.find((e) => e.id === edgeId);
+			edge?.element.classList.add("bpmn-edge-split-highlight");
+		}
+	}
+
 	// ── Pointer event handlers ─────────────────────────────────────────
 
 	private readonly _onPointerDown = (e: PointerEvent): void => {
@@ -1029,6 +1170,19 @@ export class BpmnEditor {
 		const diag = screenToDiagram(e.clientX, e.clientY, this._viewport.state, rect);
 		const hit = this._hitTest(e.clientX, e.clientY);
 		this._stateMachine.onPointerMove(e, diag, hit);
+		const mode = this._stateMachine.mode;
+		if (mode.mode === "create") {
+			const rawBounds = defaultBounds(mode.elementType, diag.x, diag.y);
+			const snapped = this._computeCreateSnap(rawBounds);
+			const snappedCenter: DiagPoint = {
+				x: snapped.x + snapped.width / 2,
+				y: snapped.y + snapped.height / 2,
+			};
+			this._ghostSnapCenter = snappedCenter;
+			this._overlay.setGhostCreate(mode.elementType, snappedCenter);
+			this._overlay.setAlignmentGuides(this._computeCreateGuides(snapped));
+			this._setCreateEdgeDropHighlight(this._findCreateEdgeDrop(snapped));
+		}
 	};
 
 	private readonly _onPointerUp = (e: PointerEvent): void => {

@@ -2,6 +2,51 @@
 
 ## 2026-02-24
 
+### Editor improvements (round 2)
+
+#### Ghost preview: edge-drop highlight during create
+- When the ghost element's center hovers over an existing sequence flow, the edge changes to the split-highlight color (indicating the element will be inserted into that edge on click)
+- New `_findCreateEdgeDrop(bounds)` method — same proximity check as the drag-move edge drop
+- New `_setCreateEdgeDropHighlight(edgeId)` method — uses existing `.bpmn-edge-split-highlight` CSS class
+- `_doCreate` uses `insertShapeOnEdge` when a target edge is highlighted, same as drag-move commit
+
+#### Ghost preview + move: magnet alignment guides
+- Create mode: ghost element snaps to alignment guides from existing shapes before placement
+  - New `_computeCreateSnap(bounds)` — finds closest alignment in x/y within 8/scale px threshold
+  - New `_computeCreateGuides(bounds)` — generates alignment guide lines at matched coordinates
+  - `_ghostSnapCenter` stores the snapped center; `_doCreate` uses it as the actual placement point
+- Regular move: alignment guides now also compare against the dragging element's **original position** (virtual ghost)
+  - `_computeSnap` and `_computeAlignGuides` add original bounds of moving shapes to the static reference set
+  - A guide appears when the element aligns with where it started, letting users precisely return to the original spot
+
+#### New connections: L-style routing (one bend instead of two)
+- `computeWaypoints` in `geometry.ts` rewritten to pick ports based on relative direction instead of always exiting right/entering left
+- `absDx >= absDy`: exits right/left, enters top/bottom (L-shape) unless same height (straight)
+- `absDy > absDx`: exits bottom/top, enters left/right (L-shape) unless same X (straight vertical)
+- Gateways below/above the source automatically use the bottom/top port instead of the right port
+- Affects new connections, contextual toolbar "add connected element", edge-split insertion, and connection preview
+
+### Editor improvements
+
+#### Ghost/preview on element creation
+- When a create tool is active (e.g. `create:serviceTask`), moving the mouse now shows a translucent shape preview following the cursor
+- Implemented by calling `overlay.setGhostCreate(mode.elementType, diag)` in `_onPointerMove` whenever the state machine is in create mode
+- Ghost is cleared on commit (`_doCreate`) and on cancel/tool-switch (`setTool`)
+- Escape key already cancelled create mode; ghost now also disappears on Escape
+
+#### Orthogonal connection preview
+- The connection ghost line during arrow drawing is now orthogonal (H/V/L/Z segments) instead of a diagonal straight line
+- `overlay.setGhostConnection()` signature changed from `(src: BpmnBounds, end: DiagPoint)` to `(waypoints: BpmnWaypoint[] | null)` — rendered as a `<polyline>` matching committed edge style
+- `previewConnect` callback in `editor.ts` computes waypoints via `computeWaypoints(src, cursor)` before passing to overlay
+
+#### Fix: arrow source port preserved when target is moved
+- **Bug**: manually re-routing an arrow's source endpoint would snap back when the target element was moved
+- **Cause**: `moveShapes` in `modeling.ts` called `computeWaypoints` (always exits right, enters left) when one endpoint moved, discarding user-set ports
+- **Fix**: derive ports from pre-move waypoints using `portFromWaypoint`, then call `computeWaypointsWithPorts` to preserve the user's chosen exit/entry direction while recomputing the route geometry
+
+#### Default theme changed to light
+- `apps/landing/src/editor.ts`: `theme: "dark"` → `theme: "light"`
+
 ### Refactor: move editor HUD logic to `@bpmn-sdk/editor`
 - Extracted all HUD code (~600 lines) from `apps/landing/src/editor.ts` into `packages/editor`
 - New `packages/editor/src/icons.ts` — `IC` SVG icon object (internal, not re-exported from index)

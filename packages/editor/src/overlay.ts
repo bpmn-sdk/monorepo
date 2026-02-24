@@ -171,23 +171,17 @@ export class OverlayRenderer {
 
 	// ── Ghost connection ───────────────────────────────────────────────
 
-	setGhostConnection(src: BpmnBounds | null, end?: DiagPoint): void {
+	setGhostConnection(waypoints: BpmnWaypoint[] | null): void {
 		this._ghostConnG.innerHTML = "";
-		if (!src || !end) return;
-
-		const srcCx = src.x + src.width / 2;
-		const srcCy = src.y + src.height / 2;
-
-		const line = svgEl("line");
-		attr(line, {
+		if (!waypoints || waypoints.length < 2) return;
+		const points = waypoints.map((wp) => `${wp.x},${wp.y}`).join(" ");
+		const poly = svgEl("polyline");
+		attr(poly, {
 			class: "bpmn-ghost-conn",
-			x1: srcCx,
-			y1: srcCy,
-			x2: end.x,
-			y2: end.y,
+			points,
 			"marker-end": `url(#${this._markerId})`,
 		});
-		this._ghostConnG.appendChild(line);
+		this._ghostConnG.appendChild(poly);
 	}
 
 	// ── Edge endpoint balls ────────────────────────────────────────────
