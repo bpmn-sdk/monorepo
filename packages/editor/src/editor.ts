@@ -77,6 +77,8 @@ function defaultBounds(
 			return { x: cx - 18, y: cy - 18, width: 36, height: 36 };
 		case "exclusiveGateway":
 		case "parallelGateway":
+		case "inclusiveGateway":
+		case "eventBasedGateway":
 			return { x: cx - 25, y: cy - 25, width: 50, height: 50 };
 		default:
 			return { x: cx - 50, y: cy - 40, width: 100, height: 80 };

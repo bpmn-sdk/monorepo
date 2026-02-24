@@ -79,10 +79,20 @@ function makeFlowElement(type: CreateShapeType, id: string, name?: string): Bpmn
 			return { ...base, type: "userTask" };
 		case "scriptTask":
 			return { ...base, type: "scriptTask" };
+		case "sendTask":
+			return { ...base, type: "sendTask" };
+		case "receiveTask":
+			return { ...base, type: "receiveTask" };
+		case "businessRuleTask":
+			return { ...base, type: "businessRuleTask" };
 		case "exclusiveGateway":
 			return { ...base, type: "exclusiveGateway" };
 		case "parallelGateway":
 			return { ...base, type: "parallelGateway" };
+		case "inclusiveGateway":
+			return { ...base, type: "inclusiveGateway" };
+		case "eventBasedGateway":
+			return { ...base, type: "eventBasedGateway" };
 	}
 }
 
@@ -550,11 +560,26 @@ export function changeElementType(
 		case "scriptTask":
 			newEl = { ...base, type: "scriptTask" };
 			break;
+		case "sendTask":
+			newEl = { ...base, type: "sendTask" };
+			break;
+		case "receiveTask":
+			newEl = { ...base, type: "receiveTask" };
+			break;
+		case "businessRuleTask":
+			newEl = { ...base, type: "businessRuleTask" };
+			break;
 		case "exclusiveGateway":
 			newEl = { ...base, type: "exclusiveGateway" };
 			break;
 		case "parallelGateway":
 			newEl = { ...base, type: "parallelGateway" };
+			break;
+		case "inclusiveGateway":
+			newEl = { ...base, type: "inclusiveGateway" };
+			break;
+		case "eventBasedGateway":
+			newEl = { ...base, type: "eventBasedGateway" };
 			break;
 	}
 

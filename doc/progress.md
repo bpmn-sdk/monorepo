@@ -1,5 +1,16 @@
 # Progress
 
+## 2026-02-24
+
+### Editor toolbar — standard BPMN groups, icons, long-press picker
+- **Undo/redo icons** fixed: replaced confusing arc-based icons with clean U-shaped curved-arrow icons (polyline arrowhead + D-shaped arc body), matching standard design-tool conventions
+- **Bottom toolbar redesigned**: replaced individual element buttons with one button per BPMN group (Events, Activities, Gateways); clicking uses the last-selected element type; holding 500ms opens a horizontal group picker showing all element types in that group
+- **Group picker**: floating panel appears above the button; selecting an element type sets it as the group default and activates the create tool
+- **Extended `CreateShapeType`**: added `sendTask`, `receiveTask`, `businessRuleTask`, `inclusiveGateway`, `eventBasedGateway`; all wired in `makeFlowElement`, `changeElementType`, `defaultBounds`, and `RESIZABLE_TYPES`
+- **Standard BPMN icons**: all toolbar icons follow BPMN 2.0 notation — events as circles (thin=start, thick=end), activities as rounded rectangles with type markers (gear/person/lines/filled-envelope/outlined-envelope/grid), gateways as diamonds with type markers (X/+/O/double-circle)
+- **Configure bar (above element)** now shows all element types in the same BPMN group, using the same full group switcher; previously only showed 2–3 hardcoded options
+- **`EXTERNAL_LABEL_TYPES`** extended to include `inclusiveGateway` and `eventBasedGateway`
+
 ## 2026-02-23 (6)
 
 ### `@bpmn-sdk/editor` — Configure bar, edge split, label fix, scriptTask

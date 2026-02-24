@@ -7,14 +7,22 @@ export type CreateShapeType =
 	| "serviceTask"
 	| "userTask"
 	| "scriptTask"
+	| "sendTask"
+	| "receiveTask"
+	| "businessRuleTask"
 	| "exclusiveGateway"
-	| "parallelGateway";
+	| "parallelGateway"
+	| "inclusiveGateway"
+	| "eventBasedGateway";
 
 /** Element types that support resize handles. */
 export const RESIZABLE_TYPES: ReadonlySet<string> = new Set([
 	"serviceTask",
 	"userTask",
 	"scriptTask",
+	"sendTask",
+	"receiveTask",
+	"businessRuleTask",
 ]);
 
 export type Tool = "select" | "pan" | `create:${CreateShapeType}`;

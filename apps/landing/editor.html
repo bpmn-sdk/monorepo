@@ -53,6 +53,18 @@
       .hud-btn:disabled:hover { background: transparent; color: rgba(255,255,255,0.65); }
       .hud-btn svg { width: 16px; height: 16px; pointer-events: none; }
 
+      /* ── Group button: small chevron at bottom-right corner ────────────── */
+      .hud-btn[data-group] { position: relative; }
+      .hud-btn[data-group]::after {
+        content: '';
+        position: absolute;
+        bottom: 3px; right: 3px;
+        width: 0; height: 0;
+        border-left: 3px solid transparent;
+        border-top: 3px solid currentColor;
+        opacity: 0.55;
+      }
+
       /* ── Separator ─────────────────────────────────────────────────────── */
       .hud-sep { width: 1px; height: 20px; background: rgba(255,255,255,0.1); margin: 0 2px; flex-shrink: 0; }
 
@@ -113,6 +125,27 @@
         font-size: 10px; font-weight: 600; letter-spacing: 0.06em;
         color: rgba(255,255,255,0.3); text-transform: uppercase;
       }
+
+      /* ── Group element picker (horizontal, appears above group button) ── */
+      .group-picker {
+        position: fixed;
+        display: flex; flex-direction: row;
+        gap: 2px; padding: 4px;
+        background: rgba(20, 20, 28, 0.96);
+        backdrop-filter: blur(12px);
+        border: 1px solid rgba(255,255,255,0.1);
+        border-radius: 9px;
+        box-shadow: 0 6px 24px rgba(0,0,0,0.5);
+        z-index: 300;
+      }
+      .group-picker-label {
+        padding: 2px 6px 4px;
+        font-size: 10px; font-weight: 600; letter-spacing: 0.05em;
+        color: rgba(255,255,255,0.3); text-transform: uppercase;
+        white-space: nowrap; align-self: center;
+        border-right: 1px solid rgba(255,255,255,0.08);
+        margin-right: 2px;
+      }
     </style>
   </head>
   <body>
@@ -140,17 +173,12 @@
       </div>
     </div>
 
-    <!-- Bottom center: tool bar -->
+    <!-- Bottom center: tool bar (select/pan static, element groups built by JS) -->
     <div id="hud-bottom-center" class="hud panel">
-      <button class="hud-btn active" data-tool="select"                 title="Select (V)"></button>
-      <button class="hud-btn"        data-tool="pan"                    title="Hand (H)"></button>
+      <button id="btn-select" class="hud-btn active" title="Select (V)"></button>
+      <button id="btn-pan"    class="hud-btn"        title="Hand (H)"></button>
       <div class="hud-sep"></div>
-      <button class="hud-btn"        data-tool="create:startEvent"      title="Start Event"></button>
-      <button class="hud-btn"        data-tool="create:endEvent"        title="End Event"></button>
-      <button class="hud-btn"        data-tool="create:serviceTask"     title="Service Task"></button>
-      <button class="hud-btn"        data-tool="create:userTask"        title="User Task"></button>
-      <button class="hud-btn"        data-tool="create:exclusiveGateway" title="Exclusive Gateway"></button>
-      <button class="hud-btn"        data-tool="create:parallelGateway"  title="Parallel Gateway"></button>
+      <div id="tool-groups" style="display:flex;align-items:center;gap:2px;"></div>
     </div>
 
     <!-- Configure toolbar (above selected element) -->

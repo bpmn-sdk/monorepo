@@ -1,9 +1,10 @@
 # Features
 
 ## BPMN Diagram Editor (2026-02-23) — `@bpmn-sdk/editor`
-- **Full diagram editing** — create, move, resize, connect, delete, label-edit, undo/redo, copy/paste; type switching (task/gateway subtypes)
+- **Full diagram editing** — create, move, resize, connect, delete, label-edit, undo/redo, copy/paste; type switching within BPMN groups
 - **Edge split on drop** — drag a shape over a sequence flow to highlight it (green); release to insert the shape between source and target, splitting the edge
-- **Configure bar (above element)** — type switcher for tasks and gateways; label position picker for events and gateways; positioned above the selected shape
+- **Configure bar (above element)** — shows all element types in the same BPMN group for quick type switching; label position picker for events and gateways
+- **Group toolbar** — bottom toolbar shows one button per BPMN group (Events, Activities, Gateways); click to use last-selected type; long-press (500ms) opens a horizontal picker with all types in the group; standard BPMN notation icons throughout
 - **`changeElementType(id, newType)`** — changes a flow element's type while preserving id, name, and connections
 - **Orthogonal edges** — all sequence flows rendered as H/V-only Z-shaped paths; routes recomputed on shape move; endpoint repositioning via drag
 - **Edge endpoint repositioning** — click edge to select; drag start/end balls to reposition on source/target port (top/right/bottom/left); route recomputed via port-aware orthogonal routing
