@@ -362,6 +362,8 @@ export class BpmnCanvas {
 			setViewport: (s) => this._viewport.set(s),
 			getShapes: () => [...this._shapes],
 			getEdges: () => [...this._edges],
+			getTheme: () => this._theme,
+			setTheme: (theme) => this.setTheme(theme),
 			on: (event, handler) => this.on(event, handler),
 			emit: (event, ...args) => this._emit(event, ...args),
 		};

@@ -1,4 +1,5 @@
 import type { ViewportState } from "@bpmn-sdk/canvas";
+import { createMainMenuPlugin } from "@bpmn-sdk/canvas-plugin-main-menu";
 import { createZoomControlsPlugin } from "@bpmn-sdk/canvas-plugin-zoom-controls";
 import { BpmnEditor } from "@bpmn-sdk/editor";
 import type { CreateShapeType, LabelPosition, Tool } from "@bpmn-sdk/editor";
@@ -19,13 +20,8 @@ const IC = {
 	trash: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="3" y1="4" x2="13" y2="4"/><path d="M5.5 4V2.5h5V4M5 4l.5 9.5h5.1L11 4"/><line x1="6.5" y1="7" x2="6.5" y2="11.5"/><line x1="9.5" y1="7" x2="9.5" y2="11.5"/></svg>`,
 	duplicate: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><rect x="5.5" y="5.5" width="8" height="8" rx="1.5"/><path d="M4 10.5V3.5A1.5 1.5 0 0 1 5.5 2H12"/></svg>`,
 	dots: `<svg viewBox="0 0 16 16" fill="currentColor"><circle cx="3.5" cy="8" r="1.3"/><circle cx="8" cy="8" r="1.3"/><circle cx="12.5" cy="8" r="1.3"/></svg>`,
-	fit: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2.5 6V2.5H6M10 2.5h3.5V6M13.5 10v3.5H10M6 13.5H2.5V10"/></svg>`,
 	zoomIn: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="8" y1="3" x2="8" y2="13"/><line x1="3" y1="8" x2="13" y2="8"/></svg>`,
 	zoomOut: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="3" y1="8" x2="13" y2="8"/></svg>`,
-	check: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="2.5,8 6,11.5 13.5,4.5"/></svg>`,
-	moon: `<svg viewBox="0 0 16 16" fill="currentColor"><path d="M13 9.5a6 6 0 1 1-7.5-7.5 7 7 0 0 0 7.5 7.5z"/></svg>`,
-	sun: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="8" cy="8" r="2.8"/><line x1="8" y1="1.5" x2="8" y2="3"/><line x1="8" y1="13" x2="8" y2="14.5"/><line x1="1.5" y1="8" x2="3" y2="8"/><line x1="13" y1="8" x2="14.5" y2="8"/><line x1="3.3" y1="3.3" x2="4.4" y2="4.4"/><line x1="11.6" y1="11.6" x2="12.7" y2="12.7"/><line x1="3.3" y1="12.7" x2="4.4" y2="11.6"/><line x1="11.6" y1="4.4" x2="12.7" y2="3.3"/></svg>`,
-	auto: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="8" cy="8" r="5.5"/><path d="M8 8V3.5"/><path d="M8 8l3.2 2"/></svg>`,
 	arrow: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="2" y1="8" x2="11" y2="8"/><polyline points="8,5 12,8 8,11"/></svg>`,
 	labelPos: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="8" cy="8" r="1.5" fill="currentColor" stroke="none"/><line x1="8" y1="2" x2="8" y2="5.5"/><line x1="8" y1="10.5" x2="8" y2="14"/><line x1="2" y1="8" x2="5.5" y2="8"/><line x1="10.5" y1="8" x2="14" y2="8"/></svg>`,
 	scriptTask: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="0.5" width="10" height="13" rx="1"/><path d="M4 4h6M4 7h6M4 10h4" stroke-linecap="round"/></svg>`,
@@ -78,8 +74,6 @@ const SAMPLE_XML = `<?xml version="1.0" encoding="UTF-8"?>
 
 // ── Editor init ───────────────────────────────────────────────────────────────
 
-type Theme = "light" | "dark" | "auto";
-let currentTheme: Theme = "dark";
 let currentScale = 1;
 let selectedIds: string[] = [];
 let ctxSourceId: string | null = null;
@@ -90,10 +84,10 @@ if (!editorContainer) throw new Error("missing #editor-container");
 const editor = new BpmnEditor({
 	container: editorContainer,
 	xml: SAMPLE_XML,
-	theme: currentTheme,
+	theme: "dark",
 	grid: true,
 	fit: "center",
-	plugins: [createZoomControlsPlugin()],
+	plugins: [createMainMenuPlugin({ title: "BPMN SDK" }), createZoomControlsPlugin()],
 });
 
 // ── DOM refs ──────────────────────────────────────────────────────────────────
@@ -103,7 +97,6 @@ const btnRedo = document.getElementById("btn-redo") as HTMLButtonElement;
 const btnDelete = document.getElementById("btn-delete") as HTMLButtonElement;
 const btnDuplicate = document.getElementById("btn-duplicate") as HTMLButtonElement;
 const btnTopMore = document.getElementById("btn-top-more") as HTMLButtonElement;
-const btnMenu = document.getElementById("btn-menu") as HTMLButtonElement;
 const btnZoomCurrent = document.getElementById("btn-zoom-current") as HTMLButtonElement;
 const btnZoomOut = document.getElementById("btn-zoom-out") as HTMLButtonElement;
 const btnZoomPct = document.getElementById("btn-zoom-pct") as HTMLButtonElement;
@@ -111,7 +104,6 @@ const btnZoomIn = document.getElementById("btn-zoom-in") as HTMLButtonElement;
 const zoomExpanded = document.getElementById("zoom-expanded") as HTMLDivElement;
 const cfgToolbar = document.getElementById("cfg-toolbar") as HTMLDivElement;
 const ctxToolbar = document.getElementById("ctx-toolbar") as HTMLDivElement;
-const mainMenuEl = document.getElementById("main-menu") as HTMLDivElement;
 const zoomMenuEl = document.getElementById("zoom-menu") as HTMLDivElement;
 const moreMenuEl = document.getElementById("more-menu") as HTMLDivElement;
 const labelPosMenuEl = document.getElementById("label-pos-menu") as HTMLDivElement;
@@ -139,7 +131,6 @@ btnRedo.innerHTML = IC.redo;
 btnDelete.innerHTML = IC.trash;
 btnDuplicate.innerHTML = IC.duplicate;
 btnTopMore.innerHTML = IC.dots;
-btnMenu.innerHTML = IC.dots;
 btnZoomOut.innerHTML = IC.zoomOut;
 btnZoomIn.innerHTML = IC.zoomIn;
 
@@ -238,57 +229,6 @@ function buildZoomMenu(): void {
 	}
 }
 
-// ── Main menu ─────────────────────────────────────────────────────────────────
-
-function buildMainMenu(): void {
-	mainMenuEl.innerHTML = "";
-
-	const label = document.createElement("div");
-	label.className = "drop-label";
-	label.textContent = "Theme";
-	mainMenuEl.appendChild(label);
-
-	const themes: Array<{ value: Theme; label: string; icon: string }> = [
-		{ value: "dark", label: "Dark", icon: IC.moon },
-		{ value: "light", label: "Light", icon: IC.sun },
-		{ value: "auto", label: "System", icon: IC.auto },
-	];
-
-	for (const t of themes) {
-		const btn = document.createElement("button");
-		btn.className = "drop-item";
-		const isActive = t.value === currentTheme;
-		btn.innerHTML = `<span class="di-check">${isActive ? IC.check : ""}</span><span class="di-icon">${t.icon}</span><span>${t.label}</span>`;
-		btn.addEventListener("click", () => {
-			currentTheme = t.value;
-			editor.setTheme(t.value);
-			buildMainMenu();
-		});
-		mainMenuEl.appendChild(btn);
-	}
-
-	const sep = document.createElement("div");
-	sep.className = "drop-sep";
-	mainMenuEl.appendChild(sep);
-
-	const fitBtn = document.createElement("button");
-	fitBtn.className = "drop-item";
-	fitBtn.innerHTML = `<span class="di-check"></span><span class="di-icon">${IC.fit}</span><span>Fit diagram</span>`;
-	fitBtn.addEventListener("click", () => {
-		editor.fitView();
-		closeAllDropdowns();
-	});
-	mainMenuEl.appendChild(fitBtn);
-}
-
-buildMainMenu();
-
-btnMenu.addEventListener("click", (e) => {
-	e.stopPropagation();
-	buildMainMenu();
-	showDropdown(mainMenuEl, btnMenu, "right");
-});
-
 // ── More actions menu ─────────────────────────────────────────────────────────
 
 function buildMoreMenu(): void {
@@ -299,14 +239,6 @@ function buildMoreMenu(): void {
 			IC.select,
 			() => {
 				editor.selectAll();
-				closeAllDropdowns();
-			},
-		],
-		[
-			"Fit diagram",
-			IC.fit,
-			() => {
-				editor.fitView();
 				closeAllDropdowns();
 			},
 		],

@@ -132,6 +132,12 @@ export interface CanvasApi {
 	/** Returns all currently rendered edges. */
 	getEdges(): RenderedEdge[];
 
+	/** Returns the current color theme. */
+	getTheme(): Theme;
+
+	/** Sets the color theme. Pass `"auto"` to follow the OS preference. */
+	setTheme(theme: Theme): void;
+
 	/**
 	 * Subscribes to a canvas event. Returns an unsubscribe function.
 	 *

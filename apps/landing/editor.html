@@ -30,7 +30,6 @@
 
       /* ── HUD positions ─────────────────────────────────────────────────── */
       #hud-top-center { top: 10px; left: 50%; transform: translateX(-50%); }
-      #hud-top-right  { top: 10px; right: 10px; align-items: center; }
       #hud-bottom-left   { bottom: 10px; left: 10px; }
       #hud-bottom-center { bottom: 10px; left: 50%; transform: translateX(-50%); }
       #ctx-toolbar { display: none; transform: translateX(-50%); }
@@ -56,13 +55,6 @@
 
       /* ── Separator ─────────────────────────────────────────────────────── */
       .hud-sep { width: 1px; height: 20px; background: rgba(255,255,255,0.1); margin: 0 2px; flex-shrink: 0; }
-
-      /* ── Logo ──────────────────────────────────────────────────────────── */
-      #logo-text {
-        padding: 0 6px 0 8px;
-        font-weight: 700; font-size: 12px; letter-spacing: 0.04em;
-        color: rgba(255,255,255,0.75); white-space: nowrap; user-select: none;
-      }
 
       /* ── Zoom widget ───────────────────────────────────────────────────── */
       #btn-zoom-current {
@@ -138,13 +130,6 @@
       <button id="btn-top-more"  class="hud-btn" title="More actions"></button>
     </div>
 
-    <!-- Top right: logo + main menu -->
-    <div id="hud-top-right" class="hud panel">
-      <span id="logo-text">BPMN SDK</span>
-      <div class="hud-sep"></div>
-      <button id="btn-menu" class="hud-btn" title="Main menu"></button>
-    </div>
-
     <!-- Bottom left: zoom control -->
     <div id="hud-bottom-left" class="hud panel">
       <button id="btn-zoom-current">100%</button>
@@ -175,7 +160,6 @@
     <div id="ctx-toolbar" class="hud panel"></div>
 
     <!-- Dropdown menus -->
-    <div id="main-menu"      class="dropdown"></div>
     <div id="zoom-menu"      class="dropdown"></div>
     <div id="more-menu"      class="dropdown"></div>
     <div id="label-pos-menu" class="dropdown"></div>

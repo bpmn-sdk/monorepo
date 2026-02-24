@@ -51,6 +51,9 @@ importers:
       '@bpmn-sdk/canvas':
         specifier: workspace:*
         version: link:../../packages/canvas
+      '@bpmn-sdk/canvas-plugin-main-menu':
+        specifier: workspace:*
+        version: link:../../canvas-plugins/main-menu
       '@bpmn-sdk/canvas-plugin-minimap':
         specifier: workspace:*
         version: link:../../canvas-plugins/minimap
@@ -60,6 +63,12 @@ importers:
       '@bpmn-sdk/editor':
         specifier: workspace:*
         version: link:../../packages/editor
+
+  canvas-plugins/main-menu:
+    dependencies:
+      '@bpmn-sdk/canvas':
+        specifier: workspace:*
+        version: link:../../packages/canvas
 
   canvas-plugins/minimap:
     dependencies:

@@ -1068,6 +1068,8 @@ export class BpmnEditor {
 			setViewport: (s) => this._viewport.set(s),
 			getShapes: () => [...this._shapes],
 			getEdges: () => [...this._edges],
+			getTheme: () => this._theme,
+			setTheme: (theme) => this.setTheme(theme),
 			on<K extends keyof CanvasEvents>(event: K, handler: CanvasEvents[K]) {
 				return self.on(event as keyof EditorEvents, handler as EditorEvents[keyof EditorEvents]);
 			},

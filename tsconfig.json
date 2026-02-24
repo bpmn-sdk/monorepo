@@ -5,6 +5,7 @@
 		{ "path": "packages/canvas" },
 		{ "path": "packages/editor" },
 		{ "path": "canvas-plugins/minimap" },
-		{ "path": "canvas-plugins/zoom-controls" }
+		{ "path": "canvas-plugins/zoom-controls" },
+		{ "path": "canvas-plugins/main-menu" }
 	]
 }
