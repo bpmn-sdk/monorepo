@@ -2,6 +2,14 @@
 
 ## 2026-02-24
 
+### Config panel fixes (round 2)
+
+- **z-index**: Overlay and compact panel both raised to `z-index: 9999` — always above HUD toolbars
+- **Centering**: When the full panel opens, the selected element is panned to the horizontal/vertical center of the left 35% darkened area (preserving zoom). Closing the panel re-centers the element at the global screen center
+- **Tabs**: Section navigation replaced with proper underline tabs; only one group's content is visible at a time; active tab highlighted in blue; switching tabs is instant (show/hide, no DOM rebuild)
+- **Conditional REST fields**: Service task REST connector groups (Request, Authentication, Output) are now hidden by default and only shown when `taskType === "io.camunda:http-json:1"`; tabs for hidden groups also disappear; if the active tab becomes hidden (e.g. clearing the task type), the first visible tab is auto-activated
+- `GroupSchema.condition?: (values) => boolean` — new optional field to conditionally show/hide groups and their tabs
+
 ### Config panel plugins
 
 Two new canvas plugin packages for schema-driven element property editing:

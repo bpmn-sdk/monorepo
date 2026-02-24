@@ -12,7 +12,7 @@ export const CONFIG_PANEL_CSS = `
   border: 1px solid rgba(255,255,255,0.1);
   border-radius: 10px;
   box-shadow: 0 4px 24px rgba(0,0,0,0.5);
-  z-index: 90;
+  z-index: 9999;
   font-family: system-ui, -apple-system, sans-serif;
   font-size: 12px;
   color: rgba(255,255,255,0.85);
@@ -81,7 +81,7 @@ export const CONFIG_PANEL_CSS = `
 .bpmn-cfg-overlay {
   position: fixed;
   inset: 0;
-  z-index: 95;
+  z-index: 9999;
   pointer-events: none;
 }
 .bpmn-cfg-backdrop {
@@ -157,45 +157,44 @@ export const CONFIG_PANEL_CSS = `
 }
 .bpmn-cfg-full-close:hover { background: rgba(255,255,255,0.08); color: #fff; }
 
-.bpmn-cfg-full-nav {
+/* ── Tabs ─────────────────────────────────────────────────────────────────── */
+.bpmn-cfg-tabs {
   display: flex;
-  align-items: center;
-  gap: 2px;
-  padding: 8px 14px;
-  border-bottom: 1px solid rgba(255,255,255,0.06);
+  align-items: flex-end;
+  gap: 0;
+  padding: 0 14px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
   overflow-x: auto;
   flex-shrink: 0;
   scrollbar-width: none;
 }
-.bpmn-cfg-full-nav::-webkit-scrollbar { display: none; }
+.bpmn-cfg-tabs::-webkit-scrollbar { display: none; }
 
-.bpmn-cfg-nav-btn {
-  padding: 5px 12px;
+.bpmn-cfg-tab-btn {
+  padding: 10px 14px;
   background: none;
   border: none;
-  color: rgba(255,255,255,0.45);
+  border-bottom: 2px solid transparent;
+  color: rgba(255,255,255,0.4);
   cursor: pointer;
   font-size: 12px;
   font-weight: 500;
-  border-radius: 6px;
   white-space: nowrap;
-  transition: background 0.1s, color 0.1s;
+  transition: color 0.1s, border-color 0.1s;
+  margin-bottom: -1px;
 }
-.bpmn-cfg-nav-btn:hover { background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.8); }
-.bpmn-cfg-nav-btn.active { background: rgba(255,255,255,0.1); color: #fff; }
+.bpmn-cfg-tab-btn:hover { color: rgba(255,255,255,0.75); }
+.bpmn-cfg-tab-btn.active { color: #4c8ef7; border-bottom-color: #4c8ef7; }
 
 .bpmn-cfg-full-body {
   flex: 1;
   overflow-y: auto;
-  padding: 0 22px 32px;
+  padding: 22px 22px 32px;
   scrollbar-width: thin;
   scrollbar-color: rgba(255,255,255,0.15) transparent;
 }
 
 /* ── Groups & Fields ──────────────────────────────────────────────────────── */
-.bpmn-cfg-group {
-  padding-top: 22px;
-}
 .bpmn-cfg-group-label {
   font-size: 10px;
   font-weight: 700;

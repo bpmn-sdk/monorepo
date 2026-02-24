@@ -87,11 +87,11 @@ const GENERAL_ADAPTER: PanelAdapter = {
 
 // ── Service task schema ───────────────────────────────────────────────────────
 
+const IS_REST_CONNECTOR = (values: Record<string, FieldValue>) =>
+	values.taskType === "io.camunda:http-json:1";
+
 const SERVICE_TASK_SCHEMA: PanelSchema = {
-	compact: [
-		{ key: "name", label: "Name", type: "text", placeholder: "Task name" },
-		{ key: "url", label: "URL", type: "text", placeholder: "https://api.example.com/…" },
-	],
+	compact: [{ key: "name", label: "Name", type: "text", placeholder: "Task name" }],
 	groups: [
 		{
 			id: "general",
@@ -103,7 +103,7 @@ const SERVICE_TASK_SCHEMA: PanelSchema = {
 					label: "Task type",
 					type: "text",
 					placeholder: "io.camunda:http-json:1",
-					hint: "Zeebe service type. For Camunda REST connector: io.camunda:http-json:1",
+					hint: "Zeebe service type. REST connector: io.camunda:http-json:1",
 				},
 				{ key: "retries", label: "Retries", type: "text", placeholder: "3" },
 				{
@@ -117,6 +117,7 @@ const SERVICE_TASK_SCHEMA: PanelSchema = {
 		{
 			id: "request",
 			label: "Request",
+			condition: IS_REST_CONNECTOR,
 			fields: [
 				{
 					key: "method",
@@ -175,6 +176,7 @@ const SERVICE_TASK_SCHEMA: PanelSchema = {
 		{
 			id: "auth",
 			label: "Authentication",
+			condition: IS_REST_CONNECTOR,
 			fields: [
 				{
 					key: "authType",
@@ -198,6 +200,7 @@ const SERVICE_TASK_SCHEMA: PanelSchema = {
 		{
 			id: "output",
 			label: "Output",
+			condition: IS_REST_CONNECTOR,
 			fields: [
 				{
 					key: "resultVariable",

@@ -1,33 +1,43 @@
-import type { RenderedShape } from "@bpmn-sdk/canvas";
+import type { RenderedShape, ViewportState } from "@bpmn-sdk/canvas";
 import type { BpmnDefinitions } from "@bpmn-sdk/core";
-import type { FieldSchema, FieldValue, PanelAdapter, PanelSchema } from "./types.js";
+import type { FieldSchema, FieldValue, GroupSchema, PanelAdapter, PanelSchema } from "./types.js";
 
 interface Registration {
 	schema: PanelSchema;
 	adapter: PanelAdapter;
 }
 
+type Bounds = { x: number; y: number; width: number; height: number };
+
 export class ConfigPanelRenderer {
 	private readonly _schemas: Map<string, Registration>;
 	private readonly _getDefinitions: () => BpmnDefinitions | null;
 	private readonly _applyChange: (fn: (d: BpmnDefinitions) => BpmnDefinitions) => void;
+	private readonly _getViewport: () => ViewportState;
+	private readonly _setViewport: (state: ViewportState) => void;
 
 	private _compactEl: HTMLElement | null = null;
 	private _overlayEl: HTMLElement | null = null;
 	private _selectedId: string | null = null;
 	private _selectedType: string | null = null;
+	private _selectedBounds: Bounds | null = null;
 	private _elementName = "";
 	private _fullOpen = false;
+	private _activeTabId: string | null = null;
 	private _values: Record<string, FieldValue> = {};
 
 	constructor(
 		schemas: Map<string, Registration>,
 		getDefinitions: () => BpmnDefinitions | null,
 		applyChange: (fn: (d: BpmnDefinitions) => BpmnDefinitions) => void,
+		getViewport: () => ViewportState,
+		setViewport: (state: ViewportState) => void,
 	) {
 		this._schemas = schemas;
 		this._getDefinitions = getDefinitions;
 		this._applyChange = applyChange;
+		this._getViewport = getViewport;
+		this._setViewport = setViewport;
 	}
 
 	onSelect(ids: string[], shapes: RenderedShape[]): void {
@@ -54,6 +64,7 @@ export class ConfigPanelRenderer {
 
 		this._selectedId = id;
 		this._selectedType = elementType;
+		this._selectedBounds = shape?.shape?.bounds ?? null;
 		this._elementName = shape?.flowElement?.name ?? "";
 		this._refreshValues(reg);
 
@@ -70,6 +81,9 @@ export class ConfigPanelRenderer {
 		if (!reg) return;
 		this._values = reg.adapter.read(defs, this._selectedId);
 		this._refreshInputs();
+		if (this._fullOpen) {
+			this._refreshGroupVisibility(reg.schema.groups);
+		}
 	}
 
 	destroy(): void {
@@ -93,13 +107,24 @@ export class ConfigPanelRenderer {
 		this._applyChange((defs) => reg.adapter.write(defs, id, snapshot));
 	}
 
+	private _centerSelected(targetScreenX: number, targetScreenY: number): void {
+		const bounds = this._selectedBounds;
+		if (!bounds) return;
+		const cx = bounds.x + bounds.width / 2;
+		const cy = bounds.y + bounds.height / 2;
+		const { scale } = this._getViewport();
+		this._setViewport({ tx: targetScreenX - cx * scale, ty: targetScreenY - cy * scale, scale });
+	}
+
 	private _close(): void {
 		this._hideCompact();
 		this._hideOverlay();
 		this._selectedId = null;
 		this._selectedType = null;
+		this._selectedBounds = null;
 		this._elementName = "";
 		this._fullOpen = false;
+		this._activeTabId = null;
 		this._values = {};
 	}
 
@@ -130,6 +155,44 @@ export class ConfigPanelRenderer {
 				}
 			}
 		}
+	}
+
+	/** Show/hide tabs and groups based on their conditions. */
+	private _refreshGroupVisibility(groups: GroupSchema[]): void {
+		const overlay = this._overlayEl;
+		if (!overlay) return;
+
+		let activeIsVisible = false;
+		for (const group of groups) {
+			const isVisible = !group.condition || group.condition(this._values);
+			const tabBtn = overlay.querySelector<HTMLElement>(`[data-tab-id="${group.id}"]`);
+			if (tabBtn) tabBtn.style.display = isVisible ? "" : "none";
+			if (group.id === this._activeTabId && isVisible) activeIsVisible = true;
+		}
+
+		// If the active tab just became hidden, switch to the first visible one
+		if (!activeIsVisible) {
+			for (const group of groups) {
+				if (!group.condition || group.condition(this._values)) {
+					this._activateTab(overlay, group.id);
+					break;
+				}
+			}
+		}
+	}
+
+	private _activateTab(overlay: HTMLElement, groupId: string): void {
+		this._activeTabId = groupId;
+		for (const btn of overlay.querySelectorAll<HTMLElement>(".bpmn-cfg-tab-btn")) {
+			btn.classList.remove("active");
+		}
+		for (const grp of overlay.querySelectorAll<HTMLElement>(".bpmn-cfg-group")) {
+			grp.style.display = "none";
+		}
+		const tabBtn = overlay.querySelector<HTMLElement>(`[data-tab-id="${groupId}"]`);
+		const groupEl = overlay.querySelector<HTMLElement>(`[data-group-id="${groupId}"]`);
+		tabBtn?.classList.add("active");
+		if (groupEl) groupEl.style.display = "";
 	}
 
 	// ── Compact panel ─────────────────────────────────────────────────────────
@@ -190,17 +253,23 @@ export class ConfigPanelRenderer {
 	private _showFull(reg: Registration): void {
 		this._hideOverlay();
 
+		// Center the selected element in the left 35% darkened area
+		this._centerSelected(window.innerWidth * 0.175, window.innerHeight / 2);
+
 		const overlay = document.createElement("div");
 		overlay.className = "bpmn-cfg-overlay";
+
+		const closeAndRestore = () => {
+			this._fullOpen = false;
+			this._hideOverlay();
+			this._centerSelected(window.innerWidth / 2, window.innerHeight / 2);
+			this._showCompact(reg);
+		};
 
 		const backdrop = document.createElement("div");
 		backdrop.className = "bpmn-cfg-backdrop";
 		backdrop.title = "Close panel";
-		backdrop.addEventListener("click", () => {
-			this._fullOpen = false;
-			this._hideOverlay();
-			this._showCompact(reg);
-		});
+		backdrop.addEventListener("click", closeAndRestore);
 
 		const panel = document.createElement("div");
 		panel.className = "bpmn-cfg-full";
@@ -225,64 +294,68 @@ export class ConfigPanelRenderer {
 
 		const closeBtn = document.createElement("button");
 		closeBtn.className = "bpmn-cfg-full-close";
-		closeBtn.setAttribute("title", "Close (show compact panel)");
+		closeBtn.setAttribute("title", "Close");
 		closeBtn.textContent = "×";
-		closeBtn.addEventListener("click", () => {
-			this._fullOpen = false;
-			this._hideOverlay();
-			this._showCompact(reg);
-		});
+		closeBtn.addEventListener("click", closeAndRestore);
 
 		header.appendChild(info);
 		header.appendChild(closeBtn);
 
-		// Section nav
-		const nav = document.createElement("div");
-		nav.className = "bpmn-cfg-full-nav";
+		// Tabs bar
+		const tabs = document.createElement("div");
+		tabs.className = "bpmn-cfg-tabs";
 
 		// Scrollable body
 		const body = document.createElement("div");
 		body.className = "bpmn-cfg-full-body";
 
-		const navBtns: HTMLButtonElement[] = [];
+		// Ensure the active tab is valid for the current values
+		const hasActive = reg.schema.groups.some(
+			(g) =>
+				g.id === this._activeTabId &&
+				g.fields.length > 0 &&
+				(!g.condition || g.condition(this._values)),
+		);
+		if (!hasActive) {
+			this._activeTabId =
+				reg.schema.groups.find(
+					(g) => g.fields.length > 0 && (!g.condition || g.condition(this._values)),
+				)?.id ?? null;
+		}
 
 		for (const group of reg.schema.groups) {
 			if (group.fields.length === 0) continue;
 
+			const isVisible = !group.condition || group.condition(this._values);
+			const isActive = group.id === this._activeTabId;
+
+			// Tab button
+			const tabBtn = document.createElement("button");
+			tabBtn.className = "bpmn-cfg-tab-btn";
+			tabBtn.textContent = group.label;
+			tabBtn.setAttribute("data-tab-id", group.id);
+			if (!isVisible) tabBtn.style.display = "none";
+			if (isActive) tabBtn.classList.add("active");
+			tabs.appendChild(tabBtn);
+
+			// Group content (visible only when this tab is active)
 			const groupEl = document.createElement("div");
 			groupEl.className = "bpmn-cfg-group";
-			groupEl.id = `bpmn-cfg-group-${group.id}`;
-
-			const groupLabel = document.createElement("div");
-			groupLabel.className = "bpmn-cfg-group-label";
-			groupLabel.textContent = group.label;
-			groupEl.appendChild(groupLabel);
+			groupEl.setAttribute("data-group-id", group.id);
+			if (!isActive) groupEl.style.display = "none";
 
 			for (const field of group.fields) {
 				groupEl.appendChild(this._renderField(field));
 			}
-
 			body.appendChild(groupEl);
 
-			// Nav button
-			const navBtn = document.createElement("button");
-			navBtn.className = "bpmn-cfg-nav-btn";
-			navBtn.textContent = group.label;
-			navBtns.push(navBtn);
-			navBtn.addEventListener("click", () => {
-				groupEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
-				for (const nb of navBtns) nb.classList.remove("active");
-				navBtn.classList.add("active");
+			tabBtn.addEventListener("click", () => {
+				this._activateTab(overlay, group.id);
 			});
-			nav.appendChild(navBtn);
 		}
 
-		// Activate first nav button
-		const firstBtn = navBtns[0];
-		if (firstBtn) firstBtn.classList.add("active");
-
 		panel.appendChild(header);
-		panel.appendChild(nav);
+		panel.appendChild(tabs);
 		panel.appendChild(body);
 
 		overlay.appendChild(backdrop);

@@ -31,6 +31,8 @@ export interface GroupSchema {
 	id: string;
 	label: string;
 	fields: FieldSchema[];
+	/** If provided, the group (and its tab) is only shown when this returns true. */
+	condition?: (values: Record<string, FieldValue>) => boolean;
 }
 
 /** Describes the full config panel for an element type. */
