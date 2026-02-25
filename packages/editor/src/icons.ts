@@ -13,7 +13,7 @@ export const IC = {
 	duplicate: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><rect x="5.5" y="5.5" width="8" height="8" rx="1.5"/><path d="M4 10.5V3.5A1.5 1.5 0 0 1 5.5 2H12"/></svg>`,
 	dots: `<svg viewBox="0 0 16 16" fill="currentColor"><circle cx="3.5" cy="8" r="1.3"/><circle cx="8" cy="8" r="1.3"/><circle cx="12.5" cy="8" r="1.3"/></svg>`,
 	arrow: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="2" y1="8" x2="11" y2="8"/><polyline points="8,5 12,8 8,11"/></svg>`,
-	labelPos: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="8" cy="8" r="1.5" fill="currentColor" stroke="none"/><line x1="8" y1="2" x2="8" y2="5.5"/><line x1="8" y1="10.5" x2="8" y2="14"/><line x1="2" y1="8" x2="5.5" y2="8"/><line x1="10.5" y1="8" x2="14" y2="8"/></svg>`,
+	labelPos: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M3 4h10M8 4v7"/><line x1="2" y1="13" x2="14" y2="13" stroke-dasharray="2 2"/></svg>`,
 	zoomIn: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="8" y1="3" x2="8" y2="13"/><line x1="3" y1="8" x2="13" y2="8"/></svg>`,
 	zoomOut: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="3" y1="8" x2="13" y2="8"/></svg>`,
 
@@ -48,4 +48,30 @@ export const IC = {
 
 	// ── BPMN Annotation ────────────────────────────────────────────────────
 	textAnnotation: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M6 3L3 3L3 13L6 13"/><line x1="7" y1="6" x2="13" y2="6"/><line x1="7" y1="9" x2="12" y2="9"/><line x1="7" y1="12" x2="10" y2="12"/></svg>`,
+
+	// ── BPMN Start Event variants ───────────────────────────────────────────
+	messageStartEvent: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6.5"/><rect x="5" y="6" width="6" height="4" fill="currentColor" stroke="none"/><path d="M5 6l3 2.5L11 6" stroke="white" stroke-width="1" fill="none"/></svg>`,
+	timerStartEvent: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6.5"/><circle cx="8" cy="8" r="3.5" stroke-width="1"/><path d="M8 5.5V8l1.5 1.5" stroke-linecap="round" stroke-width="1"/></svg>`,
+	conditionalStartEvent: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6.5"/><rect x="5.5" y="5.5" width="5" height="5" stroke-width="1"/><line x1="6.5" y1="7" x2="9.5" y2="7" stroke-width="1"/><line x1="6.5" y1="8.5" x2="9.5" y2="8.5" stroke-width="1"/><line x1="6.5" y1="10" x2="8.5" y2="10" stroke-width="1"/></svg>`,
+	signalStartEvent: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6.5"/><polygon points="8,5 11.5,11 4.5,11" fill="currentColor" stroke="none"/></svg>`,
+
+	// ── BPMN End Event variants ─────────────────────────────────────────────
+	messageEndEvent: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="3"><circle cx="8" cy="8" r="5.5"/><rect x="5" y="6" width="6" height="4" fill="currentColor" stroke="none"/><path d="M5 6l3 2.5L11 6" stroke="white" stroke-width="1" fill="none"/></svg>`,
+	escalationEndEvent: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="3"><circle cx="8" cy="8" r="5.5"/><polygon points="8,5 10.5,11 8,9.5 5.5,11" fill="currentColor" stroke="none"/></svg>`,
+	errorEndEvent: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="3"><circle cx="8" cy="8" r="5.5"/><path d="M9.5 5.5l-3.5 4h2.5L5 11.5l3.5-4H6z" fill="currentColor" stroke="none"/></svg>`,
+	compensationEndEvent: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="3"><circle cx="8" cy="8" r="5.5"/><polygon points="8,6 5,8 8,10" fill="currentColor" stroke="none"/><polygon points="11,6 8,8 11,10" fill="currentColor" stroke="none"/></svg>`,
+	signalEndEvent: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="3"><circle cx="8" cy="8" r="5.5"/><polygon points="8,5 11.5,11 4.5,11" fill="currentColor" stroke="none"/></svg>`,
+	terminateEndEvent: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="3"><circle cx="8" cy="8" r="5.5"/><circle cx="8" cy="8" r="3" fill="currentColor" stroke="none"/></svg>`,
+
+	// ── BPMN Intermediate Event variants ────────────────────────────────────
+	messageCatchEvent: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6.5"/><circle cx="8" cy="8" r="4.5"/><rect x="5" y="6" width="6" height="4" stroke-width="1"/><path d="M5 6l3 2.5L11 6" stroke-width="1"/></svg>`,
+	messageThrowEvent: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6.5"/><circle cx="8" cy="8" r="4.5"/><rect x="5" y="6" width="6" height="4" fill="currentColor" stroke="none"/><path d="M5 6l3 2.5L11 6" stroke="white" stroke-width="1" fill="none"/></svg>`,
+	timerCatchEvent: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6.5"/><circle cx="8" cy="8" r="4.5"/><circle cx="8" cy="8" r="3" stroke-width="1"/><path d="M8 6V8l1.5 1.5" stroke-linecap="round" stroke-width="1"/></svg>`,
+	escalationThrowEvent: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6.5"/><circle cx="8" cy="8" r="4.5"/><polygon points="8,5 10.5,11 8,9.5 5.5,11" fill="currentColor" stroke="none"/></svg>`,
+	conditionalCatchEvent: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6.5"/><circle cx="8" cy="8" r="4.5"/><rect x="5.5" y="5.5" width="5" height="5" stroke-width="1"/><line x1="6.5" y1="7" x2="9.5" y2="7" stroke-width="1"/><line x1="6.5" y1="8.5" x2="9.5" y2="8.5" stroke-width="1"/><line x1="6.5" y1="10" x2="8.5" y2="10" stroke-width="1"/></svg>`,
+	linkCatchEvent: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6.5"/><circle cx="8" cy="8" r="4.5"/><polygon points="7,5.5 11,8 7,10.5 7,9 5,9 5,7 7,7" stroke-width="1"/></svg>`,
+	linkThrowEvent: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6.5"/><circle cx="8" cy="8" r="4.5"/><polygon points="7,5.5 11,8 7,10.5 7,9 5,9 5,7 7,7" fill="currentColor" stroke="none"/></svg>`,
+	compensationThrowEvent: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6.5"/><circle cx="8" cy="8" r="4.5"/><polygon points="8,6 5,8 8,10" fill="currentColor" stroke="none"/><polygon points="11,6 8,8 11,10" fill="currentColor" stroke="none"/></svg>`,
+	signalCatchEvent: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6.5"/><circle cx="8" cy="8" r="4.5"/><polygon points="8,5 11.5,11 4.5,11" stroke-width="1"/></svg>`,
+	signalThrowEvent: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6.5"/><circle cx="8" cy="8" r="4.5"/><polygon points="8,5 11.5,11 4.5,11" fill="currentColor" stroke="none"/></svg>`,
 };

@@ -1,9 +1,11 @@
 import type {
 	BpmnAssociation,
+	BpmnBoundaryEvent,
 	BpmnBounds,
 	BpmnDefinitions,
 	BpmnDiEdge,
 	BpmnDiShape,
+	BpmnEventDefinition,
 	BpmnFlowElement,
 	BpmnSequenceFlow,
 	BpmnTextAnnotation,
@@ -75,12 +77,64 @@ function makeFlowElement(type: CreateShapeType, id: string, name?: string): Bpmn
 	switch (type) {
 		case "startEvent":
 			return { ...base, type: "startEvent", eventDefinitions: [] };
+		case "messageStartEvent":
+			return { ...base, type: "startEvent", eventDefinitions: [{ type: "message" }] };
+		case "timerStartEvent":
+			return { ...base, type: "startEvent", eventDefinitions: [{ type: "timer" }] };
+		case "conditionalStartEvent":
+			return { ...base, type: "startEvent", eventDefinitions: [{ type: "conditional" }] };
+		case "signalStartEvent":
+			return { ...base, type: "startEvent", eventDefinitions: [{ type: "signal" }] };
 		case "endEvent":
 			return { ...base, type: "endEvent", eventDefinitions: [] };
+		case "messageEndEvent":
+			return { ...base, type: "endEvent", eventDefinitions: [{ type: "message" }] };
+		case "escalationEndEvent":
+			return { ...base, type: "endEvent", eventDefinitions: [{ type: "escalation" }] };
+		case "errorEndEvent":
+			return { ...base, type: "endEvent", eventDefinitions: [{ type: "error" }] };
+		case "compensationEndEvent":
+			return { ...base, type: "endEvent", eventDefinitions: [{ type: "compensate" }] };
+		case "signalEndEvent":
+			return { ...base, type: "endEvent", eventDefinitions: [{ type: "signal" }] };
+		case "terminateEndEvent":
+			return { ...base, type: "endEvent", eventDefinitions: [{ type: "terminate" }] };
 		case "intermediateThrowEvent":
 			return { ...base, type: "intermediateThrowEvent", eventDefinitions: [] };
 		case "intermediateCatchEvent":
 			return { ...base, type: "intermediateCatchEvent", eventDefinitions: [] };
+		case "messageCatchEvent":
+			return { ...base, type: "intermediateCatchEvent", eventDefinitions: [{ type: "message" }] };
+		case "messageThrowEvent":
+			return { ...base, type: "intermediateThrowEvent", eventDefinitions: [{ type: "message" }] };
+		case "timerCatchEvent":
+			return { ...base, type: "intermediateCatchEvent", eventDefinitions: [{ type: "timer" }] };
+		case "escalationThrowEvent":
+			return {
+				...base,
+				type: "intermediateThrowEvent",
+				eventDefinitions: [{ type: "escalation" }],
+			};
+		case "conditionalCatchEvent":
+			return {
+				...base,
+				type: "intermediateCatchEvent",
+				eventDefinitions: [{ type: "conditional" }],
+			};
+		case "linkCatchEvent":
+			return { ...base, type: "intermediateCatchEvent", eventDefinitions: [{ type: "link" }] };
+		case "linkThrowEvent":
+			return { ...base, type: "intermediateThrowEvent", eventDefinitions: [{ type: "link" }] };
+		case "compensationThrowEvent":
+			return {
+				...base,
+				type: "intermediateThrowEvent",
+				eventDefinitions: [{ type: "compensate" }],
+			};
+		case "signalCatchEvent":
+			return { ...base, type: "intermediateCatchEvent", eventDefinitions: [{ type: "signal" }] };
+		case "signalThrowEvent":
+			return { ...base, type: "intermediateThrowEvent", eventDefinitions: [{ type: "signal" }] };
 		case "task":
 			return { ...base, type: "task" };
 		case "serviceTask":
@@ -181,6 +235,68 @@ export function createShape(
 	return { defs: newDefs, id };
 }
 
+// ── Create boundary event ─────────────────────────────────────────────────────
+
+export function createBoundaryEvent(
+	defs: BpmnDefinitions,
+	hostId: string,
+	eventDefType: string | null,
+	bounds: BpmnBounds,
+	cancelActivity = true,
+): { defs: BpmnDefinitions; id: string } {
+	const id = genId("BoundaryEvent");
+	const shapeId = genId("BoundaryEvent_di");
+
+	const process = defs.processes[0];
+	if (!process) return { defs, id };
+	const diagram = defs.diagrams[0];
+	if (!diagram) return { defs, id };
+
+	const eventDefs = eventDefType ? [{ type: eventDefType } as BpmnEventDefinition] : [];
+	const boundaryEvent: BpmnBoundaryEvent = {
+		type: "boundaryEvent",
+		id,
+		attachedToRef: hostId,
+		cancelActivity,
+		eventDefinitions: eventDefs,
+		incoming: [],
+		outgoing: [],
+		extensionElements: [],
+		unknownAttributes: {},
+	};
+
+	const diShape: BpmnDiShape = {
+		id: shapeId,
+		bpmnElement: id,
+		bounds,
+		unknownAttributes: {},
+	};
+
+	return {
+		defs: {
+			...defs,
+			processes: [
+				{
+					...process,
+					flowElements: [...process.flowElements, boundaryEvent],
+				},
+				...defs.processes.slice(1),
+			],
+			diagrams: [
+				{
+					...diagram,
+					plane: {
+						...diagram.plane,
+						shapes: [...diagram.plane.shapes, diShape],
+					},
+				},
+				...defs.diagrams.slice(1),
+			],
+		},
+		id,
+	};
+}
+
 // ── Create connection ─────────────────────────────────────────────────────────
 
 export function createConnection(
@@ -251,6 +367,19 @@ export function createConnection(
 
 // ── Move shapes ───────────────────────────────────────────────────────────────
 
+/** Returns true if the boundary event center is within the host bounds (with a margin). */
+function isOnHostBoundary(eventBounds: BpmnBounds, hostBounds: BpmnBounds): boolean {
+	const margin = 24;
+	const cx = eventBounds.x + eventBounds.width / 2;
+	const cy = eventBounds.y + eventBounds.height / 2;
+	return (
+		cx >= hostBounds.x - margin &&
+		cx <= hostBounds.x + hostBounds.width + margin &&
+		cy >= hostBounds.y - margin &&
+		cy <= hostBounds.y + hostBounds.height + margin
+	);
+}
+
 export function moveShapes(
 	defs: BpmnDefinitions,
 	moves: Array<{ id: string; dx: number; dy: number }>,
@@ -263,9 +392,24 @@ export function moveShapes(
 	const diagram = defs.diagrams[0];
 	if (!process || !diagram) return defs;
 
+	// Cascade: boundary events attached to moved shapes also move, but only if they
+	// are currently positioned on/near the host boundary (not moved away by the user).
+	const extendedMoves = [...moves];
+	for (const el of process.flowElements) {
+		if (el.type === "boundaryEvent" && moveMap.has(el.attachedToRef) && !moveMap.has(el.id)) {
+			const hostShape = diagram.plane.shapes.find((s) => s.bpmnElement === el.attachedToRef);
+			const eventShape = diagram.plane.shapes.find((s) => s.bpmnElement === el.id);
+			if (hostShape && eventShape && isOnHostBoundary(eventShape.bounds, hostShape.bounds)) {
+				const hostMove = moveMap.get(el.attachedToRef);
+				if (hostMove) extendedMoves.push({ id: el.id, dx: hostMove.dx, dy: hostMove.dy });
+			}
+		}
+	}
+	const extendedMoveMap = new Map(extendedMoves.map((m) => [m.id, m]));
+
 	// Update DI shape bounds (and label bounds, if present)
 	const newShapes = diagram.plane.shapes.map((s) => {
-		const m = moveMap.get(s.bpmnElement);
+		const m = extendedMoveMap.get(s.bpmnElement);
 		if (!m) return s;
 		return {
 			...s,
@@ -297,8 +441,8 @@ export function moveShapes(
 		// Handle sequence flows
 		const flow = process.sequenceFlows.find((sf) => sf.id === edge.bpmnElement);
 		if (flow) {
-			const srcMove = moveMap.get(flow.sourceRef);
-			const tgtMove = moveMap.get(flow.targetRef);
+			const srcMove = extendedMoveMap.get(flow.sourceRef);
+			const tgtMove = extendedMoveMap.get(flow.targetRef);
 
 			if (!srcMove && !tgtMove) return edge;
 			if (edge.waypoints.length < 2) return edge;
@@ -345,8 +489,8 @@ export function moveShapes(
 		// Handle association edges
 		const assoc = process.associations.find((a) => a.id === edge.bpmnElement);
 		if (assoc) {
-			const srcMove = moveMap.get(assoc.sourceRef);
-			const tgtMove = moveMap.get(assoc.targetRef);
+			const srcMove = extendedMoveMap.get(assoc.sourceRef);
+			const tgtMove = extendedMoveMap.get(assoc.targetRef);
 			if (!srcMove && !tgtMove) return edge;
 
 			if (srcMove && tgtMove) {
@@ -431,6 +575,16 @@ export function deleteElements(defs: BpmnDefinitions, ids: string[]): BpmnDefini
 	if (ids.length === 0) return defs;
 
 	const idSet = new Set(ids);
+
+	// Cascade: boundary events whose host is deleted are also deleted
+	const process0 = defs.processes[0];
+	if (process0) {
+		for (const el of process0.flowElements) {
+			if (el.type === "boundaryEvent" && idSet.has(el.attachedToRef)) {
+				idSet.add(el.id);
+			}
+		}
+	}
 
 	const process = defs.processes[0];
 	const diagram = defs.diagrams[0];
@@ -656,14 +810,86 @@ export function changeElementType(
 		case "startEvent":
 			newEl = { ...base, type: "startEvent", eventDefinitions: [] };
 			break;
+		case "messageStartEvent":
+			newEl = { ...base, type: "startEvent", eventDefinitions: [{ type: "message" }] };
+			break;
+		case "timerStartEvent":
+			newEl = { ...base, type: "startEvent", eventDefinitions: [{ type: "timer" }] };
+			break;
+		case "conditionalStartEvent":
+			newEl = { ...base, type: "startEvent", eventDefinitions: [{ type: "conditional" }] };
+			break;
+		case "signalStartEvent":
+			newEl = { ...base, type: "startEvent", eventDefinitions: [{ type: "signal" }] };
+			break;
 		case "endEvent":
 			newEl = { ...base, type: "endEvent", eventDefinitions: [] };
+			break;
+		case "messageEndEvent":
+			newEl = { ...base, type: "endEvent", eventDefinitions: [{ type: "message" }] };
+			break;
+		case "escalationEndEvent":
+			newEl = { ...base, type: "endEvent", eventDefinitions: [{ type: "escalation" }] };
+			break;
+		case "errorEndEvent":
+			newEl = { ...base, type: "endEvent", eventDefinitions: [{ type: "error" }] };
+			break;
+		case "compensationEndEvent":
+			newEl = { ...base, type: "endEvent", eventDefinitions: [{ type: "compensate" }] };
+			break;
+		case "signalEndEvent":
+			newEl = { ...base, type: "endEvent", eventDefinitions: [{ type: "signal" }] };
+			break;
+		case "terminateEndEvent":
+			newEl = { ...base, type: "endEvent", eventDefinitions: [{ type: "terminate" }] };
 			break;
 		case "intermediateThrowEvent":
 			newEl = { ...base, type: "intermediateThrowEvent", eventDefinitions: [] };
 			break;
 		case "intermediateCatchEvent":
 			newEl = { ...base, type: "intermediateCatchEvent", eventDefinitions: [] };
+			break;
+		case "messageCatchEvent":
+			newEl = { ...base, type: "intermediateCatchEvent", eventDefinitions: [{ type: "message" }] };
+			break;
+		case "messageThrowEvent":
+			newEl = { ...base, type: "intermediateThrowEvent", eventDefinitions: [{ type: "message" }] };
+			break;
+		case "timerCatchEvent":
+			newEl = { ...base, type: "intermediateCatchEvent", eventDefinitions: [{ type: "timer" }] };
+			break;
+		case "escalationThrowEvent":
+			newEl = {
+				...base,
+				type: "intermediateThrowEvent",
+				eventDefinitions: [{ type: "escalation" }],
+			};
+			break;
+		case "conditionalCatchEvent":
+			newEl = {
+				...base,
+				type: "intermediateCatchEvent",
+				eventDefinitions: [{ type: "conditional" }],
+			};
+			break;
+		case "linkCatchEvent":
+			newEl = { ...base, type: "intermediateCatchEvent", eventDefinitions: [{ type: "link" }] };
+			break;
+		case "linkThrowEvent":
+			newEl = { ...base, type: "intermediateThrowEvent", eventDefinitions: [{ type: "link" }] };
+			break;
+		case "compensationThrowEvent":
+			newEl = {
+				...base,
+				type: "intermediateThrowEvent",
+				eventDefinitions: [{ type: "compensate" }],
+			};
+			break;
+		case "signalCatchEvent":
+			newEl = { ...base, type: "intermediateCatchEvent", eventDefinitions: [{ type: "signal" }] };
+			break;
+		case "signalThrowEvent":
+			newEl = { ...base, type: "intermediateThrowEvent", eventDefinitions: [{ type: "signal" }] };
 			break;
 		case "task":
 			newEl = { ...base, type: "task" };

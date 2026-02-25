@@ -22,7 +22,9 @@ interface GroupDef {
 }
 
 const GROUP_ICONS: Record<string, string> = {
-	events: IC.startEvent,
+	startEvents: IC.startEvent,
+	endEvents: IC.endEvent,
+	intermediateEvents: IC.messageCatchEvent,
 	activities: IC.task,
 	gateways: IC.exclusiveGateway,
 	annotations: IC.textAnnotation,
@@ -178,7 +180,9 @@ export function initEditorHud(editor: BpmnEditor): void {
 	let zoomOpen = false;
 
 	const groupActiveType: Record<string, CreateShapeType> = {
-		events: "startEvent",
+		startEvents: "startEvent",
+		endEvents: "endEvent",
+		intermediateEvents: "messageCatchEvent",
 		activities: "serviceTask",
 		gateways: "exclusiveGateway",
 		annotations: "textAnnotation",

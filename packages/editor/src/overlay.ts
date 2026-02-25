@@ -32,6 +32,7 @@ export class OverlayRenderer {
 	private readonly _rubberG: SVGGElement;
 	private readonly _resizePreviewG: SVGGElement;
 	private readonly _ghostConnG: SVGGElement;
+	private readonly _boundaryHostG: SVGGElement;
 	private readonly _ghostCreateG: SVGGElement;
 	private readonly _alignG: SVGGElement;
 	private readonly _distG: SVGGElement;
@@ -48,6 +49,7 @@ export class OverlayRenderer {
 		this._rubberG = svgEl("g");
 		this._resizePreviewG = svgEl("g");
 		this._ghostConnG = svgEl("g");
+		this._boundaryHostG = svgEl("g");
 		this._ghostCreateG = svgEl("g");
 		this._alignG = svgEl("g");
 		this._distG = svgEl("g");
@@ -56,6 +58,7 @@ export class OverlayRenderer {
 		this._spaceG = svgEl("g");
 
 		this._g.appendChild(this._spaceG);
+		this._g.appendChild(this._boundaryHostG);
 		this._g.appendChild(this._ghostCreateG);
 		this._g.appendChild(this._ghostConnG);
 		this._g.appendChild(this._endpointGhostG);
@@ -311,7 +314,42 @@ export class OverlayRenderer {
 		const g = svgEl("g");
 		attr(g, { class: "bpmn-ghost", transform: `translate(${x} ${y})` });
 
-		if (type === "startEvent" || type === "endEvent") {
+		const isStartEvent =
+			type === "startEvent" ||
+			type === "messageStartEvent" ||
+			type === "timerStartEvent" ||
+			type === "conditionalStartEvent" ||
+			type === "signalStartEvent";
+		const isEndEvent =
+			type === "endEvent" ||
+			type === "messageEndEvent" ||
+			type === "escalationEndEvent" ||
+			type === "errorEndEvent" ||
+			type === "compensationEndEvent" ||
+			type === "signalEndEvent" ||
+			type === "terminateEndEvent";
+		const isIntermediateEvent =
+			type === "intermediateThrowEvent" ||
+			type === "intermediateCatchEvent" ||
+			type === "messageCatchEvent" ||
+			type === "messageThrowEvent" ||
+			type === "timerCatchEvent" ||
+			type === "escalationThrowEvent" ||
+			type === "conditionalCatchEvent" ||
+			type === "linkCatchEvent" ||
+			type === "linkThrowEvent" ||
+			type === "compensationThrowEvent" ||
+			type === "signalCatchEvent" ||
+			type === "signalThrowEvent";
+		const isGateway =
+			type === "exclusiveGateway" ||
+			type === "parallelGateway" ||
+			type === "inclusiveGateway" ||
+			type === "eventBasedGateway" ||
+			type === "complexGateway";
+		const isAnnotation = type === "textAnnotation";
+
+		if (isStartEvent || isEndEvent || isIntermediateEvent) {
 			const cx = width / 2;
 			const cy = height / 2;
 			const r = Math.min(cx, cy) - 1;
@@ -320,10 +358,15 @@ export class OverlayRenderer {
 				cx,
 				cy,
 				r,
-				class: type === "endEvent" ? "bpmn-end-body" : "bpmn-event-body",
+				class: isEndEvent ? "bpmn-end-body" : "bpmn-event-body",
 			});
 			g.appendChild(circle);
-		} else if (type === "exclusiveGateway" || type === "parallelGateway") {
+			if (isIntermediateEvent) {
+				const inner = svgEl("circle");
+				attr(inner, { cx, cy, r: r - 3, class: "bpmn-event-inner" });
+				g.appendChild(inner);
+			}
+		} else if (isGateway) {
 			const cx = width / 2;
 			const cy = height / 2;
 			const diamond = svgEl("polygon");
@@ -332,6 +375,14 @@ export class OverlayRenderer {
 				class: "bpmn-gw-body",
 			});
 			g.appendChild(diamond);
+		} else if (isAnnotation) {
+			const path = svgEl("path");
+			attr(path, {
+				d: `M ${width * 0.4} 0 L 0 0 L 0 ${height} L ${width * 0.4} ${height}`,
+				class: "bpmn-shape-body",
+				fill: "none",
+			});
+			g.appendChild(path);
 		} else {
 			const rect = svgEl("rect");
 			attr(rect, { x: 0, y: 0, width, height, rx: 10, class: "bpmn-shape-body" });
@@ -339,6 +390,25 @@ export class OverlayRenderer {
 		}
 
 		this._ghostCreateG.appendChild(g);
+	}
+
+	// ── Boundary host highlight ────────────────────────────────────────
+
+	setBoundaryHostHighlight(
+		shapeBounds: { x: number; y: number; width: number; height: number } | null,
+	): void {
+		this._boundaryHostG.innerHTML = "";
+		if (!shapeBounds) return;
+		const rect = svgEl("rect");
+		attr(rect, {
+			class: "bpmn-boundary-host",
+			x: shapeBounds.x - 3,
+			y: shapeBounds.y - 3,
+			width: shapeBounds.width + 6,
+			height: shapeBounds.height + 6,
+			rx: 12,
+		});
+		this._boundaryHostG.appendChild(rect);
 	}
 }
 
@@ -349,14 +419,43 @@ function defaultBoundsForType(
 	cx: number,
 	cy: number,
 ): { x: number; y: number; width: number; height: number } {
-	switch (type) {
-		case "startEvent":
-		case "endEvent":
-			return { x: cx - 18, y: cy - 18, width: 36, height: 36 };
-		case "exclusiveGateway":
-		case "parallelGateway":
-			return { x: cx - 25, y: cy - 25, width: 50, height: 50 };
-		default:
-			return { x: cx - 50, y: cy - 40, width: 100, height: 80 };
-	}
+	const isEvent =
+		type === "startEvent" ||
+		type === "messageStartEvent" ||
+		type === "timerStartEvent" ||
+		type === "conditionalStartEvent" ||
+		type === "signalStartEvent" ||
+		type === "endEvent" ||
+		type === "messageEndEvent" ||
+		type === "escalationEndEvent" ||
+		type === "errorEndEvent" ||
+		type === "compensationEndEvent" ||
+		type === "signalEndEvent" ||
+		type === "terminateEndEvent" ||
+		type === "intermediateThrowEvent" ||
+		type === "intermediateCatchEvent" ||
+		type === "messageCatchEvent" ||
+		type === "messageThrowEvent" ||
+		type === "timerCatchEvent" ||
+		type === "escalationThrowEvent" ||
+		type === "conditionalCatchEvent" ||
+		type === "linkCatchEvent" ||
+		type === "linkThrowEvent" ||
+		type === "compensationThrowEvent" ||
+		type === "signalCatchEvent" ||
+		type === "signalThrowEvent";
+	if (isEvent) return { x: cx - 18, y: cy - 18, width: 36, height: 36 };
+
+	const isGateway =
+		type === "exclusiveGateway" ||
+		type === "parallelGateway" ||
+		type === "inclusiveGateway" ||
+		type === "eventBasedGateway" ||
+		type === "complexGateway";
+	if (isGateway) return { x: cx - 25, y: cy - 25, width: 50, height: 50 };
+
+	if (type === "subProcess" || type === "transaction")
+		return { x: cx - 100, y: cy - 60, width: 200, height: 120 };
+	if (type === "textAnnotation") return { x: cx - 50, y: cy - 25, width: 100, height: 50 };
+	return { x: cx - 50, y: cy - 40, width: 100, height: 80 };
 }

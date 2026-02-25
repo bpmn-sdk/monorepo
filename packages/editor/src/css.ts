@@ -155,6 +155,16 @@ export const EDITOR_CSS = `
   white-space: pre-wrap;
   word-break: break-word;
 }
+
+/* Boundary event attach highlight */
+.bpmn-boundary-host {
+  fill: none;
+  stroke: #2563eb;
+  stroke-width: 2;
+  stroke-dasharray: 6 3;
+  pointer-events: none;
+  opacity: 0.7;
+}
 `;
 
 /** Injects the editor stylesheet into `<head>` if not already present. */

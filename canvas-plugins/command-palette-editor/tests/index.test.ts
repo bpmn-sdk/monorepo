@@ -51,7 +51,7 @@ describe("createCommandPaletteEditorPlugin", () => {
 		input.value = "Add";
 		input.dispatchEvent(new Event("input", { bubbles: true }));
 		const items = document.querySelectorAll(".bpmn-palette-item");
-		expect(items.length).toBe(21); // 21 element types
+		expect(items.length).toBe(39); // 39 element types
 	});
 
 	it("deregisters commands on uninstall", () => {

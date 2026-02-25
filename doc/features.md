@@ -1,5 +1,13 @@
 # Features
 
+## Event Subgroups, Boundary Events & Ghost Fix (2026-02-25) — `@bpmn-sdk/editor`
+- **3 event palette groups** — Start Events (5), End Events (7), Intermediate Events (10); each group contains only compatible types for type-switching
+- **20 specific event palette types** — every BPMN event variant has a dedicated `CreateShapeType` with preset event definition; icons show the appropriate marker inside the ring
+- **Boundary events** — any intermediate event type can be attached to an activity by hovering over it during creation; dashed blue highlight indicates attachment target; the event is positioned on the nearest boundary edge; boundary events move and delete with their host
+- **Ghost shape preview** — the ghost preview now renders the correct shape for every element type (double ring for intermediate events, correct ring weight for start/end, diamond for gateways, bracket for annotations)
+- **Type-switch restriction** — the configure toolbar only shows types within the same event subgroup; start, end, and intermediate events cannot be changed to each other
+- **Escape to cancel** — canvas host auto-focuses when a create tool is activated, so Escape always cancels creation
+
 ## Full BPMN Element Type Coverage (2026-02-25) — `@bpmn-sdk/core` + `@bpmn-sdk/canvas` + `@bpmn-sdk/editor`
 - **New core model types** — `BpmnTask`, `BpmnManualTask`, `BpmnTransaction`, `BpmnComplexGateway`; `BpmnLane`/`BpmnLaneSet` swimlane hierarchy; `BpmnMessageFlow` for inter-pool communication; five new event definition types (conditional, link, cancel, terminate, compensate)
 - **Pool & lane rendering** — pools and lanes render as container rects with rotated title bars; correct nesting in the renderer

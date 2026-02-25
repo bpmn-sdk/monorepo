@@ -9,10 +9,47 @@ export interface ElementGroup {
 
 export const ELEMENT_GROUPS: ReadonlyArray<ElementGroup> = [
 	{
-		id: "events",
-		title: "Events",
+		id: "startEvents",
+		title: "Start Events",
 		defaultType: "startEvent",
-		types: ["startEvent", "endEvent", "intermediateThrowEvent", "intermediateCatchEvent"],
+		types: [
+			"startEvent",
+			"messageStartEvent",
+			"timerStartEvent",
+			"conditionalStartEvent",
+			"signalStartEvent",
+		],
+	},
+	{
+		id: "endEvents",
+		title: "End Events",
+		defaultType: "endEvent",
+		types: [
+			"endEvent",
+			"messageEndEvent",
+			"escalationEndEvent",
+			"errorEndEvent",
+			"compensationEndEvent",
+			"signalEndEvent",
+			"terminateEndEvent",
+		],
+	},
+	{
+		id: "intermediateEvents",
+		title: "Intermediate Events",
+		defaultType: "messageCatchEvent",
+		types: [
+			"messageCatchEvent",
+			"messageThrowEvent",
+			"timerCatchEvent",
+			"escalationThrowEvent",
+			"conditionalCatchEvent",
+			"linkCatchEvent",
+			"linkThrowEvent",
+			"compensationThrowEvent",
+			"signalCatchEvent",
+			"signalThrowEvent",
+		],
 	},
 	{
 		id: "activities",
@@ -65,9 +102,29 @@ export function getElementGroup(type: CreateShapeType): ElementGroup | undefined
 
 export const ELEMENT_TYPE_LABELS: Readonly<Record<CreateShapeType, string>> = {
 	startEvent: "Start Event",
+	messageStartEvent: "Message Start Event",
+	timerStartEvent: "Timer Start Event",
+	conditionalStartEvent: "Conditional Start Event",
+	signalStartEvent: "Signal Start Event",
 	endEvent: "End Event",
+	messageEndEvent: "Message End Event",
+	escalationEndEvent: "Escalation End Event",
+	errorEndEvent: "Error End Event",
+	compensationEndEvent: "Compensation End Event",
+	signalEndEvent: "Signal End Event",
+	terminateEndEvent: "Terminate End Event",
 	intermediateThrowEvent: "Intermediate Throw Event",
 	intermediateCatchEvent: "Intermediate Catch Event",
+	messageCatchEvent: "Message Intermediate Catch Event",
+	messageThrowEvent: "Message Intermediate Throw Event",
+	timerCatchEvent: "Timer Intermediate Catch Event",
+	escalationThrowEvent: "Escalation Intermediate Throw Event",
+	conditionalCatchEvent: "Conditional Intermediate Catch Event",
+	linkCatchEvent: "Link Intermediate Catch Event",
+	linkThrowEvent: "Link Intermediate Throw Event",
+	compensationThrowEvent: "Compensation Intermediate Throw Event",
+	signalCatchEvent: "Signal Intermediate Catch Event",
+	signalThrowEvent: "Signal Intermediate Throw Event",
 	task: "Task",
 	serviceTask: "Service Task",
 	userTask: "User Task",
@@ -89,9 +146,29 @@ export const ELEMENT_TYPE_LABELS: Readonly<Record<CreateShapeType, string>> = {
 
 export const EXTERNAL_LABEL_TYPES: ReadonlySet<CreateShapeType> = new Set([
 	"startEvent",
+	"messageStartEvent",
+	"timerStartEvent",
+	"conditionalStartEvent",
+	"signalStartEvent",
 	"endEvent",
+	"messageEndEvent",
+	"escalationEndEvent",
+	"errorEndEvent",
+	"compensationEndEvent",
+	"signalEndEvent",
+	"terminateEndEvent",
 	"intermediateThrowEvent",
 	"intermediateCatchEvent",
+	"messageCatchEvent",
+	"messageThrowEvent",
+	"timerCatchEvent",
+	"escalationThrowEvent",
+	"conditionalCatchEvent",
+	"linkCatchEvent",
+	"linkThrowEvent",
+	"compensationThrowEvent",
+	"signalCatchEvent",
+	"signalThrowEvent",
 	"exclusiveGateway",
 	"parallelGateway",
 	"inclusiveGateway",
@@ -112,7 +189,19 @@ export function getValidLabelPositions(type: CreateShapeType): ReadonlyArray<Lab
 		type === "parallelGateway" ||
 		type === "inclusiveGateway" ||
 		type === "eventBasedGateway" ||
-		type === "complexGateway"
+		type === "complexGateway" ||
+		type === "intermediateThrowEvent" ||
+		type === "intermediateCatchEvent" ||
+		type === "messageCatchEvent" ||
+		type === "messageThrowEvent" ||
+		type === "timerCatchEvent" ||
+		type === "escalationThrowEvent" ||
+		type === "conditionalCatchEvent" ||
+		type === "linkCatchEvent" ||
+		type === "linkThrowEvent" ||
+		type === "compensationThrowEvent" ||
+		type === "signalCatchEvent" ||
+		type === "signalThrowEvent"
 	) {
 		return [...base, "bottom-left", "bottom-right", "top-left", "top-right"];
 	}

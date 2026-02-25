@@ -1,5 +1,22 @@
 # Progress
 
+## 2026-02-25 — Intermediate Event Subgroups, Boundary Events, Ghost Fix
+
+### `@bpmn-sdk/editor` — Event system overhaul
+- **3 event subgroups** — single "Events" palette group replaced with `startEvents` (5 types), `endEvents` (7 types), `intermediateEvents` (10 types)
+- **20 new `CreateShapeType` values** — one per BPMN event variant: `messageStartEvent`, `timerStartEvent`, `conditionalStartEvent`, `signalStartEvent`; `messageEndEvent`, `escalationEndEvent`, `errorEndEvent`, `compensationEndEvent`, `signalEndEvent`, `terminateEndEvent`; `messageCatchEvent`, `messageThrowEvent`, `timerCatchEvent`, `escalationThrowEvent`, `conditionalCatchEvent`, `linkCatchEvent`, `linkThrowEvent`, `compensationThrowEvent`, `signalCatchEvent`, `signalThrowEvent`
+- **`makeFlowElement` / `changeElementType`** — all 20 new types map to the correct BPMN base type (`startEvent`, `endEvent`, `intermediateCatchEvent`, `intermediateThrowEvent`) with the right `eventDefinitions` entry
+- **Type-switch restriction** — types can only change within their subgroup: start events ↔ start events, end ↔ end, intermediate ↔ intermediate (enforced by group membership)
+- **`getElementType` resolution** — returns specific palette type (e.g. `"messageCatchEvent"`) by inspecting `eventDefinitions[0]`; cfg toolbar highlights the correct active variant
+- **Boundary events** — creating any intermediate event type while hovering over an activity shows a dashed blue highlight on the host; on click, a `boundaryEvent` is created attached to that activity at the cursor's nearest boundary point; `cancelActivity = true` by default
+- **`createBoundaryEvent(defs, hostId, eventDefType, bounds)`** — new modeling function; creates `BpmnBoundaryEvent` in `process.flowElements` + DI shape
+- **`moveShapes` cascade** — moving an activity automatically also moves its attached boundary events
+- **`deleteElements` cascade** — deleting an activity also deletes its attached boundary events
+- **Ghost shape preview fix** — `overlay.ts::setGhostCreate` now renders correct shape per type: thin circle (start), thick circle (end), double ring (intermediate), diamond (gateway), bracket (annotation), rounded rect (activities)
+- **`defaultBoundsForType` in overlay.ts** — fixed to cover all event and gateway types (36×36 for events, 50×50 for gateways)
+- **Escape key to cancel** — canvas host is now focused when entering create mode, ensuring Escape key correctly cancels creation
+- **39 element commands** — command palette and shape palette now cover all BPMN element variants (was 21, now 39)
+
 ## 2026-02-25 — Full BPMN Element Type Coverage
 
 ### `@bpmn-sdk/core` — New model types
