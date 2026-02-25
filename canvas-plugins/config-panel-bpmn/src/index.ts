@@ -285,6 +285,105 @@ const SERVICE_TASK_ADAPTER: PanelAdapter = {
 	},
 };
 
+// ── Ad-hoc subprocess schema (template-aware, shown for adHocSubProcess) ──────
+
+/** Templates applicable to ad-hoc subprocesses (AI agent pattern). */
+const ADHOC_SUBPROCESS_TEMPLATES = CAMUNDA_CONNECTOR_TEMPLATES.filter(
+	(t) => t.appliesTo.includes("bpmn:SubProcess") || t.appliesTo.includes("bpmn:AdHocSubProcess"),
+);
+
+/** Connector selector for ad-hoc subprocess templates. */
+const ADHOC_OPTIONS: Array<{ value: string; label: string }> = [
+	{ value: CUSTOM_TASK_TYPE, label: "Custom (no connector)" },
+	...ADHOC_SUBPROCESS_TEMPLATES.map((t) => ({ value: t.id, label: t.name })).sort((a, b) =>
+		a.label.localeCompare(b.label),
+	),
+];
+
+const GENERIC_ADHOC_SCHEMA: PanelSchema = {
+	compact: [{ key: "name", label: "Name", type: "text", placeholder: "Subprocess name" }],
+	groups: [
+		{
+			id: "general",
+			label: "General",
+			fields: [
+				{ key: "name", label: "Name", type: "text", placeholder: "Subprocess name" },
+				{
+					key: "connector",
+					label: "Template",
+					type: "select",
+					options: ADHOC_OPTIONS,
+					hint: "Attach a Camunda AI agent template or use a plain ad-hoc subprocess.",
+				},
+				{
+					key: "documentation",
+					label: "Documentation",
+					type: "textarea",
+					placeholder: "Add notes or documentation…",
+				},
+			],
+		},
+	],
+};
+
+const ADHOC_SUBPROCESS_ADAPTER: PanelAdapter = {
+	read(defs, id) {
+		const el = findFlowElement(defs, id);
+		if (!el) return {};
+		return {
+			name: el.name ?? "",
+			documentation: el.documentation ?? "",
+			connector: el.unknownAttributes?.["zeebe:modelerTemplate"] ?? CUSTOM_TASK_TYPE,
+		};
+	},
+
+	write(defs: BpmnDefinitions, id: string, values: Record<string, FieldValue>): BpmnDefinitions {
+		const connectorVal = strVal(values.connector);
+		const newTemplateId =
+			connectorVal && connectorVal !== CUSTOM_TASK_TYPE && TEMPLATE_REGISTRY.has(connectorVal)
+				? connectorVal
+				: undefined;
+
+		if (newTemplateId) {
+			const withAttr = updateFlowElement(defs, id, (el) => ({
+				...el,
+				name: typeof values.name === "string" ? values.name || undefined : el.name,
+				unknownAttributes: { ...el.unknownAttributes, "zeebe:modelerTemplate": newTemplateId },
+			}));
+			const templateReg = TEMPLATE_REGISTRY.get(newTemplateId);
+			if (templateReg) return templateReg.adapter.write(withAttr, id, values);
+			return withAttr;
+		}
+
+		// Custom or clearing a template
+		return updateFlowElement(defs, id, (el) => {
+			const {
+				"zeebe:modelerTemplate": _t,
+				"zeebe:modelerTemplateVersion": _v,
+				"zeebe:modelerTemplateIcon": _i,
+				...rest
+			} = el.unknownAttributes;
+			return {
+				...el,
+				name: typeof values.name === "string" ? values.name : el.name,
+				documentation:
+					typeof values.documentation === "string"
+						? values.documentation || undefined
+						: el.documentation,
+				unknownAttributes: rest,
+			};
+		});
+	},
+
+	resolve(defs, id) {
+		const el = findFlowElement(defs, id);
+		if (!el) return null;
+		const templateId = el.unknownAttributes?.["zeebe:modelerTemplate"];
+		if (!templateId) return null;
+		return TEMPLATE_REGISTRY.get(templateId) ?? null;
+	},
+};
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function strVal(v: FieldValue): string {
@@ -334,6 +433,8 @@ export function createConfigPanelBpmnPlugin(configPanel: ConfigPanelPlugin): Can
 			}
 			// Service task: template-aware adapter
 			configPanel.registerSchema("serviceTask", GENERIC_SERVICE_TASK_SCHEMA, SERVICE_TASK_ADAPTER);
+			// Ad-hoc subprocess: template-aware adapter (AI Agent pattern)
+			configPanel.registerSchema("adHocSubProcess", GENERIC_ADHOC_SCHEMA, ADHOC_SUBPROCESS_ADAPTER);
 		},
 
 		registerTemplate(template: ElementTemplate): void {

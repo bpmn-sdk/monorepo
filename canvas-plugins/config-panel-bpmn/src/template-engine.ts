@@ -8,7 +8,7 @@ import type {
 	PanelAdapter,
 	PanelSchema,
 } from "@bpmn-sdk/canvas-plugin-config-panel";
-import type { BpmnDefinitions } from "@bpmn-sdk/core";
+import type { BpmnDefinitions, XmlElement } from "@bpmn-sdk/core";
 import { zeebeExtensionsToXmlElements } from "@bpmn-sdk/core";
 import type {
 	ElementTemplate,
@@ -18,6 +18,7 @@ import type {
 } from "./template-types.js";
 import {
 	findFlowElement,
+	getAdHocAttr,
 	getIoInput,
 	getTaskHeader,
 	parseZeebeExtensions,
@@ -69,6 +70,7 @@ function getPropertyKey(prop: TemplateProperty): string {
 	if (b.type === "zeebe:taskDefinition:type") return "taskDef.type";
 	if (b.type === "property") return b.name;
 	if (b.type === "zeebe:property") return b.name;
+	if (b.type === "zeebe:adHoc") return `adHoc.${b.property}`;
 	return "";
 }
 
@@ -119,7 +121,7 @@ function propToFieldSchema(prop: TemplateProperty): FieldSchema {
 
 function readPropertyValue(
 	ext: ReturnType<typeof parseZeebeExtensions>,
-	el: { name?: string },
+	el: { name?: string; extensionElements: XmlElement[] },
 	prop: TemplateProperty,
 ): string | undefined {
 	const b = prop.binding;
@@ -130,6 +132,7 @@ function readPropertyValue(
 		return ext.taskDefinition?.retries;
 	if (b.type === "zeebe:taskDefinition:type") return ext.taskDefinition?.type;
 	if (b.type === "property" && b.name === "name") return el.name;
+	if (b.type === "zeebe:adHoc") return getAdHocAttr(el.extensionElements, b.property);
 	return undefined;
 }
 
@@ -139,6 +142,11 @@ function applyBinding(
 	inputs: Array<{ source: string; target: string }>,
 	headers: Array<{ key: string; value: string }>,
 	taskDef: { type?: string; retries?: string },
+	adHocProps: {
+		outputCollection?: string;
+		outputElement?: string;
+		activeElementsCollection?: string;
+	},
 ): void {
 	if (binding.type === "zeebe:input") {
 		inputs.push({ source: value, target: binding.name });
@@ -150,6 +158,11 @@ function applyBinding(
 		taskDef.retries = value;
 	} else if (binding.type === "zeebe:taskDefinition:type") {
 		taskDef.type = value;
+	} else if (binding.type === "zeebe:adHoc") {
+		if (binding.property === "outputCollection") adHocProps.outputCollection = value;
+		else if (binding.property === "outputElement") adHocProps.outputElement = value;
+		else if (binding.property === "activeElementsCollection")
+			adHocProps.activeElementsCollection = value;
 	}
 }
 
@@ -241,11 +254,16 @@ export function buildRegistrationFromTemplate(template: ElementTemplate): Templa
 				const inputs: Array<{ source: string; target: string }> = [];
 				const headers: Array<{ key: string; value: string }> = [];
 				const taskDef: { type?: string; retries?: string } = {};
+				const adHocProps: {
+					outputCollection?: string;
+					outputElement?: string;
+					activeElementsCollection?: string;
+				} = {};
 
 				// 1. Apply hidden properties first (fixed default values)
 				for (const prop of hiddenProps) {
 					const val = String(prop.value ?? "");
-					if (val) applyBinding(prop.binding, val, inputs, headers, taskDef);
+					if (val) applyBinding(prop.binding, val, inputs, headers, taskDef, adHocProps);
 				}
 
 				// 2. Apply user-entered values for visible properties
@@ -262,11 +280,11 @@ export function buildRegistrationFromTemplate(template: ElementTemplate): Templa
 					const effectiveVal = val !== "" ? val : String(prop.value ?? "");
 					if (!effectiveVal) continue;
 
-					applyBinding(prop.binding, effectiveVal, inputs, headers, taskDef);
+					applyBinding(prop.binding, effectiveVal, inputs, headers, taskDef, adHocProps);
 				}
 
 				// Preserve non-Zeebe extension elements
-				const ZEEBE_LOCAL = new Set(["taskDefinition", "ioMapping", "taskHeaders"]);
+				const ZEEBE_LOCAL = new Set(["taskDefinition", "ioMapping", "taskHeaders", "adHoc"]);
 				const otherExts = el.extensionElements.filter(
 					(x) => !ZEEBE_LOCAL.has(xmlLocalName(x.name)),
 				);
@@ -277,6 +295,12 @@ export function buildRegistrationFromTemplate(template: ElementTemplate): Templa
 						: undefined,
 					ioMapping: inputs.length > 0 ? { inputs, outputs: [] } : undefined,
 					taskHeaders: headers.length > 0 ? { headers } : undefined,
+					adHoc:
+						(adHocProps.outputCollection ??
+						adHocProps.outputElement ??
+						adHocProps.activeElementsCollection)
+							? adHocProps
+							: undefined,
 				});
 
 				return {

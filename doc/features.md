@@ -1,5 +1,12 @@
 # Features
 
+## Agentic AI Subprocess (2026-02-25) — `@bpmn-sdk/editor` + `@bpmn-sdk/canvas-plugin-config-panel-bpmn` + `@bpmn-sdk/core`
+- **`adHocSubProcess` creatable in the editor** — appears in the Activities palette group (with tilde icon); 200×120 default size; resizable; type-switchable via `changeElementType`
+- **AI Agent template wired end-to-end** — selecting the `io.camunda.connectors.agenticai.aiagent.jobworker.v1` template in the config panel's "Template" dropdown writes `zeebe:taskDefinition type="io.camunda.agenticai:aiagent-job-worker:1"`, `zeebe:adHoc outputCollection="toolCallResults"` + `outputElement` FEEL expression, and all required IO mappings and task headers; `zeebe:modelerTemplate`, `zeebe:modelerTemplateVersion`, and `zeebe:modelerTemplateIcon` are stamped on the element
+- **`ZeebeAdHoc` typed interface** in `@bpmn-sdk/core` — `outputCollection`, `outputElement`, `activeElementsCollection`; `zeebeExtensionsToXmlElements` serialises it
+- **`zeebe:adHoc` template binding** — `TemplateBinding` union extended; template engine reads/writes all three `zeebe:adHoc` properties correctly
+- **Template-aware config panel for `adHocSubProcess`** — shows "Custom" or AI Agent template selector; `resolve()` delegates to full template form when template is active; clearing the template removes all modelerTemplate attributes
+
 ## Config Panel: Template Adapter Fix + Required Field Indicators (2026-02-25) — `@bpmn-sdk/canvas-plugin-config-panel` + `@bpmn-sdk/canvas-plugin-config-panel-bpmn`
 - **Template adapter bug fixed** — changing any field while a connector template was active reverted the panel to the generic service task form (the write path used the base adapter which strips `zeebe:modelerTemplate`); now correctly uses the template-resolved adapter for all writes
 - **Required field asterisk** — fields with `constraints.notEmpty: true` in connector templates show a red `*` next to the label

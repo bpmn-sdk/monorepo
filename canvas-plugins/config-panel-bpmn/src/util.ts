@@ -98,3 +98,12 @@ export function getIoInput(ext: ZeebeExtensions, target: string): string | undef
 export function getTaskHeader(ext: ZeebeExtensions, key: string): string | undefined {
 	return ext.taskHeaders?.headers.find((h) => h.key === key)?.value;
 }
+
+/** Get an attribute from the zeebe:adHoc extension element. */
+export function getAdHocAttr(
+	extensionElements: XmlElement[],
+	property: "outputCollection" | "outputElement" | "activeElementsCollection",
+): string | undefined {
+	const el = extensionElements.find((x) => xmlLocalName(x.name) === "adHoc");
+	return el?.attributes[property];
+}

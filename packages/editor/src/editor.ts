@@ -108,6 +108,7 @@ function defaultBounds(
 		case "complexGateway":
 			return { x: cx - 25, y: cy - 25, width: 50, height: 50 };
 		case "subProcess":
+		case "adHocSubProcess":
 		case "transaction":
 			return { x: cx - 100, y: cy - 60, width: 200, height: 120 };
 		case "textAnnotation":

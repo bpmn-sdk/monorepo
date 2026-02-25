@@ -1,5 +1,34 @@
 # Progress
 
+## 2026-02-25 — Agentic AI Subprocess Support
+
+### `@bpmn-sdk/core` — `ZeebeAdHoc` typed interface
+- **`ZeebeAdHoc`** interface added to `zeebe-extensions.ts`: `outputCollection`, `outputElement`, `activeElementsCollection` fields
+- **`ZeebeExtensions.adHoc`** field added; `zeebeExtensionsToXmlElements` now serialises `zeebe:adHoc` element when present
+
+### `@bpmn-sdk/canvas-plugin-config-panel-bpmn` — Full AI Agent template support
+- **`TemplateBinding`** union extended with `{ type: "zeebe:adHoc"; property: "outputCollection" | "outputElement" | "activeElementsCollection" }` in `template-types.ts`
+- **`getPropertyKey`** handles `zeebe:adHoc` → `adHoc.${property}` key
+- **`readPropertyValue`** reads `zeebe:adHoc` attributes via `getAdHocAttr(el.extensionElements, property)`; `el` parameter widened to include `extensionElements`
+- **`applyBinding`** accepts new `adHocProps` accumulator; populates it for `zeebe:adHoc` bindings
+- **Template engine `write`**: adds `"adHoc"` to `ZEEBE_LOCAL` set (prevents duplicate elements); passes `adHocProps` to `zeebeExtensionsToXmlElements` → produces correct `<zeebe:adHoc outputCollection="toolCallResults" outputElement="..."/>` in the XML
+- **`getAdHocAttr`** helper added to `util.ts`
+- **`ADHOC_SUBPROCESS_TEMPLATES`** — filters `CAMUNDA_CONNECTOR_TEMPLATES` to templates that apply to `bpmn:SubProcess` (including `io.camunda.connectors.agenticai.aiagent.jobworker.v1`)
+- **`ADHOC_OPTIONS`** dropdown — "Custom" + all ad-hoc subprocess templates, sorted alphabetically
+- **`GENERIC_ADHOC_SCHEMA` + `ADHOC_SUBPROCESS_ADAPTER`** — template-aware config panel for `adHocSubProcess`; `resolve()` hook delegates to the AI Agent template registration when `zeebe:modelerTemplate` is set; `write()` stamps `zeebe:modelerTemplate` and delegates to template adapter; clearing sets connector to "" and removes all modelerTemplate attributes
+- **`adHocSubProcess`** registered in `createConfigPanelBpmnPlugin.install()`
+- **6 new tests** in `index.test.ts` covering registration, read/write, resolve, template delegation, and clearing
+
+### `@bpmn-sdk/editor` — Ad-hoc subprocess as a creatable element
+- **`CreateShapeType`**: `"adHocSubProcess"` added to the union
+- **`RESIZABLE_TYPES`**: `"adHocSubProcess"` added
+- **`ELEMENT_TYPE_LABELS`**: `adHocSubProcess: "Ad-hoc Sub-Process"` added
+- **`ELEMENT_GROUPS`**: `"adHocSubProcess"` added to the Activities group (after `subProcess`, before `transaction`)
+- **`makeFlowElement`**: `case "adHocSubProcess"` — creates element with empty `flowElements`, `sequenceFlows`, `textAnnotations`, `associations`
+- **`changeElementType`**: `case "adHocSubProcess"` — preserves child contents when changing to/from ad-hoc subprocess
+- **`defaultBounds`**: `"adHocSubProcess"` added alongside `"subProcess"` and `"transaction"` — 200×120 px
+- **`icons.ts`**: `adHocSubProcess` SVG icon added (rounded rect + tilde wave marker, matches BPMN standard notation)
+
 ## 2026-02-25 — Config Panel: Template Adapter Bug Fix + Required Field Indicators
 
 ### `@bpmn-sdk/canvas-plugin-config-panel` — Bug fix + required field UI

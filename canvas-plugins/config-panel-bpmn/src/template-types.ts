@@ -78,7 +78,11 @@ export type TemplateBinding =
 	| { type: "zeebe:input"; name: string }
 	| { type: "zeebe:output"; source: string }
 	| { type: "zeebe:taskHeader"; key: string }
-	| { type: "zeebe:property"; name: string };
+	| { type: "zeebe:property"; name: string }
+	| {
+			type: "zeebe:adHoc";
+			property: "outputCollection" | "outputElement" | "activeElementsCollection";
+	  };
 
 /** Condition controlling whether a property is shown in the UI. */
 export type TemplateCondition =

@@ -162,6 +162,15 @@ function makeFlowElement(type: CreateShapeType, id: string, name?: string): Bpmn
 				textAnnotations: [],
 				associations: [],
 			};
+		case "adHocSubProcess":
+			return {
+				...base,
+				type: "adHocSubProcess",
+				flowElements: [],
+				sequenceFlows: [],
+				textAnnotations: [],
+				associations: [],
+			};
 		case "transaction":
 			return {
 				...base,
@@ -926,6 +935,16 @@ export function changeElementType(
 				sequenceFlows: el.type === "subProcess" ? el.sequenceFlows : [],
 				textAnnotations: el.type === "subProcess" ? el.textAnnotations : [],
 				associations: el.type === "subProcess" ? el.associations : [],
+			};
+			break;
+		case "adHocSubProcess":
+			newEl = {
+				...base,
+				type: "adHocSubProcess",
+				flowElements: el.type === "adHocSubProcess" ? el.flowElements : [],
+				sequenceFlows: el.type === "adHocSubProcess" ? el.sequenceFlows : [],
+				textAnnotations: el.type === "adHocSubProcess" ? el.textAnnotations : [],
+				associations: el.type === "adHocSubProcess" ? el.associations : [],
 			};
 			break;
 		case "transaction":

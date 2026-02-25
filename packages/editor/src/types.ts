@@ -36,6 +36,7 @@ export type CreateShapeType =
 	| "manualTask"
 	| "callActivity"
 	| "subProcess"
+	| "adHocSubProcess"
 	| "transaction"
 	| "exclusiveGateway"
 	| "parallelGateway"
@@ -56,6 +57,7 @@ export const RESIZABLE_TYPES: ReadonlySet<string> = new Set([
 	"manualTask",
 	"callActivity",
 	"subProcess",
+	"adHocSubProcess",
 	"transaction",
 	"textAnnotation",
 ]);
