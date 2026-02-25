@@ -1,5 +1,10 @@
 # Features
 
+## Config Panel: Template Adapter Fix + Required Field Indicators (2026-02-25) — `@bpmn-sdk/canvas-plugin-config-panel` + `@bpmn-sdk/canvas-plugin-config-panel-bpmn`
+- **Template adapter bug fixed** — changing any field while a connector template was active reverted the panel to the generic service task form (the write path used the base adapter which strips `zeebe:modelerTemplate`); now correctly uses the template-resolved adapter for all writes
+- **Required field asterisk** — fields with `constraints.notEmpty: true` in connector templates show a red `*` next to the label
+- **Required field red border** — input/select/textarea gets a red border when a required field is empty; clears as soon as the user enters a value
+
 ## Connector Template Icons in Canvas (2026-02-25) — `@bpmn-sdk/canvas` + `@bpmn-sdk/canvas-plugin-config-panel-bpmn`
 - **Template icon rendering** — when a service task has `zeebe:modelerTemplateIcon` set (data URI from the connector template), the canvas renderer displays it as an SVG `<image>` in the top-left icon slot instead of the generic gear icon; works for all 116 Camunda connectors
 - **Icon stamped on apply** — the config panel template engine writes `zeebe:modelerTemplateIcon` to the BPMN element whenever a connector template is applied, so the icon persists in the saved XML

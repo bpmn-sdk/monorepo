@@ -108,6 +108,7 @@ export class ConfigPanelRenderer {
 
 		this._refreshInputs();
 		this._refreshConditionals(newEffective.schema);
+		this._refreshValidation(newEffective.schema);
 	}
 
 	destroy(): void {
@@ -126,11 +127,14 @@ export class ConfigPanelRenderer {
 		if (!id || !type) return;
 		const reg = this._schemas.get(type);
 		if (!reg) return;
+		// Use the template-resolved adapter (if any) so template attributes are preserved on write
+		const effective = this._effectiveReg ?? reg;
 		this._values[key] = value;
-		// Refresh visibility immediately so the UI responds without waiting for diagram:change
-		this._refreshConditionals(reg.schema);
+		// Refresh visibility and validation immediately without waiting for diagram:change
+		this._refreshConditionals(effective.schema);
+		this._refreshValidation(effective.schema);
 		const snapshot = { ...this._values };
-		this._applyChange((defs) => reg.adapter.write(defs, id, snapshot));
+		this._applyChange((defs) => effective.adapter.write(defs, id, snapshot));
 	}
 
 	private _centerSelected(targetScreenX: number, targetScreenY: number): void {
@@ -204,6 +208,23 @@ export class ConfigPanelRenderer {
 
 		// Group/tab conditions only apply in the full overlay
 		if (this._fullOpen) this._refreshGroupVisibility(schema.groups);
+	}
+
+	/** Update red-border invalid state for required fields that are empty. */
+	private _refreshValidation(schema: PanelSchema): void {
+		const container = this._fullOpen ? this._overlayEl : this._compactEl;
+		if (!container) return;
+		const allFields = [...schema.compact, ...schema.groups.flatMap((g) => g.fields)];
+		for (const field of allFields) {
+			if (!field.required) continue;
+			const wrapper = container.querySelector<HTMLElement>(
+				`[${FIELD_WRAPPER_ATTR}="${field.key}"]`,
+			);
+			if (!wrapper) continue;
+			const val = this._values[field.key];
+			const isEmpty = val === "" || val === undefined;
+			wrapper.classList.toggle("bpmn-cfg-field--invalid", isEmpty);
+		}
 	}
 
 	/** Show/hide tabs and groups based on their conditions. */
@@ -419,12 +440,16 @@ export class ConfigPanelRenderer {
 		const wrapper = document.createElement("div");
 		wrapper.className = "bpmn-cfg-field";
 
-		if (field.condition) {
-			wrapper.setAttribute(FIELD_WRAPPER_ATTR, field.key);
-			if (!field.condition(this._values)) wrapper.style.display = "none";
-		}
+		// Always stamp the key so _refreshConditionals and _refreshValidation can find the wrapper
+		wrapper.setAttribute(FIELD_WRAPPER_ATTR, field.key);
+		if (field.condition && !field.condition(this._values)) wrapper.style.display = "none";
 
 		const value = this._values[field.key];
+
+		// Initial required-empty state
+		if (field.required && (value === "" || value === undefined)) {
+			wrapper.classList.add("bpmn-cfg-field--invalid");
+		}
 
 		if (field.type === "toggle") {
 			wrapper.appendChild(this._renderToggle(field, value));
@@ -432,6 +457,14 @@ export class ConfigPanelRenderer {
 			const labelRow = document.createElement("div");
 			labelRow.className = "bpmn-cfg-field-label";
 			labelRow.textContent = field.label;
+
+			if (field.required) {
+				const star = document.createElement("span");
+				star.className = "bpmn-cfg-required-star";
+				star.textContent = "*";
+				star.setAttribute("aria-hidden", "true");
+				labelRow.appendChild(star);
+			}
 
 			if (field.docsUrl) {
 				const link = document.createElement("a");

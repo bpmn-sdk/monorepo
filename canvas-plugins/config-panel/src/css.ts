@@ -225,6 +225,16 @@ export const CONFIG_PANEL_CSS = `
   transition: opacity 0.1s;
 }
 .bpmn-cfg-field-docs:hover { opacity: 1; }
+.bpmn-cfg-required-star {
+  color: #f87171;
+  font-weight: 700;
+  margin-left: 2px;
+}
+.bpmn-cfg-field--invalid .bpmn-cfg-input,
+.bpmn-cfg-field--invalid .bpmn-cfg-select,
+.bpmn-cfg-field--invalid .bpmn-cfg-textarea {
+  border-color: rgba(248, 113, 113, 0.6);
+}
 
 .bpmn-cfg-input,
 .bpmn-cfg-select,

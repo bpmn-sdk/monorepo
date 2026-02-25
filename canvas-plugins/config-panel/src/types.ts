@@ -24,6 +24,8 @@ export interface FieldSchema {
 	docsUrl?: string;
 	/** Mask the input (password-style) for secret values. */
 	secret?: boolean;
+	/** If true, the field is mandatory — shown with an asterisk and a red border when empty. */
+	required?: boolean;
 	/** If provided, the field is only shown when this returns true. */
 	condition?: (values: Record<string, FieldValue>) => boolean;
 }

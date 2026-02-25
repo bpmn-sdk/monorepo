@@ -85,6 +85,7 @@ function propToFieldSchema(prop: TemplateProperty): FieldSchema {
 		placeholder: prop.placeholder,
 		hint: prop.description,
 		condition,
+		...(prop.constraints?.notEmpty === true ? { required: true } : {}),
 	};
 
 	switch (prop.type) {

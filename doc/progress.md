@@ -1,5 +1,17 @@
 # Progress
 
+## 2026-02-25 — Config Panel: Template Adapter Bug Fix + Required Field Indicators
+
+### `@bpmn-sdk/canvas-plugin-config-panel` — Bug fix + required field UI
+- **Bug**: `_applyField` was always using the base registered adapter (`this._schemas.get(type)`) instead of `this._effectiveReg` (the template-resolved adapter). The generic `SERVICE_TASK_ADAPTER.write()` explicitly strips `zeebe:modelerTemplate`, causing the template panel to revert to the generic service task form whenever a field was changed while a connector template was active. Fixed by resolving `effective = this._effectiveReg ?? reg` and using `effective.adapter.write()` + `effective.schema` in `_applyField`.
+- **Feature**: Required field visual indication — `FieldSchema` gains an optional `required?: boolean` field; when set, a red asterisk (`*`) is shown next to the label and the input/select/textarea gets a red border when empty. Validation state is refreshed on every field change and on diagram reload.
+- **`_refreshValidation(schema)`** — new method that toggles `.bpmn-cfg-field--invalid` on field wrappers for required fields with empty values; called from `_applyField` and `onDiagramChange`.
+- **`FIELD_WRAPPER_ATTR`** now stamped on every field wrapper (not just conditional ones) so both `_refreshConditionals` and `_refreshValidation` can query by key.
+- **CSS**: `.bpmn-cfg-required-star` (red `#f87171`) and `.bpmn-cfg-field--invalid` border style added to `css.ts`.
+
+### `@bpmn-sdk/canvas-plugin-config-panel-bpmn` — Propagate `required` from templates
+- **`propToFieldSchema`** — sets `required: true` on the generated `FieldSchema` when `prop.constraints?.notEmpty === true`; all Camunda connector template fields marked `notEmpty` now show the required indicator in the config panel.
+
 ## 2026-02-25 — Connector Template Icons Rendered in Canvas
 
 ### `@bpmn-sdk/canvas` — Template icon rendering
