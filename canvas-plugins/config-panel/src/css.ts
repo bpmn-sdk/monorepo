@@ -245,7 +245,7 @@ export const CONFIG_PANEL_CSS = `
 .bpmn-cfg-select:focus,
 .bpmn-cfg-textarea:focus {
   border-color: #4c8ef7;
-  background: rgba(255,255,255,0.09);
+  background-color: rgba(255,255,255,0.09);
 }
 .bpmn-cfg-select {
   appearance: none;
@@ -355,17 +355,17 @@ export const CONFIG_PANEL_CSS = `
 [data-bpmn-hud-theme="light"] .bpmn-cfg-input,
 [data-bpmn-hud-theme="light"] .bpmn-cfg-select,
 [data-bpmn-hud-theme="light"] .bpmn-cfg-textarea {
-  background: rgba(0,0,0,0.04);
+  background-color: rgba(0,0,0,0.04);
   border-color: rgba(0,0,0,0.12);
   color: rgba(0,0,0,0.85);
 }
 [data-bpmn-hud-theme="light"] .bpmn-cfg-input:focus,
 [data-bpmn-hud-theme="light"] .bpmn-cfg-select:focus,
 [data-bpmn-hud-theme="light"] .bpmn-cfg-textarea:focus {
-  background: rgba(0,0,0,0.06);
+  background-color: rgba(0,0,0,0.06);
 }
 [data-bpmn-hud-theme="light"] .bpmn-cfg-select {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M0 0l5 6 5-6' fill='none' stroke='rgba(0%2C0%2C0%2C0.45)' stroke-width='1.5'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M0 0l5 6 5-6' fill='none' stroke='rgba(0,0,0,0.45)' stroke-width='1.5'/%3E%3C/svg%3E");
 }
 
 [data-bpmn-hud-theme="light"] .bpmn-cfg-toggle-label { color: rgba(0,0,0,0.7); }
