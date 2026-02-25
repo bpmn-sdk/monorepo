@@ -24,6 +24,10 @@ export interface FieldSchema {
 	docsUrl?: string;
 	/** Mask the input (password-style) for secret values. */
 	secret?: boolean;
+	/** If true, the field is mandatory — shown with an asterisk and a red border when empty. */
+	required?: boolean;
+	/** If provided, the field is only shown when this returns true. */
+	condition?: (values: Record<string, FieldValue>) => boolean;
 }
 
 /** A named group of fields shown as a section in the full editor. */
@@ -51,6 +55,18 @@ export interface PanelAdapter {
 	read(defs: BpmnDefinitions, id: string): Record<string, FieldValue>;
 	/** Apply updated values and return new definitions. */
 	write(defs: BpmnDefinitions, id: string, values: Record<string, FieldValue>): BpmnDefinitions;
+	/**
+	 * Optional: dynamically resolve a different schema+adapter for this specific element instance.
+	 * Called on each select and diagram-change event. When it returns non-null the renderer uses
+	 * the returned registration instead of the one stored in the schema registry.
+	 *
+	 * Typical use: detect a `zeebe:modelerTemplate` attribute and switch to the matching template
+	 * schema without requiring a separate registration for every possible template.
+	 */
+	resolve?(
+		defs: BpmnDefinitions,
+		id: string,
+	): { schema: PanelSchema; adapter: PanelAdapter } | null;
 }
 
 /** The config panel plugin — extends CanvasPlugin with a schema registration API. */

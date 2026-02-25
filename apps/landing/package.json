@@ -18,6 +18,7 @@
 		"@bpmn-sdk/canvas-plugin-command-palette-editor": "workspace:*",
 		"@bpmn-sdk/canvas-plugin-config-panel": "workspace:*",
 		"@bpmn-sdk/canvas-plugin-config-panel-bpmn": "workspace:*",
+		"@bpmn-sdk/canvas-plugin-watermark": "workspace:*",
 		"@bpmn-sdk/editor": "workspace:*"
 	}
 }

@@ -13,7 +13,8 @@
 		"verify": "pnpm turbo build typecheck check test",
 		"changeset": "changeset",
 		"version-packages": "changeset version",
-		"release": "pnpm turbo build && changeset publish"
+		"release": "pnpm turbo build && changeset publish",
+		"update-connectors": "node scripts/update-connectors.mjs"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "^1.9.4",

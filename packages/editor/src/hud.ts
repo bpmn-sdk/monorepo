@@ -1,4 +1,6 @@
 import type { ViewportState } from "@bpmn-sdk/canvas";
+import { readDiColor } from "@bpmn-sdk/core";
+import { injectHudStyles } from "./css.js";
 import type { BpmnEditor } from "./editor.js";
 import {
 	CONTEXTUAL_ADD_TYPES,
@@ -20,10 +22,22 @@ interface GroupDef {
 }
 
 const GROUP_ICONS: Record<string, string> = {
-	events: IC.startEvent,
+	startEvents: IC.startEvent,
+	endEvents: IC.endEvent,
+	intermediateEvents: IC.messageCatchEvent,
 	activities: IC.task,
 	gateways: IC.exclusiveGateway,
+	annotations: IC.textAnnotation,
 };
+
+const COLOR_PALETTE: ReadonlyArray<{ fill: string; stroke: string }> = [
+	{ fill: "#bbdefb", stroke: "#0d4372" },
+	{ fill: "#c8e6c9", stroke: "#1b5e20" },
+	{ fill: "#fff9c4", stroke: "#f57f17" },
+	{ fill: "#ffccbc", stroke: "#bf360c" },
+	{ fill: "#e1bee7", stroke: "#4a148c" },
+	{ fill: "#dcedc8", stroke: "#33691e" },
+];
 
 const GROUPS: GroupDef[] = ELEMENT_GROUPS.map((g) => ({
 	...g,
@@ -53,27 +67,108 @@ const POSITION_LABELS: Record<LabelPosition, string> = {
 };
 
 export function initEditorHud(editor: BpmnEditor): void {
-	// ── DOM refs ───────────────────────────────────────────────────────────────
+	injectHudStyles();
 
-	const btnSelect = document.getElementById("btn-select") as HTMLButtonElement;
-	const btnPan = document.getElementById("btn-pan") as HTMLButtonElement;
-	const btnSpace = document.getElementById("btn-space") as HTMLButtonElement;
-	const toolGroupsEl = document.getElementById("tool-groups") as HTMLDivElement;
-	const btnUndo = document.getElementById("btn-undo") as HTMLButtonElement;
-	const btnRedo = document.getElementById("btn-redo") as HTMLButtonElement;
-	const btnDelete = document.getElementById("btn-delete") as HTMLButtonElement;
-	const btnDuplicate = document.getElementById("btn-duplicate") as HTMLButtonElement;
-	const btnTopMore = document.getElementById("btn-top-more") as HTMLButtonElement;
-	const btnZoomCurrent = document.getElementById("btn-zoom-current") as HTMLButtonElement;
-	const btnZoomOut = document.getElementById("btn-zoom-out") as HTMLButtonElement;
-	const btnZoomPct = document.getElementById("btn-zoom-pct") as HTMLButtonElement;
-	const btnZoomIn = document.getElementById("btn-zoom-in") as HTMLButtonElement;
-	const zoomExpanded = document.getElementById("zoom-expanded") as HTMLDivElement;
-	const cfgToolbar = document.getElementById("cfg-toolbar") as HTMLDivElement;
-	const ctxToolbar = document.getElementById("ctx-toolbar") as HTMLDivElement;
-	const zoomMenuEl = document.getElementById("zoom-menu") as HTMLDivElement;
-	const moreMenuEl = document.getElementById("more-menu") as HTMLDivElement;
-	const labelPosMenuEl = document.getElementById("label-pos-menu") as HTMLDivElement;
+	// ── Create and inject HUD DOM ──────────────────────────────────────────────
+
+	function hudBtn(id: string, title: string): HTMLButtonElement {
+		const b = document.createElement("button");
+		b.id = id;
+		b.className = "hud-btn";
+		b.title = title;
+		return b;
+	}
+
+	function hudSep(): HTMLDivElement {
+		const d = document.createElement("div");
+		d.className = "hud-sep";
+		return d;
+	}
+
+	// Action bar — top center
+	const btnUndo = hudBtn("btn-undo", "Undo (Ctrl+Z)");
+	const btnRedo = hudBtn("btn-redo", "Redo (Ctrl+Y)");
+	const btnDelete = hudBtn("btn-delete", "Delete");
+	const btnDuplicate = hudBtn("btn-duplicate", "Duplicate (Ctrl+D)");
+	const btnTopMore = hudBtn("btn-top-more", "More actions");
+
+	const hudTopCenter = document.createElement("div");
+	hudTopCenter.id = "hud-top-center";
+	hudTopCenter.className = "hud panel";
+	hudTopCenter.append(btnUndo, btnRedo, hudSep(), btnDelete, btnDuplicate, hudSep(), btnTopMore);
+
+	// Zoom widget — bottom left
+	const btnZoomCurrent = document.createElement("button");
+	btnZoomCurrent.id = "btn-zoom-current";
+	btnZoomCurrent.textContent = "100%";
+
+	const btnZoomOut = hudBtn("btn-zoom-out", "Zoom out (−)");
+
+	const btnZoomPct = document.createElement("button");
+	btnZoomPct.id = "btn-zoom-pct";
+	btnZoomPct.textContent = "100% ▾";
+
+	const btnZoomIn = hudBtn("btn-zoom-in", "Zoom in (+)");
+
+	const zoomExpanded = document.createElement("div");
+	zoomExpanded.id = "zoom-expanded";
+	zoomExpanded.append(btnZoomOut, btnZoomPct, btnZoomIn);
+
+	const hudBottomLeft = document.createElement("div");
+	hudBottomLeft.id = "hud-bottom-left";
+	hudBottomLeft.className = "hud panel";
+	hudBottomLeft.append(btnZoomCurrent, zoomExpanded);
+
+	// Tool selector — bottom center
+	const btnSelect = hudBtn("btn-select", "Select (V)");
+	btnSelect.classList.add("active");
+	const btnPan = hudBtn("btn-pan", "Hand (H)");
+	const btnSpace = hudBtn("btn-space", "Space tool");
+
+	const toolGroupsEl = document.createElement("div");
+	toolGroupsEl.id = "tool-groups";
+
+	const hudBottomCenter = document.createElement("div");
+	hudBottomCenter.id = "hud-bottom-center";
+	hudBottomCenter.className = "hud panel";
+	hudBottomCenter.append(btnSelect, btnPan, btnSpace, hudSep(), toolGroupsEl);
+
+	// Contextual toolbars (positioned dynamically)
+	const cfgToolbar = document.createElement("div");
+	cfgToolbar.id = "cfg-toolbar";
+	cfgToolbar.className = "hud panel";
+
+	const ctxToolbar = document.createElement("div");
+	ctxToolbar.id = "ctx-toolbar";
+	ctxToolbar.className = "hud panel";
+
+	// Dropdown menus
+	const zoomMenuEl = document.createElement("div");
+	zoomMenuEl.id = "zoom-menu";
+	zoomMenuEl.className = "dropdown";
+
+	const moreMenuEl = document.createElement("div");
+	moreMenuEl.id = "more-menu";
+	moreMenuEl.className = "dropdown";
+
+	const labelPosMenuEl = document.createElement("div");
+	labelPosMenuEl.id = "label-pos-menu";
+	labelPosMenuEl.className = "dropdown";
+
+	document.body.append(
+		hudTopCenter,
+		hudBottomLeft,
+		hudBottomCenter,
+		cfgToolbar,
+		ctxToolbar,
+		zoomMenuEl,
+		moreMenuEl,
+		labelPosMenuEl,
+	);
+
+	// ── Theme ──────────────────────────────────────────────────────────────────
+
+	document.body.dataset.bpmnHudTheme = editor.getTheme();
 
 	// ── Closure state ──────────────────────────────────────────────────────────
 
@@ -85,9 +180,12 @@ export function initEditorHud(editor: BpmnEditor): void {
 	let zoomOpen = false;
 
 	const groupActiveType: Record<string, CreateShapeType> = {
-		events: "startEvent",
+		startEvents: "startEvent",
+		endEvents: "endEvent",
+		intermediateEvents: "messageCatchEvent",
 		activities: "serviceTask",
 		gateways: "exclusiveGateway",
+		annotations: "textAnnotation",
 	};
 
 	const groupBtns: Record<string, HTMLButtonElement> = {};
@@ -328,10 +426,16 @@ export function initEditorHud(editor: BpmnEditor): void {
 	btnZoomOut.addEventListener("click", () => editor.zoomOut());
 	btnZoomIn.addEventListener("click", () => editor.zoomIn());
 
-	btnZoomPct.addEventListener("click", (e) => {
+	btnZoomPct.addEventListener("pointerdown", (e) => {
 		e.stopPropagation();
-		buildZoomMenu();
-		showDropdown(zoomMenuEl, btnZoomPct, "above");
+	});
+	btnZoomPct.addEventListener("click", () => {
+		if (openDropdown === zoomMenuEl) {
+			closeAllDropdowns();
+		} else {
+			buildZoomMenu();
+			showDropdown(zoomMenuEl, btnZoomPct, "above");
+		}
 	});
 
 	// ── More actions menu ──────────────────────────────────────────────────────
@@ -357,10 +461,16 @@ export function initEditorHud(editor: BpmnEditor): void {
 		}
 	}
 
-	btnTopMore.addEventListener("click", (e) => {
+	btnTopMore.addEventListener("pointerdown", (e) => {
 		e.stopPropagation();
-		buildMoreMenu();
-		showDropdown(moreMenuEl, btnTopMore, "right");
+	});
+	btnTopMore.addEventListener("click", () => {
+		if (openDropdown === moreMenuEl) {
+			closeAllDropdowns();
+		} else {
+			buildMoreMenu();
+			showDropdown(moreMenuEl, btnTopMore, "right");
+		}
 	});
 
 	// ── Action bar ─────────────────────────────────────────────────────────────
@@ -399,7 +509,8 @@ export function initEditorHud(editor: BpmnEditor): void {
 
 	function buildCtxToolbar(sourceId: string, sourceType: string): void {
 		ctxToolbar.innerHTML = "";
-		const canAddElements = sourceType !== "endEvent";
+		const isAnnotation = sourceType === "textAnnotation";
+		const canAddElements = !isAnnotation && sourceType !== "endEvent";
 
 		if (canAddElements) {
 			const arrowBtn = document.createElement("button");
@@ -437,6 +548,49 @@ export function initEditorHud(editor: BpmnEditor): void {
 				ctxToolbar.appendChild(btn);
 			}
 		}
+
+		// Color swatches and annotation button for non-annotation flow elements
+		if (!isAnnotation) {
+			if (ctxToolbar.children.length > 0) {
+				const sep = document.createElement("div");
+				sep.className = "hud-sep";
+				ctxToolbar.appendChild(sep);
+			}
+
+			// Get current shape color
+			const defs = editor.getDefinitions();
+			const diShape = defs?.diagrams[0]?.plane.shapes.find((s) => s.bpmnElement === sourceId);
+			const currentColor = diShape ? readDiColor(diShape.unknownAttributes) : {};
+
+			const swatchRow = document.createElement("div");
+			swatchRow.className = "bpmn-color-swatches";
+
+			for (const { fill, stroke } of COLOR_PALETTE) {
+				const swatch = document.createElement("button");
+				const isActive = currentColor.fill === fill;
+				swatch.className = isActive ? "bpmn-color-swatch active" : "bpmn-color-swatch";
+				swatch.style.background = fill;
+				swatch.style.outlineColor = stroke;
+				swatch.title = "Apply color";
+				swatch.addEventListener("click", () => {
+					// Toggle: clicking active swatch clears the color
+					editor.updateColor(sourceId, isActive ? {} : { fill, stroke });
+				});
+				swatchRow.appendChild(swatch);
+			}
+			ctxToolbar.appendChild(swatchRow);
+
+			// Add annotation button
+			const annotBtn = document.createElement("button");
+			annotBtn.className = "hud-btn";
+			annotBtn.innerHTML = IC.textAnnotation;
+			annotBtn.title = "Add text annotation";
+			annotBtn.addEventListener("click", () => {
+				editor.createAnnotationFor(sourceId);
+				hideCtxToolbar();
+			});
+			ctxToolbar.appendChild(annotBtn);
+		}
 	}
 
 	// ── Configure toolbar ──────────────────────────────────────────────────────
@@ -472,10 +626,16 @@ export function initEditorHud(editor: BpmnEditor): void {
 			labelBtn.className = "hud-btn";
 			labelBtn.innerHTML = IC.labelPos;
 			labelBtn.title = "Label position";
-			labelBtn.addEventListener("click", (e) => {
+			labelBtn.addEventListener("pointerdown", (e) => {
 				e.stopPropagation();
-				buildLabelPosMenu(sourceId, sourceType);
-				showDropdown(labelPosMenuEl, labelBtn, "above");
+			});
+			labelBtn.addEventListener("click", () => {
+				if (openDropdown === labelPosMenuEl) {
+					closeAllDropdowns();
+				} else {
+					buildLabelPosMenu(sourceId, sourceType);
+					showDropdown(labelPosMenuEl, labelBtn, "above");
+				}
 			});
 			cfgToolbar.appendChild(labelBtn);
 		}
@@ -589,8 +749,7 @@ export function initEditorHud(editor: BpmnEditor): void {
 	// ── Close zoom widget on outside click ─────────────────────────────────────
 
 	document.addEventListener("pointerdown", (e) => {
-		const bottomLeft = document.getElementById("hud-bottom-left");
-		if (zoomOpen && bottomLeft && !bottomLeft.contains(e.target as Node)) {
+		if (zoomOpen && !hudBottomLeft.contains(e.target as Node)) {
 			toggleZoomWidget();
 		}
 	});

@@ -40,12 +40,23 @@ export interface ZeebeProperties {
 	properties: ZeebePropertyEntry[];
 }
 
+/** Zeebe ad-hoc sub-process extension (AI Agent job worker pattern). */
+export interface ZeebeAdHoc {
+	/** Variable name that collects tool call results from child tasks. */
+	outputCollection?: string;
+	/** FEEL expression mapping each child task's result into the collection. */
+	outputElement?: string;
+	/** FEEL expression selecting which child element IDs to activate (BPMN-native mode). */
+	activeElementsCollection?: string;
+}
+
 /** Collected Zeebe extensions on a service task. */
 export interface ZeebeExtensions {
 	taskDefinition?: ZeebeTaskDefinition;
 	ioMapping?: ZeebeIoMapping;
 	taskHeaders?: ZeebeTaskHeaders;
 	properties?: ZeebeProperties;
+	adHoc?: ZeebeAdHoc;
 	/** Unrecognized extension elements preserved for roundtrip. */
 	unknownElements?: XmlElement[];
 }
@@ -115,6 +126,15 @@ export function zeebeExtensionsToXmlElements(extensions: ZeebeExtensions): XmlEl
 			attributes: {},
 			children,
 		});
+	}
+
+	if (extensions.adHoc) {
+		const attrs: Record<string, string> = {};
+		const { outputCollection, outputElement, activeElementsCollection } = extensions.adHoc;
+		if (outputCollection) attrs.outputCollection = outputCollection;
+		if (outputElement) attrs.outputElement = outputElement;
+		if (activeElementsCollection) attrs.activeElementsCollection = activeElementsCollection;
+		elements.push({ name: "zeebe:adHoc", attributes: attrs, children: [] });
 	}
 
 	if (extensions.unknownElements) {

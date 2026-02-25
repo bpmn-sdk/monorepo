@@ -3,26 +3,63 @@ import type { BpmnDefinitions } from "@bpmn-sdk/core";
 
 export type CreateShapeType =
 	| "startEvent"
+	| "messageStartEvent"
+	| "timerStartEvent"
+	| "conditionalStartEvent"
+	| "signalStartEvent"
 	| "endEvent"
+	| "messageEndEvent"
+	| "escalationEndEvent"
+	| "errorEndEvent"
+	| "compensationEndEvent"
+	| "signalEndEvent"
+	| "terminateEndEvent"
+	| "intermediateThrowEvent"
+	| "intermediateCatchEvent"
+	| "messageCatchEvent"
+	| "messageThrowEvent"
+	| "timerCatchEvent"
+	| "escalationThrowEvent"
+	| "conditionalCatchEvent"
+	| "linkCatchEvent"
+	| "linkThrowEvent"
+	| "compensationThrowEvent"
+	| "signalCatchEvent"
+	| "signalThrowEvent"
+	| "task"
 	| "serviceTask"
 	| "userTask"
 	| "scriptTask"
 	| "sendTask"
 	| "receiveTask"
 	| "businessRuleTask"
+	| "manualTask"
+	| "callActivity"
+	| "subProcess"
+	| "adHocSubProcess"
+	| "transaction"
 	| "exclusiveGateway"
 	| "parallelGateway"
 	| "inclusiveGateway"
-	| "eventBasedGateway";
+	| "eventBasedGateway"
+	| "complexGateway"
+	| "textAnnotation";
 
 /** Element types that support resize handles. */
 export const RESIZABLE_TYPES: ReadonlySet<string> = new Set([
+	"task",
 	"serviceTask",
 	"userTask",
 	"scriptTask",
 	"sendTask",
 	"receiveTask",
 	"businessRuleTask",
+	"manualTask",
+	"callActivity",
+	"subProcess",
+	"adHocSubProcess",
+	"transaction",
+	"textAnnotation",
 ]);
 
 export type Tool = "select" | "pan" | "space" | `create:${CreateShapeType}`;

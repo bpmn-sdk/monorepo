@@ -2,6 +2,10 @@ import type { RenderedShape, ViewportState } from "@bpmn-sdk/canvas";
 import type { BpmnDefinitions } from "@bpmn-sdk/core";
 import type { FieldSchema, FieldValue, GroupSchema, PanelAdapter, PanelSchema } from "./types.js";
 
+// Attribute set on the field wrapper div when the field has a condition, used
+// by _refreshConditionals to toggle visibility without a full re-render.
+const FIELD_WRAPPER_ATTR = "data-field-wrapper";
+
 interface Registration {
 	schema: PanelSchema;
 	adapter: PanelAdapter;
@@ -25,6 +29,8 @@ export class ConfigPanelRenderer {
 	private _fullOpen = false;
 	private _activeTabId: string | null = null;
 	private _values: Record<string, FieldValue> = {};
+	/** The effective registration after optional `resolve?` override. */
+	private _effectiveReg: Registration | null = null;
 
 	constructor(
 		schemas: Map<string, Registration>,
@@ -66,12 +72,18 @@ export class ConfigPanelRenderer {
 		this._selectedType = elementType;
 		this._selectedBounds = shape?.shape?.bounds ?? null;
 		this._elementName = shape?.flowElement?.name ?? "";
-		this._refreshValues(reg);
+
+		// Resolve optional template override
+		const defs = this._getDefinitions();
+		const resolved = defs ? (reg.adapter.resolve?.(defs, id) ?? null) : null;
+		this._effectiveReg = resolved ?? reg;
+
+		this._refreshValues(this._effectiveReg);
 
 		if (this._fullOpen) {
-			this._showFull(reg);
+			this._showFull(this._effectiveReg);
 		} else {
-			this._showCompact(reg);
+			this._showCompact(this._effectiveReg);
 		}
 	}
 
@@ -79,11 +91,24 @@ export class ConfigPanelRenderer {
 		if (!this._selectedId || !this._selectedType) return;
 		const reg = this._schemas.get(this._selectedType);
 		if (!reg) return;
-		this._values = reg.adapter.read(defs, this._selectedId);
-		this._refreshInputs();
-		if (this._fullOpen) {
-			this._refreshGroupVisibility(reg.schema.groups);
+
+		// Re-resolve in case a template was applied or removed
+		const resolved = reg.adapter.resolve?.(defs, this._selectedId) ?? null;
+		const newEffective = resolved ?? reg;
+
+		this._values = newEffective.adapter.read(defs, this._selectedId);
+
+		// If the effective registration changed (e.g. template applied), re-render
+		if (newEffective !== this._effectiveReg) {
+			this._effectiveReg = newEffective;
+			if (this._fullOpen) this._showFull(newEffective);
+			else this._showCompact(newEffective);
+			return;
 		}
+
+		this._refreshInputs();
+		this._refreshConditionals(newEffective.schema);
+		this._refreshValidation(newEffective.schema);
 	}
 
 	destroy(): void {
@@ -102,9 +127,14 @@ export class ConfigPanelRenderer {
 		if (!id || !type) return;
 		const reg = this._schemas.get(type);
 		if (!reg) return;
+		// Use the template-resolved adapter (if any) so template attributes are preserved on write
+		const effective = this._effectiveReg ?? reg;
 		this._values[key] = value;
+		// Refresh visibility and validation immediately without waiting for diagram:change
+		this._refreshConditionals(effective.schema);
+		this._refreshValidation(effective.schema);
 		const snapshot = { ...this._values };
-		this._applyChange((defs) => reg.adapter.write(defs, id, snapshot));
+		this._applyChange((defs) => effective.adapter.write(defs, id, snapshot));
 	}
 
 	private _centerSelected(targetScreenX: number, targetScreenY: number): void {
@@ -126,6 +156,7 @@ export class ConfigPanelRenderer {
 		this._fullOpen = false;
 		this._activeTabId = null;
 		this._values = {};
+		this._effectiveReg = null;
 	}
 
 	private _hideCompact(): void {
@@ -154,6 +185,45 @@ export class ConfigPanelRenderer {
 					el.value = typeof value === "string" ? value : "";
 				}
 			}
+		}
+	}
+
+	/**
+	 * Refresh both field-level and group-level conditional visibility.
+	 * Called synchronously after any value change so the UI updates immediately.
+	 */
+	private _refreshConditionals(schema: PanelSchema): void {
+		const container = this._fullOpen ? this._overlayEl : this._compactEl;
+		if (!container) return;
+
+		// Field-level conditions
+		const allFields = [...schema.compact, ...schema.groups.flatMap((g) => g.fields)];
+		for (const field of allFields) {
+			if (!field.condition) continue;
+			const wrapper = container.querySelector<HTMLElement>(
+				`[${FIELD_WRAPPER_ATTR}="${field.key}"]`,
+			);
+			if (wrapper) wrapper.style.display = field.condition(this._values) ? "" : "none";
+		}
+
+		// Group/tab conditions only apply in the full overlay
+		if (this._fullOpen) this._refreshGroupVisibility(schema.groups);
+	}
+
+	/** Update red-border invalid state for required fields that are empty. */
+	private _refreshValidation(schema: PanelSchema): void {
+		const container = this._fullOpen ? this._overlayEl : this._compactEl;
+		if (!container) return;
+		const allFields = [...schema.compact, ...schema.groups.flatMap((g) => g.fields)];
+		for (const field of allFields) {
+			if (!field.required) continue;
+			const wrapper = container.querySelector<HTMLElement>(
+				`[${FIELD_WRAPPER_ATTR}="${field.key}"]`,
+			);
+			if (!wrapper) continue;
+			const val = this._values[field.key];
+			const isEmpty = val === "" || val === undefined;
+			wrapper.classList.toggle("bpmn-cfg-field--invalid", isEmpty);
 		}
 	}
 
@@ -370,7 +440,16 @@ export class ConfigPanelRenderer {
 		const wrapper = document.createElement("div");
 		wrapper.className = "bpmn-cfg-field";
 
+		// Always stamp the key so _refreshConditionals and _refreshValidation can find the wrapper
+		wrapper.setAttribute(FIELD_WRAPPER_ATTR, field.key);
+		if (field.condition && !field.condition(this._values)) wrapper.style.display = "none";
+
 		const value = this._values[field.key];
+
+		// Initial required-empty state
+		if (field.required && (value === "" || value === undefined)) {
+			wrapper.classList.add("bpmn-cfg-field--invalid");
+		}
 
 		if (field.type === "toggle") {
 			wrapper.appendChild(this._renderToggle(field, value));
@@ -378,6 +457,14 @@ export class ConfigPanelRenderer {
 			const labelRow = document.createElement("div");
 			labelRow.className = "bpmn-cfg-field-label";
 			labelRow.textContent = field.label;
+
+			if (field.required) {
+				const star = document.createElement("span");
+				star.className = "bpmn-cfg-required-star";
+				star.textContent = "*";
+				star.setAttribute("aria-hidden", "true");
+				labelRow.appendChild(star);
+			}
 
 			if (field.docsUrl) {
 				const link = document.createElement("a");

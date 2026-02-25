@@ -17,7 +17,7 @@ import type {
 	Theme,
 } from "@bpmn-sdk/canvas";
 import { Bpmn } from "@bpmn-sdk/core";
-import type { BpmnBounds, BpmnDefinitions } from "@bpmn-sdk/core";
+import type { BpmnBounds, BpmnDefinitions, DiColor } from "@bpmn-sdk/core";
 import { CommandStack } from "./command-stack.js";
 import { injectEditorStyles } from "./css.js";
 import {
@@ -33,6 +33,9 @@ import { LabelEditor } from "./label-editor.js";
 import {
 	changeElementType as changeElementTypeFn,
 	copyElements,
+	createAnnotation,
+	createAnnotationWithLink,
+	createBoundaryEvent,
 	createConnection,
 	createEmptyDefinitions,
 	createShape,
@@ -44,6 +47,7 @@ import {
 	updateEdgeEndpoint,
 	updateLabel,
 	updateLabelPosition,
+	updateShapeColor,
 } from "./modeling.js";
 import type { Clipboard } from "./modeling.js";
 import { OverlayRenderer } from "./overlay.js";
@@ -73,15 +77,175 @@ function defaultBounds(
 ): { x: number; y: number; width: number; height: number } {
 	switch (type) {
 		case "startEvent":
+		case "messageStartEvent":
+		case "timerStartEvent":
+		case "conditionalStartEvent":
+		case "signalStartEvent":
 		case "endEvent":
+		case "messageEndEvent":
+		case "escalationEndEvent":
+		case "errorEndEvent":
+		case "compensationEndEvent":
+		case "signalEndEvent":
+		case "terminateEndEvent":
+		case "intermediateThrowEvent":
+		case "intermediateCatchEvent":
+		case "messageCatchEvent":
+		case "messageThrowEvent":
+		case "timerCatchEvent":
+		case "escalationThrowEvent":
+		case "conditionalCatchEvent":
+		case "linkCatchEvent":
+		case "linkThrowEvent":
+		case "compensationThrowEvent":
+		case "signalCatchEvent":
+		case "signalThrowEvent":
 			return { x: cx - 18, y: cy - 18, width: 36, height: 36 };
 		case "exclusiveGateway":
 		case "parallelGateway":
 		case "inclusiveGateway":
 		case "eventBasedGateway":
+		case "complexGateway":
 			return { x: cx - 25, y: cy - 25, width: 50, height: 50 };
+		case "subProcess":
+		case "adHocSubProcess":
+		case "transaction":
+			return { x: cx - 100, y: cy - 60, width: 200, height: 120 };
+		case "textAnnotation":
+			return { x: cx - 50, y: cy - 25, width: 100, height: 50 };
 		default:
 			return { x: cx - 50, y: cy - 40, width: 100, height: 80 };
+	}
+}
+
+function resolveEventPaletteType(bpmnType: string, defType: string): string {
+	if (bpmnType === "startEvent") {
+		if (defType === "message") return "messageStartEvent";
+		if (defType === "timer") return "timerStartEvent";
+		if (defType === "conditional") return "conditionalStartEvent";
+		if (defType === "signal") return "signalStartEvent";
+	}
+	if (bpmnType === "endEvent") {
+		if (defType === "message") return "messageEndEvent";
+		if (defType === "escalation") return "escalationEndEvent";
+		if (defType === "error") return "errorEndEvent";
+		if (defType === "compensate") return "compensationEndEvent";
+		if (defType === "signal") return "signalEndEvent";
+		if (defType === "terminate") return "terminateEndEvent";
+	}
+	if (bpmnType === "intermediateCatchEvent") {
+		if (defType === "message") return "messageCatchEvent";
+		if (defType === "timer") return "timerCatchEvent";
+		if (defType === "conditional") return "conditionalCatchEvent";
+		if (defType === "link") return "linkCatchEvent";
+		if (defType === "signal") return "signalCatchEvent";
+	}
+	if (bpmnType === "intermediateThrowEvent") {
+		if (defType === "message") return "messageThrowEvent";
+		if (defType === "escalation") return "escalationThrowEvent";
+		if (defType === "link") return "linkThrowEvent";
+		if (defType === "compensate") return "compensationThrowEvent";
+		if (defType === "signal") return "signalThrowEvent";
+	}
+	return bpmnType;
+}
+
+const INTERMEDIATE_EVENT_TYPES = new Set<CreateShapeType>([
+	"intermediateThrowEvent",
+	"intermediateCatchEvent",
+	"messageCatchEvent",
+	"messageThrowEvent",
+	"timerCatchEvent",
+	"escalationThrowEvent",
+	"conditionalCatchEvent",
+	"linkCatchEvent",
+	"linkThrowEvent",
+	"compensationThrowEvent",
+	"signalCatchEvent",
+	"signalThrowEvent",
+]);
+
+const ACTIVITY_TYPES = new Set([
+	"task",
+	"serviceTask",
+	"userTask",
+	"scriptTask",
+	"sendTask",
+	"receiveTask",
+	"businessRuleTask",
+	"manualTask",
+	"callActivity",
+	"subProcess",
+	"adHocSubProcess",
+	"eventSubProcess",
+	"transaction",
+]);
+
+function isIntermediateEventType(type: CreateShapeType): boolean {
+	return INTERMEDIATE_EVENT_TYPES.has(type);
+}
+
+function isActivityType(type: string): boolean {
+	return ACTIVITY_TYPES.has(type);
+}
+
+function snapToBoundary(
+	center: DiagPoint,
+	hostBounds: { x: number; y: number; width: number; height: number },
+	r: number,
+): { x: number; y: number; width: number; height: number } {
+	// Clamp center to host boundary and return event bounds
+	const left = hostBounds.x;
+	const right = hostBounds.x + hostBounds.width;
+	const top = hostBounds.y;
+	const bottom = hostBounds.y + hostBounds.height;
+
+	// Find the nearest point on the rect border
+	const clampedX = Math.max(left, Math.min(right, center.x));
+	const clampedY = Math.max(top, Math.min(bottom, center.y));
+
+	// Determine which edge is closest
+	const dLeft = Math.abs(center.x - left);
+	const dRight = Math.abs(center.x - right);
+	const dTop = Math.abs(center.y - top);
+	const dBottom = Math.abs(center.y - bottom);
+	const minD = Math.min(dLeft, dRight, dTop, dBottom);
+
+	let snapX = clampedX;
+	let snapY = clampedY;
+	if (minD === dLeft) snapX = left;
+	else if (minD === dRight) snapX = right;
+	else if (minD === dTop) snapY = top;
+	else snapY = bottom;
+
+	// Clamp to host boundary so center is on the edge
+	snapX = Math.max(left, Math.min(right, snapX));
+	snapY = Math.max(top, Math.min(bottom, snapY));
+
+	return { x: snapX - r, y: snapY - r, width: r * 2, height: r * 2 };
+}
+
+function intermediateEventDefType(type: CreateShapeType): string | null {
+	switch (type) {
+		case "messageCatchEvent":
+		case "messageThrowEvent":
+			return "message";
+		case "timerCatchEvent":
+			return "timer";
+		case "escalationThrowEvent":
+			return "escalation";
+		case "conditionalCatchEvent":
+			return "conditional";
+		case "linkCatchEvent":
+		case "linkThrowEvent":
+			return "link";
+		case "compensationThrowEvent":
+			return "compensate";
+		case "signalCatchEvent":
+		case "signalThrowEvent":
+			return "signal";
+		default:
+			return null;
 	}
 }
 
@@ -125,6 +289,7 @@ export class BpmnEditor {
 	private _ghostSnapCenter: DiagPoint | null = null;
 	private _createEdgeDropTarget: string | null = null;
 	private _readOnly = false;
+	private _boundaryHostId: string | null = null;
 
 	// ── Events ─────────────────────────────────────────────────────────
 	private readonly _listeners = new Map<string, Set<(...args: unknown[]) => void>>();
@@ -353,6 +518,8 @@ export class BpmnEditor {
 	setTool(tool: Tool): void {
 		if (this._readOnly) return;
 		this._overlay.setGhostCreate(null);
+		this._boundaryHostId = null;
+		this._overlay.setBoundaryHostHighlight(null);
 		this._overlay.setAlignmentGuides([]);
 		this._setCreateEdgeDropHighlight(null);
 		this._ghostSnapCenter = null;
@@ -365,6 +532,9 @@ export class BpmnEditor {
 		} else {
 			const elementType = tool.slice(7) as CreateShapeType;
 			this._stateMachine.setMode({ mode: "create", elementType });
+		}
+		if (tool.startsWith("create:")) {
+			this._host.focus();
 		}
 		this._emit("editor:tool", tool);
 	}
@@ -429,6 +599,10 @@ export class BpmnEditor {
 		const tx = (svgW - dW * scale) / 2 - bounds.minX * scale;
 		const ty = (svgH - dH * scale) / 2 - bounds.minY * scale;
 		this._viewport.set({ tx, ty, scale });
+	}
+
+	getTheme(): "light" | "dark" {
+		return this._host.getAttribute("data-theme") === "dark" ? "dark" : "light";
 	}
 
 	setTheme(theme: Theme): void {
@@ -693,10 +867,45 @@ export class BpmnEditor {
 		this._overlay.setAlignmentGuides([]);
 		const actualCenter = this._ghostSnapCenter ?? diagPoint;
 		this._ghostSnapCenter = null;
-		const edgeDropId = this._createEdgeDropTarget;
 		this._setCreateEdgeDropHighlight(null);
 		if (!this._defs) return;
 		const bounds = defaultBounds(type, actualCenter.x, actualCenter.y);
+
+		if (type === "textAnnotation") {
+			const result = createAnnotation(this._defs, bounds);
+			this._selectedIds = [result.id];
+			this._commandStack.push(result.defs);
+			this._renderDefs(result.defs);
+			this._emit("diagram:change", result.defs);
+			this._emit("editor:select", [result.id]);
+			this._startLabelEdit(result.id);
+			return;
+		}
+
+		// If hovering over an activity, create a boundary event
+		const boundaryHostId = this._boundaryHostId;
+		this._setBoundaryHost(null);
+
+		if (boundaryHostId && isIntermediateEventType(type) && this._defs) {
+			const hostShape = this._shapes.find((s) => s.id === boundaryHostId);
+			if (hostShape) {
+				const hostBounds = hostShape.shape.bounds;
+				// Snap the event center to the nearest point on the host boundary
+				const eventBounds = snapToBoundary(actualCenter, hostBounds, 18);
+				// Map palette type to event definition type
+				const eventDefType = intermediateEventDefType(type);
+				const result = createBoundaryEvent(this._defs, boundaryHostId, eventDefType, eventBounds);
+				this._selectedIds = [result.id];
+				this._commandStack.push(result.defs);
+				this._renderDefs(result.defs);
+				this._emit("diagram:change", result.defs);
+				this._emit("editor:select", [result.id]);
+				return;
+			}
+		}
+
+		const edgeDropId = this._createEdgeDropTarget;
+		this._setCreateEdgeDropHighlight(null);
 		const result = createShape(this._defs, type, bounds);
 		this._selectedIds = [result.id];
 		const finalDefs = edgeDropId
@@ -746,6 +955,7 @@ export class BpmnEditor {
 		const currentText =
 			process?.flowElements.find((el) => el.id === id)?.name ??
 			process?.sequenceFlows.find((sf) => sf.id === id)?.name ??
+			process?.textAnnotations.find((ta) => ta.id === id)?.text ??
 			"";
 		this._labelEditor.start(
 			id,
@@ -782,7 +992,26 @@ export class BpmnEditor {
 
 	/** Returns the BPMN element type for a given id, or null if not found. */
 	getElementType(id: string): string | null {
-		return this._shapes.find((s) => s.id === id)?.flowElement?.type ?? null;
+		const shape = this._shapes.find((s) => s.id === id);
+		if (!shape) return null;
+		if (shape.annotation !== undefined) return "textAnnotation";
+		const bpmnType = shape.flowElement?.type ?? null;
+		if (!bpmnType) return null;
+		// For events, resolve to specific palette type based on event definition
+		const el = shape.flowElement;
+		if (
+			el &&
+			(el.type === "startEvent" ||
+				el.type === "endEvent" ||
+				el.type === "intermediateCatchEvent" ||
+				el.type === "intermediateThrowEvent")
+		) {
+			const def = el.eventDefinitions[0];
+			if (def) {
+				return resolveEventPaletteType(el.type, def.type);
+			}
+		}
+		return bpmnType;
 	}
 
 	/**
@@ -951,6 +1180,37 @@ export class BpmnEditor {
 		});
 	}
 
+	/** Creates a text annotation linked to the given source shape via an association. */
+	createAnnotationFor(sourceId: string): void {
+		if (!this._defs) return;
+		const srcShape = this._shapes.find((s) => s.id === sourceId);
+		if (!srcShape) return;
+		const srcBounds = srcShape.shape.bounds;
+
+		// Place annotation above-right of source
+		const annW = 100;
+		const annH = 50;
+		const annBounds = {
+			x: srcBounds.x + srcBounds.width + 30,
+			y: srcBounds.y - annH - 10,
+			width: annW,
+			height: annH,
+		};
+
+		const result = createAnnotationWithLink(this._defs, annBounds, sourceId, srcBounds);
+		this._selectedIds = [result.annotationId];
+		this._commandStack.push(result.defs);
+		this._renderDefs(result.defs);
+		this._emit("diagram:change", result.defs);
+		this._emit("editor:select", [result.annotationId]);
+		this._startLabelEdit(result.annotationId);
+	}
+
+	/** Updates the color of a shape in the diagram. Pass `{}` to clear colors. */
+	updateColor(id: string, color: DiColor): void {
+		this._executeCommand((d) => updateShapeColor(d, id, color));
+	}
+
 	// ── Private helpers ────────────────────────────────────────────────
 
 	private _setEdgeSelected(edgeId: string | null): void {
@@ -1073,14 +1333,19 @@ export class BpmnEditor {
 	}
 
 	private _isResizable(id: string): boolean {
-		const el = this._shapes.find((s) => s.id === id)?.flowElement;
-		return el !== undefined && RESIZABLE_TYPES.has(el.type);
+		const shape = this._shapes.find((s) => s.id === id);
+		if (!shape) return false;
+		if (shape.annotation !== undefined) return true;
+		return shape.flowElement !== undefined && RESIZABLE_TYPES.has(shape.flowElement.type);
 	}
 
 	private _getResizableIds(): Set<string> {
 		const ids = new Set<string>();
 		for (const shape of this._shapes) {
-			if (shape.flowElement && RESIZABLE_TYPES.has(shape.flowElement.type)) {
+			if (
+				shape.annotation !== undefined ||
+				(shape.flowElement && RESIZABLE_TYPES.has(shape.flowElement.type))
+			) {
 				ids.add(shape.id);
 			}
 		}
@@ -1401,6 +1666,17 @@ export class BpmnEditor {
 		return null;
 	}
 
+	private _setBoundaryHost(shapeId: string | null): void {
+		if (this._boundaryHostId === shapeId) return;
+		this._boundaryHostId = shapeId;
+		if (shapeId) {
+			const shape = this._shapes.find((s) => s.id === shapeId);
+			this._overlay.setBoundaryHostHighlight(shape ? shape.shape.bounds : null);
+		} else {
+			this._overlay.setBoundaryHostHighlight(null);
+		}
+	}
+
 	private _setCreateEdgeDropHighlight(edgeId: string | null): void {
 		if (this._createEdgeDropTarget === edgeId) return;
 		if (this._createEdgeDropTarget) {
@@ -1441,6 +1717,18 @@ export class BpmnEditor {
 			this._overlay.setGhostCreate(mode.elementType, snappedCenter);
 			this._overlay.setAlignmentGuides(this._computeCreateGuides(snapped));
 			this._setCreateEdgeDropHighlight(this._findCreateEdgeDrop(snapped));
+
+			// Detect boundary event attachment target for intermediate event types
+			if (isIntermediateEventType(mode.elementType) && hit.type === "shape") {
+				const shape = this._shapes.find((s) => s.id === hit.id);
+				if (shape?.flowElement && isActivityType(shape.flowElement.type)) {
+					this._setBoundaryHost(hit.id);
+				} else {
+					this._setBoundaryHost(null);
+				}
+			} else {
+				this._setBoundaryHost(null);
+			}
 		}
 	};
 

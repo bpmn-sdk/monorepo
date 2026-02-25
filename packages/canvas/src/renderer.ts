@@ -3,8 +3,12 @@ import type {
 	BpmnDiEdge,
 	BpmnDiShape,
 	BpmnFlowElement,
+	BpmnLane,
+	BpmnParticipant,
 	BpmnSequenceFlow,
+	BpmnTextAnnotation,
 } from "@bpmn-sdk/core";
+import { readDiColor } from "@bpmn-sdk/core";
 import type { RenderedEdge, RenderedShape } from "./types.js";
 
 // ── SVG helpers ───────────────────────────────────────────────────────────────
@@ -85,6 +89,9 @@ function makeLabel(
  */
 function taskIcon(type: string): string {
 	switch (type) {
+		case "manualTask":
+			// Hand icon
+			return `<path d="M3 8V4.5a1 1 0 012 0V8M5 7V3a1 1 0 012 0v4M7 6a1 1 0 012 0v1.5M9 7.5a1 1 0 012 0V9c0 2.5-1.5 4-4.5 4H5c-2.5 0-4-1.5-4-4V8" class="bpmn-icon"/>`;
 		case "serviceTask":
 			// Gear: two concentric circles + 8 spokes
 			return `<circle cx="7" cy="7" r="5.5" class="bpmn-icon"/>
@@ -132,8 +139,17 @@ function eventMarker(defType: string, filled: boolean): string {
 			return `<path d="M-2 -5l2.5 4.5-3.5 0.5L2 5l-2.5-4.5 3.5-0.5z" class="${cls}"/>`;
 		case "escalation":
 			return `<path d="M0 -5.5l3.5 9.5-3.5-3.5-3.5 3.5z" class="${cls}"/>`;
-		case "compensation":
+		case "compensate":
 			return `<path d="M1 -3.5l-5 3.5 5 3.5zM6 -3.5l-5 3.5 5 3.5z" class="${cls}"/>`;
+		case "conditional":
+			return `<rect x="-4.5" y="-5.5" width="9" height="11" rx="1" class="${cls}"/>
+<path d="M-2.5 -2.5h5M-2.5 0h5M-2.5 2.5h3" class="bpmn-icon"/>`;
+		case "link":
+			return `<path d="M-2 -3.5v7l5.5-3.5z" class="${cls}"/><path d="M-6 0h4" class="bpmn-icon"/>`;
+		case "cancel":
+			return `<path d="M-4 -4l8 8M4 -4l-8 8" class="${cls}"/>`;
+		case "terminate":
+			return `<circle cx="0" cy="0" r="5" class="bpmn-icon-solid"/>`;
 		default:
 			return "";
 	}
@@ -153,6 +169,8 @@ function gatewayMarker(type: string): string {
 			return `<circle cx="0" cy="0" r="7" class="bpmn-gw-marker-stroke"/>
 <circle cx="0" cy="0" r="5" class="bpmn-gw-marker-stroke"/>
 <path d="M0 -4L3.8 1.8H-3.8Z" class="bpmn-gw-marker"/>`;
+		case "complexGateway":
+			return `<path d="M0 -8v16M-8 0h16M-5.7 -5.7l11.4 11.4M5.7 -5.7l-11.4 11.4" class="bpmn-gw-marker-stroke"/>`;
 		default:
 			return "";
 	}
@@ -177,11 +195,23 @@ interface ModelIndex {
 	elements: Map<string, BpmnFlowElement>;
 	/** id → BpmnSequenceFlow */
 	flows: Map<string, BpmnSequenceFlow>;
+	/** id → BpmnTextAnnotation */
+	annotations: Map<string, BpmnTextAnnotation>;
+	/** id → BpmnParticipant */
+	participants: Map<string, BpmnParticipant>;
+	/** id → BpmnLane */
+	lanes: Map<string, BpmnLane>;
+	/** id → messageFlow (stored by id for edge rendering) */
+	messageFlowIds: Set<string>;
 }
 
 function buildIndex(defs: BpmnDefinitions): ModelIndex {
 	const elements = new Map<string, BpmnFlowElement>();
 	const flows = new Map<string, BpmnSequenceFlow>();
+	const annotations = new Map<string, BpmnTextAnnotation>();
+	const participants = new Map<string, BpmnParticipant>();
+	const lanes = new Map<string, BpmnLane>();
+	const messageFlowIds = new Set<string>();
 
 	function indexProcess(flowElements: BpmnFlowElement[], sequenceFlows: BpmnSequenceFlow[]): void {
 		for (const el of flowElements) {
@@ -189,7 +219,8 @@ function buildIndex(defs: BpmnDefinitions): ModelIndex {
 			if (
 				el.type === "subProcess" ||
 				el.type === "adHocSubProcess" ||
-				el.type === "eventSubProcess"
+				el.type === "eventSubProcess" ||
+				el.type === "transaction"
 			) {
 				indexProcess(el.flowElements, el.sequenceFlows);
 			}
@@ -199,10 +230,44 @@ function buildIndex(defs: BpmnDefinitions): ModelIndex {
 		}
 	}
 
+	function indexLaneSet(laneSet: { lanes: BpmnLane[] }): void {
+		for (const lane of laneSet.lanes) {
+			lanes.set(lane.id, lane);
+			if (lane.childLaneSet) indexLaneSet(lane.childLaneSet);
+		}
+	}
+
 	for (const proc of defs.processes) {
 		indexProcess(proc.flowElements, proc.sequenceFlows);
+		for (const ta of proc.textAnnotations) {
+			annotations.set(ta.id, ta);
+		}
+		if (proc.laneSet) indexLaneSet(proc.laneSet);
 	}
-	return { elements, flows };
+	for (const collab of defs.collaborations) {
+		for (const p of collab.participants) {
+			participants.set(p.id, p);
+		}
+		for (const ta of collab.textAnnotations) {
+			annotations.set(ta.id, ta);
+		}
+		for (const mf of collab.messageFlows) {
+			messageFlowIds.add(mf.id);
+		}
+	}
+	return { elements, flows, annotations, participants, lanes, messageFlowIds };
+}
+
+// ── Color helper ─────────────────────────────────────────────────────────────
+
+/** Applies bioc/color namespace attributes as inline style on a shape body element. */
+function applyColor(el: SVGElement, shape: BpmnDiShape): void {
+	const { fill, stroke } = readDiColor(shape.unknownAttributes);
+	if (!fill && !stroke) return;
+	const parts: string[] = [];
+	if (fill) parts.push(`fill: ${fill}`);
+	if (stroke) parts.push(`stroke: ${stroke}`);
+	el.setAttribute("style", parts.join("; "));
 }
 
 // ── Shape renderers ───────────────────────────────────────────────────────────
@@ -236,12 +301,19 @@ function renderEvent(
 		r,
 		class: isEnd ? "bpmn-end-body" : "bpmn-event-body",
 	});
+	applyColor(outer, shape);
 	g.appendChild(outer);
 
-	// Intermediate: inner circle
+	// Intermediate: inner circle (dashed for non-interrupting boundary events)
 	if (isIntermediate) {
 		const inner = svgEl("circle");
-		attr(inner, { cx, cy, r: r - 3, class: "bpmn-event-inner" });
+		const isNonInterrupting = el?.type === "boundaryEvent" && el.cancelActivity === false;
+		attr(inner, {
+			cx,
+			cy,
+			r: r - 3,
+			class: isNonInterrupting ? "bpmn-event-inner-dashed" : "bpmn-event-inner",
+		});
 		g.appendChild(inner);
 	}
 
@@ -291,16 +363,37 @@ function renderTask(
 					? "bpmn-shape-body"
 					: "bpmn-shape-body";
 	attr(body, { x: 0, y: 0, width, height, rx: 10, class: bodyClass });
+	applyColor(body, shape);
 	g.appendChild(body);
 
+	// Transaction: double inner border
+	if (el?.type === "transaction") {
+		const inner = svgEl("rect");
+		attr(inner, { x: 3, y: 3, width: width - 6, height: height - 6, rx: 8, class: "bpmn-icon" });
+		g.appendChild(inner);
+	}
+
 	// Task type icon (14×14 at position 4,4)
-	const iconType = el?.type ?? "";
-	const iconSvg = taskIcon(iconType);
-	if (iconSvg) {
-		const iconG = svgEl("g");
-		attr(iconG, { transform: "translate(4 4)" });
-		iconG.innerHTML = iconSvg;
-		g.appendChild(iconG);
+	const templateIconUri = el?.unknownAttributes?.["zeebe:modelerTemplateIcon"];
+	if (templateIconUri) {
+		const img = svgEl("image");
+		attr(img, {
+			x: 4,
+			y: 4,
+			width: 14,
+			height: 14,
+			href: templateIconUri,
+			preserveAspectRatio: "xMidYMid meet",
+		});
+		g.appendChild(img);
+	} else {
+		const iconSvg = taskIcon(el?.type ?? "");
+		if (iconSvg) {
+			const iconG = svgEl("g");
+			attr(iconG, { transform: "translate(4 4)" });
+			iconG.innerHTML = iconSvg;
+			g.appendChild(iconG);
+		}
 	}
 
 	// Label — centred in shape
@@ -314,7 +407,8 @@ function renderTask(
 	if (
 		el?.type === "subProcess" ||
 		el?.type === "adHocSubProcess" ||
-		el?.type === "eventSubProcess"
+		el?.type === "eventSubProcess" ||
+		el?.type === "transaction"
 	) {
 		const markerG = svgEl("g");
 		attr(markerG, { transform: `translate(${width / 2} ${height - 10})` });
@@ -352,6 +446,7 @@ function renderGateway(
 		points: `${cx},0 ${width},${cy} ${cx},${height} 0,${cy}`,
 		class: "bpmn-gw-body",
 	});
+	applyColor(diamond, shape);
 	g.appendChild(diamond);
 
 	// Gateway marker centred in diamond
@@ -376,17 +471,110 @@ function renderGateway(
 	return g;
 }
 
-function renderAnnotation(shape: BpmnDiShape, instanceId: string): SVGGElement {
+function renderPool(
+	shape: BpmnDiShape,
+	participant: BpmnParticipant | undefined,
+	instanceId: string,
+): SVGGElement {
 	const { width, height } = shape.bounds;
 	const g = svgEl("g");
 
-	// Bracket (open rectangle on the left)
+	// Pool body
+	const bg = svgEl("rect");
+	attr(bg, { x: 0, y: 0, width, height, class: "bpmn-pool-body" });
+	g.appendChild(bg);
+
+	// Title bar (left column, 30px wide)
+	const titleBar = svgEl("rect");
+	attr(titleBar, { x: 0, y: 0, width: 30, height, class: "bpmn-pool-header" });
+	g.appendChild(titleBar);
+
+	// Pool name (rotated in title bar)
+	if (participant?.name) {
+		const text = svgEl("text");
+		attr(text, {
+			class: "bpmn-label",
+			transform: `translate(15 ${height / 2}) rotate(-90)`,
+		});
+		text.textContent = participant.name;
+		g.appendChild(text);
+	}
+
+	attr(g, {
+		class: "bpmn-shape bpmn-pool",
+		tabindex: "-1",
+		role: "region",
+		"data-bpmn-id": shape.bpmnElement,
+		"data-bpmn-instance": instanceId,
+	});
+	return g;
+}
+
+function renderLane(
+	shape: BpmnDiShape,
+	lane: BpmnLane | undefined,
+	instanceId: string,
+): SVGGElement {
+	const { width, height } = shape.bounds;
+	const g = svgEl("g");
+
+	// Lane body
+	const bg = svgEl("rect");
+	attr(bg, { x: 0, y: 0, width, height, class: "bpmn-lane-body" });
+	g.appendChild(bg);
+
+	// Title bar (left column, 30px wide)
+	const titleBar = svgEl("rect");
+	attr(titleBar, { x: 0, y: 0, width: 30, height, class: "bpmn-lane-header" });
+	g.appendChild(titleBar);
+
+	// Lane name (rotated in title bar)
+	if (lane?.name) {
+		const text = svgEl("text");
+		attr(text, {
+			class: "bpmn-label",
+			transform: `translate(15 ${height / 2}) rotate(-90)`,
+		});
+		text.textContent = lane.name;
+		g.appendChild(text);
+	}
+
+	attr(g, {
+		class: "bpmn-shape bpmn-lane",
+		tabindex: "-1",
+		role: "region",
+		"data-bpmn-id": shape.bpmnElement,
+		"data-bpmn-instance": instanceId,
+	});
+	return g;
+}
+
+function renderAnnotation(
+	shape: BpmnDiShape,
+	text: string | undefined,
+	instanceId: string,
+): SVGGElement {
+	const { width, height } = shape.bounds;
+	const g = svgEl("g");
+
+	// Transparent hit rect so the full bounding area is clickable/draggable
+	const hit = svgEl("rect");
+	attr(hit, { x: "0", y: "0", width: String(width), height: String(height), fill: "transparent" });
+	g.appendChild(hit);
+
+	// Bracket (open on the right — left + top + bottom strokes only)
 	const path = svgEl("path");
 	attr(path, {
-		d: `M${width * 0.3} 0 L0 0 L0 ${height} L${width * 0.3} ${height}`,
+		d: `M${width} 0 L0 0 L0 ${height} L${width} ${height}`,
 		class: "bpmn-icon",
 	});
 	g.appendChild(path);
+
+	// Annotation text centred in the full shape area
+	if (text) {
+		const labelEl = makeLabel(text, width / 2, height / 2, width - 8);
+		g.appendChild(labelEl);
+	}
 
 	attr(g, {
 		class: "bpmn-shape",
@@ -560,6 +748,16 @@ export function render(
 
 		if (flow) {
 			g = renderEdge(edge, flow, markerId);
+		} else if (index.messageFlowIds.has(edge.bpmnElement)) {
+			// Message flow — dashed arrow between pools
+			g = svgEl("g");
+			attr(g, { class: "bpmn-edge", "data-bpmn-id": edge.bpmnElement });
+			if (edge.waypoints.length >= 2) {
+				const points = edge.waypoints.map((wp) => `${wp.x},${wp.y}`).join(" ");
+				const path = svgEl("polyline");
+				attr(path, { points, class: "bpmn-msgflow-path", "marker-end": `url(#${markerId})` });
+				g.appendChild(path);
+			}
 		} else {
 			// Association or unknown edge type
 			g = renderAssociation(edge);
@@ -589,12 +787,33 @@ export function render(
 			type === "exclusiveGateway" ||
 			type === "parallelGateway" ||
 			type === "inclusiveGateway" ||
-			type === "eventBasedGateway"
+			type === "eventBasedGateway" ||
+			type === "complexGateway"
 		) {
 			g = renderGateway(shape, el, instanceId);
 		} else if (type === "" && !el) {
-			// Text annotation (not in flowElements, stored separately)
-			g = renderAnnotation(shape, instanceId);
+			// Could be: text annotation, pool (participant), or lane
+			const annotation = index.annotations.get(shape.bpmnElement);
+			if (annotation !== undefined) {
+				g = renderAnnotation(shape, annotation.text, instanceId);
+				attr(g, { transform: `translate(${x} ${y})` });
+				shapesLayer.appendChild(g);
+				shapes.push({ id: shape.bpmnElement, element: g, shape, flowElement: el, annotation });
+				continue;
+			}
+			if (index.participants.has(shape.bpmnElement)) {
+				g = renderPool(shape, index.participants.get(shape.bpmnElement), instanceId);
+			} else if (index.lanes.has(shape.bpmnElement)) {
+				g = renderLane(shape, index.lanes.get(shape.bpmnElement), instanceId);
+			} else {
+				// Unknown shape — invisible placeholder
+				g = svgEl("g");
+				attr(g, { "data-bpmn-id": shape.bpmnElement, "data-bpmn-instance": instanceId });
+				attr(g, { transform: `translate(${x} ${y})` });
+				shapesLayer.appendChild(g);
+				shapes.push({ id: shape.bpmnElement, element: g, shape, flowElement: el });
+				continue;
+			}
 		} else {
 			g = renderTask(shape, el, instanceId);
 		}
@@ -613,7 +832,8 @@ export function render(
 			type === "exclusiveGateway" ||
 			type === "parallelGateway" ||
 			type === "inclusiveGateway" ||
-			type === "eventBasedGateway";
+			type === "eventBasedGateway" ||
+			type === "complexGateway";
 		if (el?.name && isExternalLabelType) {
 			const lb = shape.label?.bounds ?? {
 				x: shape.bounds.x + shape.bounds.width / 2 - 40,

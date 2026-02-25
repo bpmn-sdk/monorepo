@@ -1,5 +1,206 @@
 # Progress
 
+## 2026-02-25 — SubProcess Containment + Sticky Movement
+
+### `@bpmn-sdk/editor` — Container-aware modeling operations
+
+- **Sticky movement** — moving an `adHocSubProcess` (or any subprocess/transaction) also moves all descendant DI shapes; edge waypoints for flows inside or connected to the subprocess are updated correctly using a new `collectAllSequenceFlows` helper that searches all nesting levels
+- **Containment on create** — when a new shape is dropped inside a subprocess's DI bounds, `createShape` detects the innermost container via `findContainerForPoint` and nests the new `BpmnFlowElement` inside it via `addToContainer`; the DI shape is always added flat to `diagram.plane.shapes`
+- **Cascade delete** — deleting a subprocess recursively collects all descendant element and flow IDs via `collectDescendantIds`, then `removeFromContainers` removes them from all nesting levels; DI shapes and edges for descendants are also removed
+- **Recursive label update** — `updateLabel` now uses `updateNameInElements` which searches all nesting levels; renaming a task inside a subprocess now works
+- **Recursive incoming/outgoing update** — `createConnection` now uses `updateRefInElements` so connecting subprocess-child elements correctly updates their `incoming`/`outgoing` refs
+
+## 2026-02-25 — Agentic AI Subprocess Support
+
+### `@bpmn-sdk/core` — `ZeebeAdHoc` typed interface
+- **`ZeebeAdHoc`** interface added to `zeebe-extensions.ts`: `outputCollection`, `outputElement`, `activeElementsCollection` fields
+- **`ZeebeExtensions.adHoc`** field added; `zeebeExtensionsToXmlElements` now serialises `zeebe:adHoc` element when present
+
+### `@bpmn-sdk/canvas-plugin-config-panel-bpmn` — Full AI Agent template support
+- **`TemplateBinding`** union extended with `{ type: "zeebe:adHoc"; property: "outputCollection" | "outputElement" | "activeElementsCollection" }` in `template-types.ts`
+- **`getPropertyKey`** handles `zeebe:adHoc` → `adHoc.${property}` key
+- **`readPropertyValue`** reads `zeebe:adHoc` attributes via `getAdHocAttr(el.extensionElements, property)`; `el` parameter widened to include `extensionElements`
+- **`applyBinding`** accepts new `adHocProps` accumulator; populates it for `zeebe:adHoc` bindings
+- **Template engine `write`**: adds `"adHoc"` to `ZEEBE_LOCAL` set (prevents duplicate elements); passes `adHocProps` to `zeebeExtensionsToXmlElements` → produces correct `<zeebe:adHoc outputCollection="toolCallResults" outputElement="..."/>` in the XML
+- **`getAdHocAttr`** helper added to `util.ts`
+- **`ADHOC_SUBPROCESS_TEMPLATES`** — filters `CAMUNDA_CONNECTOR_TEMPLATES` to templates that apply to `bpmn:SubProcess` (including `io.camunda.connectors.agenticai.aiagent.jobworker.v1`)
+- **`ADHOC_OPTIONS`** dropdown — "Custom" + all ad-hoc subprocess templates, sorted alphabetically
+- **`GENERIC_ADHOC_SCHEMA` + `ADHOC_SUBPROCESS_ADAPTER`** — template-aware config panel for `adHocSubProcess`; `resolve()` hook delegates to the AI Agent template registration when `zeebe:modelerTemplate` is set; `write()` stamps `zeebe:modelerTemplate` and delegates to template adapter; clearing sets connector to "" and removes all modelerTemplate attributes
+- **`adHocSubProcess`** registered in `createConfigPanelBpmnPlugin.install()`
+- **6 new tests** in `index.test.ts` covering registration, read/write, resolve, template delegation, and clearing
+
+### `@bpmn-sdk/editor` — Ad-hoc subprocess as a creatable element
+- **`CreateShapeType`**: `"adHocSubProcess"` added to the union
+- **`RESIZABLE_TYPES`**: `"adHocSubProcess"` added
+- **`ELEMENT_TYPE_LABELS`**: `adHocSubProcess: "Ad-hoc Sub-Process"` added
+- **`ELEMENT_GROUPS`**: `"adHocSubProcess"` added to the Activities group (after `subProcess`, before `transaction`)
+- **`makeFlowElement`**: `case "adHocSubProcess"` — creates element with empty `flowElements`, `sequenceFlows`, `textAnnotations`, `associations`
+- **`changeElementType`**: `case "adHocSubProcess"` — preserves child contents when changing to/from ad-hoc subprocess
+- **`defaultBounds`**: `"adHocSubProcess"` added alongside `"subProcess"` and `"transaction"` — 200×120 px
+- **`icons.ts`**: `adHocSubProcess` SVG icon added (rounded rect + tilde wave marker, matches BPMN standard notation)
+
+## 2026-02-25 — Config Panel: Template Adapter Bug Fix + Required Field Indicators
+
+### `@bpmn-sdk/canvas-plugin-config-panel` — Bug fix + required field UI
+- **Bug**: `_applyField` was always using the base registered adapter (`this._schemas.get(type)`) instead of `this._effectiveReg` (the template-resolved adapter). The generic `SERVICE_TASK_ADAPTER.write()` explicitly strips `zeebe:modelerTemplate`, causing the template panel to revert to the generic service task form whenever a field was changed while a connector template was active. Fixed by resolving `effective = this._effectiveReg ?? reg` and using `effective.adapter.write()` + `effective.schema` in `_applyField`.
+- **Feature**: Required field visual indication — `FieldSchema` gains an optional `required?: boolean` field; when set, a red asterisk (`*`) is shown next to the label and the input/select/textarea gets a red border when empty. Validation state is refreshed on every field change and on diagram reload.
+- **`_refreshValidation(schema)`** — new method that toggles `.bpmn-cfg-field--invalid` on field wrappers for required fields with empty values; called from `_applyField` and `onDiagramChange`.
+- **`FIELD_WRAPPER_ATTR`** now stamped on every field wrapper (not just conditional ones) so both `_refreshConditionals` and `_refreshValidation` can query by key.
+- **CSS**: `.bpmn-cfg-required-star` (red `#f87171`) and `.bpmn-cfg-field--invalid` border style added to `css.ts`.
+
+### `@bpmn-sdk/canvas-plugin-config-panel-bpmn` — Propagate `required` from templates
+- **`propToFieldSchema`** — sets `required: true` on the generated `FieldSchema` when `prop.constraints?.notEmpty === true`; all Camunda connector template fields marked `notEmpty` now show the required indicator in the config panel.
+
+## 2026-02-25 — Connector Template Icons Rendered in Canvas
+
+### `@bpmn-sdk/canvas` — Template icon rendering
+- **`renderer.ts`** — `renderTask()` checks `el.unknownAttributes["zeebe:modelerTemplateIcon"]`; if present, renders an SVG `<image>` element (14×14 at position 4,4) with `href` set to the data URI instead of the hardcoded gear icon; standard task type icons are unaffected
+- **1 new test** in `canvas.test.ts`: verifies `<image>` is rendered and gear icon circles are absent when `modelerTemplateIcon` is set
+
+### `@bpmn-sdk/canvas-plugin-config-panel-bpmn` — Stamp icon on template apply
+- **`template-engine.ts`** — `adapter.write()` now includes `zeebe:modelerTemplateIcon` in `unknownAttributes` when the template has `icon.contents`; icon is persisted to the BPMN element whenever a connector template is applied via the UI
+
+## 2026-02-25 — Connector Templates Usable via Core Builder
+
+### `@bpmn-sdk/canvas-plugin-config-panel-bpmn` — `templateToServiceTaskOptions`
+- **`templateToServiceTaskOptions(template, values)`** — converts any `ElementTemplate` + user-provided values into `ServiceTaskOptions` for the core `Bpmn` builder; applies Hidden property defaults and user values to zeebe bindings
+- **`CAMUNDA_CONNECTOR_TEMPLATES`** — now exported from the package public API
+- **3 new tests** in `tests/template-to-service-task.test.ts`: Kafka connector options, full Bpmn build integration, REST connector template defaults
+
+## 2026-02-25 — Camunda Connector Templates: Fetch, Generate, Integrate
+
+### `@bpmn-sdk/canvas-plugin-config-panel-bpmn` — All 116 Camunda connectors
+- **`scripts/update-connectors.mjs`** — new script that fetches all OOTB connector templates from the Camunda marketplace (`marketplace.cloud.camunda.io/api/v1/ootb-connectors`), resolves each template's `ref` URL, and writes `canvas-plugins/config-panel-bpmn/src/templates/generated.ts` with all templates as a typed array
+- **`pnpm update-connectors`** — root-level script to regenerate `generated.ts` at any time
+- **`generated.ts`** excluded from Biome linting (`biome.json` `files.ignore`)
+- **116 connector templates** registered in `TEMPLATE_REGISTRY` at startup (all OOTB Camunda connectors: REST, Slack, Salesforce, ServiceNow, GitHub, Twilio, AWS, Azure, Google, WhatsApp, Facebook, etc.)
+- **Connector selector** shows all 116 service-task connectors (one entry per template id, no collisions even when multiple connectors share the same underlying task type)
+- **Write path** accepts template id directly from CONNECTOR_OPTIONS, with backward-compat fallback to task type → template id map
+- **`TASK_TYPE_TO_TEMPLATE_ID`** built with first-wins per task type for backward-compat detection
+- **Deleted `rest-connector.ts`** — hand-written REST template superseded by `generated.ts`
+
+## 2026-02-25 — Element Templates System + REST Connector Template
+
+### `@bpmn-sdk/canvas-plugin-config-panel-bpmn` — Template-aware property panel
+- **Element template types** — `ElementTemplate`, `TemplateProperty`, `TemplateBinding`, `TemplateCondition` TypeScript types matching the Camunda element templates JSON schema
+- **Template engine** — `buildRegistrationFromTemplate(template)` converts any element template descriptor into a `PanelSchema` + `PanelAdapter` pair; handles all binding types (`zeebe:input`, `zeebe:taskHeader`, `zeebe:taskDefinition`), condition types (`equals`, `oneOf`, `allMatch`), and property types (`String`, `Text`, `Dropdown`, `Boolean`, `Number`, `Hidden`)
+- **REST Outbound Connector template** — official Camunda template (`io.camunda.connectors.HttpJson.v2`, version 12) bundled as TypeScript; covers all 8 groups: Authentication (noAuth/apiKey/basic/bearer/OAuth 2.0), HTTP endpoint, Timeout, Payload, Output mapping, Error handling, Retries
+- **Dynamic schema resolution** — `PanelAdapter.resolve?()` mechanism: when `zeebe:modelerTemplate` attribute is detected on an element (or inferred from known task type), the panel switches to the template-specific form automatically
+- **Template application** — selecting a connector in the generic service task form stamps `zeebe:modelerTemplate` + delegates all field writes to the template adapter (including template-specific fields like URL, method, auth)
+- **`registerTemplate(template)`** — public API on the plugin for registering additional element templates at runtime
+- **`TEMPLATE_ID_TO_TASK_TYPE` / `TASK_TYPE_TO_TEMPLATE_ID`** maps for bidirectional connector detection
+- **Backward compatibility** — elements with known task definition types (e.g. `io.camunda:http-json:1`) but without `zeebe:modelerTemplate` are still detected and shown with the correct template form
+
+### `@bpmn-sdk/canvas-plugin-config-panel` — Dynamic registration
+- **`PanelAdapter.resolve?(defs, id)`** — optional method that overrides the schema+adapter for a specific element instance; renderer calls it on every select and diagram-change event
+- **Re-render on schema change** — when `resolve?` returns a different registration (e.g. template applied), the compact/full panel re-renders automatically without requiring a manual re-select
+
+### `@bpmn-sdk/core` — Builder
+- **`restConnector()` stamps `zeebe:modelerTemplate`** — builder now sets `zeebe:modelerTemplate: "io.camunda.connectors.HttpJson.v2"` and `zeebe:modelerTemplateVersion: "12"` on the element; programmatically generated BPMN is now recognized by the editor's template panel
+
+## 2026-02-25 — Intermediate Event Subgroups, Boundary Events, Ghost Fix
+
+### `@bpmn-sdk/editor` — Event system overhaul
+- **3 event subgroups** — single "Events" palette group replaced with `startEvents` (5 types), `endEvents` (7 types), `intermediateEvents` (10 types)
+- **20 new `CreateShapeType` values** — one per BPMN event variant: `messageStartEvent`, `timerStartEvent`, `conditionalStartEvent`, `signalStartEvent`; `messageEndEvent`, `escalationEndEvent`, `errorEndEvent`, `compensationEndEvent`, `signalEndEvent`, `terminateEndEvent`; `messageCatchEvent`, `messageThrowEvent`, `timerCatchEvent`, `escalationThrowEvent`, `conditionalCatchEvent`, `linkCatchEvent`, `linkThrowEvent`, `compensationThrowEvent`, `signalCatchEvent`, `signalThrowEvent`
+- **`makeFlowElement` / `changeElementType`** — all 20 new types map to the correct BPMN base type (`startEvent`, `endEvent`, `intermediateCatchEvent`, `intermediateThrowEvent`) with the right `eventDefinitions` entry
+- **Type-switch restriction** — types can only change within their subgroup: start events ↔ start events, end ↔ end, intermediate ↔ intermediate (enforced by group membership)
+- **`getElementType` resolution** — returns specific palette type (e.g. `"messageCatchEvent"`) by inspecting `eventDefinitions[0]`; cfg toolbar highlights the correct active variant
+- **Boundary events** — creating any intermediate event type while hovering over an activity shows a dashed blue highlight on the host; on click, a `boundaryEvent` is created attached to that activity at the cursor's nearest boundary point; `cancelActivity = true` by default
+- **`createBoundaryEvent(defs, hostId, eventDefType, bounds)`** — new modeling function; creates `BpmnBoundaryEvent` in `process.flowElements` + DI shape
+- **`moveShapes` cascade** — moving an activity automatically also moves its attached boundary events
+- **`deleteElements` cascade** — deleting an activity also deletes its attached boundary events
+- **Ghost shape preview fix** — `overlay.ts::setGhostCreate` now renders correct shape per type: thin circle (start), thick circle (end), double ring (intermediate), diamond (gateway), bracket (annotation), rounded rect (activities)
+- **`defaultBoundsForType` in overlay.ts** — fixed to cover all event and gateway types (36×36 for events, 50×50 for gateways)
+- **Escape key to cancel** — canvas host is now focused when entering create mode, ensuring Escape key correctly cancels creation
+- **39 element commands** — command palette and shape palette now cover all BPMN element variants (was 21, now 39)
+
+## 2026-02-25 — Full BPMN Element Type Coverage
+
+### `@bpmn-sdk/core` — New model types
+- **`BpmnTask`**, **`BpmnManualTask`**, **`BpmnTransaction`**, **`BpmnComplexGateway`** — new flow element interfaces added to the discriminated union
+- **`BpmnLane`**, **`BpmnLaneSet`** — swimlane hierarchy; `BpmnProcess.laneSet` optional field
+- **`BpmnMessageFlow`** — inter-pool communication; `BpmnCollaboration.messageFlows` array
+- **New event definitions** — `BpmnConditionalEventDefinition`, `BpmnLinkEventDefinition`, `BpmnCancelEventDefinition`, `BpmnTerminateEventDefinition`, `BpmnCompensateEventDefinition`; all added to `BpmnEventDefinition` union
+- **Parser** — full parse support for all new types including `parseLaneSet`, `parseLane`, `parseMessageFlow`; `compensation` → `compensate` event def rename
+- **Serializer** — full serialize support for all new types; `serializeLaneSet`, `serializeLane`, `serializeMessageFlow`
+- **Builder** — `makeFlowElement` extended with task, manualTask, complexGateway, transaction cases
+
+### `@bpmn-sdk/canvas` — New renderers
+- **Pool/lane rendering** — `renderPool` and `renderLane` produce container rects with rotated title bars; `ModelIndex` now indexes `participants` and `lanes` maps
+- **Message flow rendering** — dashed inter-pool arrows rendered in the edge loop via `messageFlowIds` Set
+- **Non-interrupting boundary events** — dashed inner ring via new `.bpmn-event-inner-dashed` CSS class when `cancelActivity === false`
+- **Transaction** — double inner border rect inside the task body
+- **New event markers** — conditional (document icon), link (arrow), cancel (X), terminate (filled circle); `compensation` renamed to `compensate`
+- **New gateway marker** — complexGateway asterisk (diagonal + cross paths)
+- **New task icon** — manualTask (hand SVG path)
+
+### `@bpmn-sdk/editor` — New creatable types
+- **8 new `CreateShapeType` values** — `intermediateThrowEvent`, `intermediateCatchEvent`, `task`, `manualTask`, `callActivity`, `subProcess`, `transaction`, `complexGateway`
+- **`RESIZABLE_TYPES`** — task, manualTask, callActivity, subProcess, transaction added
+- **`defaultBounds`** — intermediate events 36×36; complexGateway 50×50; subProcess/transaction 200×120
+- **Element groups** — events group gains intermediate throw/catch; activities group gains task, manualTask, callActivity, subProcess, transaction; gateways group gains complexGateway
+- **Icons** — all 8 new types have dedicated SVG icons
+- **`EXTERNAL_LABEL_TYPES`** — intermediateThrowEvent, intermediateCatchEvent, complexGateway added (external label placement)
+- **`makeFlowElement` / `changeElementType`** — all 8 new types handled in modeling operations
+
+### `@bpmn-sdk/canvas-plugin-command-palette-editor`
+- Updated command count: 21 element creation commands (was 13); test updated accordingly
+
+## 2026-02-25 — Watermark Plugin
+
+### `@bpmn-sdk/canvas-plugin-watermark` (NEW)
+- **`createWatermarkPlugin(options?)`** — bottom-right attribution bar; renders configurable links and an optional square SVG logo; logo is always the rightmost element; fully self-contained CSS injection
+- **`WatermarkLink`** / **`WatermarkOptions`** interfaces exported
+- 7 tests; added to `canvas-plugins/*` workspace
+
+### `@bpmn-sdk/landing` — editor page
+- Added watermark plugin with a "Github" link (`https://github.com/bpmn-sdk/monorepo`) and a BPMN-flow square SVG logo (start event → task → end event on blue rounded square)
+
+## 2026-02-25 — Annotation Bug Fixes
+
+### `@bpmn-sdk/canvas`
+- **Annotation selection** — added transparent `<rect>` fill covering the full bounding area so the entire annotation rectangle is clickable/draggable
+- **Bracket path** — changed from short-stub to full-width open-right bracket (`M w 0 L 0 0 L 0 h L w h`) matching standard BPMN notation
+- **Annotation text position** — text now centred in the full shape area (`cx = width/2, cy = height/2, maxW = width - 8`)
+
+## 2026-02-25 — Colors & Text Annotations
+
+### `@bpmn-sdk/core` — `DiColor` helpers
+- **NEW `packages/bpmn-sdk/src/bpmn/di-color.ts`** — `DiColor` interface, `readDiColor`, `writeDiColor`, `BIOC_NS`, `COLOR_NS` re-exported from `@bpmn-sdk/core`
+
+### `@bpmn-sdk/canvas` — Color rendering + annotation text
+- **`RenderedShape.annotation?: BpmnTextAnnotation`** — annotation object available on rendered shapes
+- **Color rendering** — `applyColor(el, shape)` helper reads `bioc:fill`/`bioc:stroke` (+ OMG namespace equivalents) from DI `unknownAttributes` and applies inline `style` on shape bodies (task rect, event outer circle, gateway diamond)
+- **Annotation text** — `renderAnnotation` now accepts a `text` param and renders wrapped text inside the bracket
+- **Model index** — `buildIndex` now indexes `textAnnotations` from all processes and collaborations
+
+### `@bpmn-sdk/editor` — New tools, color editing, annotation editing
+- **`textAnnotation` type** — added to `CreateShapeType`, `ELEMENT_GROUPS` ("Annotations" group), `ELEMENT_TYPE_LABELS`, `RESIZABLE_TYPES`, `defaultBounds`
+- **`createAnnotation(defs, bounds, text?)`** — creates a `BpmnTextAnnotation` + DI shape
+- **`createAnnotationWithLink(defs, bounds, sourceId, sourceBounds, text?)`** — creates annotation + `BpmnAssociation` + DI edge
+- **`updateShapeColor(defs, id, color)`** — writes `bioc:`/`color:` attributes via `writeDiColor`; adds namespaces to definitions
+- **`updateLabel`** — extended to update `text` on `BpmnTextAnnotation`
+- **`deleteElements`** — cascades to remove linked associations (and their DI edges) when a flow element or annotation is deleted
+- **`moveShapes`** — recomputes association edge waypoints when source or target shape moves
+- **`editor.createAnnotationFor(sourceId)`** — creates a linked annotation above-right of source; opens label editor
+- **`editor.updateColor(id, color)`** — applies color or clears it (pass `{}`)
+- **Double-click annotation** — opens label editor via existing `_startLabelEdit` (now reads `textAnnotations.text`)
+- **Annotation resize** — `_isResizable`/`_getResizableIds` now include annotation shapes
+- **HUD color swatches** — 6 preset color swatches in ctx toolbar for all non-annotation flow elements; clicking active swatch clears the color
+- **HUD annotation button** — "Add text annotation" button in ctx toolbar creates a linked annotation
+
+## 2026-02-25
+
+### `@bpmn-sdk/canvas-plugin-config-panel` + `@bpmn-sdk/canvas-plugin-config-panel-bpmn` — Connector selector
+- **`FieldSchema.condition`** — new optional field; hides a field when the predicate returns false, mirroring the existing `GroupSchema.condition` at the individual-field level
+- **`ConfigPanelRenderer._refreshConditionals`** — new method updates both field-level and group/tab visibility; called synchronously from `_applyField` (immediate UI) and `onDiagramChange` (after external model update)
+- **Service task "Connector" selector** — replaces the raw `taskType` text input with a `connector` select dropdown:
+  - `""` → **Custom** — shows a `taskType` text field for the Zeebe job type string
+  - `"io.camunda:http-json:1"` → **REST Connector** — hides the task-type field; shows Request / Authentication / Output tab groups
+- **Adapter logic** — `read()` derives `connector` value from `taskDefinition.type`; `write()` only emits REST ioMapping / taskHeaders when REST connector is selected (switching to Custom clears REST-specific extensions)
+- **4 new tests** in `canvas-plugins/config-panel-bpmn/tests/index.test.ts`
+
 ## 2026-02-24
 
 ### Config panel fixes (round 2)

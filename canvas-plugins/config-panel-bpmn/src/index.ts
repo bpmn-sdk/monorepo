@@ -2,8 +2,10 @@
  * @bpmn-sdk/canvas-plugin-config-panel-bpmn — BPMN element schemas for the
  * config panel plugin.
  *
- * Registers config panel schemas for all standard BPMN element types,
- * including a full REST connector form for service tasks.
+ * Registers config panel schemas for all standard BPMN element types. For
+ * service tasks the panel is template-aware: when `zeebe:modelerTemplate` is
+ * set on an element the matching template's property form is shown instead of
+ * the generic connector selector.
  *
  * ## Usage
  * ```typescript
@@ -34,6 +36,11 @@ import type { BpmnDefinitions } from "@bpmn-sdk/core";
 import { zeebeExtensionsToXmlElements } from "@bpmn-sdk/core";
 import { ELEMENT_TYPE_LABELS } from "@bpmn-sdk/editor";
 import type { CreateShapeType } from "@bpmn-sdk/editor";
+import { buildRegistrationFromTemplate } from "./template-engine.js";
+import type { ElementTemplate } from "./template-types.js";
+import { CAMUNDA_CONNECTOR_TEMPLATES } from "./templates/generated.js";
+export { CAMUNDA_CONNECTOR_TEMPLATES } from "./templates/generated.js";
+export { templateToServiceTaskOptions } from "./template-to-service-task.js";
 import {
 	findFlowElement,
 	getIoInput,
@@ -42,6 +49,52 @@ import {
 	updateFlowElement,
 	xmlLocalName,
 } from "./util.js";
+
+// ── Built-in template registry ────────────────────────────────────────────────
+
+/**
+ * All built-in Camunda connector templates, keyed by template id.
+ * Pre-built so that reference-equality comparisons in the renderer work.
+ */
+const TEMPLATE_REGISTRY = new Map<string, ReturnType<typeof buildRegistrationFromTemplate>>();
+
+/** Templates applicable to service tasks. */
+const SERVICE_TASK_TEMPLATES = CAMUNDA_CONNECTOR_TEMPLATES.filter(
+	(t) => t.appliesTo.includes("bpmn:ServiceTask") || t.appliesTo.includes("bpmn:Task"),
+);
+
+/** Extract the fixed task definition type from a template's Hidden binding. */
+function extractTaskType(t: ElementTemplate): string | undefined {
+	for (const p of t.properties) {
+		if (typeof p.value !== "string") continue;
+		if (
+			(p.binding.type === "zeebe:taskDefinition" &&
+				"property" in p.binding &&
+				p.binding.property === "type") ||
+			p.binding.type === "zeebe:taskDefinition:type"
+		) {
+			return p.value;
+		}
+	}
+	return undefined;
+}
+
+// Register all Camunda connector templates
+for (const tpl of CAMUNDA_CONNECTOR_TEMPLATES) {
+	TEMPLATE_REGISTRY.set(tpl.id, buildRegistrationFromTemplate(tpl));
+}
+
+/**
+ * Task definition type → template id mapping (first-wins; used for
+ * backward-compat detection in `read` when `zeebe:modelerTemplate` is absent).
+ */
+const TASK_TYPE_TO_TEMPLATE_ID = new Map<string, string>();
+for (const tpl of SERVICE_TASK_TEMPLATES) {
+	const taskType = extractTaskType(tpl);
+	if (taskType && !TASK_TYPE_TO_TEMPLATE_ID.has(taskType)) {
+		TASK_TYPE_TO_TEMPLATE_ID.set(taskType, tpl.id);
+	}
+}
 
 // ── General schema (all flow element types) ───────────────────────────────────
 
@@ -85,12 +138,24 @@ const GENERAL_ADAPTER: PanelAdapter = {
 	},
 };
 
-// ── Service task schema ───────────────────────────────────────────────────────
+// ── Service task schema (generic — shown when no template is applied) ─────────
 
-const IS_REST_CONNECTOR = (values: Record<string, FieldValue>) =>
-	values.taskType === "io.camunda:http-json:1";
+const CUSTOM_TASK_TYPE = "";
 
-const SERVICE_TASK_SCHEMA: PanelSchema = {
+const IS_CUSTOM = (values: Record<string, FieldValue>) => values.connector === CUSTOM_TASK_TYPE;
+
+/**
+ * Connector selector options keyed by template id (not task type) so each of
+ * the 116+ connectors gets its own entry, even when multiple share a task type.
+ */
+const CONNECTOR_OPTIONS: Array<{ value: string; label: string }> = [
+	{ value: CUSTOM_TASK_TYPE, label: "Custom (no connector)" },
+	...SERVICE_TASK_TEMPLATES.flatMap((t) =>
+		extractTaskType(t) ? [{ value: t.id, label: t.name }] : [],
+	).sort((a, b) => a.label.localeCompare(b.label)),
+];
+
+const GENERIC_SERVICE_TASK_SCHEMA: PanelSchema = {
 	compact: [{ key: "name", label: "Name", type: "text", placeholder: "Task name" }],
 	groups: [
 		{
@@ -99,11 +164,19 @@ const SERVICE_TASK_SCHEMA: PanelSchema = {
 			fields: [
 				{ key: "name", label: "Name", type: "text", placeholder: "Task name" },
 				{
+					key: "connector",
+					label: "Connector",
+					type: "select",
+					options: CONNECTOR_OPTIONS,
+					hint: "Select a Camunda connector or use a custom job worker type.",
+				},
+				{
 					key: "taskType",
 					label: "Task type",
 					type: "text",
-					placeholder: "io.camunda:http-json:1",
-					hint: "Zeebe service type. REST connector: io.camunda:http-json:1",
+					placeholder: "e.g. my-worker-type",
+					hint: "Zeebe job type string consumed by your worker.",
+					condition: IS_CUSTOM,
 				},
 				{ key: "retries", label: "Retries", type: "text", placeholder: "3" },
 				{
@@ -114,117 +187,6 @@ const SERVICE_TASK_SCHEMA: PanelSchema = {
 				},
 			],
 		},
-		{
-			id: "request",
-			label: "Request",
-			condition: IS_REST_CONNECTOR,
-			fields: [
-				{
-					key: "method",
-					label: "Method",
-					type: "select",
-					options: [
-						{ value: "GET", label: "GET" },
-						{ value: "POST", label: "POST" },
-						{ value: "PUT", label: "PUT" },
-						{ value: "PATCH", label: "PATCH" },
-						{ value: "DELETE", label: "DELETE" },
-					],
-				},
-				{
-					key: "url",
-					label: "URL",
-					type: "text",
-					placeholder: "https://api.example.com/endpoint",
-					hint: "Prefix with = for a FEEL expression.",
-				},
-				{
-					key: "headers",
-					label: "Headers",
-					type: "textarea",
-					placeholder: '= { "Content-Type": "application/json" }',
-					hint: "FEEL expression or leave blank.",
-				},
-				{
-					key: "queryParameters",
-					label: "Query parameters",
-					type: "textarea",
-					placeholder: '= { "page": 1, "limit": 10 }',
-					hint: "FEEL expression or leave blank.",
-				},
-				{
-					key: "body",
-					label: "Body",
-					type: "textarea",
-					placeholder: '= { "orderId": orderId }',
-					hint: "FEEL expression. Leave blank for GET / DELETE.",
-				},
-				{
-					key: "connectionTimeoutInSeconds",
-					label: "Connection timeout (s)",
-					type: "text",
-					placeholder: "20",
-				},
-				{
-					key: "readTimeoutInSeconds",
-					label: "Read timeout (s)",
-					type: "text",
-					placeholder: "20",
-				},
-			],
-		},
-		{
-			id: "auth",
-			label: "Authentication",
-			condition: IS_REST_CONNECTOR,
-			fields: [
-				{
-					key: "authType",
-					label: "Type",
-					type: "select",
-					options: [
-						{ value: "noAuth", label: "No authentication" },
-						{ value: "bearer", label: "Bearer token" },
-					],
-				},
-				{
-					key: "authToken",
-					label: "Bearer token",
-					type: "text",
-					placeholder: "secrets.MY_API_TOKEN",
-					secret: true,
-					hint: "Reference a Camunda secret with secrets.TOKEN_NAME.",
-				},
-			],
-		},
-		{
-			id: "output",
-			label: "Output",
-			condition: IS_REST_CONNECTOR,
-			fields: [
-				{
-					key: "resultVariable",
-					label: "Result variable",
-					type: "text",
-					placeholder: "response",
-					hint: "Stores the full response object in this process variable.",
-				},
-				{
-					key: "resultExpression",
-					label: "Result expression",
-					type: "textarea",
-					placeholder: "= { orderId: response.body.id }",
-					hint: "FEEL expression to extract values from the response.",
-				},
-				{
-					key: "retryBackoff",
-					label: "Retry backoff",
-					type: "text",
-					placeholder: "PT0S",
-					hint: "ISO 8601 duration (e.g. PT5S for 5 seconds). Default: PT0S.",
-				},
-			],
-		},
 	],
 };
 
@@ -232,93 +194,197 @@ const SERVICE_TASK_ADAPTER: PanelAdapter = {
 	read(defs, id) {
 		const el = findFlowElement(defs, id);
 		if (!el) return {};
-
 		const ext = parseZeebeExtensions(el.extensionElements);
+		const definitionType = ext.taskDefinition?.type ?? "";
+		// Detect template via explicit attribute OR by known task type (backward-compat)
+		const hasTemplate =
+			Boolean(el.unknownAttributes?.["zeebe:modelerTemplate"]) ||
+			TASK_TYPE_TO_TEMPLATE_ID.has(definitionType);
+		// Connector selector value = the task definition type when template is active
+		const connector = hasTemplate ? definitionType : CUSTOM_TASK_TYPE;
 
 		return {
 			name: el.name ?? "",
 			documentation: el.documentation ?? "",
-			taskType: ext.taskDefinition?.type ?? "",
+			connector,
+			taskType: connector === CUSTOM_TASK_TYPE ? definitionType : "",
 			retries: ext.taskDefinition?.retries ?? "",
-			method: getIoInput(ext, "method") ?? "GET",
-			url: getIoInput(ext, "url") ?? "",
-			headers: getIoInput(ext, "headers") ?? "",
-			queryParameters: getIoInput(ext, "queryParameters") ?? "",
-			body: getIoInput(ext, "body") ?? "",
-			connectionTimeoutInSeconds: getIoInput(ext, "connectionTimeoutInSeconds") ?? "",
-			readTimeoutInSeconds: getIoInput(ext, "readTimeoutInSeconds") ?? "",
-			authType: getIoInput(ext, "authentication.type") ?? "noAuth",
-			authToken: getIoInput(ext, "authentication.token") ?? "",
-			resultVariable: getTaskHeader(ext, "resultVariable") ?? "",
-			resultExpression: getTaskHeader(ext, "resultExpression") ?? "",
-			retryBackoff: getTaskHeader(ext, "retryBackoff") ?? "",
 		};
 	},
 
-	write(defs, id, values) {
+	write(defs: BpmnDefinitions, id: string, values: Record<string, FieldValue>): BpmnDefinitions {
+		const connectorVal = strVal(values.connector);
+		const isCustom = connectorVal === CUSTOM_TASK_TYPE;
+		// connector is either a template id (new) or a task type (backward-compat read)
+		const newTemplateId = isCustom
+			? undefined
+			: TEMPLATE_REGISTRY.has(connectorVal)
+				? connectorVal
+				: TASK_TYPE_TO_TEMPLATE_ID.get(connectorVal);
+
+		if (newTemplateId) {
+			// Switching to (or already on) a template: stamp the attribute then delegate
+			// all field writing to the template adapter so it handles template-specific fields.
+			const withAttr = updateFlowElement(defs, id, (el) => ({
+				...el,
+				name: typeof values.name === "string" ? values.name || undefined : el.name,
+				unknownAttributes: {
+					...el.unknownAttributes,
+					"zeebe:modelerTemplate": newTemplateId,
+				},
+			}));
+			const templateReg = TEMPLATE_REGISTRY.get(newTemplateId);
+			if (templateReg) return templateReg.adapter.write(withAttr, id, values);
+			return withAttr;
+		}
+
+		// Custom task or clearing a template
 		return updateFlowElement(defs, id, (el) => {
 			const name = typeof values.name === "string" ? values.name : el.name;
 			const documentation =
 				typeof values.documentation === "string"
 					? values.documentation || undefined
 					: el.documentation;
-
-			// Preserve non-zeebe extension elements (custom extensions roundtrip)
-			const ZEEBE_EXTS = ["taskDefinition", "ioMapping", "taskHeaders"];
-			const otherExts = el.extensionElements.filter(
-				(x) => !ZEEBE_EXTS.includes(xmlLocalName(x.name)),
-			);
-
 			const taskType = strVal(values.taskType);
 			const retries = strVal(values.retries);
-			const authType = strVal(values.authType) || "noAuth";
 
-			// Build ioMapping inputs
-			const inputs: Array<{ source: string; target: string }> = [];
-			inputs.push({ source: authType, target: "authentication.type" });
-			const authToken = strVal(values.authToken);
-			if (authType === "bearer" && authToken) {
-				inputs.push({ source: authToken, target: "authentication.token" });
-			}
-			const method = strVal(values.method) || "GET";
-			inputs.push({ source: method, target: "method" });
-			const url = strVal(values.url);
-			if (url) inputs.push({ source: url, target: "url" });
-			const headers = strVal(values.headers);
-			if (headers) inputs.push({ source: headers, target: "headers" });
-			const qp = strVal(values.queryParameters);
-			if (qp) inputs.push({ source: qp, target: "queryParameters" });
-			const body = strVal(values.body);
-			if (body) inputs.push({ source: body, target: "body" });
-			const connTimeout = strVal(values.connectionTimeoutInSeconds);
-			if (connTimeout) inputs.push({ source: connTimeout, target: "connectionTimeoutInSeconds" });
-			const readTimeout = strVal(values.readTimeoutInSeconds);
-			if (readTimeout) inputs.push({ source: readTimeout, target: "readTimeoutInSeconds" });
-
-			// Build taskHeaders
-			const taskHeadersList: Array<{ key: string; value: string }> = [];
-			const resultVar = strVal(values.resultVariable);
-			if (resultVar) taskHeadersList.push({ key: "resultVariable", value: resultVar });
-			const resultExpr = strVal(values.resultExpression);
-			if (resultExpr) taskHeadersList.push({ key: "resultExpression", value: resultExpr });
-			const retryBackoff = strVal(values.retryBackoff);
-			if (retryBackoff) taskHeadersList.push({ key: "retryBackoff", value: retryBackoff });
+			const ZEEBE_EXTS = new Set(["taskDefinition", "ioMapping", "taskHeaders"]);
+			const otherExts = el.extensionElements.filter((x) => !ZEEBE_EXTS.has(xmlLocalName(x.name)));
 
 			const newZeebeExts = zeebeExtensionsToXmlElements({
 				taskDefinition: taskType ? { type: taskType, retries: retries || undefined } : undefined,
-				ioMapping: inputs.length > 0 ? { inputs, outputs: [] } : undefined,
-				taskHeaders: taskHeadersList.length > 0 ? { headers: taskHeadersList } : undefined,
 			});
+
+			// Remove modelerTemplate attribute when switching to custom
+			const {
+				"zeebe:modelerTemplate": _t,
+				"zeebe:modelerTemplateVersion": _v,
+				...rest
+			} = el.unknownAttributes;
 
 			return {
 				...el,
 				name,
 				documentation,
 				extensionElements: [...otherExts, ...newZeebeExts],
+				unknownAttributes: rest,
 			};
 		});
 	},
+
+	/**
+	 * When `zeebe:modelerTemplate` is set on the element, switch to the
+	 * matching template registration instead of the generic form.
+	 */
+	resolve(defs, id) {
+		const el = findFlowElement(defs, id);
+		if (!el) return null;
+		const templateId = el.unknownAttributes?.["zeebe:modelerTemplate"];
+		if (!templateId) return null;
+		return TEMPLATE_REGISTRY.get(templateId) ?? null;
+	},
 };
+
+// ── Ad-hoc subprocess schema (template-aware, shown for adHocSubProcess) ──────
+
+/** Templates applicable to ad-hoc subprocesses (AI agent pattern). */
+const ADHOC_SUBPROCESS_TEMPLATES = CAMUNDA_CONNECTOR_TEMPLATES.filter(
+	(t) => t.appliesTo.includes("bpmn:SubProcess") || t.appliesTo.includes("bpmn:AdHocSubProcess"),
+);
+
+/** Connector selector for ad-hoc subprocess templates. */
+const ADHOC_OPTIONS: Array<{ value: string; label: string }> = [
+	{ value: CUSTOM_TASK_TYPE, label: "Custom (no connector)" },
+	...ADHOC_SUBPROCESS_TEMPLATES.map((t) => ({ value: t.id, label: t.name })).sort((a, b) =>
+		a.label.localeCompare(b.label),
+	),
+];
+
+const GENERIC_ADHOC_SCHEMA: PanelSchema = {
+	compact: [{ key: "name", label: "Name", type: "text", placeholder: "Subprocess name" }],
+	groups: [
+		{
+			id: "general",
+			label: "General",
+			fields: [
+				{ key: "name", label: "Name", type: "text", placeholder: "Subprocess name" },
+				{
+					key: "connector",
+					label: "Template",
+					type: "select",
+					options: ADHOC_OPTIONS,
+					hint: "Attach a Camunda AI agent template or use a plain ad-hoc subprocess.",
+				},
+				{
+					key: "documentation",
+					label: "Documentation",
+					type: "textarea",
+					placeholder: "Add notes or documentation…",
+				},
+			],
+		},
+	],
+};
+
+const ADHOC_SUBPROCESS_ADAPTER: PanelAdapter = {
+	read(defs, id) {
+		const el = findFlowElement(defs, id);
+		if (!el) return {};
+		return {
+			name: el.name ?? "",
+			documentation: el.documentation ?? "",
+			connector: el.unknownAttributes?.["zeebe:modelerTemplate"] ?? CUSTOM_TASK_TYPE,
+		};
+	},
+
+	write(defs: BpmnDefinitions, id: string, values: Record<string, FieldValue>): BpmnDefinitions {
+		const connectorVal = strVal(values.connector);
+		const newTemplateId =
+			connectorVal && connectorVal !== CUSTOM_TASK_TYPE && TEMPLATE_REGISTRY.has(connectorVal)
+				? connectorVal
+				: undefined;
+
+		if (newTemplateId) {
+			const withAttr = updateFlowElement(defs, id, (el) => ({
+				...el,
+				name: typeof values.name === "string" ? values.name || undefined : el.name,
+				unknownAttributes: { ...el.unknownAttributes, "zeebe:modelerTemplate": newTemplateId },
+			}));
+			const templateReg = TEMPLATE_REGISTRY.get(newTemplateId);
+			if (templateReg) return templateReg.adapter.write(withAttr, id, values);
+			return withAttr;
+		}
+
+		// Custom or clearing a template
+		return updateFlowElement(defs, id, (el) => {
+			const {
+				"zeebe:modelerTemplate": _t,
+				"zeebe:modelerTemplateVersion": _v,
+				"zeebe:modelerTemplateIcon": _i,
+				...rest
+			} = el.unknownAttributes;
+			return {
+				...el,
+				name: typeof values.name === "string" ? values.name : el.name,
+				documentation:
+					typeof values.documentation === "string"
+						? values.documentation || undefined
+						: el.documentation,
+				unknownAttributes: rest,
+			};
+		});
+	},
+
+	resolve(defs, id) {
+		const el = findFlowElement(defs, id);
+		if (!el) return null;
+		const templateId = el.unknownAttributes?.["zeebe:modelerTemplate"];
+		if (!templateId) return null;
+		return TEMPLATE_REGISTRY.get(templateId) ?? null;
+	},
+};
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 function strVal(v: FieldValue): string {
 	return typeof v === "string" ? v : "";
@@ -346,13 +412,17 @@ const GENERAL_TYPES: CreateShapeType[] = [
  * Creates the BPMN config panel extension plugin.
  *
  * Registers property schemas for all standard BPMN element types. Service tasks
- * get a comprehensive form including Zeebe task definition and REST connector
- * fields.
+ * are template-aware: when `zeebe:modelerTemplate` is set the matching
+ * connector template form is rendered; otherwise a generic connector selector
+ * is shown. Custom templates can be registered via `registerTemplate`.
  *
  * @param configPanel - The base config panel plugin returned by
- *   `createConfigPanelPlugin`. Schemas are registered into it.
+ *   `createConfigPanelPlugin`.
  */
-export function createConfigPanelBpmnPlugin(configPanel: ConfigPanelPlugin): CanvasPlugin {
+export function createConfigPanelBpmnPlugin(configPanel: ConfigPanelPlugin): CanvasPlugin & {
+	/** Register an additional element template to make it available in the UI. */
+	registerTemplate(template: ElementTemplate): void;
+} {
 	return {
 		name: "config-panel-bpmn",
 
@@ -361,12 +431,25 @@ export function createConfigPanelBpmnPlugin(configPanel: ConfigPanelPlugin): Can
 			for (const type of GENERAL_TYPES) {
 				configPanel.registerSchema(type, GENERAL_SCHEMA, GENERAL_ADAPTER);
 			}
+			// Service task: template-aware adapter
+			configPanel.registerSchema("serviceTask", GENERIC_SERVICE_TASK_SCHEMA, SERVICE_TASK_ADAPTER);
+			// Ad-hoc subprocess: template-aware adapter (AI Agent pattern)
+			configPanel.registerSchema("adHocSubProcess", GENERIC_ADHOC_SCHEMA, ADHOC_SUBPROCESS_ADAPTER);
+		},
 
-			// Service task gets the full connector form
-			configPanel.registerSchema("serviceTask", SERVICE_TASK_SCHEMA, SERVICE_TASK_ADAPTER);
+		registerTemplate(template: ElementTemplate): void {
+			TEMPLATE_REGISTRY.set(template.id, buildRegistrationFromTemplate(template));
+			const taskType = extractTaskType(template);
+			if (taskType && !TASK_TYPE_TO_TEMPLATE_ID.has(taskType)) {
+				TASK_TYPE_TO_TEMPLATE_ID.set(taskType, template.id);
+			}
+			if (!CONNECTOR_OPTIONS.some((o) => o.value === template.id)) {
+				CONNECTOR_OPTIONS.push({ value: template.id, label: template.name });
+			}
 		},
 	};
 }
 
-// Re-export label map for external use
+// Re-export types for external use
 export { ELEMENT_TYPE_LABELS };
+export type { ElementTemplate };

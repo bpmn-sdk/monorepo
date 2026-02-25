@@ -16,7 +16,10 @@ import type {
 	BpmnEscalation,
 	BpmnEventDefinition,
 	BpmnFlowElement,
+	BpmnLane,
+	BpmnLaneSet,
 	BpmnMessage,
+	BpmnMessageFlow,
 	BpmnMultiInstanceLoopCharacteristics,
 	BpmnParticipant,
 	BpmnProcess,
@@ -112,6 +115,11 @@ const KNOWN_FLOW_CHILDREN = new Set([
 	"escalationEventDefinition",
 	"messageEventDefinition",
 	"signalEventDefinition",
+	"conditionalEventDefinition",
+	"linkEventDefinition",
+	"cancelEventDefinition",
+	"terminateEventDefinition",
+	"compensateEventDefinition",
 	"multiInstanceLoopCharacteristics",
 	// Sub-process children are handled separately
 ]);
@@ -122,23 +130,28 @@ const KNOWN_PROCESS_CHILDREN = new Set([
 	"intermediateCatchEvent",
 	"intermediateThrowEvent",
 	"boundaryEvent",
+	"task",
 	"serviceTask",
 	"scriptTask",
 	"userTask",
 	"sendTask",
 	"receiveTask",
 	"businessRuleTask",
+	"manualTask",
 	"callActivity",
 	"subProcess",
 	"adHocSubProcess",
 	"eventSubProcess",
+	"transaction",
 	"exclusiveGateway",
 	"parallelGateway",
 	"inclusiveGateway",
 	"eventBasedGateway",
+	"complexGateway",
 	"sequenceFlow",
 	"textAnnotation",
 	"association",
+	"laneSet",
 	"extensionElements",
 ]);
 
@@ -210,6 +223,29 @@ function parseEventDefinitions(element: XmlElement): BpmnEventDefinition[] {
 				id: attr(child, "id"),
 				signalRef: attr(child, "signalRef"),
 			});
+		} else if (ln === "conditionalEventDefinition") {
+			const condEl = findChild(child, "condition");
+			defs.push({
+				type: "conditional",
+				id: attr(child, "id"),
+				condition: condEl?.text?.trim(),
+			});
+		} else if (ln === "linkEventDefinition") {
+			defs.push({
+				type: "link",
+				id: attr(child, "id"),
+				name: attr(child, "name"),
+			});
+		} else if (ln === "cancelEventDefinition") {
+			defs.push({ type: "cancel", id: attr(child, "id") });
+		} else if (ln === "terminateEventDefinition") {
+			defs.push({ type: "terminate", id: attr(child, "id") });
+		} else if (ln === "compensateEventDefinition") {
+			defs.push({
+				type: "compensate",
+				id: attr(child, "id"),
+				activityRef: attr(child, "activityRef"),
+			});
 		}
 	}
 
@@ -238,20 +274,24 @@ const FLOW_ELEMENT_TYPES = new Set<string>([
 	"intermediateCatchEvent",
 	"intermediateThrowEvent",
 	"boundaryEvent",
+	"task",
 	"serviceTask",
 	"scriptTask",
 	"userTask",
 	"sendTask",
 	"receiveTask",
 	"businessRuleTask",
+	"manualTask",
 	"callActivity",
 	"subProcess",
 	"adHocSubProcess",
 	"eventSubProcess",
+	"transaction",
 	"exclusiveGateway",
 	"parallelGateway",
 	"inclusiveGateway",
 	"eventBasedGateway",
+	"complexGateway",
 ]);
 
 function parseFlowElement(element: XmlElement): BpmnFlowElement | undefined {
@@ -287,12 +327,14 @@ function parseFlowElement(element: XmlElement): BpmnFlowElement | undefined {
 				eventDefinitions: parseEventDefinitions(element),
 			} satisfies BpmnBoundaryEvent;
 
+		case "task":
 		case "serviceTask":
 		case "scriptTask":
 		case "userTask":
 		case "sendTask":
 		case "receiveTask":
 		case "businessRuleTask":
+		case "manualTask":
 		case "callActivity":
 			return { ...base, type: ln, loopCharacteristics: parseLoopCharacteristics(element) };
 
@@ -323,6 +365,14 @@ function parseFlowElement(element: XmlElement): BpmnFlowElement | undefined {
 				...parseProcessContents(element),
 			};
 
+		case "transaction":
+			return {
+				...base,
+				type: "transaction",
+				loopCharacteristics: parseLoopCharacteristics(element),
+				...parseProcessContents(element),
+			};
+
 		case "exclusiveGateway":
 			return { ...base, type: "exclusiveGateway", default: attr(element, "default") };
 
@@ -334,6 +384,9 @@ function parseFlowElement(element: XmlElement): BpmnFlowElement | undefined {
 
 		case "eventBasedGateway":
 			return { ...base, type: "eventBasedGateway" };
+
+		case "complexGateway":
+			return { ...base, type: "complexGateway", default: attr(element, "default") };
 
 		default:
 			return undefined;
@@ -422,16 +475,43 @@ function parseProcessContents(element: XmlElement): {
 }
 
 // ---------------------------------------------------------------------------
+// Lanes
+// ---------------------------------------------------------------------------
+
+function parseLane(element: XmlElement): BpmnLane {
+	const flowNodeRefs = findChildren(element, "flowNodeRef")
+		.map((c) => c.text?.trim())
+		.filter((t): t is string => !!t);
+	const childLaneSetEl = findChild(element, "childLaneSet");
+	return {
+		id: requiredAttr(element, "id"),
+		name: attr(element, "name"),
+		flowNodeRefs,
+		childLaneSet: childLaneSetEl ? parseLaneSet(childLaneSetEl) : undefined,
+		unknownAttributes: unknownAttrs(element),
+	};
+}
+
+function parseLaneSet(element: XmlElement): BpmnLaneSet {
+	return {
+		id: attr(element, "id"),
+		lanes: findChildren(element, "lane").map(parseLane),
+	};
+}
+
+// ---------------------------------------------------------------------------
 // Process
 // ---------------------------------------------------------------------------
 
 function parseProcess(element: XmlElement): BpmnProcess {
+	const laneSetEl = findChild(element, "laneSet");
 	return {
 		id: requiredAttr(element, "id"),
 		name: attr(element, "name"),
 		isExecutable: attr(element, "isExecutable") === "true" ? true : undefined,
 		extensionElements: parseExtensionElements(element),
 		unknownAttributes: unknownAttrs(element),
+		laneSet: laneSetEl ? parseLaneSet(laneSetEl) : undefined,
 		...parseProcessContents(element),
 	};
 }
@@ -449,10 +529,21 @@ function parseParticipant(element: XmlElement): BpmnParticipant {
 	};
 }
 
+function parseMessageFlow(element: XmlElement): BpmnMessageFlow {
+	return {
+		id: requiredAttr(element, "id"),
+		name: attr(element, "name"),
+		sourceRef: requiredAttr(element, "sourceRef"),
+		targetRef: requiredAttr(element, "targetRef"),
+		unknownAttributes: unknownAttrs(element),
+	};
+}
+
 function parseCollaboration(element: XmlElement): BpmnCollaboration {
 	return {
 		id: requiredAttr(element, "id"),
 		participants: findChildren(element, "participant").map(parseParticipant),
+		messageFlows: findChildren(element, "messageFlow").map(parseMessageFlow),
 		textAnnotations: findChildren(element, "textAnnotation").map(parseTextAnnotation),
 		associations: findChildren(element, "association").map(parseAssociation),
 		extensionElements: parseExtensionElements(element),

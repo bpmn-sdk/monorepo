@@ -159,8 +159,10 @@ export function createMainMenuPlugin(options: MainMenuOptions = {}): CanvasPlugi
 				isOpen = false;
 			}
 
-			menuBtn.addEventListener("click", (e) => {
+			menuBtn.addEventListener("pointerdown", (e) => {
 				e.stopPropagation();
+			});
+			menuBtn.addEventListener("click", () => {
 				if (isOpen) {
 					closeDropdown();
 				} else {

@@ -1,4 +1,10 @@
-import type { BpmnDefinitions, BpmnDiEdge, BpmnDiShape, BpmnFlowElement } from "@bpmn-sdk/core";
+import type {
+	BpmnDefinitions,
+	BpmnDiEdge,
+	BpmnDiShape,
+	BpmnFlowElement,
+	BpmnTextAnnotation,
+} from "@bpmn-sdk/core";
 
 /** The color theme applied to the canvas. */
 export type Theme = "light" | "dark" | "auto";
@@ -65,6 +71,8 @@ export interface RenderedShape {
 	readonly shape: BpmnDiShape;
 	/** The matching BPMN flow element from the process model, if found. */
 	readonly flowElement: BpmnFlowElement | undefined;
+	/** Set if this shape represents a text annotation. */
+	readonly annotation?: BpmnTextAnnotation;
 }
 
 /** A rendered BPMN edge (sequence flow or association) with its SVG element. */

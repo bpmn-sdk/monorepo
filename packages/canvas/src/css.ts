@@ -67,6 +67,12 @@ export const CANVAS_CSS = `
   stroke: var(--bpmn-shape-stroke, #404040);
   stroke-width: 1.5;
 }
+.bpmn-event-inner-dashed {
+  fill: none;
+  stroke: var(--bpmn-shape-stroke, #404040);
+  stroke-width: 1.5;
+  stroke-dasharray: 4 2;
+}
 .bpmn-eventsubprocess-body {
   fill: var(--bpmn-shape-fill, #ffffff);
   stroke: var(--bpmn-shape-stroke, #404040);
@@ -104,6 +110,32 @@ export const CANVAS_CSS = `
   stroke-width: 2.5;
   stroke-linecap: round;
   pointer-events: none;
+}
+
+/* ── Pool / Lane ─────────────────────────────────────────────────── */
+.bpmn-pool-body,
+.bpmn-lane-body {
+  fill: var(--bpmn-shape-fill, #ffffff);
+  stroke: var(--bpmn-shape-stroke, #404040);
+  stroke-width: 1.5;
+}
+.bpmn-pool-header,
+.bpmn-lane-header {
+  fill: var(--bpmn-pool-header, rgba(0,0,0,0.04));
+  stroke: var(--bpmn-shape-stroke, #404040);
+  stroke-width: 1.5;
+}
+[data-theme="dark"] .bpmn-pool-header,
+[data-theme="dark"] .bpmn-lane-header {
+  fill: rgba(255,255,255,0.06);
+}
+
+/* ── Message flow ─────────────────────────────────────────────────── */
+.bpmn-msgflow-path {
+  fill: none;
+  stroke: var(--bpmn-flow-stroke, #404040);
+  stroke-width: 1.5;
+  stroke-dasharray: 6 3;
 }
 
 /* ── Edges ───────────────────────────────────────────────────────── */

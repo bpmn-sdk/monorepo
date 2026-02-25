@@ -13,7 +13,10 @@ import type {
 	BpmnEscalation,
 	BpmnEventDefinition,
 	BpmnFlowElement,
+	BpmnLane,
+	BpmnLaneSet,
 	BpmnMessage,
+	BpmnMessageFlow,
 	BpmnMultiInstanceLoopCharacteristics,
 	BpmnParticipant,
 	BpmnProcess,
@@ -107,6 +110,37 @@ function serializeEventDefinitions(defs: BpmnEventDefinition[], bp: string): Xml
 				if (d.signalRef) attrs.signalRef = d.signalRef;
 				return el(`${bp}:signalEventDefinition`, attrs, []);
 			}
+			case "conditional": {
+				const attrs: Record<string, string> = {};
+				if (d.id) attrs.id = d.id;
+				const condChildren: XmlElement[] = [];
+				if (d.condition !== undefined) {
+					condChildren.push(el(`${bp}:condition`, {}, [], d.condition));
+				}
+				return el(`${bp}:conditionalEventDefinition`, attrs, condChildren);
+			}
+			case "link": {
+				const attrs: Record<string, string> = {};
+				if (d.id) attrs.id = d.id;
+				if (d.name) attrs.name = d.name;
+				return el(`${bp}:linkEventDefinition`, attrs, []);
+			}
+			case "cancel": {
+				const attrs: Record<string, string> = {};
+				if (d.id) attrs.id = d.id;
+				return el(`${bp}:cancelEventDefinition`, attrs, []);
+			}
+			case "terminate": {
+				const attrs: Record<string, string> = {};
+				if (d.id) attrs.id = d.id;
+				return el(`${bp}:terminateEventDefinition`, attrs, []);
+			}
+			case "compensate": {
+				const attrs: Record<string, string> = {};
+				if (d.id) attrs.id = d.id;
+				if (d.activityRef) attrs.activityRef = d.activityRef;
+				return el(`${bp}:compensateEventDefinition`, attrs, []);
+			}
 			default: {
 				const _exhaustive: never = d;
 				throw new Error(
@@ -183,12 +217,14 @@ function serializeFlowElement(fe: BpmnFlowElement, ns: Record<string, string>): 
 			children.push(...serializeEventDefinitions(fe.eventDefinitions, bp));
 			break;
 
+		case "task":
 		case "serviceTask":
 		case "scriptTask":
 		case "userTask":
 		case "sendTask":
 		case "receiveTask":
 		case "businessRuleTask":
+		case "manualTask":
 		case "callActivity":
 			children.push(...serializeLoopCharacteristics(fe.loopCharacteristics, bp));
 			break;
@@ -208,11 +244,20 @@ function serializeFlowElement(fe: BpmnFlowElement, ns: Record<string, string>): 
 			children.push(...serializeProcessContents(fe, ns));
 			break;
 
+		case "transaction":
+			children.push(...serializeLoopCharacteristics(fe.loopCharacteristics, bp));
+			children.push(...serializeProcessContents(fe, ns));
+			break;
+
 		case "exclusiveGateway":
 			if (fe.default !== undefined) attrs.default = fe.default;
 			break;
 
 		case "inclusiveGateway":
+			if (fe.default !== undefined) attrs.default = fe.default;
+			break;
+
+		case "complexGateway":
 			if (fe.default !== undefined) attrs.default = fe.default;
 			break;
 
@@ -310,6 +355,32 @@ function serializeProcessContents(
 }
 
 // ---------------------------------------------------------------------------
+// Lanes
+// ---------------------------------------------------------------------------
+
+function serializeLane(lane: BpmnLane, bp: string): XmlElement {
+	const attrs: Record<string, string> = { id: lane.id, ...lane.unknownAttributes };
+	if (lane.name !== undefined) attrs.name = lane.name;
+	const children: XmlElement[] = lane.flowNodeRefs.map((ref) =>
+		el(`${bp}:flowNodeRef`, {}, [], ref),
+	);
+	if (lane.childLaneSet) {
+		children.push(serializeLaneSet(lane.childLaneSet, bp));
+	}
+	return el(`${bp}:lane`, attrs, children);
+}
+
+function serializeLaneSet(laneSet: BpmnLaneSet, bp: string): XmlElement {
+	const attrs: Record<string, string> = {};
+	if (laneSet.id) attrs.id = laneSet.id;
+	return el(
+		`${bp}:laneSet`,
+		attrs,
+		laneSet.lanes.map((l) => serializeLane(l, bp)),
+	);
+}
+
+// ---------------------------------------------------------------------------
 // Process
 // ---------------------------------------------------------------------------
 
@@ -321,6 +392,9 @@ function serializeProcess(process: BpmnProcess, ns: Record<string, string>): Xml
 
 	const children: XmlElement[] = [];
 	children.push(...serializeExtensionElements(process.extensionElements, bp));
+	if (process.laneSet) {
+		children.push(serializeLaneSet(process.laneSet, bp));
+	}
 	children.push(...serializeProcessContents(process, ns));
 
 	return el(`${bp}:process`, attrs, children);
@@ -337,12 +411,26 @@ function serializeParticipant(p: BpmnParticipant, bp: string): XmlElement {
 	return el(`${bp}:participant`, attrs, []);
 }
 
+function serializeMessageFlow(mf: BpmnMessageFlow, bp: string): XmlElement {
+	const attrs: Record<string, string> = {
+		id: mf.id,
+		sourceRef: mf.sourceRef,
+		targetRef: mf.targetRef,
+		...mf.unknownAttributes,
+	};
+	if (mf.name !== undefined) attrs.name = mf.name;
+	return el(`${bp}:messageFlow`, attrs, []);
+}
+
 function serializeCollaboration(c: BpmnCollaboration, ns: Record<string, string>): XmlElement {
 	const bp = bpmnPrefix(ns);
 	const children: XmlElement[] = [];
 
 	for (const p of c.participants) {
 		children.push(serializeParticipant(p, bp));
+	}
+	for (const mf of c.messageFlows) {
+		children.push(serializeMessageFlow(mf, bp));
 	}
 	for (const ta of c.textAnnotations) {
 		children.push(serializeTextAnnotation(ta, bp));

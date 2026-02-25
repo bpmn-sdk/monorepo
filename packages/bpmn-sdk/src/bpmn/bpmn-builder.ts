@@ -298,16 +298,19 @@ function makeFlowElement(
 				attachedToRef: "",
 				eventDefinitions: [],
 			};
+		case "task":
 		case "serviceTask":
 		case "scriptTask":
 		case "userTask":
 		case "sendTask":
 		case "receiveTask":
 		case "businessRuleTask":
+		case "manualTask":
 		case "callActivity":
 			return { ...base, type } as BpmnFlowElement;
 		case "exclusiveGateway":
 		case "inclusiveGateway":
+		case "complexGateway":
 			return { ...base, type } as BpmnFlowElement;
 		case "parallelGateway":
 		case "eventBasedGateway":
@@ -334,6 +337,15 @@ function makeFlowElement(
 			return {
 				...base,
 				type: "eventSubProcess",
+				flowElements: [],
+				sequenceFlows: [],
+				textAnnotations: [],
+				associations: [],
+			};
+		case "transaction":
+			return {
+				...base,
+				type: "transaction",
 				flowElements: [],
 				sequenceFlows: [],
 				textAnnotations: [],
@@ -1052,11 +1064,16 @@ export class ProcessBuilder {
 			extensions.taskHeaders = { headers: taskHeaderEntries };
 		}
 
-		this.addFlowElement(
-			makeFlowElement(id, "serviceTask", {
-				extensionElements: zeebeExtensionsToXmlElements(extensions),
-			}),
-		);
+		const el = makeFlowElement(id, "serviceTask", {
+			name: config.name,
+			extensionElements: zeebeExtensionsToXmlElements(extensions),
+		});
+		// Stamp the template identifier so editors recognise this as a REST connector
+		el.unknownAttributes = {
+			"zeebe:modelerTemplate": "io.camunda.connectors.HttpJson.v2",
+			"zeebe:modelerTemplateVersion": "12",
+		};
+		this.addFlowElement(el);
 		return this;
 	}
 
