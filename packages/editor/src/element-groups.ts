@@ -26,6 +26,12 @@ export const ELEMENT_GROUPS: ReadonlyArray<ElementGroup> = [
 		defaultType: "exclusiveGateway",
 		types: ["exclusiveGateway", "parallelGateway", "inclusiveGateway", "eventBasedGateway"],
 	},
+	{
+		id: "annotations",
+		title: "Annotations",
+		defaultType: "textAnnotation",
+		types: ["textAnnotation"],
+	},
 ];
 
 const _typeToGroup = new Map<CreateShapeType, ElementGroup>();
@@ -52,6 +58,7 @@ export const ELEMENT_TYPE_LABELS: Readonly<Record<CreateShapeType, string>> = {
 	parallelGateway: "Parallel Gateway",
 	inclusiveGateway: "Inclusive Gateway",
 	eventBasedGateway: "Event-based Gateway",
+	textAnnotation: "Text Annotation",
 };
 
 export const EXTERNAL_LABEL_TYPES: ReadonlySet<CreateShapeType> = new Set([

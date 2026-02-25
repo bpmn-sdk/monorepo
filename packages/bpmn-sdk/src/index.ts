@@ -133,3 +133,5 @@ export type {
 export type { XmlElement } from "./types/xml-element.js";
 export { generateId, resetIdCounter } from "./types/id-generator.js";
 export { parseXml, serializeXml } from "./xml/index.js";
+export { readDiColor, writeDiColor, BIOC_NS, COLOR_NS } from "./bpmn/di-color.js";
+export type { DiColor } from "./bpmn/di-color.js";

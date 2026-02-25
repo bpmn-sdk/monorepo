@@ -1,4 +1,5 @@
 import type { ViewportState } from "@bpmn-sdk/canvas";
+import { readDiColor } from "@bpmn-sdk/core";
 import { injectHudStyles } from "./css.js";
 import type { BpmnEditor } from "./editor.js";
 import {
@@ -24,7 +25,17 @@ const GROUP_ICONS: Record<string, string> = {
 	events: IC.startEvent,
 	activities: IC.task,
 	gateways: IC.exclusiveGateway,
+	annotations: IC.textAnnotation,
 };
+
+const COLOR_PALETTE: ReadonlyArray<{ fill: string; stroke: string }> = [
+	{ fill: "#bbdefb", stroke: "#0d4372" },
+	{ fill: "#c8e6c9", stroke: "#1b5e20" },
+	{ fill: "#fff9c4", stroke: "#f57f17" },
+	{ fill: "#ffccbc", stroke: "#bf360c" },
+	{ fill: "#e1bee7", stroke: "#4a148c" },
+	{ fill: "#dcedc8", stroke: "#33691e" },
+];
 
 const GROUPS: GroupDef[] = ELEMENT_GROUPS.map((g) => ({
 	...g,
@@ -170,6 +181,7 @@ export function initEditorHud(editor: BpmnEditor): void {
 		events: "startEvent",
 		activities: "serviceTask",
 		gateways: "exclusiveGateway",
+		annotations: "textAnnotation",
 	};
 
 	const groupBtns: Record<string, HTMLButtonElement> = {};
@@ -481,7 +493,8 @@ export function initEditorHud(editor: BpmnEditor): void {
 
 	function buildCtxToolbar(sourceId: string, sourceType: string): void {
 		ctxToolbar.innerHTML = "";
-		const canAddElements = sourceType !== "endEvent";
+		const isAnnotation = sourceType === "textAnnotation";
+		const canAddElements = !isAnnotation && sourceType !== "endEvent";
 
 		if (canAddElements) {
 			const arrowBtn = document.createElement("button");
@@ -518,6 +531,49 @@ export function initEditorHud(editor: BpmnEditor): void {
 				});
 				ctxToolbar.appendChild(btn);
 			}
+		}
+
+		// Color swatches and annotation button for non-annotation flow elements
+		if (!isAnnotation) {
+			if (ctxToolbar.children.length > 0) {
+				const sep = document.createElement("div");
+				sep.className = "hud-sep";
+				ctxToolbar.appendChild(sep);
+			}
+
+			// Get current shape color
+			const defs = editor.getDefinitions();
+			const diShape = defs?.diagrams[0]?.plane.shapes.find((s) => s.bpmnElement === sourceId);
+			const currentColor = diShape ? readDiColor(diShape.unknownAttributes) : {};
+
+			const swatchRow = document.createElement("div");
+			swatchRow.className = "bpmn-color-swatches";
+
+			for (const { fill, stroke } of COLOR_PALETTE) {
+				const swatch = document.createElement("button");
+				const isActive = currentColor.fill === fill;
+				swatch.className = isActive ? "bpmn-color-swatch active" : "bpmn-color-swatch";
+				swatch.style.background = fill;
+				swatch.style.outlineColor = stroke;
+				swatch.title = "Apply color";
+				swatch.addEventListener("click", () => {
+					// Toggle: clicking active swatch clears the color
+					editor.updateColor(sourceId, isActive ? {} : { fill, stroke });
+				});
+				swatchRow.appendChild(swatch);
+			}
+			ctxToolbar.appendChild(swatchRow);
+
+			// Add annotation button
+			const annotBtn = document.createElement("button");
+			annotBtn.className = "hud-btn";
+			annotBtn.innerHTML = IC.textAnnotation;
+			annotBtn.title = "Add text annotation";
+			annotBtn.addEventListener("click", () => {
+				editor.createAnnotationFor(sourceId);
+				hideCtxToolbar();
+			});
+			ctxToolbar.appendChild(annotBtn);
 		}
 	}
 

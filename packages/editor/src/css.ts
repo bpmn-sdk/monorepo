@@ -338,6 +338,18 @@ export const HUD_CSS = `
   color: rgba(0,0,0,0.35);
   border-right-color: rgba(0,0,0,0.08);
 }
+
+/* ── Color swatches ──────────────────────────────────────────────── */
+.bpmn-color-swatches { display: flex; gap: 4px; padding: 2px 4px; align-items: center; }
+.bpmn-color-swatch {
+  width: 16px; height: 16px; border-radius: 50%; cursor: pointer;
+  border: 2px solid transparent; flex-shrink: 0;
+  transition: transform 0.1s;
+  padding: 0;
+}
+.bpmn-color-swatch:hover { transform: scale(1.2); }
+.bpmn-color-swatch.active { border-color: rgba(255,255,255,0.8); }
+[data-bpmn-hud-theme="light"] .bpmn-color-swatch.active { border-color: rgba(0,0,0,0.5); }
 `;
 
 /** Injects the HUD stylesheet into `<head>` if not already present. */

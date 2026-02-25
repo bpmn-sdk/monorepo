@@ -1,12 +1,16 @@
 import type {
+	BpmnAssociation,
 	BpmnBounds,
 	BpmnDefinitions,
 	BpmnDiEdge,
 	BpmnDiShape,
 	BpmnFlowElement,
 	BpmnSequenceFlow,
+	BpmnTextAnnotation,
 	BpmnWaypoint,
+	DiColor,
 } from "@bpmn-sdk/core";
+import { BIOC_NS, COLOR_NS, writeDiColor } from "@bpmn-sdk/core";
 import { computeWaypoints, computeWaypointsWithPorts, portFromWaypoint } from "./geometry.js";
 import { genId } from "./id.js";
 import type { CreateShapeType, PortDir } from "./types.js";
@@ -93,6 +97,8 @@ function makeFlowElement(type: CreateShapeType, id: string, name?: string): Bpmn
 			return { ...base, type: "inclusiveGateway" };
 		case "eventBasedGateway":
 			return { ...base, type: "eventBasedGateway" };
+		case "textAnnotation":
+			throw new Error("textAnnotation is not a flow element — use createAnnotation()");
 	}
 }
 
@@ -258,51 +264,74 @@ export function moveShapes(
 	// - If only source is moving: translate first waypoint
 	// - If only target is moving: translate last waypoint
 	const newEdges = diagram.plane.edges.map((edge) => {
+		// Handle sequence flows
 		const flow = process.sequenceFlows.find((sf) => sf.id === edge.bpmnElement);
-		if (!flow) return edge;
+		if (flow) {
+			const srcMove = moveMap.get(flow.sourceRef);
+			const tgtMove = moveMap.get(flow.targetRef);
 
-		const srcMove = moveMap.get(flow.sourceRef);
-		const tgtMove = moveMap.get(flow.targetRef);
+			if (!srcMove && !tgtMove) return edge;
+			if (edge.waypoints.length < 2) return edge;
 
-		if (!srcMove && !tgtMove) return edge;
-		if (edge.waypoints.length < 2) return edge;
-
-		const newWps = [...edge.waypoints];
-		if (srcMove && tgtMove) {
-			// Both endpoints moving — translate all waypoints together
-			return {
-				...edge,
-				waypoints: newWps.map((wp) => ({ x: wp.x + srcMove.dx, y: wp.y + srcMove.dy })),
-			};
+			const newWps = [...edge.waypoints];
+			if (srcMove && tgtMove) {
+				// Both endpoints moving — translate all waypoints together
+				return {
+					...edge,
+					waypoints: newWps.map((wp) => ({ x: wp.x + srcMove.dx, y: wp.y + srcMove.dy })),
+				};
+			}
+			// Only one endpoint moves — preserve user-adjusted ports, recompute route
+			const srcShape = newShapes.find((s) => s.bpmnElement === flow.sourceRef);
+			const tgtShape = newShapes.find((s) => s.bpmnElement === flow.targetRef);
+			if (srcShape && tgtShape) {
+				const firstWp = newWps[0];
+				const lastWp = newWps[newWps.length - 1];
+				// Derive ports from pre-move bounds so user-adjusted exit/entry points are preserved
+				const srcOldBounds = srcMove
+					? {
+							...srcShape.bounds,
+							x: srcShape.bounds.x - srcMove.dx,
+							y: srcShape.bounds.y - srcMove.dy,
+						}
+					: srcShape.bounds;
+				const tgtOldBounds = tgtMove
+					? {
+							...tgtShape.bounds,
+							x: tgtShape.bounds.x - tgtMove.dx,
+							y: tgtShape.bounds.y - tgtMove.dy,
+						}
+					: tgtShape.bounds;
+				const srcPort = firstWp ? portFromWaypoint(firstWp, srcOldBounds) : "right";
+				const tgtPort = lastWp ? portFromWaypoint(lastWp, tgtOldBounds) : "left";
+				return {
+					...edge,
+					waypoints: computeWaypointsWithPorts(srcShape.bounds, srcPort, tgtShape.bounds, tgtPort),
+				};
+			}
+			return edge;
 		}
-		// Only one endpoint moves — preserve user-adjusted ports, recompute route
-		const srcShape = newShapes.find((s) => s.bpmnElement === flow.sourceRef);
-		const tgtShape = newShapes.find((s) => s.bpmnElement === flow.targetRef);
-		if (srcShape && tgtShape) {
-			const firstWp = newWps[0];
-			const lastWp = newWps[newWps.length - 1];
-			// Derive ports from pre-move bounds so user-adjusted exit/entry points are preserved
-			const srcOldBounds = srcMove
-				? {
-						...srcShape.bounds,
-						x: srcShape.bounds.x - srcMove.dx,
-						y: srcShape.bounds.y - srcMove.dy,
-					}
-				: srcShape.bounds;
-			const tgtOldBounds = tgtMove
-				? {
-						...tgtShape.bounds,
-						x: tgtShape.bounds.x - tgtMove.dx,
-						y: tgtShape.bounds.y - tgtMove.dy,
-					}
-				: tgtShape.bounds;
-			const srcPort = firstWp ? portFromWaypoint(firstWp, srcOldBounds) : "right";
-			const tgtPort = lastWp ? portFromWaypoint(lastWp, tgtOldBounds) : "left";
-			return {
-				...edge,
-				waypoints: computeWaypointsWithPorts(srcShape.bounds, srcPort, tgtShape.bounds, tgtPort),
-			};
+
+		// Handle association edges
+		const assoc = process.associations.find((a) => a.id === edge.bpmnElement);
+		if (assoc) {
+			const srcMove = moveMap.get(assoc.sourceRef);
+			const tgtMove = moveMap.get(assoc.targetRef);
+			if (!srcMove && !tgtMove) return edge;
+
+			if (srcMove && tgtMove) {
+				return {
+					...edge,
+					waypoints: edge.waypoints.map((wp) => ({ x: wp.x + srcMove.dx, y: wp.y + srcMove.dy })),
+				};
+			}
+			const srcShape = newShapes.find((s) => s.bpmnElement === assoc.sourceRef);
+			const tgtShape = newShapes.find((s) => s.bpmnElement === assoc.targetRef);
+			if (srcShape && tgtShape) {
+				return { ...edge, waypoints: computeWaypoints(srcShape.bounds, tgtShape.bounds) };
+			}
 		}
+
 		return edge;
 	});
 
@@ -384,8 +413,15 @@ export function deleteElements(defs: BpmnDefinitions, ids: string[]): BpmnDefini
 			.map((sf) => sf.id),
 	);
 
+	// Find associations to remove (directly specified, or whose source/target is deleted)
+	const assocsToRemove = new Set(
+		process.associations
+			.filter((a) => idSet.has(a.id) || idSet.has(a.sourceRef) || idSet.has(a.targetRef))
+			.map((a) => a.id),
+	);
+
 	// All IDs to remove from DI (shapes + edges)
-	const allRemovedIds = new Set([...ids, ...flowsToRemove]);
+	const allRemovedIds = new Set([...ids, ...flowsToRemove, ...assocsToRemove]);
 
 	// Remove from process.flowElements and clean up incoming/outgoing
 	const newFlowElements = process.flowElements
@@ -399,6 +435,10 @@ export function deleteElements(defs: BpmnDefinitions, ids: string[]): BpmnDefini
 	// Remove from process.sequenceFlows
 	const newSequenceFlows = process.sequenceFlows.filter((sf) => !flowsToRemove.has(sf.id));
 
+	// Remove text annotations and associations
+	const newTextAnnotations = process.textAnnotations.filter((ta) => !idSet.has(ta.id));
+	const newAssociations = process.associations.filter((a) => !assocsToRemove.has(a.id));
+
 	// Remove DI shapes and edges
 	const newDiShapes = diagram.plane.shapes.filter((s) => !idSet.has(s.bpmnElement));
 	const newDiEdges = diagram.plane.edges.filter((e) => !allRemovedIds.has(e.bpmnElement));
@@ -410,6 +450,8 @@ export function deleteElements(defs: BpmnDefinitions, ids: string[]): BpmnDefini
 				...process,
 				flowElements: newFlowElements,
 				sequenceFlows: newSequenceFlows,
+				textAnnotations: newTextAnnotations,
+				associations: newAssociations,
 			},
 			...defs.processes.slice(1),
 		],
@@ -454,6 +496,20 @@ export function updateLabel(defs: BpmnDefinitions, id: string, name: string): Bp
 		return {
 			...defs,
 			processes: [{ ...process, sequenceFlows: newFlows }, ...defs.processes.slice(1)],
+		};
+	}
+
+	// Check text annotations (text field, not name)
+	const taIndex = process.textAnnotations.findIndex((ta) => ta.id === id);
+	if (taIndex >= 0) {
+		const newAnnotations = [...process.textAnnotations];
+		const ta = newAnnotations[taIndex];
+		if (ta) {
+			newAnnotations[taIndex] = { ...ta, text: name };
+		}
+		return {
+			...defs,
+			processes: [{ ...process, textAnnotations: newAnnotations }, ...defs.processes.slice(1)],
 		};
 	}
 
@@ -603,6 +659,8 @@ export function changeElementType(
 		case "eventBasedGateway":
 			newEl = { ...base, type: "eventBasedGateway" };
 			break;
+		case "textAnnotation":
+			throw new Error("textAnnotation is not a flow element — use createAnnotation()");
 	}
 
 	const newElements = [...process.flowElements];
@@ -776,4 +834,120 @@ export function pasteElements(
 	};
 
 	return { defs: newDefs, newIds };
+}
+
+// ── Create text annotation ────────────────────────────────────────────────────
+
+export function createAnnotation(
+	defs: BpmnDefinitions,
+	bounds: BpmnBounds,
+	text?: string,
+): { defs: BpmnDefinitions; id: string } {
+	const id = genId("TextAnnotation");
+	const shapeId = genId("TextAnnotation_di");
+
+	const annotation: BpmnTextAnnotation = { id, text, unknownAttributes: {} };
+	const diShape: BpmnDiShape = { id: shapeId, bpmnElement: id, bounds, unknownAttributes: {} };
+
+	const process = defs.processes[0];
+	if (!process) return { defs, id };
+	const diagram = defs.diagrams[0];
+	if (!diagram) return { defs, id };
+
+	return {
+		defs: {
+			...defs,
+			processes: [
+				{ ...process, textAnnotations: [...process.textAnnotations, annotation] },
+				...defs.processes.slice(1),
+			],
+			diagrams: [
+				{
+					...diagram,
+					plane: { ...diagram.plane, shapes: [...diagram.plane.shapes, diShape] },
+				},
+				...defs.diagrams.slice(1),
+			],
+		},
+		id,
+	};
+}
+
+export function createAnnotationWithLink(
+	defs: BpmnDefinitions,
+	bounds: BpmnBounds,
+	sourceId: string,
+	sourceBounds: BpmnBounds,
+	text?: string,
+): { defs: BpmnDefinitions; annotationId: string; associationId: string } {
+	const annotResult = createAnnotation(defs, bounds, text);
+	const annotationId = annotResult.id;
+	const assocId = genId("Association");
+	const edgeId = genId("Association_di");
+
+	const assoc: BpmnAssociation = {
+		id: assocId,
+		sourceRef: sourceId,
+		targetRef: annotationId,
+		associationDirection: "None",
+		unknownAttributes: {},
+	};
+	const waypoints = computeWaypoints(sourceBounds, bounds);
+	const edge: BpmnDiEdge = { id: edgeId, bpmnElement: assocId, waypoints, unknownAttributes: {} };
+
+	const d = annotResult.defs;
+	const process = d.processes[0];
+	const diagram = d.diagrams[0];
+	if (!process || !diagram) return { defs: d, annotationId, associationId: assocId };
+
+	return {
+		defs: {
+			...d,
+			processes: [
+				{ ...process, associations: [...process.associations, assoc] },
+				...d.processes.slice(1),
+			],
+			diagrams: [
+				{
+					...diagram,
+					plane: { ...diagram.plane, edges: [...diagram.plane.edges, edge] },
+				},
+				...d.diagrams.slice(1),
+			],
+		},
+		annotationId,
+		associationId: assocId,
+	};
+}
+
+// ── Update shape color ────────────────────────────────────────────────────────
+
+export function updateShapeColor(
+	defs: BpmnDefinitions,
+	id: string,
+	color: DiColor,
+): BpmnDefinitions {
+	const diagram = defs.diagrams[0];
+	if (!diagram) return defs;
+
+	const newShapes = diagram.plane.shapes.map((s) =>
+		s.bpmnElement === id
+			? { ...s, unknownAttributes: writeDiColor(s.unknownAttributes, color) }
+			: s,
+	);
+
+	// Add color namespaces when any color is set
+	const needsNs = !!(color.fill ?? color.stroke);
+	const newNamespaces = needsNs
+		? { ...defs.namespaces, bioc: BIOC_NS, color: COLOR_NS }
+		: defs.namespaces;
+
+	return {
+		...defs,
+		namespaces: newNamespaces,
+		diagrams: [
+			{ ...diagram, plane: { ...diagram.plane, shapes: newShapes } },
+			...defs.diagrams.slice(1),
+		],
+	};
 }

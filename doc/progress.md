@@ -1,5 +1,31 @@
 # Progress
 
+## 2026-02-25 — Colors & Text Annotations
+
+### `@bpmn-sdk/core` — `DiColor` helpers
+- **NEW `packages/bpmn-sdk/src/bpmn/di-color.ts`** — `DiColor` interface, `readDiColor`, `writeDiColor`, `BIOC_NS`, `COLOR_NS` re-exported from `@bpmn-sdk/core`
+
+### `@bpmn-sdk/canvas` — Color rendering + annotation text
+- **`RenderedShape.annotation?: BpmnTextAnnotation`** — annotation object available on rendered shapes
+- **Color rendering** — `applyColor(el, shape)` helper reads `bioc:fill`/`bioc:stroke` (+ OMG namespace equivalents) from DI `unknownAttributes` and applies inline `style` on shape bodies (task rect, event outer circle, gateway diamond)
+- **Annotation text** — `renderAnnotation` now accepts a `text` param and renders wrapped text inside the bracket
+- **Model index** — `buildIndex` now indexes `textAnnotations` from all processes and collaborations
+
+### `@bpmn-sdk/editor` — New tools, color editing, annotation editing
+- **`textAnnotation` type** — added to `CreateShapeType`, `ELEMENT_GROUPS` ("Annotations" group), `ELEMENT_TYPE_LABELS`, `RESIZABLE_TYPES`, `defaultBounds`
+- **`createAnnotation(defs, bounds, text?)`** — creates a `BpmnTextAnnotation` + DI shape
+- **`createAnnotationWithLink(defs, bounds, sourceId, sourceBounds, text?)`** — creates annotation + `BpmnAssociation` + DI edge
+- **`updateShapeColor(defs, id, color)`** — writes `bioc:`/`color:` attributes via `writeDiColor`; adds namespaces to definitions
+- **`updateLabel`** — extended to update `text` on `BpmnTextAnnotation`
+- **`deleteElements`** — cascades to remove linked associations (and their DI edges) when a flow element or annotation is deleted
+- **`moveShapes`** — recomputes association edge waypoints when source or target shape moves
+- **`editor.createAnnotationFor(sourceId)`** — creates a linked annotation above-right of source; opens label editor
+- **`editor.updateColor(id, color)`** — applies color or clears it (pass `{}`)
+- **Double-click annotation** — opens label editor via existing `_startLabelEdit` (now reads `textAnnotations.text`)
+- **Annotation resize** — `_isResizable`/`_getResizableIds` now include annotation shapes
+- **HUD color swatches** — 6 preset color swatches in ctx toolbar for all non-annotation flow elements; clicking active swatch clears the color
+- **HUD annotation button** — "Add text annotation" button in ctx toolbar creates a linked annotation
+
 ## 2026-02-25
 
 ### `@bpmn-sdk/canvas-plugin-config-panel` + `@bpmn-sdk/canvas-plugin-config-panel-bpmn` — Connector selector

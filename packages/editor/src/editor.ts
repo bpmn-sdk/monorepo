@@ -17,7 +17,7 @@ import type {
 	Theme,
 } from "@bpmn-sdk/canvas";
 import { Bpmn } from "@bpmn-sdk/core";
-import type { BpmnBounds, BpmnDefinitions } from "@bpmn-sdk/core";
+import type { BpmnBounds, BpmnDefinitions, DiColor } from "@bpmn-sdk/core";
 import { CommandStack } from "./command-stack.js";
 import { injectEditorStyles } from "./css.js";
 import {
@@ -33,6 +33,8 @@ import { LabelEditor } from "./label-editor.js";
 import {
 	changeElementType as changeElementTypeFn,
 	copyElements,
+	createAnnotation,
+	createAnnotationWithLink,
 	createConnection,
 	createEmptyDefinitions,
 	createShape,
@@ -44,6 +46,7 @@ import {
 	updateEdgeEndpoint,
 	updateLabel,
 	updateLabelPosition,
+	updateShapeColor,
 } from "./modeling.js";
 import type { Clipboard } from "./modeling.js";
 import { OverlayRenderer } from "./overlay.js";
@@ -80,6 +83,8 @@ function defaultBounds(
 		case "inclusiveGateway":
 		case "eventBasedGateway":
 			return { x: cx - 25, y: cy - 25, width: 50, height: 50 };
+		case "textAnnotation":
+			return { x: cx - 50, y: cy - 25, width: 100, height: 50 };
 		default:
 			return { x: cx - 50, y: cy - 40, width: 100, height: 80 };
 	}
@@ -697,10 +702,23 @@ export class BpmnEditor {
 		this._overlay.setAlignmentGuides([]);
 		const actualCenter = this._ghostSnapCenter ?? diagPoint;
 		this._ghostSnapCenter = null;
-		const edgeDropId = this._createEdgeDropTarget;
 		this._setCreateEdgeDropHighlight(null);
 		if (!this._defs) return;
 		const bounds = defaultBounds(type, actualCenter.x, actualCenter.y);
+
+		if (type === "textAnnotation") {
+			const result = createAnnotation(this._defs, bounds);
+			this._selectedIds = [result.id];
+			this._commandStack.push(result.defs);
+			this._renderDefs(result.defs);
+			this._emit("diagram:change", result.defs);
+			this._emit("editor:select", [result.id]);
+			this._startLabelEdit(result.id);
+			return;
+		}
+
+		const edgeDropId = this._createEdgeDropTarget;
+		this._setCreateEdgeDropHighlight(null);
 		const result = createShape(this._defs, type, bounds);
 		this._selectedIds = [result.id];
 		const finalDefs = edgeDropId
@@ -750,6 +768,7 @@ export class BpmnEditor {
 		const currentText =
 			process?.flowElements.find((el) => el.id === id)?.name ??
 			process?.sequenceFlows.find((sf) => sf.id === id)?.name ??
+			process?.textAnnotations.find((ta) => ta.id === id)?.text ??
 			"";
 		this._labelEditor.start(
 			id,
@@ -786,7 +805,10 @@ export class BpmnEditor {
 
 	/** Returns the BPMN element type for a given id, or null if not found. */
 	getElementType(id: string): string | null {
-		return this._shapes.find((s) => s.id === id)?.flowElement?.type ?? null;
+		const shape = this._shapes.find((s) => s.id === id);
+		if (!shape) return null;
+		if (shape.annotation !== undefined) return "textAnnotation";
+		return shape.flowElement?.type ?? null;
 	}
 
 	/**
@@ -955,6 +977,37 @@ export class BpmnEditor {
 		});
 	}
 
+	/** Creates a text annotation linked to the given source shape via an association. */
+	createAnnotationFor(sourceId: string): void {
+		if (!this._defs) return;
+		const srcShape = this._shapes.find((s) => s.id === sourceId);
+		if (!srcShape) return;
+		const srcBounds = srcShape.shape.bounds;
+
+		// Place annotation above-right of source
+		const annW = 100;
+		const annH = 50;
+		const annBounds = {
+			x: srcBounds.x + srcBounds.width + 30,
+			y: srcBounds.y - annH - 10,
+			width: annW,
+			height: annH,
+		};
+
+		const result = createAnnotationWithLink(this._defs, annBounds, sourceId, srcBounds);
+		this._selectedIds = [result.annotationId];
+		this._commandStack.push(result.defs);
+		this._renderDefs(result.defs);
+		this._emit("diagram:change", result.defs);
+		this._emit("editor:select", [result.annotationId]);
+		this._startLabelEdit(result.annotationId);
+	}
+
+	/** Updates the color of a shape in the diagram. Pass `{}` to clear colors. */
+	updateColor(id: string, color: DiColor): void {
+		this._executeCommand((d) => updateShapeColor(d, id, color));
+	}
+
 	// ── Private helpers ────────────────────────────────────────────────
 
 	private _setEdgeSelected(edgeId: string | null): void {
@@ -1077,14 +1130,19 @@ export class BpmnEditor {
 	}
 
 	private _isResizable(id: string): boolean {
-		const el = this._shapes.find((s) => s.id === id)?.flowElement;
-		return el !== undefined && RESIZABLE_TYPES.has(el.type);
+		const shape = this._shapes.find((s) => s.id === id);
+		if (!shape) return false;
+		if (shape.annotation !== undefined) return true;
+		return shape.flowElement !== undefined && RESIZABLE_TYPES.has(shape.flowElement.type);
 	}
 
 	private _getResizableIds(): Set<string> {
 		const ids = new Set<string>();
 		for (const shape of this._shapes) {
-			if (shape.flowElement && RESIZABLE_TYPES.has(shape.flowElement.type)) {
+			if (
+				shape.annotation !== undefined ||
+				(shape.flowElement && RESIZABLE_TYPES.has(shape.flowElement.type))
+			) {
 				ids.add(shape.id);
 			}
 		}

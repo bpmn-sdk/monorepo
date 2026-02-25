@@ -4,7 +4,9 @@ import type {
 	BpmnDiShape,
 	BpmnFlowElement,
 	BpmnSequenceFlow,
+	BpmnTextAnnotation,
 } from "@bpmn-sdk/core";
+import { readDiColor } from "@bpmn-sdk/core";
 import type { RenderedEdge, RenderedShape } from "./types.js";
 
 // ── SVG helpers ───────────────────────────────────────────────────────────────
@@ -177,11 +179,14 @@ interface ModelIndex {
 	elements: Map<string, BpmnFlowElement>;
 	/** id → BpmnSequenceFlow */
 	flows: Map<string, BpmnSequenceFlow>;
+	/** id → BpmnTextAnnotation */
+	annotations: Map<string, BpmnTextAnnotation>;
 }
 
 function buildIndex(defs: BpmnDefinitions): ModelIndex {
 	const elements = new Map<string, BpmnFlowElement>();
 	const flows = new Map<string, BpmnSequenceFlow>();
+	const annotations = new Map<string, BpmnTextAnnotation>();
 
 	function indexProcess(flowElements: BpmnFlowElement[], sequenceFlows: BpmnSequenceFlow[]): void {
 		for (const el of flowElements) {
@@ -201,8 +206,28 @@ function buildIndex(defs: BpmnDefinitions): ModelIndex {
 
 	for (const proc of defs.processes) {
 		indexProcess(proc.flowElements, proc.sequenceFlows);
+		for (const ta of proc.textAnnotations) {
+			annotations.set(ta.id, ta);
+		}
 	}
-	return { elements, flows };
+	for (const collab of defs.collaborations) {
+		for (const ta of collab.textAnnotations) {
+			annotations.set(ta.id, ta);
+		}
+	}
+	return { elements, flows, annotations };
+}
+
+// ── Color helper ─────────────────────────────────────────────────────────────
+
+/** Applies bioc/color namespace attributes as inline style on a shape body element. */
+function applyColor(el: SVGElement, shape: BpmnDiShape): void {
+	const { fill, stroke } = readDiColor(shape.unknownAttributes);
+	if (!fill && !stroke) return;
+	const parts: string[] = [];
+	if (fill) parts.push(`fill: ${fill}`);
+	if (stroke) parts.push(`stroke: ${stroke}`);
+	el.setAttribute("style", parts.join("; "));
 }
 
 // ── Shape renderers ───────────────────────────────────────────────────────────
@@ -236,6 +261,7 @@ function renderEvent(
 		r,
 		class: isEnd ? "bpmn-end-body" : "bpmn-event-body",
 	});
+	applyColor(outer, shape);
 	g.appendChild(outer);
 
 	// Intermediate: inner circle
@@ -291,6 +317,7 @@ function renderTask(
 					? "bpmn-shape-body"
 					: "bpmn-shape-body";
 	attr(body, { x: 0, y: 0, width, height, rx: 10, class: bodyClass });
+	applyColor(body, shape);
 	g.appendChild(body);
 
 	// Task type icon (14×14 at position 4,4)
@@ -352,6 +379,7 @@ function renderGateway(
 		points: `${cx},0 ${width},${cy} ${cx},${height} 0,${cy}`,
 		class: "bpmn-gw-body",
 	});
+	applyColor(diamond, shape);
 	g.appendChild(diamond);
 
 	// Gateway marker centred in diamond
@@ -376,17 +404,32 @@ function renderGateway(
 	return g;
 }
 
-function renderAnnotation(shape: BpmnDiShape, instanceId: string): SVGGElement {
+function renderAnnotation(
+	shape: BpmnDiShape,
+	text: string | undefined,
+	instanceId: string,
+): SVGGElement {
 	const { width, height } = shape.bounds;
 	const g = svgEl("g");
 
-	// Bracket (open rectangle on the left)
+	// Transparent hit rect so the full bounding area is clickable/draggable
+	const hit = svgEl("rect");
+	attr(hit, { x: "0", y: "0", width: String(width), height: String(height), fill: "transparent" });
+	g.appendChild(hit);
+
+	// Bracket (open on the right — left + top + bottom strokes only)
 	const path = svgEl("path");
 	attr(path, {
-		d: `M${width * 0.3} 0 L0 0 L0 ${height} L${width * 0.3} ${height}`,
+		d: `M${width} 0 L0 0 L0 ${height} L${width} ${height}`,
 		class: "bpmn-icon",
 	});
 	g.appendChild(path);
+
+	// Annotation text centred in the full shape area
+	if (text) {
+		const labelEl = makeLabel(text, width / 2, height / 2, width - 8);
+		g.appendChild(labelEl);
+	}
 
 	attr(g, {
 		class: "bpmn-shape",
@@ -594,7 +637,12 @@ export function render(
 			g = renderGateway(shape, el, instanceId);
 		} else if (type === "" && !el) {
 			// Text annotation (not in flowElements, stored separately)
-			g = renderAnnotation(shape, instanceId);
+			const annotation = index.annotations.get(shape.bpmnElement);
+			g = renderAnnotation(shape, annotation?.text, instanceId);
+			attr(g, { transform: `translate(${x} ${y})` });
+			shapesLayer.appendChild(g);
+			shapes.push({ id: shape.bpmnElement, element: g, shape, flowElement: el, annotation });
+			continue;
 		} else {
 			g = renderTask(shape, el, instanceId);
 		}

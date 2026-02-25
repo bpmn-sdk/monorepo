@@ -13,7 +13,8 @@ export type CreateShapeType =
 	| "exclusiveGateway"
 	| "parallelGateway"
 	| "inclusiveGateway"
-	| "eventBasedGateway";
+	| "eventBasedGateway"
+	| "textAnnotation";
 
 /** Element types that support resize handles. */
 export const RESIZABLE_TYPES: ReadonlySet<string> = new Set([
@@ -23,6 +24,7 @@ export const RESIZABLE_TYPES: ReadonlySet<string> = new Set([
 	"sendTask",
 	"receiveTask",
 	"businessRuleTask",
+	"textAnnotation",
 ]);
 
 export type Tool = "select" | "pan" | "space" | `create:${CreateShapeType}`;
