@@ -167,18 +167,21 @@ export function injectEditorStyles(): void {
 	document.head.appendChild(style);
 }
 
-/** CSS for the editor HUD — panels, buttons, dropdowns, group picker. */
+/** CSS for the editor HUD — panels, buttons, dropdowns, group picker.
+ *  Dark theme is the default. Light theme is activated by setting
+ *  `data-bpmn-hud-theme="light"` on `document.body`. */
 export const HUD_CSS = `
 /* ── HUD base ────────────────────────────────────────────────────── */
 .hud { position: fixed; z-index: 100; }
 
+/* ── Dark theme (default) ────────────────────────────────────────── */
 .panel {
   display: flex; align-items: center; gap: 2px; padding: 4px;
-  background: rgba(22, 22, 30, 0.72);
+  background: rgba(22, 22, 30, 0.88);
   backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 10px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
 }
 
 /* ── HUD positions ───────────────────────────────────────────────── */
@@ -195,15 +198,15 @@ export const HUD_CSS = `
   background: transparent;
   border: 1px solid transparent;
   border-radius: 6px;
-  color: rgba(255, 255, 255, 0.4);
+  color: rgba(255, 255, 255, 0.6);
   cursor: pointer;
-  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  transition: background 0.1s, color 0.1s, border-color 0.1s;
   padding: 0; flex-shrink: 0;
 }
-.hud-btn:hover  { background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.9); }
-.hud-btn.active { background: rgba(255,255,255,0.12); color: #fff; border-color: rgba(255,255,255,0.18); }
-.hud-btn:disabled { opacity: 0.22; cursor: default; }
-.hud-btn:disabled:hover { background: transparent; color: rgba(255,255,255,0.4); }
+.hud-btn:hover  { background: rgba(255,255,255,0.08); color: #fff; }
+.hud-btn.active { background: rgba(255,255,255,0.12); color: #fff; border-color: rgba(255,255,255,0.2); }
+.hud-btn:disabled { opacity: 0.28; cursor: default; }
+.hud-btn:disabled:hover { background: transparent; color: rgba(255,255,255,0.6); }
 .hud-btn svg { width: 16px; height: 16px; pointer-events: none; }
 
 /* ── Group button: small chevron at bottom-right corner ──────────── */
@@ -221,31 +224,31 @@ export const HUD_CSS = `
 #tool-groups { display: flex; align-items: center; gap: 2px; }
 
 /* ── Separator ───────────────────────────────────────────────────── */
-.hud-sep { width: 1px; height: 20px; background: rgba(255,255,255,0.07); margin: 0 2px; flex-shrink: 0; }
+.hud-sep { width: 1px; height: 20px; background: rgba(255,255,255,0.1); margin: 0 2px; flex-shrink: 0; }
 
 /* ── Zoom widget ─────────────────────────────────────────────────── */
 #btn-zoom-current {
   padding: 0 10px; height: 32px;
   background: transparent; border: 1px solid transparent; border-radius: 7px;
-  color: rgba(255,255,255,0.4); cursor: pointer;
+  color: rgba(255,255,255,0.6); cursor: pointer;
   font-size: 12px; font-weight: 600;
-  transition: background 0.15s, color 0.15s;
+  transition: background 0.1s, color 0.1s;
   white-space: nowrap;
 }
-#btn-zoom-current:hover { background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.9); }
+#btn-zoom-current:hover { background: rgba(255,255,255,0.08); color: #fff; }
 
 #zoom-expanded { display: none; align-items: center; gap: 2px; }
 #zoom-expanded.open { display: flex; }
 
 #btn-zoom-pct {
   padding: 0 8px; height: 30px;
-  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px;
-  color: rgba(255,255,255,0.6); cursor: pointer;
+  background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px;
+  color: rgba(255,255,255,0.75); cursor: pointer;
   font-size: 12px; font-weight: 600;
-  transition: background 0.15s, color 0.15s;
+  transition: background 0.1s, color 0.1s;
   white-space: nowrap; min-width: 60px; text-align: center;
 }
-#btn-zoom-pct:hover { background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.9); }
+#btn-zoom-pct:hover { background: rgba(255,255,255,0.12); color: #fff; }
 
 /* ── Dropdown menus ──────────────────────────────────────────────── */
 .dropdown {
@@ -298,6 +301,42 @@ export const HUD_CSS = `
   white-space: nowrap; align-self: center;
   border-right: 1px solid rgba(255,255,255,0.08);
   margin-right: 2px;
+}
+
+/* ── Light theme overrides ───────────────────────────────────────── */
+[data-bpmn-hud-theme="light"] .panel {
+  background: rgba(255, 255, 255, 0.92);
+  border-color: rgba(0, 0, 0, 0.08);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+[data-bpmn-hud-theme="light"] .hud-btn { color: rgba(0,0,0,0.5); }
+[data-bpmn-hud-theme="light"] .hud-btn:hover { background: rgba(0,0,0,0.06); color: rgba(0,0,0,0.9); }
+[data-bpmn-hud-theme="light"] .hud-btn.active { background: rgba(0,0,0,0.08); color: rgba(0,0,0,0.9); border-color: rgba(0,0,0,0.15); }
+[data-bpmn-hud-theme="light"] .hud-btn:disabled:hover { background: transparent; color: rgba(0,0,0,0.5); }
+[data-bpmn-hud-theme="light"] .hud-sep { background: rgba(0,0,0,0.1); }
+[data-bpmn-hud-theme="light"] #btn-zoom-current { color: rgba(0,0,0,0.5); }
+[data-bpmn-hud-theme="light"] #btn-zoom-current:hover { background: rgba(0,0,0,0.06); color: rgba(0,0,0,0.9); }
+[data-bpmn-hud-theme="light"] #btn-zoom-pct {
+  background: rgba(0,0,0,0.04); border-color: rgba(0,0,0,0.1); color: rgba(0,0,0,0.65);
+}
+[data-bpmn-hud-theme="light"] #btn-zoom-pct:hover { background: rgba(0,0,0,0.08); color: rgba(0,0,0,0.9); }
+[data-bpmn-hud-theme="light"] .dropdown {
+  background: rgba(252, 252, 254, 0.98);
+  border-color: rgba(0,0,0,0.1);
+  box-shadow: 0 6px 24px rgba(0,0,0,0.15);
+}
+[data-bpmn-hud-theme="light"] .drop-item { color: rgba(0,0,0,0.65); }
+[data-bpmn-hud-theme="light"] .drop-item:hover { background: rgba(0,0,0,0.05); color: rgba(0,0,0,0.9); }
+[data-bpmn-hud-theme="light"] .drop-sep { background: rgba(0,0,0,0.08); }
+[data-bpmn-hud-theme="light"] .drop-label { color: rgba(0,0,0,0.35); }
+[data-bpmn-hud-theme="light"] .group-picker {
+  background: rgba(252, 252, 254, 0.98);
+  border-color: rgba(0,0,0,0.1);
+  box-shadow: 0 6px 24px rgba(0,0,0,0.15);
+}
+[data-bpmn-hud-theme="light"] .group-picker-label {
+  color: rgba(0,0,0,0.35);
+  border-right-color: rgba(0,0,0,0.08);
 }
 `;
 

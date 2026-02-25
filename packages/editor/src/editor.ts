@@ -431,6 +431,10 @@ export class BpmnEditor {
 		this._viewport.set({ tx, ty, scale });
 	}
 
+	getTheme(): "light" | "dark" {
+		return this._host.getAttribute("data-theme") === "dark" ? "dark" : "light";
+	}
+
 	setTheme(theme: Theme): void {
 		this._theme = theme;
 		this._applyTheme(theme);

@@ -153,6 +153,10 @@ export function initEditorHud(editor: BpmnEditor): void {
 		labelPosMenuEl,
 	);
 
+	// ── Theme ──────────────────────────────────────────────────────────────────
+
+	document.body.dataset.bpmnHudTheme = editor.getTheme();
+
 	// ── Closure state ──────────────────────────────────────────────────────────
 
 	let currentScale = 1;
