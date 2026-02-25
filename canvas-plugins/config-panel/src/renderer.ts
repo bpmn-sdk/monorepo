@@ -2,6 +2,10 @@ import type { RenderedShape, ViewportState } from "@bpmn-sdk/canvas";
 import type { BpmnDefinitions } from "@bpmn-sdk/core";
 import type { FieldSchema, FieldValue, GroupSchema, PanelAdapter, PanelSchema } from "./types.js";
 
+// Attribute set on the field wrapper div when the field has a condition, used
+// by _refreshConditionals to toggle visibility without a full re-render.
+const FIELD_WRAPPER_ATTR = "data-field-wrapper";
+
 interface Registration {
 	schema: PanelSchema;
 	adapter: PanelAdapter;
@@ -81,9 +85,7 @@ export class ConfigPanelRenderer {
 		if (!reg) return;
 		this._values = reg.adapter.read(defs, this._selectedId);
 		this._refreshInputs();
-		if (this._fullOpen) {
-			this._refreshGroupVisibility(reg.schema.groups);
-		}
+		this._refreshConditionals(reg.schema);
 	}
 
 	destroy(): void {
@@ -103,6 +105,8 @@ export class ConfigPanelRenderer {
 		const reg = this._schemas.get(type);
 		if (!reg) return;
 		this._values[key] = value;
+		// Refresh visibility immediately so the UI responds without waiting for diagram:change
+		this._refreshConditionals(reg.schema);
 		const snapshot = { ...this._values };
 		this._applyChange((defs) => reg.adapter.write(defs, id, snapshot));
 	}
@@ -155,6 +159,28 @@ export class ConfigPanelRenderer {
 				}
 			}
 		}
+	}
+
+	/**
+	 * Refresh both field-level and group-level conditional visibility.
+	 * Called synchronously after any value change so the UI updates immediately.
+	 */
+	private _refreshConditionals(schema: PanelSchema): void {
+		const container = this._fullOpen ? this._overlayEl : this._compactEl;
+		if (!container) return;
+
+		// Field-level conditions
+		const allFields = [...schema.compact, ...schema.groups.flatMap((g) => g.fields)];
+		for (const field of allFields) {
+			if (!field.condition) continue;
+			const wrapper = container.querySelector<HTMLElement>(
+				`[${FIELD_WRAPPER_ATTR}="${field.key}"]`,
+			);
+			if (wrapper) wrapper.style.display = field.condition(this._values) ? "" : "none";
+		}
+
+		// Group/tab conditions only apply in the full overlay
+		if (this._fullOpen) this._refreshGroupVisibility(schema.groups);
 	}
 
 	/** Show/hide tabs and groups based on their conditions. */
@@ -369,6 +395,11 @@ export class ConfigPanelRenderer {
 	private _renderField(field: FieldSchema): HTMLElement {
 		const wrapper = document.createElement("div");
 		wrapper.className = "bpmn-cfg-field";
+
+		if (field.condition) {
+			wrapper.setAttribute(FIELD_WRAPPER_ATTR, field.key);
+			if (!field.condition(this._values)) wrapper.style.display = "none";
+		}
 
 		const value = this._values[field.key];
 

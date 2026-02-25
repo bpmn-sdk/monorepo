@@ -1,5 +1,16 @@
 # Progress
 
+## 2026-02-25
+
+### `@bpmn-sdk/canvas-plugin-config-panel` + `@bpmn-sdk/canvas-plugin-config-panel-bpmn` — Connector selector
+- **`FieldSchema.condition`** — new optional field; hides a field when the predicate returns false, mirroring the existing `GroupSchema.condition` at the individual-field level
+- **`ConfigPanelRenderer._refreshConditionals`** — new method updates both field-level and group/tab visibility; called synchronously from `_applyField` (immediate UI) and `onDiagramChange` (after external model update)
+- **Service task "Connector" selector** — replaces the raw `taskType` text input with a `connector` select dropdown:
+  - `""` → **Custom** — shows a `taskType` text field for the Zeebe job type string
+  - `"io.camunda:http-json:1"` → **REST Connector** — hides the task-type field; shows Request / Authentication / Output tab groups
+- **Adapter logic** — `read()` derives `connector` value from `taskDefinition.type`; `write()` only emits REST ioMapping / taskHeaders when REST connector is selected (switching to Custom clears REST-specific extensions)
+- **4 new tests** in `canvas-plugins/config-panel-bpmn/tests/index.test.ts`
+
 ## 2026-02-24
 
 ### Config panel fixes (round 2)

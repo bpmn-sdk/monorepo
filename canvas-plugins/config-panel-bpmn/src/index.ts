@@ -87,8 +87,10 @@ const GENERAL_ADAPTER: PanelAdapter = {
 
 // ── Service task schema ───────────────────────────────────────────────────────
 
-const IS_REST_CONNECTOR = (values: Record<string, FieldValue>) =>
-	values.taskType === "io.camunda:http-json:1";
+const REST_CONNECTOR_TYPE = "io.camunda:http-json:1";
+
+const IS_REST = (values: Record<string, FieldValue>) => values.connector === REST_CONNECTOR_TYPE;
+const IS_CUSTOM = (values: Record<string, FieldValue>) => values.connector === "";
 
 const SERVICE_TASK_SCHEMA: PanelSchema = {
 	compact: [{ key: "name", label: "Name", type: "text", placeholder: "Task name" }],
@@ -99,11 +101,21 @@ const SERVICE_TASK_SCHEMA: PanelSchema = {
 			fields: [
 				{ key: "name", label: "Name", type: "text", placeholder: "Task name" },
 				{
+					key: "connector",
+					label: "Connector",
+					type: "select",
+					options: [
+						{ value: "", label: "Custom (no connector)" },
+						{ value: REST_CONNECTOR_TYPE, label: "REST Connector" },
+					],
+				},
+				{
 					key: "taskType",
 					label: "Task type",
 					type: "text",
-					placeholder: "io.camunda:http-json:1",
-					hint: "Zeebe service type. REST connector: io.camunda:http-json:1",
+					placeholder: "e.g. my-worker-type",
+					hint: "Zeebe job type string consumed by your service task worker.",
+					condition: IS_CUSTOM,
 				},
 				{ key: "retries", label: "Retries", type: "text", placeholder: "3" },
 				{
@@ -117,7 +129,7 @@ const SERVICE_TASK_SCHEMA: PanelSchema = {
 		{
 			id: "request",
 			label: "Request",
-			condition: IS_REST_CONNECTOR,
+			condition: IS_REST,
 			fields: [
 				{
 					key: "method",
@@ -176,7 +188,7 @@ const SERVICE_TASK_SCHEMA: PanelSchema = {
 		{
 			id: "auth",
 			label: "Authentication",
-			condition: IS_REST_CONNECTOR,
+			condition: IS_REST,
 			fields: [
 				{
 					key: "authType",
@@ -200,7 +212,7 @@ const SERVICE_TASK_SCHEMA: PanelSchema = {
 		{
 			id: "output",
 			label: "Output",
-			condition: IS_REST_CONNECTOR,
+			condition: IS_REST,
 			fields: [
 				{
 					key: "resultVariable",
@@ -234,11 +246,16 @@ const SERVICE_TASK_ADAPTER: PanelAdapter = {
 		if (!el) return {};
 
 		const ext = parseZeebeExtensions(el.extensionElements);
+		const definitionType = ext.taskDefinition?.type ?? "";
+		// Derive the connector selector value from the task definition type
+		const connector = definitionType === REST_CONNECTOR_TYPE ? REST_CONNECTOR_TYPE : "";
 
 		return {
 			name: el.name ?? "",
 			documentation: el.documentation ?? "",
-			taskType: ext.taskDefinition?.type ?? "",
+			connector,
+			// taskType is only meaningful (and shown) when connector === ""
+			taskType: connector === "" ? definitionType : "",
 			retries: ext.taskDefinition?.retries ?? "",
 			method: getIoInput(ext, "method") ?? "GET",
 			url: getIoInput(ext, "url") ?? "",
@@ -269,40 +286,44 @@ const SERVICE_TASK_ADAPTER: PanelAdapter = {
 				(x) => !ZEEBE_EXTS.includes(xmlLocalName(x.name)),
 			);
 
-			const taskType = strVal(values.taskType);
+			const isRest = strVal(values.connector) === REST_CONNECTOR_TYPE;
+			// For REST connector the task type is fixed; for custom it comes from the field
+			const taskType = isRest ? REST_CONNECTOR_TYPE : strVal(values.taskType);
 			const retries = strVal(values.retries);
-			const authType = strVal(values.authType) || "noAuth";
 
-			// Build ioMapping inputs
+			// Only build REST-specific ioMapping / taskHeaders when the REST connector is selected
 			const inputs: Array<{ source: string; target: string }> = [];
-			inputs.push({ source: authType, target: "authentication.type" });
-			const authToken = strVal(values.authToken);
-			if (authType === "bearer" && authToken) {
-				inputs.push({ source: authToken, target: "authentication.token" });
-			}
-			const method = strVal(values.method) || "GET";
-			inputs.push({ source: method, target: "method" });
-			const url = strVal(values.url);
-			if (url) inputs.push({ source: url, target: "url" });
-			const headers = strVal(values.headers);
-			if (headers) inputs.push({ source: headers, target: "headers" });
-			const qp = strVal(values.queryParameters);
-			if (qp) inputs.push({ source: qp, target: "queryParameters" });
-			const body = strVal(values.body);
-			if (body) inputs.push({ source: body, target: "body" });
-			const connTimeout = strVal(values.connectionTimeoutInSeconds);
-			if (connTimeout) inputs.push({ source: connTimeout, target: "connectionTimeoutInSeconds" });
-			const readTimeout = strVal(values.readTimeoutInSeconds);
-			if (readTimeout) inputs.push({ source: readTimeout, target: "readTimeoutInSeconds" });
-
-			// Build taskHeaders
 			const taskHeadersList: Array<{ key: string; value: string }> = [];
-			const resultVar = strVal(values.resultVariable);
-			if (resultVar) taskHeadersList.push({ key: "resultVariable", value: resultVar });
-			const resultExpr = strVal(values.resultExpression);
-			if (resultExpr) taskHeadersList.push({ key: "resultExpression", value: resultExpr });
-			const retryBackoff = strVal(values.retryBackoff);
-			if (retryBackoff) taskHeadersList.push({ key: "retryBackoff", value: retryBackoff });
+
+			if (isRest) {
+				const authType = strVal(values.authType) || "noAuth";
+				inputs.push({ source: authType, target: "authentication.type" });
+				const authToken = strVal(values.authToken);
+				if (authType === "bearer" && authToken) {
+					inputs.push({ source: authToken, target: "authentication.token" });
+				}
+				const method = strVal(values.method) || "GET";
+				inputs.push({ source: method, target: "method" });
+				const url = strVal(values.url);
+				if (url) inputs.push({ source: url, target: "url" });
+				const headers = strVal(values.headers);
+				if (headers) inputs.push({ source: headers, target: "headers" });
+				const qp = strVal(values.queryParameters);
+				if (qp) inputs.push({ source: qp, target: "queryParameters" });
+				const body = strVal(values.body);
+				if (body) inputs.push({ source: body, target: "body" });
+				const connTimeout = strVal(values.connectionTimeoutInSeconds);
+				if (connTimeout) inputs.push({ source: connTimeout, target: "connectionTimeoutInSeconds" });
+				const readTimeout = strVal(values.readTimeoutInSeconds);
+				if (readTimeout) inputs.push({ source: readTimeout, target: "readTimeoutInSeconds" });
+
+				const resultVar = strVal(values.resultVariable);
+				if (resultVar) taskHeadersList.push({ key: "resultVariable", value: resultVar });
+				const resultExpr = strVal(values.resultExpression);
+				if (resultExpr) taskHeadersList.push({ key: "resultExpression", value: resultExpr });
+				const retryBackoff = strVal(values.retryBackoff);
+				if (retryBackoff) taskHeadersList.push({ key: "retryBackoff", value: retryBackoff });
+			}
 
 			const newZeebeExts = zeebeExtensionsToXmlElements({
 				taskDefinition: taskType ? { type: taskType, retries: retries || undefined } : undefined,

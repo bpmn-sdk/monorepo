@@ -24,6 +24,8 @@ export interface FieldSchema {
 	docsUrl?: string;
 	/** Mask the input (password-style) for secret values. */
 	secret?: boolean;
+	/** If provided, the field is only shown when this returns true. */
+	condition?: (values: Record<string, FieldValue>) => boolean;
 }
 
 /** A named group of fields shown as a section in the full editor. */
