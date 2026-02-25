@@ -152,7 +152,7 @@ const CONNECTOR_OPTIONS: Array<{ value: string; label: string }> = [
 	{ value: CUSTOM_TASK_TYPE, label: "Custom (no connector)" },
 	...SERVICE_TASK_TEMPLATES.flatMap((t) =>
 		extractTaskType(t) ? [{ value: t.id, label: t.name }] : [],
-	),
+	).sort((a, b) => a.label.localeCompare(b.label)),
 ];
 
 const GENERIC_SERVICE_TASK_SCHEMA: PanelSchema = {

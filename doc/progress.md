@@ -1,5 +1,14 @@
 # Progress
 
+## 2026-02-25 — Connector Template Icons Rendered in Canvas
+
+### `@bpmn-sdk/canvas` — Template icon rendering
+- **`renderer.ts`** — `renderTask()` checks `el.unknownAttributes["zeebe:modelerTemplateIcon"]`; if present, renders an SVG `<image>` element (14×14 at position 4,4) with `href` set to the data URI instead of the hardcoded gear icon; standard task type icons are unaffected
+- **1 new test** in `canvas.test.ts`: verifies `<image>` is rendered and gear icon circles are absent when `modelerTemplateIcon` is set
+
+### `@bpmn-sdk/canvas-plugin-config-panel-bpmn` — Stamp icon on template apply
+- **`template-engine.ts`** — `adapter.write()` now includes `zeebe:modelerTemplateIcon` in `unknownAttributes` when the template has `icon.contents`; icon is persisted to the BPMN element whenever a connector template is applied via the UI
+
 ## 2026-02-25 — Connector Templates Usable via Core Builder
 
 ### `@bpmn-sdk/canvas-plugin-config-panel-bpmn` — `templateToServiceTaskOptions`

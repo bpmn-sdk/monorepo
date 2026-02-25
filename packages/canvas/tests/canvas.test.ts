@@ -186,4 +186,32 @@ describe("computeDiagramBounds", () => {
 		expect(bounds.maxX).toBeGreaterThanOrEqual(418); // 382 + 36
 		expect(bounds.maxY).toBeGreaterThanOrEqual(140); // 60 + 80
 	});
+
+	it("renders connector template icon as <image> when zeebe:modelerTemplateIcon is set", () => {
+		const ICON_URI =
+			"data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciLz4=";
+		const defs = Bpmn.createProcess("proc")
+			.withAutoLayout()
+			.startEvent("start")
+			.serviceTask("task", {
+				name: "Kafka Publish",
+				taskType: "io.camunda:connector-kafka:1",
+				modelerTemplate: "io.camunda.connectors.KAFKA.v1",
+				modelerTemplateIcon: ICON_URI,
+			})
+			.endEvent("end")
+			.build();
+
+		const iconContainer = makeContainer();
+		const c = new BpmnCanvas({ container: iconContainer, grid: false });
+		c.loadDefinitions(defs);
+
+		const taskShape = iconContainer.querySelector('[data-bpmn-id="task"]');
+		if (!taskShape) throw new Error("task shape not found");
+		const img = taskShape.querySelector("image");
+		expect(img).not.toBeNull();
+		expect(img?.getAttribute("href")).toBe(ICON_URI);
+		// Gear icon SVG paths should NOT be present
+		expect(taskShape.querySelector("circle")).toBeNull();
+	});
 });

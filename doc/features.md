@@ -1,5 +1,9 @@
 # Features
 
+## Connector Template Icons in Canvas (2026-02-25) — `@bpmn-sdk/canvas` + `@bpmn-sdk/canvas-plugin-config-panel-bpmn`
+- **Template icon rendering** — when a service task has `zeebe:modelerTemplateIcon` set (data URI from the connector template), the canvas renderer displays it as an SVG `<image>` in the top-left icon slot instead of the generic gear icon; works for all 116 Camunda connectors
+- **Icon stamped on apply** — the config panel template engine writes `zeebe:modelerTemplateIcon` to the BPMN element whenever a connector template is applied, so the icon persists in the saved XML
+
 ## Connector Templates + Core Builder Integration (2026-02-25) — `@bpmn-sdk/canvas-plugin-config-panel-bpmn`
 - **`templateToServiceTaskOptions(template, values)`** — converts any of the 116 connector templates into `ServiceTaskOptions` for the `Bpmn` builder; use any connector programmatically without hand-crafting extension XML
 - **`CAMUNDA_CONNECTOR_TEMPLATES`** exported from the public API — find templates by id or name for programmatic use

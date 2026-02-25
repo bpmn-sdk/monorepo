@@ -374,13 +374,26 @@ function renderTask(
 	}
 
 	// Task type icon (14×14 at position 4,4)
-	const iconType = el?.type ?? "";
-	const iconSvg = taskIcon(iconType);
-	if (iconSvg) {
-		const iconG = svgEl("g");
-		attr(iconG, { transform: "translate(4 4)" });
-		iconG.innerHTML = iconSvg;
-		g.appendChild(iconG);
+	const templateIconUri = el?.unknownAttributes?.["zeebe:modelerTemplateIcon"];
+	if (templateIconUri) {
+		const img = svgEl("image");
+		attr(img, {
+			x: 4,
+			y: 4,
+			width: 14,
+			height: 14,
+			href: templateIconUri,
+			preserveAspectRatio: "xMidYMid meet",
+		});
+		g.appendChild(img);
+	} else {
+		const iconSvg = taskIcon(el?.type ?? "");
+		if (iconSvg) {
+			const iconG = svgEl("g");
+			attr(iconG, { transform: "translate(4 4)" });
+			iconG.innerHTML = iconSvg;
+			g.appendChild(iconG);
+		}
 	}
 
 	// Label — centred in shape

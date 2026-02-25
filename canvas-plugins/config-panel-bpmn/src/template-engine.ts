@@ -289,6 +289,9 @@ export function buildRegistrationFromTemplate(template: ElementTemplate): Templa
 						...(template.version !== undefined
 							? { "zeebe:modelerTemplateVersion": String(template.version) }
 							: {}),
+						...(template.icon?.contents
+							? { "zeebe:modelerTemplateIcon": template.icon.contents }
+							: {}),
 					},
 				};
 			});
