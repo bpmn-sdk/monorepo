@@ -10,20 +10,24 @@ export type BpmnElementType =
 	| "intermediateThrowEvent"
 	| "intermediateCatchEvent"
 	| "boundaryEvent"
+	| "task"
 	| "serviceTask"
 	| "scriptTask"
 	| "userTask"
 	| "sendTask"
 	| "receiveTask"
 	| "businessRuleTask"
+	| "manualTask"
 	| "callActivity"
 	| "exclusiveGateway"
 	| "parallelGateway"
 	| "inclusiveGateway"
 	| "eventBasedGateway"
+	| "complexGateway"
 	| "subProcess"
 	| "adHocSubProcess"
-	| "eventSubProcess";
+	| "eventSubProcess"
+	| "transaction";
 
 // ---------------------------------------------------------------------------
 // Geometry
@@ -80,12 +84,45 @@ export interface BpmnSignalEventDefinition {
 	signalRef?: string;
 }
 
+export interface BpmnConditionalEventDefinition {
+	type: "conditional";
+	id?: string;
+	condition?: string;
+}
+
+export interface BpmnLinkEventDefinition {
+	type: "link";
+	id?: string;
+	name?: string;
+}
+
+export interface BpmnCancelEventDefinition {
+	type: "cancel";
+	id?: string;
+}
+
+export interface BpmnTerminateEventDefinition {
+	type: "terminate";
+	id?: string;
+}
+
+export interface BpmnCompensateEventDefinition {
+	type: "compensate";
+	id?: string;
+	activityRef?: string;
+}
+
 export type BpmnEventDefinition =
 	| BpmnTimerEventDefinition
 	| BpmnErrorEventDefinition
 	| BpmnEscalationEventDefinition
 	| BpmnMessageEventDefinition
-	| BpmnSignalEventDefinition;
+	| BpmnSignalEventDefinition
+	| BpmnConditionalEventDefinition
+	| BpmnLinkEventDefinition
+	| BpmnCancelEventDefinition
+	| BpmnTerminateEventDefinition
+	| BpmnCompensateEventDefinition;
 
 // ---------------------------------------------------------------------------
 // Multi-instance loop
@@ -237,6 +274,34 @@ export interface BpmnEventBasedGateway extends BpmnFlowNodeBase {
 	type: "eventBasedGateway";
 }
 
+export interface BpmnComplexGateway extends BpmnFlowNodeBase {
+	type: "complexGateway";
+	default?: string;
+}
+
+// ---------------------------------------------------------------------------
+// Additional activities
+// ---------------------------------------------------------------------------
+
+export interface BpmnTask extends BpmnFlowNodeBase {
+	type: "task";
+	loopCharacteristics?: BpmnMultiInstanceLoopCharacteristics;
+}
+
+export interface BpmnManualTask extends BpmnFlowNodeBase {
+	type: "manualTask";
+	loopCharacteristics?: BpmnMultiInstanceLoopCharacteristics;
+}
+
+export interface BpmnTransaction extends BpmnFlowNodeBase {
+	type: "transaction";
+	loopCharacteristics?: BpmnMultiInstanceLoopCharacteristics;
+	flowElements: BpmnFlowElement[];
+	sequenceFlows: BpmnSequenceFlow[];
+	textAnnotations: BpmnTextAnnotation[];
+	associations: BpmnAssociation[];
+}
+
 // ---------------------------------------------------------------------------
 // Flow element union
 // ---------------------------------------------------------------------------
@@ -247,20 +312,24 @@ export type BpmnFlowElement =
 	| BpmnIntermediateCatchEvent
 	| BpmnIntermediateThrowEvent
 	| BpmnBoundaryEvent
+	| BpmnTask
 	| BpmnServiceTask
 	| BpmnScriptTask
 	| BpmnUserTask
 	| BpmnSendTask
 	| BpmnReceiveTask
 	| BpmnBusinessRuleTask
+	| BpmnManualTask
 	| BpmnCallActivity
 	| BpmnSubProcess
 	| BpmnAdHocSubProcess
 	| BpmnEventSubProcess
+	| BpmnTransaction
 	| BpmnExclusiveGateway
 	| BpmnParallelGateway
 	| BpmnInclusiveGateway
-	| BpmnEventBasedGateway;
+	| BpmnEventBasedGateway
+	| BpmnComplexGateway;
 
 /** Backward-compat alias used by the layout module. */
 export type BpmnFlowNode = BpmnFlowElement;
@@ -298,6 +367,23 @@ export interface BpmnAssociation {
 }
 
 // ---------------------------------------------------------------------------
+// Lanes
+// ---------------------------------------------------------------------------
+
+export interface BpmnLane {
+	id: string;
+	name?: string;
+	flowNodeRefs: string[];
+	childLaneSet?: BpmnLaneSet;
+	unknownAttributes: Record<string, string>;
+}
+
+export interface BpmnLaneSet {
+	id?: string;
+	lanes: BpmnLane[];
+}
+
+// ---------------------------------------------------------------------------
 // Process
 // ---------------------------------------------------------------------------
 
@@ -310,6 +396,7 @@ export interface BpmnProcess {
 	sequenceFlows: BpmnSequenceFlow[];
 	textAnnotations: BpmnTextAnnotation[];
 	associations: BpmnAssociation[];
+	laneSet?: BpmnLaneSet;
 	unknownAttributes: Record<string, string>;
 }
 
@@ -324,9 +411,18 @@ export interface BpmnParticipant {
 	unknownAttributes: Record<string, string>;
 }
 
+export interface BpmnMessageFlow {
+	id: string;
+	name?: string;
+	sourceRef: string;
+	targetRef: string;
+	unknownAttributes: Record<string, string>;
+}
+
 export interface BpmnCollaboration {
 	id: string;
 	participants: BpmnParticipant[];
+	messageFlows: BpmnMessageFlow[];
 	textAnnotations: BpmnTextAnnotation[];
 	associations: BpmnAssociation[];
 	extensionElements: XmlElement[];

@@ -12,19 +12,37 @@ export const ELEMENT_GROUPS: ReadonlyArray<ElementGroup> = [
 		id: "events",
 		title: "Events",
 		defaultType: "startEvent",
-		types: ["startEvent", "endEvent"],
+		types: ["startEvent", "endEvent", "intermediateThrowEvent", "intermediateCatchEvent"],
 	},
 	{
 		id: "activities",
 		title: "Activities",
 		defaultType: "serviceTask",
-		types: ["serviceTask", "userTask", "scriptTask", "sendTask", "receiveTask", "businessRuleTask"],
+		types: [
+			"task",
+			"serviceTask",
+			"userTask",
+			"scriptTask",
+			"sendTask",
+			"receiveTask",
+			"businessRuleTask",
+			"manualTask",
+			"callActivity",
+			"subProcess",
+			"transaction",
+		],
 	},
 	{
 		id: "gateways",
 		title: "Gateways",
 		defaultType: "exclusiveGateway",
-		types: ["exclusiveGateway", "parallelGateway", "inclusiveGateway", "eventBasedGateway"],
+		types: [
+			"exclusiveGateway",
+			"parallelGateway",
+			"inclusiveGateway",
+			"eventBasedGateway",
+			"complexGateway",
+		],
 	},
 	{
 		id: "annotations",
@@ -48,26 +66,37 @@ export function getElementGroup(type: CreateShapeType): ElementGroup | undefined
 export const ELEMENT_TYPE_LABELS: Readonly<Record<CreateShapeType, string>> = {
 	startEvent: "Start Event",
 	endEvent: "End Event",
+	intermediateThrowEvent: "Intermediate Throw Event",
+	intermediateCatchEvent: "Intermediate Catch Event",
+	task: "Task",
 	serviceTask: "Service Task",
 	userTask: "User Task",
 	scriptTask: "Script Task",
 	sendTask: "Send Task",
 	receiveTask: "Receive Task",
 	businessRuleTask: "Business Rule Task",
+	manualTask: "Manual Task",
+	callActivity: "Call Activity",
+	subProcess: "Sub-Process",
+	transaction: "Transaction",
 	exclusiveGateway: "Exclusive Gateway",
 	parallelGateway: "Parallel Gateway",
 	inclusiveGateway: "Inclusive Gateway",
 	eventBasedGateway: "Event-based Gateway",
+	complexGateway: "Complex Gateway",
 	textAnnotation: "Text Annotation",
 };
 
 export const EXTERNAL_LABEL_TYPES: ReadonlySet<CreateShapeType> = new Set([
 	"startEvent",
 	"endEvent",
+	"intermediateThrowEvent",
+	"intermediateCatchEvent",
 	"exclusiveGateway",
 	"parallelGateway",
 	"inclusiveGateway",
 	"eventBasedGateway",
+	"complexGateway",
 ]);
 
 export const CONTEXTUAL_ADD_TYPES: ReadonlyArray<CreateShapeType> = [
@@ -82,7 +111,8 @@ export function getValidLabelPositions(type: CreateShapeType): ReadonlyArray<Lab
 		type === "exclusiveGateway" ||
 		type === "parallelGateway" ||
 		type === "inclusiveGateway" ||
-		type === "eventBasedGateway"
+		type === "eventBasedGateway" ||
+		type === "complexGateway"
 	) {
 		return [...base, "bottom-left", "bottom-right", "top-left", "top-right"];
 	}

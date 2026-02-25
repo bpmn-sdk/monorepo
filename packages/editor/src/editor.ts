@@ -77,12 +77,18 @@ function defaultBounds(
 	switch (type) {
 		case "startEvent":
 		case "endEvent":
+		case "intermediateThrowEvent":
+		case "intermediateCatchEvent":
 			return { x: cx - 18, y: cy - 18, width: 36, height: 36 };
 		case "exclusiveGateway":
 		case "parallelGateway":
 		case "inclusiveGateway":
 		case "eventBasedGateway":
+		case "complexGateway":
 			return { x: cx - 25, y: cy - 25, width: 50, height: 50 };
+		case "subProcess":
+		case "transaction":
+			return { x: cx - 100, y: cy - 60, width: 200, height: 120 };
 		case "textAnnotation":
 			return { x: cx - 50, y: cy - 25, width: 100, height: 50 };
 		default:

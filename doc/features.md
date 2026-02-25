@@ -1,5 +1,15 @@
 # Features
 
+## Full BPMN Element Type Coverage (2026-02-25) — `@bpmn-sdk/core` + `@bpmn-sdk/canvas` + `@bpmn-sdk/editor`
+- **New core model types** — `BpmnTask`, `BpmnManualTask`, `BpmnTransaction`, `BpmnComplexGateway`; `BpmnLane`/`BpmnLaneSet` swimlane hierarchy; `BpmnMessageFlow` for inter-pool communication; five new event definition types (conditional, link, cancel, terminate, compensate)
+- **Pool & lane rendering** — pools and lanes render as container rects with rotated title bars; correct nesting in the renderer
+- **Message flow rendering** — dashed inter-pool arrows between participants
+- **Non-interrupting boundary events** — dashed inner ring distinguishes non-interrupting from interrupting boundary events
+- **Transaction subprocess** — double inner border distinguishes transaction subprocesses
+- **New event markers** — conditional, link, cancel, terminate, compensate; complete event marker set
+- **Complex gateway** — asterisk marker; added to creatable types with proper default bounds
+- **21 element creation commands** — command palette and shape palette updated to cover all standard BPMN elements
+
 ## Element Colors & Text Annotations (2026-02-25) — `@bpmn-sdk/editor` + `@bpmn-sdk/canvas` + `@bpmn-sdk/core`
 - **Shape colors** — `bioc:fill`/`bioc:stroke` (bpmn-js) and `color:background-color`/`color:border-color` (OMG) attributes rendered as inline fill/stroke on shape bodies; fully round-trips through import/export
 - **Color picker** — 6 preset color swatches in the contextual toolbar for any selected flow element; clicking active swatch clears the color
@@ -42,7 +52,7 @@
 - New pnpm workspace `canvas-plugins/*` for first-party canvas plugin packages
 - **`@bpmn-sdk/canvas-plugin-minimap`** — minimap as an opt-in plugin; install via `plugins: [createMinimapPlugin()]`; handles `diagram:load`, `viewport:change`, `diagram:clear`; navigates via `CanvasApi.setViewport()`; fully self-contained CSS injection
 - **`@bpmn-sdk/canvas-plugin-command-palette`** (2026-02-24) — Ctrl+K / ⌘K command palette; built-in commands: toggle theme, zoom to 100%/fit, export BPMN XML, zen mode; `addCommands(cmds)` extension point; works with both canvas viewer and editor
-- **`@bpmn-sdk/canvas-plugin-command-palette-editor`** (2026-02-24) — editor extension plugin adding 12 BPMN element creation commands to the palette; requires `@bpmn-sdk/canvas-plugin-command-palette`
+- **`@bpmn-sdk/canvas-plugin-command-palette-editor`** (2026-02-24) — editor extension plugin adding 21 BPMN element creation commands to the palette; requires `@bpmn-sdk/canvas-plugin-command-palette`
 - **`@bpmn-sdk/canvas-plugin-config-panel`** (2026-02-24) — schema-driven property panel; `registerSchema(type, schema, adapter)` for extensible element forms; compact right-rail panel for single-element selection; 65%-wide full overlay with grouped tabs; auto-save on change; in-place value refresh preserves focus
 - **`@bpmn-sdk/canvas-plugin-config-panel-bpmn`** (2026-02-24) — BPMN schemas for all standard element types; full Zeebe REST connector form for service tasks (method, URL, headers, body, auth, output mapping, retries)
 

@@ -77,6 +77,12 @@ function makeFlowElement(type: CreateShapeType, id: string, name?: string): Bpmn
 			return { ...base, type: "startEvent", eventDefinitions: [] };
 		case "endEvent":
 			return { ...base, type: "endEvent", eventDefinitions: [] };
+		case "intermediateThrowEvent":
+			return { ...base, type: "intermediateThrowEvent", eventDefinitions: [] };
+		case "intermediateCatchEvent":
+			return { ...base, type: "intermediateCatchEvent", eventDefinitions: [] };
+		case "task":
+			return { ...base, type: "task" };
 		case "serviceTask":
 			return { ...base, type: "serviceTask" };
 		case "userTask":
@@ -89,6 +95,28 @@ function makeFlowElement(type: CreateShapeType, id: string, name?: string): Bpmn
 			return { ...base, type: "receiveTask" };
 		case "businessRuleTask":
 			return { ...base, type: "businessRuleTask" };
+		case "manualTask":
+			return { ...base, type: "manualTask" };
+		case "callActivity":
+			return { ...base, type: "callActivity" };
+		case "subProcess":
+			return {
+				...base,
+				type: "subProcess",
+				flowElements: [],
+				sequenceFlows: [],
+				textAnnotations: [],
+				associations: [],
+			};
+		case "transaction":
+			return {
+				...base,
+				type: "transaction",
+				flowElements: [],
+				sequenceFlows: [],
+				textAnnotations: [],
+				associations: [],
+			};
 		case "exclusiveGateway":
 			return { ...base, type: "exclusiveGateway" };
 		case "parallelGateway":
@@ -97,6 +125,8 @@ function makeFlowElement(type: CreateShapeType, id: string, name?: string): Bpmn
 			return { ...base, type: "inclusiveGateway" };
 		case "eventBasedGateway":
 			return { ...base, type: "eventBasedGateway" };
+		case "complexGateway":
+			return { ...base, type: "complexGateway" };
 		case "textAnnotation":
 			throw new Error("textAnnotation is not a flow element — use createAnnotation()");
 	}
@@ -629,6 +659,15 @@ export function changeElementType(
 		case "endEvent":
 			newEl = { ...base, type: "endEvent", eventDefinitions: [] };
 			break;
+		case "intermediateThrowEvent":
+			newEl = { ...base, type: "intermediateThrowEvent", eventDefinitions: [] };
+			break;
+		case "intermediateCatchEvent":
+			newEl = { ...base, type: "intermediateCatchEvent", eventDefinitions: [] };
+			break;
+		case "task":
+			newEl = { ...base, type: "task" };
+			break;
 		case "serviceTask":
 			newEl = { ...base, type: "serviceTask" };
 			break;
@@ -647,6 +686,32 @@ export function changeElementType(
 		case "businessRuleTask":
 			newEl = { ...base, type: "businessRuleTask" };
 			break;
+		case "manualTask":
+			newEl = { ...base, type: "manualTask" };
+			break;
+		case "callActivity":
+			newEl = { ...base, type: "callActivity" };
+			break;
+		case "subProcess":
+			newEl = {
+				...base,
+				type: "subProcess",
+				flowElements: el.type === "subProcess" ? el.flowElements : [],
+				sequenceFlows: el.type === "subProcess" ? el.sequenceFlows : [],
+				textAnnotations: el.type === "subProcess" ? el.textAnnotations : [],
+				associations: el.type === "subProcess" ? el.associations : [],
+			};
+			break;
+		case "transaction":
+			newEl = {
+				...base,
+				type: "transaction",
+				flowElements: el.type === "transaction" ? el.flowElements : [],
+				sequenceFlows: el.type === "transaction" ? el.sequenceFlows : [],
+				textAnnotations: el.type === "transaction" ? el.textAnnotations : [],
+				associations: el.type === "transaction" ? el.associations : [],
+			};
+			break;
 		case "exclusiveGateway":
 			newEl = { ...base, type: "exclusiveGateway" };
 			break;
@@ -658,6 +723,9 @@ export function changeElementType(
 			break;
 		case "eventBasedGateway":
 			newEl = { ...base, type: "eventBasedGateway" };
+			break;
+		case "complexGateway":
+			newEl = { ...base, type: "complexGateway" };
 			break;
 		case "textAnnotation":
 			throw new Error("textAnnotation is not a flow element — use createAnnotation()");

@@ -1,5 +1,37 @@
 # Progress
 
+## 2026-02-25 — Full BPMN Element Type Coverage
+
+### `@bpmn-sdk/core` — New model types
+- **`BpmnTask`**, **`BpmnManualTask`**, **`BpmnTransaction`**, **`BpmnComplexGateway`** — new flow element interfaces added to the discriminated union
+- **`BpmnLane`**, **`BpmnLaneSet`** — swimlane hierarchy; `BpmnProcess.laneSet` optional field
+- **`BpmnMessageFlow`** — inter-pool communication; `BpmnCollaboration.messageFlows` array
+- **New event definitions** — `BpmnConditionalEventDefinition`, `BpmnLinkEventDefinition`, `BpmnCancelEventDefinition`, `BpmnTerminateEventDefinition`, `BpmnCompensateEventDefinition`; all added to `BpmnEventDefinition` union
+- **Parser** — full parse support for all new types including `parseLaneSet`, `parseLane`, `parseMessageFlow`; `compensation` → `compensate` event def rename
+- **Serializer** — full serialize support for all new types; `serializeLaneSet`, `serializeLane`, `serializeMessageFlow`
+- **Builder** — `makeFlowElement` extended with task, manualTask, complexGateway, transaction cases
+
+### `@bpmn-sdk/canvas` — New renderers
+- **Pool/lane rendering** — `renderPool` and `renderLane` produce container rects with rotated title bars; `ModelIndex` now indexes `participants` and `lanes` maps
+- **Message flow rendering** — dashed inter-pool arrows rendered in the edge loop via `messageFlowIds` Set
+- **Non-interrupting boundary events** — dashed inner ring via new `.bpmn-event-inner-dashed` CSS class when `cancelActivity === false`
+- **Transaction** — double inner border rect inside the task body
+- **New event markers** — conditional (document icon), link (arrow), cancel (X), terminate (filled circle); `compensation` renamed to `compensate`
+- **New gateway marker** — complexGateway asterisk (diagonal + cross paths)
+- **New task icon** — manualTask (hand SVG path)
+
+### `@bpmn-sdk/editor` — New creatable types
+- **8 new `CreateShapeType` values** — `intermediateThrowEvent`, `intermediateCatchEvent`, `task`, `manualTask`, `callActivity`, `subProcess`, `transaction`, `complexGateway`
+- **`RESIZABLE_TYPES`** — task, manualTask, callActivity, subProcess, transaction added
+- **`defaultBounds`** — intermediate events 36×36; complexGateway 50×50; subProcess/transaction 200×120
+- **Element groups** — events group gains intermediate throw/catch; activities group gains task, manualTask, callActivity, subProcess, transaction; gateways group gains complexGateway
+- **Icons** — all 8 new types have dedicated SVG icons
+- **`EXTERNAL_LABEL_TYPES`** — intermediateThrowEvent, intermediateCatchEvent, complexGateway added (external label placement)
+- **`makeFlowElement` / `changeElementType`** — all 8 new types handled in modeling operations
+
+### `@bpmn-sdk/canvas-plugin-command-palette-editor`
+- Updated command count: 21 element creation commands (was 13); test updated accordingly
+
 ## 2026-02-25 — Watermark Plugin
 
 ### `@bpmn-sdk/canvas-plugin-watermark` (NEW)

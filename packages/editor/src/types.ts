@@ -4,26 +4,39 @@ import type { BpmnDefinitions } from "@bpmn-sdk/core";
 export type CreateShapeType =
 	| "startEvent"
 	| "endEvent"
+	| "intermediateThrowEvent"
+	| "intermediateCatchEvent"
+	| "task"
 	| "serviceTask"
 	| "userTask"
 	| "scriptTask"
 	| "sendTask"
 	| "receiveTask"
 	| "businessRuleTask"
+	| "manualTask"
+	| "callActivity"
+	| "subProcess"
+	| "transaction"
 	| "exclusiveGateway"
 	| "parallelGateway"
 	| "inclusiveGateway"
 	| "eventBasedGateway"
+	| "complexGateway"
 	| "textAnnotation";
 
 /** Element types that support resize handles. */
 export const RESIZABLE_TYPES: ReadonlySet<string> = new Set([
+	"task",
 	"serviceTask",
 	"userTask",
 	"scriptTask",
 	"sendTask",
 	"receiveTask",
 	"businessRuleTask",
+	"manualTask",
+	"callActivity",
+	"subProcess",
+	"transaction",
 	"textAnnotation",
 ]);
 

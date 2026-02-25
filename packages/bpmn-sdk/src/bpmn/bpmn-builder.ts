@@ -298,16 +298,19 @@ function makeFlowElement(
 				attachedToRef: "",
 				eventDefinitions: [],
 			};
+		case "task":
 		case "serviceTask":
 		case "scriptTask":
 		case "userTask":
 		case "sendTask":
 		case "receiveTask":
 		case "businessRuleTask":
+		case "manualTask":
 		case "callActivity":
 			return { ...base, type } as BpmnFlowElement;
 		case "exclusiveGateway":
 		case "inclusiveGateway":
+		case "complexGateway":
 			return { ...base, type } as BpmnFlowElement;
 		case "parallelGateway":
 		case "eventBasedGateway":
@@ -334,6 +337,15 @@ function makeFlowElement(
 			return {
 				...base,
 				type: "eventSubProcess",
+				flowElements: [],
+				sequenceFlows: [],
+				textAnnotations: [],
+				associations: [],
+			};
+		case "transaction":
+			return {
+				...base,
+				type: "transaction",
 				flowElements: [],
 				sequenceFlows: [],
 				textAnnotations: [],
