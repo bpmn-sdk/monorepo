@@ -422,10 +422,16 @@ export function initEditorHud(editor: BpmnEditor): void {
 	btnZoomOut.addEventListener("click", () => editor.zoomOut());
 	btnZoomIn.addEventListener("click", () => editor.zoomIn());
 
-	btnZoomPct.addEventListener("click", (e) => {
+	btnZoomPct.addEventListener("pointerdown", (e) => {
 		e.stopPropagation();
-		buildZoomMenu();
-		showDropdown(zoomMenuEl, btnZoomPct, "above");
+	});
+	btnZoomPct.addEventListener("click", () => {
+		if (openDropdown === zoomMenuEl) {
+			closeAllDropdowns();
+		} else {
+			buildZoomMenu();
+			showDropdown(zoomMenuEl, btnZoomPct, "above");
+		}
 	});
 
 	// ── More actions menu ──────────────────────────────────────────────────────
@@ -451,10 +457,16 @@ export function initEditorHud(editor: BpmnEditor): void {
 		}
 	}
 
-	btnTopMore.addEventListener("click", (e) => {
+	btnTopMore.addEventListener("pointerdown", (e) => {
 		e.stopPropagation();
-		buildMoreMenu();
-		showDropdown(moreMenuEl, btnTopMore, "right");
+	});
+	btnTopMore.addEventListener("click", () => {
+		if (openDropdown === moreMenuEl) {
+			closeAllDropdowns();
+		} else {
+			buildMoreMenu();
+			showDropdown(moreMenuEl, btnTopMore, "right");
+		}
 	});
 
 	// ── Action bar ─────────────────────────────────────────────────────────────
@@ -610,10 +622,16 @@ export function initEditorHud(editor: BpmnEditor): void {
 			labelBtn.className = "hud-btn";
 			labelBtn.innerHTML = IC.labelPos;
 			labelBtn.title = "Label position";
-			labelBtn.addEventListener("click", (e) => {
+			labelBtn.addEventListener("pointerdown", (e) => {
 				e.stopPropagation();
-				buildLabelPosMenu(sourceId, sourceType);
-				showDropdown(labelPosMenuEl, labelBtn, "above");
+			});
+			labelBtn.addEventListener("click", () => {
+				if (openDropdown === labelPosMenuEl) {
+					closeAllDropdowns();
+				} else {
+					buildLabelPosMenu(sourceId, sourceType);
+					showDropdown(labelPosMenuEl, labelBtn, "above");
+				}
 			});
 			cfgToolbar.appendChild(labelBtn);
 		}

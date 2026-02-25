@@ -21,23 +21,23 @@ export const IC = {
 	space: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="2.5" height="8" rx="0.8"/><rect x="12.5" y="4" width="2.5" height="8" rx="0.8"/><path d="M4 8h8"/><path d="M5.5 6.5 4 8 5.5 9.5"/><path d="M10.5 6.5 12 8 10.5 9.5"/></svg>`,
 
 	// ── BPMN Events (circles: thin=start, thick=end) ────────────────────────
-	startEvent: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><circle cx="8" cy="8" r="6.5"/></svg>`,
+	startEvent: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6.5"/></svg>`,
 	endEvent: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="3"><circle cx="8" cy="8" r="5.5"/></svg>`,
 
 	// ── BPMN Activities (rounded rect + type marker top-left) ──────────────
-	task: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="0.5" y="2.5" width="15" height="11" rx="2"/></svg>`,
-	serviceTask: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="0.5" y="2.5" width="15" height="11" rx="2"/><circle cx="4" cy="6" r="2.2" stroke-width="1.1"/><circle cx="4" cy="6" r="0.9" fill="currentColor" stroke="none"/><path d="M4 3.5v1M4 7.5v1M1.5 6h1M5.5 6h1" stroke-linecap="round" stroke-width="1.1"/></svg>`,
-	userTask: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="0.5" y="2.5" width="15" height="11" rx="2"/><circle cx="4" cy="5.5" r="1.5" stroke-width="1.1"/><path d="M1 10Q1 7.5 4 7.5Q7 7.5 7 10" stroke-linecap="round" stroke-width="1.1"/></svg>`,
-	scriptTask: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="0.5" y="2.5" width="15" height="11" rx="2"/><rect x="1" y="3.5" width="4.5" height="6" rx="0.5" stroke-width="1.1"/><path d="M2 5h2.5M2 6.5h2.5M2 8h1.5" stroke-linecap="round" stroke-width="1"/></svg>`,
-	sendTask: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="0.5" y="2.5" width="15" height="11" rx="2"/><rect x="1" y="3.5" width="5.5" height="4" fill="currentColor" rx="0.3" stroke-width="1.1"/></svg>`,
-	receiveTask: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="0.5" y="2.5" width="15" height="11" rx="2"/><rect x="1" y="3.5" width="5.5" height="4" rx="0.3" stroke-width="1.1"/><path d="M1 3.5l2.75 2 2.75-2" stroke-width="1.1"/></svg>`,
-	businessRuleTask: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="0.5" y="2.5" width="15" height="11" rx="2"/><rect x="1" y="3.5" width="6" height="4.5" stroke-width="1.1"/><path d="M1 5.3h6M3 3.5v4.5" stroke-width="1.1"/></svg>`,
+	task: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="0.5" y="2.5" width="15" height="11" rx="2"/></svg>`,
+	serviceTask: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="0.5" y="2.5" width="15" height="11" rx="2"/><circle cx="4" cy="6" r="2.2" stroke-width="1.1"/><circle cx="4" cy="6" r="0.9" fill="currentColor" stroke="none"/><path d="M4 3.5v1M4 7.5v1M1.5 6h1M5.5 6h1" stroke-linecap="round" stroke-width="1.1"/></svg>`,
+	userTask: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="0.5" y="2.5" width="15" height="11" rx="2"/><circle cx="4" cy="5.5" r="1.5" stroke-width="1.1"/><path d="M1 10Q1 7.5 4 7.5Q7 7.5 7 10" stroke-linecap="round" stroke-width="1.1"/></svg>`,
+	scriptTask: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="0.5" y="2.5" width="15" height="11" rx="2"/><rect x="1" y="3.5" width="4.5" height="6" rx="0.5" stroke-width="1.1"/><path d="M2 5h2.5M2 6.5h2.5M2 8h1.5" stroke-linecap="round" stroke-width="1"/></svg>`,
+	sendTask: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="0.5" y="2.5" width="15" height="11" rx="2"/><rect x="1" y="3.5" width="5.5" height="4" fill="currentColor" rx="0.3" stroke-width="1.1"/></svg>`,
+	receiveTask: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="0.5" y="2.5" width="15" height="11" rx="2"/><rect x="1" y="3.5" width="5.5" height="4" rx="0.3" stroke-width="1.1"/><path d="M1 3.5l2.75 2 2.75-2" stroke-width="1.1"/></svg>`,
+	businessRuleTask: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="0.5" y="2.5" width="15" height="11" rx="2"/><rect x="1" y="3.5" width="6" height="4.5" stroke-width="1.1"/><path d="M1 5.3h6M3 3.5v4.5" stroke-width="1.1"/></svg>`,
 
 	// ── BPMN Gateways (diamond + type marker) ──────────────────────────────
-	exclusiveGateway: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><polygon points="8,1.5 14.5,8 8,14.5 1.5,8"/><path d="M5.5 5.5l5 5M10.5 5.5l-5 5" stroke-linecap="round" stroke-width="1.5"/></svg>`,
-	parallelGateway: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><polygon points="8,1.5 14.5,8 8,14.5 1.5,8"/><path d="M8 4.5v7M4.5 8h7" stroke-linecap="round" stroke-width="1.5"/></svg>`,
-	inclusiveGateway: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><polygon points="8,1.5 14.5,8 8,14.5 1.5,8"/><circle cx="8" cy="8" r="3" stroke-width="1.5"/></svg>`,
-	eventBasedGateway: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><polygon points="8,1.5 14.5,8 8,14.5 1.5,8"/><circle cx="8" cy="8" r="3.5" stroke-width="1"/><circle cx="8" cy="8" r="2" stroke-width="1"/></svg>`,
+	exclusiveGateway: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="8,1.5 14.5,8 8,14.5 1.5,8"/><path d="M5.5 5.5l5 5M10.5 5.5l-5 5" stroke-linecap="round" stroke-width="1.5"/></svg>`,
+	parallelGateway: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="8,1.5 14.5,8 8,14.5 1.5,8"/><path d="M8 4.5v7M4.5 8h7" stroke-linecap="round" stroke-width="1.5"/></svg>`,
+	inclusiveGateway: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="8,1.5 14.5,8 8,14.5 1.5,8"/><circle cx="8" cy="8" r="3" stroke-width="1.5"/></svg>`,
+	eventBasedGateway: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="8,1.5 14.5,8 8,14.5 1.5,8"/><circle cx="8" cy="8" r="3.5" stroke-width="1"/><circle cx="8" cy="8" r="2" stroke-width="1"/></svg>`,
 
 	// ── BPMN Annotation ────────────────────────────────────────────────────
 	textAnnotation: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M6 3L3 3L3 13L6 13"/><line x1="7" y1="6" x2="13" y2="6"/><line x1="7" y1="9" x2="12" y2="9"/><line x1="7" y1="12" x2="10" y2="12"/></svg>`,
