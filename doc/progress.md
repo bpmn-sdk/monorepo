@@ -1,5 +1,12 @@
 # Progress
 
+## 2026-02-25 — Connector Templates Usable via Core Builder
+
+### `@bpmn-sdk/canvas-plugin-config-panel-bpmn` — `templateToServiceTaskOptions`
+- **`templateToServiceTaskOptions(template, values)`** — converts any `ElementTemplate` + user-provided values into `ServiceTaskOptions` for the core `Bpmn` builder; applies Hidden property defaults and user values to zeebe bindings
+- **`CAMUNDA_CONNECTOR_TEMPLATES`** — now exported from the package public API
+- **3 new tests** in `tests/template-to-service-task.test.ts`: Kafka connector options, full Bpmn build integration, REST connector template defaults
+
 ## 2026-02-25 — Camunda Connector Templates: Fetch, Generate, Integrate
 
 ### `@bpmn-sdk/canvas-plugin-config-panel-bpmn` — All 116 Camunda connectors

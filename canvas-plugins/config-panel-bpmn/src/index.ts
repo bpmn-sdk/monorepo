@@ -39,6 +39,8 @@ import type { CreateShapeType } from "@bpmn-sdk/editor";
 import { buildRegistrationFromTemplate } from "./template-engine.js";
 import type { ElementTemplate } from "./template-types.js";
 import { CAMUNDA_CONNECTOR_TEMPLATES } from "./templates/generated.js";
+export { CAMUNDA_CONNECTOR_TEMPLATES } from "./templates/generated.js";
+export { templateToServiceTaskOptions } from "./template-to-service-task.js";
 import {
 	findFlowElement,
 	getIoInput,

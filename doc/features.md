@@ -1,5 +1,9 @@
 # Features
 
+## Connector Templates + Core Builder Integration (2026-02-25) — `@bpmn-sdk/canvas-plugin-config-panel-bpmn`
+- **`templateToServiceTaskOptions(template, values)`** — converts any of the 116 connector templates into `ServiceTaskOptions` for the `Bpmn` builder; use any connector programmatically without hand-crafting extension XML
+- **`CAMUNDA_CONNECTOR_TEMPLATES`** exported from the public API — find templates by id or name for programmatic use
+
 ## All 116 Camunda Connector Templates (2026-02-25) — `@bpmn-sdk/canvas-plugin-config-panel-bpmn`
 - **`pnpm update-connectors`** — fetches all OOTB templates from the Camunda marketplace and regenerates `canvas-plugins/config-panel-bpmn/src/templates/generated.ts`
 - **116 connectors** available in the connector selector: REST, Slack, Salesforce, ServiceNow, GitHub, Twilio, AWS EventBridge/Lambda/SQS/SNS, Azure, Google Sheets, WhatsApp, Facebook Messenger, and 100+ more
