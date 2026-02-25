@@ -1064,11 +1064,16 @@ export class ProcessBuilder {
 			extensions.taskHeaders = { headers: taskHeaderEntries };
 		}
 
-		this.addFlowElement(
-			makeFlowElement(id, "serviceTask", {
-				extensionElements: zeebeExtensionsToXmlElements(extensions),
-			}),
-		);
+		const el = makeFlowElement(id, "serviceTask", {
+			name: config.name,
+			extensionElements: zeebeExtensionsToXmlElements(extensions),
+		});
+		// Stamp the template identifier so editors recognise this as a REST connector
+		el.unknownAttributes = {
+			"zeebe:modelerTemplate": "io.camunda.connectors.HttpJson.v2",
+			"zeebe:modelerTemplateVersion": "12",
+		};
+		this.addFlowElement(el);
 		return this;
 	}
 

@@ -1,5 +1,24 @@
 # Progress
 
+## 2026-02-25 — Element Templates System + REST Connector Template
+
+### `@bpmn-sdk/canvas-plugin-config-panel-bpmn` — Template-aware property panel
+- **Element template types** — `ElementTemplate`, `TemplateProperty`, `TemplateBinding`, `TemplateCondition` TypeScript types matching the Camunda element templates JSON schema
+- **Template engine** — `buildRegistrationFromTemplate(template)` converts any element template descriptor into a `PanelSchema` + `PanelAdapter` pair; handles all binding types (`zeebe:input`, `zeebe:taskHeader`, `zeebe:taskDefinition`), condition types (`equals`, `oneOf`, `allMatch`), and property types (`String`, `Text`, `Dropdown`, `Boolean`, `Number`, `Hidden`)
+- **REST Outbound Connector template** — official Camunda template (`io.camunda.connectors.HttpJson.v2`, version 12) bundled as TypeScript; covers all 8 groups: Authentication (noAuth/apiKey/basic/bearer/OAuth 2.0), HTTP endpoint, Timeout, Payload, Output mapping, Error handling, Retries
+- **Dynamic schema resolution** — `PanelAdapter.resolve?()` mechanism: when `zeebe:modelerTemplate` attribute is detected on an element (or inferred from known task type), the panel switches to the template-specific form automatically
+- **Template application** — selecting a connector in the generic service task form stamps `zeebe:modelerTemplate` + delegates all field writes to the template adapter (including template-specific fields like URL, method, auth)
+- **`registerTemplate(template)`** — public API on the plugin for registering additional element templates at runtime
+- **`TEMPLATE_ID_TO_TASK_TYPE` / `TASK_TYPE_TO_TEMPLATE_ID`** maps for bidirectional connector detection
+- **Backward compatibility** — elements with known task definition types (e.g. `io.camunda:http-json:1`) but without `zeebe:modelerTemplate` are still detected and shown with the correct template form
+
+### `@bpmn-sdk/canvas-plugin-config-panel` — Dynamic registration
+- **`PanelAdapter.resolve?(defs, id)`** — optional method that overrides the schema+adapter for a specific element instance; renderer calls it on every select and diagram-change event
+- **Re-render on schema change** — when `resolve?` returns a different registration (e.g. template applied), the compact/full panel re-renders automatically without requiring a manual re-select
+
+### `@bpmn-sdk/core` — Builder
+- **`restConnector()` stamps `zeebe:modelerTemplate`** — builder now sets `zeebe:modelerTemplate: "io.camunda.connectors.HttpJson.v2"` and `zeebe:modelerTemplateVersion: "12"` on the element; programmatically generated BPMN is now recognized by the editor's template panel
+
 ## 2026-02-25 — Intermediate Event Subgroups, Boundary Events, Ghost Fix
 
 ### `@bpmn-sdk/editor` — Event system overhaul

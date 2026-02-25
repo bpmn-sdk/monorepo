@@ -1,5 +1,13 @@
 # Features
 
+## Element Templates System (2026-02-25) — `@bpmn-sdk/canvas-plugin-config-panel-bpmn` + `@bpmn-sdk/canvas-plugin-config-panel`
+- **Camunda element template types** — full TypeScript type definitions (`ElementTemplate`, `TemplateProperty`, `TemplateBinding`, `TemplateCondition`) matching the Camunda zeebe-element-templates-json-schema
+- **Template engine** — `buildRegistrationFromTemplate(template)` converts any element template descriptor to a `PanelSchema` + `PanelAdapter` pair; all binding types, condition types, and property types supported
+- **REST Outbound Connector** — official Camunda template (`io.camunda.connectors.HttpJson.v2` v12) bundled; 8 groups, 5 auth modes (noAuth, API key, Basic, Bearer, OAuth 2.0), full output/error/retry configuration
+- **Dynamic schema resolution** — `PanelAdapter.resolve?()` hook: config panel switches to the template-specific form when `zeebe:modelerTemplate` is present; re-renders on diagram change without losing state
+- **`registerTemplate(template)`** — runtime API to register additional connector templates
+- **`restConnector()` builder** — now stamps `zeebe:modelerTemplate` so programmatically-generated BPMN is recognized by the editor's template panel automatically
+
 ## Event Subgroups, Boundary Events & Ghost Fix (2026-02-25) — `@bpmn-sdk/editor`
 - **3 event palette groups** — Start Events (5), End Events (7), Intermediate Events (10); each group contains only compatible types for type-switching
 - **20 specific event palette types** — every BPMN event variant has a dedicated `CreateShapeType` with preset event definition; icons show the appropriate marker inside the ring

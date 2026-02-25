@@ -29,6 +29,8 @@ export class ConfigPanelRenderer {
 	private _fullOpen = false;
 	private _activeTabId: string | null = null;
 	private _values: Record<string, FieldValue> = {};
+	/** The effective registration after optional `resolve?` override. */
+	private _effectiveReg: Registration | null = null;
 
 	constructor(
 		schemas: Map<string, Registration>,
@@ -70,12 +72,18 @@ export class ConfigPanelRenderer {
 		this._selectedType = elementType;
 		this._selectedBounds = shape?.shape?.bounds ?? null;
 		this._elementName = shape?.flowElement?.name ?? "";
-		this._refreshValues(reg);
+
+		// Resolve optional template override
+		const defs = this._getDefinitions();
+		const resolved = defs ? (reg.adapter.resolve?.(defs, id) ?? null) : null;
+		this._effectiveReg = resolved ?? reg;
+
+		this._refreshValues(this._effectiveReg);
 
 		if (this._fullOpen) {
-			this._showFull(reg);
+			this._showFull(this._effectiveReg);
 		} else {
-			this._showCompact(reg);
+			this._showCompact(this._effectiveReg);
 		}
 	}
 
@@ -83,9 +91,23 @@ export class ConfigPanelRenderer {
 		if (!this._selectedId || !this._selectedType) return;
 		const reg = this._schemas.get(this._selectedType);
 		if (!reg) return;
-		this._values = reg.adapter.read(defs, this._selectedId);
+
+		// Re-resolve in case a template was applied or removed
+		const resolved = reg.adapter.resolve?.(defs, this._selectedId) ?? null;
+		const newEffective = resolved ?? reg;
+
+		this._values = newEffective.adapter.read(defs, this._selectedId);
+
+		// If the effective registration changed (e.g. template applied), re-render
+		if (newEffective !== this._effectiveReg) {
+			this._effectiveReg = newEffective;
+			if (this._fullOpen) this._showFull(newEffective);
+			else this._showCompact(newEffective);
+			return;
+		}
+
 		this._refreshInputs();
-		this._refreshConditionals(reg.schema);
+		this._refreshConditionals(newEffective.schema);
 	}
 
 	destroy(): void {
@@ -130,6 +152,7 @@ export class ConfigPanelRenderer {
 		this._fullOpen = false;
 		this._activeTabId = null;
 		this._values = {};
+		this._effectiveReg = null;
 	}
 
 	private _hideCompact(): void {
