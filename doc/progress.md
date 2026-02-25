@@ -1,5 +1,15 @@
 # Progress
 
+## 2026-02-25 — SubProcess Containment + Sticky Movement
+
+### `@bpmn-sdk/editor` — Container-aware modeling operations
+
+- **Sticky movement** — moving an `adHocSubProcess` (or any subprocess/transaction) also moves all descendant DI shapes; edge waypoints for flows inside or connected to the subprocess are updated correctly using a new `collectAllSequenceFlows` helper that searches all nesting levels
+- **Containment on create** — when a new shape is dropped inside a subprocess's DI bounds, `createShape` detects the innermost container via `findContainerForPoint` and nests the new `BpmnFlowElement` inside it via `addToContainer`; the DI shape is always added flat to `diagram.plane.shapes`
+- **Cascade delete** — deleting a subprocess recursively collects all descendant element and flow IDs via `collectDescendantIds`, then `removeFromContainers` removes them from all nesting levels; DI shapes and edges for descendants are also removed
+- **Recursive label update** — `updateLabel` now uses `updateNameInElements` which searches all nesting levels; renaming a task inside a subprocess now works
+- **Recursive incoming/outgoing update** — `createConnection` now uses `updateRefInElements` so connecting subprocess-child elements correctly updates their `incoming`/`outgoing` refs
+
 ## 2026-02-25 — Agentic AI Subprocess Support
 
 ### `@bpmn-sdk/core` — `ZeebeAdHoc` typed interface

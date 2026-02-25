@@ -1,5 +1,11 @@
 # Features
 
+## SubProcess Containment + Sticky Movement (2026-02-25) — `@bpmn-sdk/editor`
+- **Sticky movement** — moving a subprocess moves all descendant shapes with it
+- **Containment on create** — shapes dropped inside a subprocess become children in the BPMN model
+- **Cascade delete** — deleting a subprocess removes all descendants from both the model and DI
+- **Recursive label/connection updates** — renaming and connecting works for elements at any nesting depth
+
 ## Agentic AI Subprocess (2026-02-25) — `@bpmn-sdk/editor` + `@bpmn-sdk/canvas-plugin-config-panel-bpmn` + `@bpmn-sdk/core`
 - **`adHocSubProcess` creatable in the editor** — appears in the Activities palette group (with tilde icon); 200×120 default size; resizable; type-switchable via `changeElementType`
 - **AI Agent template wired end-to-end** — selecting the `io.camunda.connectors.agenticai.aiagent.jobworker.v1` template in the config panel's "Template" dropdown writes `zeebe:taskDefinition type="io.camunda.agenticai:aiagent-job-worker:1"`, `zeebe:adHoc outputCollection="toolCallResults"` + `outputElement` FEEL expression, and all required IO mappings and task headers; `zeebe:modelerTemplate`, `zeebe:modelerTemplateVersion`, and `zeebe:modelerTemplateIcon` are stamped on the element

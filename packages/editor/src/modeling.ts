@@ -195,6 +195,216 @@ function makeFlowElement(type: CreateShapeType, id: string, name?: string): Bpmn
 	}
 }
 
+// ── Container subprocess helpers ──────────────────────────────────────────────
+
+/** Recursively collects all descendant flow element IDs and sequence flow IDs. */
+function collectDescendantIds(el: BpmnFlowElement, out: Set<string>): void {
+	if (
+		el.type !== "subProcess" &&
+		el.type !== "adHocSubProcess" &&
+		el.type !== "eventSubProcess" &&
+		el.type !== "transaction"
+	)
+		return;
+	for (const child of el.flowElements) {
+		out.add(child.id);
+		collectDescendantIds(child, out);
+	}
+	for (const sf of el.sequenceFlows) {
+		out.add(sf.id);
+	}
+}
+
+/** Flattens all sequence flows from all nesting levels into a Map. */
+function collectAllSequenceFlows(
+	flowElements: BpmnFlowElement[],
+	sequenceFlows: BpmnSequenceFlow[],
+	out: Map<string, BpmnSequenceFlow>,
+): void {
+	for (const sf of sequenceFlows) {
+		out.set(sf.id, sf);
+	}
+	for (const el of flowElements) {
+		if (
+			el.type === "subProcess" ||
+			el.type === "adHocSubProcess" ||
+			el.type === "eventSubProcess" ||
+			el.type === "transaction"
+		) {
+			collectAllSequenceFlows(el.flowElements, el.sequenceFlows, out);
+		}
+	}
+}
+
+/** Returns the innermost container element ID whose bounds contain (cx, cy), or null. */
+function findContainerForPoint(defs: BpmnDefinitions, cx: number, cy: number): string | null {
+	const process = defs.processes[0];
+	const diagram = defs.diagrams[0];
+	if (!process || !diagram) return null;
+
+	const containerIds = new Set<string>();
+	const gatherContainers = (elements: BpmnFlowElement[]): void => {
+		for (const el of elements) {
+			if (
+				el.type === "subProcess" ||
+				el.type === "adHocSubProcess" ||
+				el.type === "eventSubProcess" ||
+				el.type === "transaction"
+			) {
+				containerIds.add(el.id);
+				gatherContainers(el.flowElements);
+			}
+		}
+	};
+	gatherContainers(process.flowElements);
+
+	let bestId: string | null = null;
+	let bestArea = Number.POSITIVE_INFINITY;
+	for (const shape of diagram.plane.shapes) {
+		if (!containerIds.has(shape.bpmnElement)) continue;
+		const { x, y, width, height } = shape.bounds;
+		if (cx >= x && cx <= x + width && cy >= y && cy <= y + height) {
+			const area = width * height;
+			if (area < bestArea) {
+				bestArea = area;
+				bestId = shape.bpmnElement;
+			}
+		}
+	}
+	return bestId;
+}
+
+/** Recursively finds the container by ID and appends newElement to its flowElements. */
+function addToContainer(
+	flowElements: BpmnFlowElement[],
+	containerId: string,
+	newElement: BpmnFlowElement,
+): BpmnFlowElement[] {
+	return flowElements.map((el) => {
+		if (
+			el.type !== "subProcess" &&
+			el.type !== "adHocSubProcess" &&
+			el.type !== "eventSubProcess" &&
+			el.type !== "transaction"
+		)
+			return el;
+		if (el.id === containerId) {
+			return { ...el, flowElements: [...el.flowElements, newElement] };
+		}
+		return { ...el, flowElements: addToContainer(el.flowElements, containerId, newElement) };
+	});
+}
+
+/** Recursively searches all levels for an element/flow by ID and updates its name. */
+function updateNameInElements(
+	flowElements: BpmnFlowElement[],
+	sequenceFlows: BpmnSequenceFlow[],
+	id: string,
+	name: string,
+): { elements: BpmnFlowElement[]; flows: BpmnSequenceFlow[]; updated: boolean } {
+	const elIndex = flowElements.findIndex((el) => el.id === id);
+	if (elIndex >= 0) {
+		const newElements = [...flowElements];
+		const el = newElements[elIndex];
+		if (el) newElements[elIndex] = { ...el, name };
+		return { elements: newElements, flows: sequenceFlows, updated: true };
+	}
+
+	const sfIndex = sequenceFlows.findIndex((sf) => sf.id === id);
+	if (sfIndex >= 0) {
+		const newFlows = [...sequenceFlows];
+		const sf = newFlows[sfIndex];
+		if (sf) newFlows[sfIndex] = { ...sf, name };
+		return { elements: flowElements, flows: newFlows, updated: true };
+	}
+
+	for (let i = 0; i < flowElements.length; i++) {
+		const el = flowElements[i];
+		if (
+			el &&
+			(el.type === "subProcess" ||
+				el.type === "adHocSubProcess" ||
+				el.type === "eventSubProcess" ||
+				el.type === "transaction")
+		) {
+			const r = updateNameInElements(el.flowElements, el.sequenceFlows, id, name);
+			if (r.updated) {
+				const newElements = [...flowElements];
+				newElements[i] = { ...el, flowElements: r.elements, sequenceFlows: r.flows };
+				return { elements: newElements, flows: sequenceFlows, updated: true };
+			}
+		}
+	}
+
+	return { elements: flowElements, flows: sequenceFlows, updated: false };
+}
+
+/**
+ * Recursively removes deleted elements from all nesting levels.
+ * Mutates allRemovedIds (adds removed flow IDs) for DI edge cleanup.
+ */
+function removeFromContainers(
+	flowElements: BpmnFlowElement[],
+	sequenceFlows: BpmnSequenceFlow[],
+	idSet: Set<string>,
+	allRemovedIds: Set<string>,
+): { flowElements: BpmnFlowElement[]; sequenceFlows: BpmnSequenceFlow[] } {
+	const flowsToRemove = new Set(
+		sequenceFlows
+			.filter((sf) => idSet.has(sf.id) || idSet.has(sf.sourceRef) || idSet.has(sf.targetRef))
+			.map((sf) => sf.id),
+	);
+	for (const fid of flowsToRemove) allRemovedIds.add(fid);
+
+	const newSequenceFlows = sequenceFlows.filter((sf) => !flowsToRemove.has(sf.id));
+	const newFlowElements = flowElements
+		.filter((el) => !idSet.has(el.id))
+		.map((el): BpmnFlowElement => {
+			const cleaned = {
+				...el,
+				incoming: el.incoming.filter((ref) => !allRemovedIds.has(ref)),
+				outgoing: el.outgoing.filter((ref) => !allRemovedIds.has(ref)),
+			} as BpmnFlowElement;
+			if (
+				cleaned.type === "subProcess" ||
+				cleaned.type === "adHocSubProcess" ||
+				cleaned.type === "eventSubProcess" ||
+				cleaned.type === "transaction"
+			) {
+				const r = removeFromContainers(
+					cleaned.flowElements,
+					cleaned.sequenceFlows,
+					idSet,
+					allRemovedIds,
+				);
+				return { ...cleaned, flowElements: r.flowElements, sequenceFlows: r.sequenceFlows };
+			}
+			return cleaned;
+		});
+
+	return { flowElements: newFlowElements, sequenceFlows: newSequenceFlows };
+}
+
+/** Recursively finds element by ID and applies updateFn to it. */
+function updateRefInElements(
+	flowElements: BpmnFlowElement[],
+	id: string,
+	updateFn: (el: BpmnFlowElement) => BpmnFlowElement,
+): BpmnFlowElement[] {
+	return flowElements.map((el) => {
+		if (el.id === id) return updateFn(el);
+		if (
+			el.type === "subProcess" ||
+			el.type === "adHocSubProcess" ||
+			el.type === "eventSubProcess" ||
+			el.type === "transaction"
+		) {
+			return { ...el, flowElements: updateRefInElements(el.flowElements, id, updateFn) };
+		}
+		return el;
+	});
+}
+
 // ── Create shape ─────────────────────────────────────────────────────────────
 
 export function createShape(
@@ -220,12 +430,19 @@ export function createShape(
 		unknownAttributes: {},
 	};
 
+	const cx = bounds.x + bounds.width / 2;
+	const cy = bounds.y + bounds.height / 2;
+	const containerId = findContainerForPoint(defs, cx, cy);
+
 	const newDefs: BpmnDefinitions = {
 		...defs,
 		processes: [
 			{
 				...process,
-				flowElements: [...process.flowElements, flowElement],
+				flowElements:
+					containerId !== null
+						? addToContainer(process.flowElements, containerId, flowElement)
+						: [...process.flowElements, flowElement],
 			},
 			...defs.processes.slice(1),
 		],
@@ -338,16 +555,17 @@ export function createConnection(
 		unknownAttributes: {},
 	};
 
-	// Update source.outgoing and target.incoming
-	const updatedElements = process.flowElements.map((el) => {
-		if (el.id === sourceId) {
-			return { ...el, outgoing: [...el.outgoing, id] };
-		}
-		if (el.id === targetId) {
-			return { ...el, incoming: [...el.incoming, id] };
-		}
-		return el;
-	});
+	// Update source.outgoing and target.incoming (recursive — handles subprocess children)
+	let updatedElements = updateRefInElements(
+		process.flowElements,
+		sourceId,
+		(el) => ({ ...el, outgoing: [...el.outgoing, id] }) as BpmnFlowElement,
+	);
+	updatedElements = updateRefInElements(
+		updatedElements,
+		targetId,
+		(el) => ({ ...el, incoming: [...el.incoming, id] }) as BpmnFlowElement,
+	);
 
 	const newDefs: BpmnDefinitions = {
 		...defs,
@@ -414,6 +632,36 @@ export function moveShapes(
 			}
 		}
 	}
+
+	// Cascade: descendants of moving container elements (subprocesses) also move.
+	const seenIds = new Set(extendedMoves.map((m) => m.id));
+	const cascadeDescendants = (elements: BpmnFlowElement[]): void => {
+		for (const el of elements) {
+			if (
+				el.type === "subProcess" ||
+				el.type === "adHocSubProcess" ||
+				el.type === "eventSubProcess" ||
+				el.type === "transaction"
+			) {
+				if (moveMap.has(el.id)) {
+					const move = moveMap.get(el.id);
+					if (move) {
+						const descIds = new Set<string>();
+						collectDescendantIds(el, descIds);
+						for (const descId of descIds) {
+							if (!seenIds.has(descId)) {
+								seenIds.add(descId);
+								extendedMoves.push({ id: descId, dx: move.dx, dy: move.dy });
+							}
+						}
+					}
+				}
+				cascadeDescendants(el.flowElements);
+			}
+		}
+	};
+	cascadeDescendants(process.flowElements);
+
 	const extendedMoveMap = new Map(extendedMoves.map((m) => [m.id, m]));
 
 	// Update DI shape bounds (and label bounds, if present)
@@ -446,9 +694,12 @@ export function moveShapes(
 	// - If both source and target are moving: translate all waypoints by a consistent delta
 	// - If only source is moving: translate first waypoint
 	// - If only target is moving: translate last waypoint
+	const allFlows = new Map<string, BpmnSequenceFlow>();
+	collectAllSequenceFlows(process.flowElements, process.sequenceFlows, allFlows);
+
 	const newEdges = diagram.plane.edges.map((edge) => {
-		// Handle sequence flows
-		const flow = process.sequenceFlows.find((sf) => sf.id === edge.bpmnElement);
+		// Handle sequence flows (search all nesting levels)
+		const flow = allFlows.get(edge.bpmnElement);
 		if (flow) {
 			const srcMove = extendedMoveMap.get(flow.sourceRef);
 			const tgtMove = extendedMoveMap.get(flow.targetRef);
@@ -595,16 +846,16 @@ export function deleteElements(defs: BpmnDefinitions, ids: string[]): BpmnDefini
 		}
 	}
 
+	// Cascade: descendants of deleted container elements are also deleted
+	if (process0) {
+		for (const el of process0.flowElements) {
+			if (idSet.has(el.id)) collectDescendantIds(el, idSet);
+		}
+	}
+
 	const process = defs.processes[0];
 	const diagram = defs.diagrams[0];
 	if (!process || !diagram) return defs;
-
-	// Find sequence flows to remove (directly specified, or whose source/target is deleted)
-	const flowsToRemove = new Set(
-		process.sequenceFlows
-			.filter((sf) => idSet.has(sf.id) || idSet.has(sf.sourceRef) || idSet.has(sf.targetRef))
-			.map((sf) => sf.id),
-	);
 
 	// Find associations to remove (directly specified, or whose source/target is deleted)
 	const assocsToRemove = new Set(
@@ -613,20 +864,17 @@ export function deleteElements(defs: BpmnDefinitions, ids: string[]): BpmnDefini
 			.map((a) => a.id),
 	);
 
-	// All IDs to remove from DI (shapes + edges)
-	const allRemovedIds = new Set([...ids, ...flowsToRemove, ...assocsToRemove]);
+	// Recursively remove elements and collect all removed flow IDs into allRemovedIds
+	const allRemovedIds = new Set<string>(idSet);
+	const { flowElements: newFlowElements, sequenceFlows: newSequenceFlows } = removeFromContainers(
+		process.flowElements,
+		process.sequenceFlows,
+		idSet,
+		allRemovedIds,
+	);
 
-	// Remove from process.flowElements and clean up incoming/outgoing
-	const newFlowElements = process.flowElements
-		.filter((el) => !idSet.has(el.id))
-		.map((el) => ({
-			...el,
-			incoming: el.incoming.filter((ref) => !allRemovedIds.has(ref)),
-			outgoing: el.outgoing.filter((ref) => !allRemovedIds.has(ref)),
-		}));
-
-	// Remove from process.sequenceFlows
-	const newSequenceFlows = process.sequenceFlows.filter((sf) => !flowsToRemove.has(sf.id));
+	// Add association IDs for DI edge cleanup
+	for (const aid of assocsToRemove) allRemovedIds.add(aid);
 
 	// Remove text annotations and associations
 	const newTextAnnotations = process.textAnnotations.filter((ta) => !idSet.has(ta.id));
@@ -664,31 +912,15 @@ export function updateLabel(defs: BpmnDefinitions, id: string, name: string): Bp
 	const process = defs.processes[0];
 	if (!process) return defs;
 
-	// Check flow elements first
-	const elIndex = process.flowElements.findIndex((el) => el.id === id);
-	if (elIndex >= 0) {
-		const newElements = [...process.flowElements];
-		const el = newElements[elIndex];
-		if (el) {
-			newElements[elIndex] = { ...el, name };
-		}
+	// Check flow elements and sequence flows (recursive — handles subprocess children)
+	const r = updateNameInElements(process.flowElements, process.sequenceFlows, id, name);
+	if (r.updated) {
 		return {
 			...defs,
-			processes: [{ ...process, flowElements: newElements }, ...defs.processes.slice(1)],
-		};
-	}
-
-	// Check sequence flows
-	const sfIndex = process.sequenceFlows.findIndex((sf) => sf.id === id);
-	if (sfIndex >= 0) {
-		const newFlows = [...process.sequenceFlows];
-		const sf = newFlows[sfIndex];
-		if (sf) {
-			newFlows[sfIndex] = { ...sf, name };
-		}
-		return {
-			...defs,
-			processes: [{ ...process, sequenceFlows: newFlows }, ...defs.processes.slice(1)],
+			processes: [
+				{ ...process, flowElements: r.elements, sequenceFlows: r.flows },
+				...defs.processes.slice(1),
+			],
 		};
 	}
 
