@@ -3,7 +3,7 @@ import { defineConfig } from "vite";
 
 export default defineConfig({
 	root: ".",
-	base: "/bpmn-sdk/",
+	base: "/monorepo/",
 	build: {
 		outDir: "dist",
 		emptyOutDir: true,
