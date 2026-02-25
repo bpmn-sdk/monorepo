@@ -37,9 +37,8 @@ jobs:
         run: pnpm turbo build --filter @bpmn-sdk/landing
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-pages-artifact@v3
         with:
-          name: github-pages
           path: apps/landing/dist
 
   deploy:
