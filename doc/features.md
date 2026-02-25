@@ -33,6 +33,11 @@
 - **Keyboard shortcuts** — Delete (shapes and edges), Ctrl+Z/Y, Ctrl+A, Ctrl+C/V, Escape
 - **Events** — `diagram:change`, `editor:select`, `editor:tool` extend `CanvasEvents`
 
+## Watermark Plugin (2026-02-25) — `@bpmn-sdk/canvas-plugin-watermark`
+- **Attribution bar** — bottom-right overlay bar with configurable links and an optional square SVG logo; logo is always rightmost
+- **`createWatermarkPlugin({ links?, logo? })`** — factory; `links` is an array of `{ label, url }` objects; `logo` is an SVG markup string
+- Works with both canvas viewer and editor
+
 ## Canvas Plugins Workspace (2026-02-23) — `canvas-plugins/*`
 - New pnpm workspace `canvas-plugins/*` for first-party canvas plugin packages
 - **`@bpmn-sdk/canvas-plugin-minimap`** — minimap as an opt-in plugin; install via `plugins: [createMinimapPlugin()]`; handles `diagram:load`, `viewport:change`, `diagram:clear`; navigates via `CanvasApi.setViewport()`; fully self-contained CSS injection

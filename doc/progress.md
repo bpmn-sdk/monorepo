@@ -1,5 +1,22 @@
 # Progress
 
+## 2026-02-25 — Watermark Plugin
+
+### `@bpmn-sdk/canvas-plugin-watermark` (NEW)
+- **`createWatermarkPlugin(options?)`** — bottom-right attribution bar; renders configurable links and an optional square SVG logo; logo is always the rightmost element; fully self-contained CSS injection
+- **`WatermarkLink`** / **`WatermarkOptions`** interfaces exported
+- 7 tests; added to `canvas-plugins/*` workspace
+
+### `@bpmn-sdk/landing` — editor page
+- Added watermark plugin with a "Github" link (`https://github.com/bpmn-sdk/monorepo`) and a BPMN-flow square SVG logo (start event → task → end event on blue rounded square)
+
+## 2026-02-25 — Annotation Bug Fixes
+
+### `@bpmn-sdk/canvas`
+- **Annotation selection** — added transparent `<rect>` fill covering the full bounding area so the entire annotation rectangle is clickable/draggable
+- **Bracket path** — changed from short-stub to full-width open-right bracket (`M w 0 L 0 0 L 0 h L w h`) matching standard BPMN notation
+- **Annotation text position** — text now centred in the full shape area (`cx = width/2, cy = height/2, maxW = width - 8`)
+
 ## 2026-02-25 — Colors & Text Annotations
 
 ### `@bpmn-sdk/core` — `DiColor` helpers
