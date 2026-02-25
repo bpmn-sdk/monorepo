@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { createConfigPanelBpmnPlugin } from "../src/index.js";
 
 const REST_TYPE = "io.camunda:http-json:1";
+const REST_TEMPLATE_ID = "io.camunda.connectors.HttpJson.v2";
 
 // Minimal zeebe:taskDefinition XmlElement helper
 function taskDefExt(type: string, retries?: string): XmlElement {
@@ -352,7 +353,7 @@ describe("createConfigPanelBpmnPlugin", () => {
 
 		const defs = makeMinimalDefs();
 		const newDefs = reg.adapter.write(defs, "task1", {
-			connector: REST_TYPE,
+			connector: REST_TEMPLATE_ID,
 			url: "https://api.example.com",
 			method: "POST",
 		});

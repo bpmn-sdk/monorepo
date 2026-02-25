@@ -38,7 +38,7 @@ import { ELEMENT_TYPE_LABELS } from "@bpmn-sdk/editor";
 import type { CreateShapeType } from "@bpmn-sdk/editor";
 import { buildRegistrationFromTemplate } from "./template-engine.js";
 import type { ElementTemplate } from "./template-types.js";
-import { REST_CONNECTOR_TEMPLATE } from "./templates/rest-connector.js";
+import { CAMUNDA_CONNECTOR_TEMPLATES } from "./templates/generated.js";
 import {
 	findFlowElement,
 	getIoInput,
@@ -56,21 +56,43 @@ import {
  */
 const TEMPLATE_REGISTRY = new Map<string, ReturnType<typeof buildRegistrationFromTemplate>>();
 
-function registerBuiltInTemplate(t: ElementTemplate): void {
-	TEMPLATE_REGISTRY.set(t.id, buildRegistrationFromTemplate(t));
+/** Templates applicable to service tasks. */
+const SERVICE_TASK_TEMPLATES = CAMUNDA_CONNECTOR_TEMPLATES.filter(
+	(t) => t.appliesTo.includes("bpmn:ServiceTask") || t.appliesTo.includes("bpmn:Task"),
+);
+
+/** Extract the fixed task definition type from a template's Hidden binding. */
+function extractTaskType(t: ElementTemplate): string | undefined {
+	for (const p of t.properties) {
+		if (typeof p.value !== "string") continue;
+		if (
+			(p.binding.type === "zeebe:taskDefinition" &&
+				"property" in p.binding &&
+				p.binding.property === "type") ||
+			p.binding.type === "zeebe:taskDefinition:type"
+		) {
+			return p.value;
+		}
+	}
+	return undefined;
 }
 
-registerBuiltInTemplate(REST_CONNECTOR_TEMPLATE);
+// Register all Camunda connector templates
+for (const tpl of CAMUNDA_CONNECTOR_TEMPLATES) {
+	TEMPLATE_REGISTRY.set(tpl.id, buildRegistrationFromTemplate(tpl));
+}
 
-/** Task definition type → template id mapping (for connector selector). */
-const TASK_TYPE_TO_TEMPLATE_ID: Map<string, string> = new Map([
-	["io.camunda:http-json:1", REST_CONNECTOR_TEMPLATE.id],
-]);
-
-/** Template id → task definition type (reverse lookup). */
-const TEMPLATE_ID_TO_TASK_TYPE: Map<string, string> = new Map(
-	[...TASK_TYPE_TO_TEMPLATE_ID.entries()].map(([k, v]) => [v, k]),
-);
+/**
+ * Task definition type → template id mapping (first-wins; used for
+ * backward-compat detection in `read` when `zeebe:modelerTemplate` is absent).
+ */
+const TASK_TYPE_TO_TEMPLATE_ID = new Map<string, string>();
+for (const tpl of SERVICE_TASK_TEMPLATES) {
+	const taskType = extractTaskType(tpl);
+	if (taskType && !TASK_TYPE_TO_TEMPLATE_ID.has(taskType)) {
+		TASK_TYPE_TO_TEMPLATE_ID.set(taskType, tpl.id);
+	}
+}
 
 // ── General schema (all flow element types) ───────────────────────────────────
 
@@ -120,10 +142,15 @@ const CUSTOM_TASK_TYPE = "";
 
 const IS_CUSTOM = (values: Record<string, FieldValue>) => values.connector === CUSTOM_TASK_TYPE;
 
-/** Connector selector options: custom + one entry per registered template. */
-const CONNECTOR_OPTIONS = [
+/**
+ * Connector selector options keyed by template id (not task type) so each of
+ * the 116+ connectors gets its own entry, even when multiple share a task type.
+ */
+const CONNECTOR_OPTIONS: Array<{ value: string; label: string }> = [
 	{ value: CUSTOM_TASK_TYPE, label: "Custom (no connector)" },
-	{ value: "io.camunda:http-json:1", label: "REST Outbound Connector" },
+	...SERVICE_TASK_TEMPLATES.flatMap((t) =>
+		extractTaskType(t) ? [{ value: t.id, label: t.name }] : [],
+	),
 ];
 
 const GENERIC_SERVICE_TASK_SCHEMA: PanelSchema = {
@@ -184,10 +211,14 @@ const SERVICE_TASK_ADAPTER: PanelAdapter = {
 	},
 
 	write(defs: BpmnDefinitions, id: string, values: Record<string, FieldValue>): BpmnDefinitions {
-		const isCustom = strVal(values.connector) === CUSTOM_TASK_TYPE;
+		const connectorVal = strVal(values.connector);
+		const isCustom = connectorVal === CUSTOM_TASK_TYPE;
+		// connector is either a template id (new) or a task type (backward-compat read)
 		const newTemplateId = isCustom
 			? undefined
-			: TASK_TYPE_TO_TEMPLATE_ID.get(strVal(values.connector));
+			: TEMPLATE_REGISTRY.has(connectorVal)
+				? connectorVal
+				: TASK_TYPE_TO_TEMPLATE_ID.get(connectorVal);
 
 		if (newTemplateId) {
 			// Switching to (or already on) a template: stamp the attribute then delegate
@@ -258,12 +289,6 @@ function strVal(v: FieldValue): string {
 	return typeof v === "string" ? v : "";
 }
 
-/** Return the raw ElementTemplate object for a given id (for Hidden prop defaults). */
-function getTemplateById(id: string): ElementTemplate | undefined {
-	if (id === REST_CONNECTOR_TEMPLATE.id) return REST_CONNECTOR_TEMPLATE;
-	return undefined;
-}
-
 // ── All element types that get the general schema ─────────────────────────────
 
 const GENERAL_TYPES: CreateShapeType[] = [
@@ -311,11 +336,12 @@ export function createConfigPanelBpmnPlugin(configPanel: ConfigPanelPlugin): Can
 
 		registerTemplate(template: ElementTemplate): void {
 			TEMPLATE_REGISTRY.set(template.id, buildRegistrationFromTemplate(template));
-			const taskType = TEMPLATE_ID_TO_TASK_TYPE.get(template.id);
-			if (!taskType) return; // custom template without a known task type
-			// Ensure the connector selector shows the new template
-			if (!CONNECTOR_OPTIONS.some((o) => o.value === taskType)) {
-				CONNECTOR_OPTIONS.push({ value: taskType, label: template.name });
+			const taskType = extractTaskType(template);
+			if (taskType && !TASK_TYPE_TO_TEMPLATE_ID.has(taskType)) {
+				TASK_TYPE_TO_TEMPLATE_ID.set(taskType, template.id);
+			}
+			if (!CONNECTOR_OPTIONS.some((o) => o.value === template.id)) {
+				CONNECTOR_OPTIONS.push({ value: template.id, label: template.name });
 			}
 		},
 	};

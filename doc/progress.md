@@ -1,5 +1,17 @@
 # Progress
 
+## 2026-02-25 — Camunda Connector Templates: Fetch, Generate, Integrate
+
+### `@bpmn-sdk/canvas-plugin-config-panel-bpmn` — All 116 Camunda connectors
+- **`scripts/update-connectors.mjs`** — new script that fetches all OOTB connector templates from the Camunda marketplace (`marketplace.cloud.camunda.io/api/v1/ootb-connectors`), resolves each template's `ref` URL, and writes `canvas-plugins/config-panel-bpmn/src/templates/generated.ts` with all templates as a typed array
+- **`pnpm update-connectors`** — root-level script to regenerate `generated.ts` at any time
+- **`generated.ts`** excluded from Biome linting (`biome.json` `files.ignore`)
+- **116 connector templates** registered in `TEMPLATE_REGISTRY` at startup (all OOTB Camunda connectors: REST, Slack, Salesforce, ServiceNow, GitHub, Twilio, AWS, Azure, Google, WhatsApp, Facebook, etc.)
+- **Connector selector** shows all 116 service-task connectors (one entry per template id, no collisions even when multiple connectors share the same underlying task type)
+- **Write path** accepts template id directly from CONNECTOR_OPTIONS, with backward-compat fallback to task type → template id map
+- **`TASK_TYPE_TO_TEMPLATE_ID`** built with first-wins per task type for backward-compat detection
+- **Deleted `rest-connector.ts`** — hand-written REST template superseded by `generated.ts`
+
 ## 2026-02-25 — Element Templates System + REST Connector Template
 
 ### `@bpmn-sdk/canvas-plugin-config-panel-bpmn` — Template-aware property panel
