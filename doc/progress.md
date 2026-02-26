@@ -1,5 +1,18 @@
 # Progress
 
+## 2026-02-26 — Landing Page Editor Link + Mobile Editor Responsiveness
+
+### `apps/landing` — Editor discoverability
+- **"Try the Editor →" button** added to hero section with a gradient `btn-editor` style (accent → green)
+- **Footer link** to `/editor` added alongside GitHub and npm links
+
+### `@bpmn-sdk/editor` — Collapsible HUD toolbars on mobile (≤600px)
+- **Bottom-center toolbar** (`#hud-bottom-center`) starts collapsed on mobile; tapping the toggle button expands it to full width; auto-collapses after selecting any tool or element group
+- **Top-center toolbar** (`#hud-top-center`) same pattern; auto-collapses after undo/redo/delete/duplicate
+- Toggle button icons update to reflect the currently active tool (bottom-center) or show the undo icon (top-center)
+- Tapping outside an expanded toolbar collapses it; expanding one collapses the other
+- Desktop layout unchanged — toggle buttons hidden via CSS media query
+
 ## 2026-02-25 — SubProcess Containment + Sticky Movement
 
 ### `@bpmn-sdk/editor` — Container-aware modeling operations

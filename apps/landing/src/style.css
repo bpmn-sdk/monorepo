@@ -143,6 +143,16 @@ a:hover {
 	border-color: var(--text-muted);
 }
 
+.btn-editor {
+	background: linear-gradient(135deg, var(--accent), var(--green));
+	color: #fff;
+}
+
+.btn-editor:hover {
+	opacity: 0.88;
+	box-shadow: 0 0 30px rgba(0, 206, 201, 0.2);
+}
+
 /* ---- Why Section ---- */
 .why {
 	padding: 80px 0;

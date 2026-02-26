@@ -1,0 +1,274 @@
+{
+  "executionPlatform": "Camunda Cloud",
+  "executionPlatformVersion": "8.8.0",
+  "exporter": {
+    "name": "Camunda Web Modeler",
+    "version": "a799406"
+  },
+  "schemaVersion": 19,
+  "id": "Form_0h3l094",
+  "components": [
+    {
+      "label": "Text field",
+      "type": "textfield",
+      "layout": {
+        "row": "Row_1ioddjw",
+        "columns": null
+      },
+      "id": "Field_188tp1h",
+      "key": "textfield_45jgoo"
+    },
+    {
+      "label": "Text area",
+      "type": "textarea",
+      "layout": {
+        "row": "Row_1u72g4j",
+        "columns": null
+      },
+      "id": "Field_1g4c545",
+      "key": "textarea_habyyr"
+    },
+    {
+      "label": "Number",
+      "type": "number",
+      "layout": {
+        "row": "Row_1nfiep6",
+        "columns": null
+      },
+      "id": "Field_0inah8z",
+      "key": "number_6p2wmb"
+    },
+    {
+      "subtype": "date",
+      "dateLabel": "Date",
+      "type": "datetime",
+      "layout": {
+        "row": "Row_0k58k8l",
+        "columns": null
+      },
+      "id": "Field_06vx8n8",
+      "key": "datetime_ohk2nb"
+    },
+    {
+      "computeOn": "change",
+      "type": "expression",
+      "layout": {
+        "row": "Row_1bsbo9n",
+        "columns": null
+      },
+      "id": "Field_0vkro5p",
+      "key": "expression_hb937d"
+    },
+    {
+      "label": "File picker",
+      "type": "filepicker",
+      "layout": {
+        "row": "Row_1hev3if",
+        "columns": null
+      },
+      "id": "Field_1jp834o",
+      "key": "filepicker_70fvl"
+    },
+    {
+      "type": "table",
+      "layout": {
+        "row": "Row_1kw8l87",
+        "columns": null
+      },
+      "label": "Table",
+      "rowCount": 10,
+      "columns": [
+        {
+          "label": "ID",
+          "key": "id"
+        },
+        {
+          "label": "Name",
+          "key": "name"
+        },
+        {
+          "label": "Date",
+          "key": "date"
+        }
+      ],
+      "id": "Field_16ug60s",
+      "dataSource": "=Field_16ug60s"
+    },
+    {
+      "type": "image",
+      "layout": {
+        "row": "Row_1kw8l87",
+        "columns": null
+      },
+      "id": "Field_10fi11n"
+    },
+    {
+      "label": "Checkbox",
+      "type": "checkbox",
+      "layout": {
+        "row": "Row_1kw8l87",
+        "columns": null
+      },
+      "id": "Field_0lf8w4p",
+      "key": "checkbox_zxund"
+    },
+    {
+      "label": "Dynamic list",
+      "components": [],
+      "showOutline": true,
+      "isRepeating": true,
+      "allowAddRemove": true,
+      "defaultRepetitions": 1,
+      "type": "dynamiclist",
+      "layout": {
+        "row": "Row_1mkzolr",
+        "columns": null
+      },
+      "id": "Field_088su8g",
+      "path": "dynamiclist_v8nv6f"
+    },
+    {
+      "label": "iFrame",
+      "security": {
+        "allowScripts": true
+      },
+      "type": "iframe",
+      "layout": {
+        "row": "Row_1mkzolr",
+        "columns": null
+      },
+      "id": "Field_1p0g4fw"
+    },
+    {
+      "type": "separator",
+      "layout": {
+        "row": "Row_1mkzolr",
+        "columns": null
+      },
+      "id": "Field_086d39t"
+    },
+    {
+      "height": 60,
+      "type": "spacer",
+      "layout": {
+        "row": "Row_1mkzolr",
+        "columns": null
+      },
+      "id": "Field_05bcq9u"
+    },
+    {
+      "label": "Document preview",
+      "type": "documentPreview",
+      "layout": {
+        "row": "Row_1mkzolr",
+        "columns": null
+      },
+      "id": "Field_17vgfwk"
+    },
+    {
+      "content": "",
+      "type": "html",
+      "layout": {
+        "row": "Row_1mkzolr",
+        "columns": null
+      },
+      "id": "Field_0b7ne2i"
+    },
+    {
+      "label": "Checkbox group",
+      "values": [
+        {
+          "label": "Value",
+          "value": "value"
+        }
+      ],
+      "type": "checklist",
+      "layout": {
+        "row": "Row_1mkzolr",
+        "columns": null
+      },
+      "id": "Field_1up8aer",
+      "key": "checklist_5yppke"
+    },
+    {
+      "label": "Group",
+      "components": [
+        {
+          "label": "Button",
+          "action": "submit",
+          "type": "button",
+          "layout": {
+            "row": "Row_0ur3cxb",
+            "columns": null
+          },
+          "id": "Field_148s7u8"
+        }
+      ],
+      "showOutline": true,
+      "type": "group",
+      "layout": {
+        "row": "Row_07gso8h",
+        "columns": null
+      },
+      "id": "Field_1dyzgd2"
+    },
+    {
+      "text": "# Text",
+      "type": "text",
+      "layout": {
+        "row": "Row_09pjdzy",
+        "columns": null
+      },
+      "id": "Field_0vrl07r"
+    },
+    {
+      "label": "Radio group",
+      "values": [
+        {
+          "label": "Value",
+          "value": "value"
+        }
+      ],
+      "type": "radio",
+      "layout": {
+        "row": "Row_09pjdzy",
+        "columns": null
+      },
+      "id": "Field_1idiy1g",
+      "key": "radio_yxfxbi"
+    },
+    {
+      "label": "Select",
+      "values": [
+        {
+          "label": "Value",
+          "value": "value"
+        }
+      ],
+      "type": "select",
+      "layout": {
+        "row": "Row_1ophhor",
+        "columns": null
+      },
+      "id": "Field_1po8qs2",
+      "key": "select_ngepyu"
+    },
+    {
+      "label": "Tag list",
+      "values": [
+        {
+          "label": "Value",
+          "value": "value"
+        }
+      ],
+      "type": "taglist",
+      "layout": {
+        "row": "Row_1es5meb",
+        "columns": null
+      },
+      "id": "Field_03kd603",
+      "key": "taglist_5g7ov"
+    }
+  ],
+  "type": "default"
+}

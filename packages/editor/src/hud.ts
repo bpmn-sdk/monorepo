@@ -97,6 +97,11 @@ export function initEditorHud(editor: BpmnEditor): void {
 	hudTopCenter.className = "hud panel";
 	hudTopCenter.append(btnUndo, btnRedo, hudSep(), btnDelete, btnDuplicate, hudSep(), btnTopMore);
 
+	// Mobile collapse toggle — top center (hidden on desktop via CSS)
+	const btnTcToggle = hudBtn("btn-tc-toggle", "Actions");
+	btnTcToggle.innerHTML = IC.undo;
+	hudTopCenter.insertBefore(btnTcToggle, hudTopCenter.firstChild);
+
 	// Zoom widget — bottom left
 	const btnZoomCurrent = document.createElement("button");
 	btnZoomCurrent.id = "btn-zoom-current";
@@ -132,6 +137,11 @@ export function initEditorHud(editor: BpmnEditor): void {
 	hudBottomCenter.id = "hud-bottom-center";
 	hudBottomCenter.className = "hud panel";
 	hudBottomCenter.append(btnSelect, btnPan, btnSpace, hudSep(), toolGroupsEl);
+
+	// Mobile collapse toggle — bottom center (hidden on desktop via CSS)
+	const btnBcToggle = hudBtn("btn-bc-toggle", "Tools");
+	btnBcToggle.innerHTML = IC.select;
+	hudBottomCenter.insertBefore(btnBcToggle, hudBottomCenter.firstChild);
 
 	// Contextual toolbars (positioned dynamically)
 	const cfgToolbar = document.createElement("div");
@@ -178,6 +188,28 @@ export function initEditorHud(editor: BpmnEditor): void {
 	let openGroupPicker: HTMLElement | null = null;
 	let openDropdown: HTMLElement | null = null;
 	let zoomOpen = false;
+
+	function collapseOnMobile(panel: HTMLElement): void {
+		if (window.innerWidth <= 600) panel.classList.remove("expanded");
+	}
+
+	btnBcToggle.addEventListener("click", () => {
+		if (hudBottomCenter.classList.contains("expanded")) {
+			hudBottomCenter.classList.remove("expanded");
+		} else {
+			hudBottomCenter.classList.add("expanded");
+			hudTopCenter.classList.remove("expanded");
+		}
+	});
+
+	btnTcToggle.addEventListener("click", () => {
+		if (hudTopCenter.classList.contains("expanded")) {
+			hudTopCenter.classList.remove("expanded");
+		} else {
+			hudTopCenter.classList.add("expanded");
+			hudBottomCenter.classList.remove("expanded");
+		}
+	});
 
 	const groupActiveType: Record<string, CreateShapeType> = {
 		startEvents: "startEvent",
@@ -241,6 +273,7 @@ export function initEditorHud(editor: BpmnEditor): void {
 				updateGroupButton(group.id);
 				editor.setTool(`create:${item.type}`);
 				closeGroupPicker();
+				collapseOnMobile(hudBottomCenter);
 			});
 			picker.appendChild(btn);
 		}
@@ -294,7 +327,10 @@ export function initEditorHud(editor: BpmnEditor): void {
 			}
 			if (!isLongPress) {
 				const activeType = groupActiveType[group.id];
-				if (activeType) editor.setTool(`create:${activeType}`);
+				if (activeType) {
+					editor.setTool(`create:${activeType}`);
+					collapseOnMobile(hudBottomCenter);
+				}
 			}
 		});
 
@@ -334,11 +370,34 @@ export function initEditorHud(editor: BpmnEditor): void {
 				}
 			}
 		}
+
+		// Update bottom-center toggle icon to reflect the active tool
+		if (tool === "select") btnBcToggle.innerHTML = IC.select;
+		else if (tool === "pan") btnBcToggle.innerHTML = IC.hand;
+		else if (tool === "space") btnBcToggle.innerHTML = IC.space;
+		else {
+			for (const group of GROUPS) {
+				if (group.items.some((item) => tool === `create:${item.type}`)) {
+					const btn = groupBtns[group.id];
+					if (btn) btnBcToggle.innerHTML = btn.innerHTML;
+					break;
+				}
+			}
+		}
 	}
 
-	btnSelect.addEventListener("click", () => editor.setTool("select"));
-	btnPan.addEventListener("click", () => editor.setTool("pan"));
-	btnSpace.addEventListener("click", () => editor.setTool("space"));
+	btnSelect.addEventListener("click", () => {
+		editor.setTool("select");
+		collapseOnMobile(hudBottomCenter);
+	});
+	btnPan.addEventListener("click", () => {
+		editor.setTool("pan");
+		collapseOnMobile(hudBottomCenter);
+	});
+	btnSpace.addEventListener("click", () => {
+		editor.setTool("space");
+		collapseOnMobile(hudBottomCenter);
+	});
 
 	// ── Dropdown management ────────────────────────────────────────────────────
 
@@ -373,6 +432,17 @@ export function initEditorHud(editor: BpmnEditor): void {
 	document.addEventListener("pointerdown", (e) => {
 		if (openDropdown && !openDropdown.contains(e.target as Node)) {
 			closeAllDropdowns();
+		}
+		if (window.innerWidth <= 600) {
+			if (
+				hudBottomCenter.classList.contains("expanded") &&
+				!hudBottomCenter.contains(e.target as Node)
+			) {
+				hudBottomCenter.classList.remove("expanded");
+			}
+			if (hudTopCenter.classList.contains("expanded") && !hudTopCenter.contains(e.target as Node)) {
+				hudTopCenter.classList.remove("expanded");
+			}
 		}
 	});
 
@@ -484,10 +554,22 @@ export function initEditorHud(editor: BpmnEditor): void {
 
 	updateActionBar();
 
-	btnUndo.addEventListener("click", () => editor.undo());
-	btnRedo.addEventListener("click", () => editor.redo());
-	btnDelete.addEventListener("click", () => editor.deleteSelected());
-	btnDuplicate.addEventListener("click", () => editor.duplicate());
+	btnUndo.addEventListener("click", () => {
+		editor.undo();
+		collapseOnMobile(hudTopCenter);
+	});
+	btnRedo.addEventListener("click", () => {
+		editor.redo();
+		collapseOnMobile(hudTopCenter);
+	});
+	btnDelete.addEventListener("click", () => {
+		editor.deleteSelected();
+		collapseOnMobile(hudTopCenter);
+	});
+	btnDuplicate.addEventListener("click", () => {
+		editor.duplicate();
+		collapseOnMobile(hudTopCenter);
+	});
 
 	// ── Label position menu ────────────────────────────────────────────────────
 
