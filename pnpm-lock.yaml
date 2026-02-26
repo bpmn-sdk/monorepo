@@ -177,6 +177,9 @@ importers:
       '@bpmn-sdk/canvas':
         specifier: workspace:*
         version: link:../../packages/canvas
+      '@bpmn-sdk/canvas-plugin-main-menu':
+        specifier: workspace:*
+        version: link:../main-menu
       '@bpmn-sdk/core':
         specifier: workspace:*
         version: link:../../packages/bpmn-sdk

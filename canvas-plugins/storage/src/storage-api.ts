@@ -9,9 +9,11 @@ import type {
 } from "./types.js";
 
 export interface StorageApiOptions {
-	/** Called when the user opens a file from the sidebar. */
+	/** Called when the user opens a file from the menu. */
 	onOpenFile(file: FileRecord, content: string): void;
 }
+
+const CURRENT_PROJECT_KEY = "bpmn-sdk-current-project";
 
 function now(): number {
 	return Date.now();
@@ -23,14 +25,107 @@ function newId(): string {
 
 export class StorageApi {
 	private _currentFileId: string | null = null;
+	private _currentProjectId: string | null;
 	private readonly _autoSave: AutoSave;
 	private _listeners: Array<() => void> = [];
 
+	// In-memory caches for synchronous menu building
+	private _workspaces: WorkspaceRecord[] = [];
+	private _projects = new Map<string, ProjectRecord[]>();
+
 	constructor(private readonly _options: StorageApiOptions) {
+		this._currentProjectId = localStorage.getItem(CURRENT_PROJECT_KEY);
 		this._autoSave = new AutoSave(async (fileId, content) => {
 			await this._persistContent(fileId, content);
 			this._notify();
 		});
+	}
+
+	/** Load caches and restore last-opened project. Returns the project files if restoring. */
+	async initialize(): Promise<FileRecord[] | null> {
+		this._workspaces = await db.workspaces.orderBy("name").toArray();
+		for (const ws of this._workspaces) {
+			const projects = await db.projects.where("workspaceId").equals(ws.id).sortBy("name");
+			this._projects.set(ws.id, projects);
+		}
+		if (this._currentProjectId) {
+			const project = await db.projects.get(this._currentProjectId);
+			if (project) {
+				return db.files.where("projectId").equals(this._currentProjectId).sortBy("name");
+			}
+			// Project no longer exists — clear persisted id
+			this.setCurrentProjectId(null);
+		}
+		return null;
+	}
+
+	getCurrentProjectId(): string | null {
+		return this._currentProjectId;
+	}
+
+	setCurrentProjectId(id: string | null): void {
+		this._currentProjectId = id;
+		if (id === null) {
+			localStorage.removeItem(CURRENT_PROJECT_KEY);
+		} else {
+			localStorage.setItem(CURRENT_PROJECT_KEY, id);
+		}
+	}
+
+	getCachedWorkspaces(): WorkspaceRecord[] {
+		return this._workspaces;
+	}
+
+	getCachedProjects(wsId: string): ProjectRecord[] {
+		return this._projects.get(wsId) ?? [];
+	}
+
+	/** Open a project: sets it as current and returns its files. */
+	async openProject(id: string): Promise<FileRecord[]> {
+		this.setCurrentProjectId(id);
+		const files = await db.files.where("projectId").equals(id).sortBy("name");
+		for (const file of files) {
+			const content = await this.getFileContent(file.id);
+			if (content !== null) {
+				this._options.onOpenFile(file, content);
+			}
+		}
+		this._notify();
+		return files;
+	}
+
+	/**
+	 * Save the given open tabs as files in a project, creating new file records
+	 * (or updating existing ones by matching name+type) and activating the project.
+	 */
+	async saveTabsToProject(
+		projectId: string,
+		workspaceId: string,
+		tabs: Array<{ tabId: string; name: string; type: FileType; content: string }>,
+	): Promise<string[]> {
+		const existingFiles = await db.files.where("projectId").equals(projectId).toArray();
+		const fileIdByKey = new Map<string, string>();
+		for (const f of existingFiles) {
+			fileIdByKey.set(`${f.name}::${f.type}`, f.id);
+		}
+
+		const tabIds: string[] = [];
+		for (const tab of tabs) {
+			const key = `${tab.name}::${tab.type}`;
+			const existingId = fileIdByKey.get(key);
+			if (existingId) {
+				await this._persistContent(existingId, tab.content);
+				await db.files.update(existingId, { updatedAt: now() });
+				tabIds.push(existingId);
+			} else {
+				const file = await this.createFile(projectId, workspaceId, tab.name, tab.type, tab.content);
+				tabIds.push(file.id);
+			}
+		}
+
+		this.setCurrentProjectId(projectId);
+		this._notify();
+		return tabIds;
 	}
 
 	// ─── Workspaces ──────────────────────────────────────────────────────────────
@@ -38,6 +133,7 @@ export class StorageApi {
 	async createWorkspace(name: string): Promise<WorkspaceRecord> {
 		const ws: WorkspaceRecord = { id: newId(), name, createdAt: now(), updatedAt: now() };
 		await db.workspaces.add(ws);
+		this._workspaces = [...this._workspaces, ws].sort((a, b) => a.name.localeCompare(b.name));
 		this._notify();
 		return ws;
 	}
@@ -48,6 +144,8 @@ export class StorageApi {
 
 	async renameWorkspace(id: string, name: string): Promise<void> {
 		await db.workspaces.update(id, { name, updatedAt: now() });
+		this._workspaces = this._workspaces.map((w) => (w.id === id ? { ...w, name } : w));
+		this._workspaces.sort((a, b) => a.name.localeCompare(b.name));
 		this._notify();
 	}
 
@@ -55,9 +153,15 @@ export class StorageApi {
 		const projects = await db.projects.where("workspaceId").equals(id).toArray();
 		for (const p of projects) await this._deleteProjectData(p.id);
 		await db.workspaces.delete(id);
+		this._workspaces = this._workspaces.filter((w) => w.id !== id);
+		this._projects.delete(id);
 		if (this._currentFileId !== null) {
 			const f = await db.files.get(this._currentFileId);
 			if (!f || f.workspaceId === id) this._currentFileId = null;
+		}
+		if (this._currentProjectId) {
+			const p = await db.projects.get(this._currentProjectId);
+			if (!p || p.workspaceId === id) this.setCurrentProjectId(null);
 		}
 		this._notify();
 	}
@@ -67,6 +171,9 @@ export class StorageApi {
 	async createProject(workspaceId: string, name: string): Promise<ProjectRecord> {
 		const p: ProjectRecord = { id: newId(), workspaceId, name, createdAt: now(), updatedAt: now() };
 		await db.projects.add(p);
+		const existing = this._projects.get(workspaceId) ?? [];
+		const updated = [...existing, p].sort((a, b) => a.name.localeCompare(b.name));
+		this._projects.set(workspaceId, updated);
 		this._notify();
 		return p;
 	}
@@ -77,11 +184,21 @@ export class StorageApi {
 
 	async renameProject(id: string, name: string): Promise<void> {
 		await db.projects.update(id, { name, updatedAt: now() });
+		for (const [wsId, projects] of this._projects) {
+			const idx = projects.findIndex((p) => p.id === id);
+			if (idx !== -1) {
+				const updated = projects.map((p) => (p.id === id ? { ...p, name } : p));
+				updated.sort((a, b) => a.name.localeCompare(b.name));
+				this._projects.set(wsId, updated);
+				break;
+			}
+		}
 		this._notify();
 	}
 
 	async deleteProject(id: string): Promise<void> {
 		await this._deleteProjectData(id);
+		if (this._currentProjectId === id) this.setCurrentProjectId(null);
 		this._notify();
 	}
 
@@ -93,6 +210,16 @@ export class StorageApi {
 		}
 		await db.files.where("projectId").equals(projectId).delete();
 		await db.projects.delete(projectId);
+		// Update cache
+		for (const [wsId, projects] of this._projects) {
+			if (projects.some((p) => p.id === projectId)) {
+				this._projects.set(
+					wsId,
+					projects.filter((p) => p.id !== projectId),
+				);
+				break;
+			}
+		}
 	}
 
 	// ─── Files ───────────────────────────────────────────────────────────────────

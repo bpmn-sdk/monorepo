@@ -1,5 +1,31 @@
 # Progress
 
+## 2026-02-26 — Storage plugin overhaul: main-menu integration, drill-down nav, project persistence
+
+### `canvas-plugins/main-menu`
+- Added `MenuDrill` type — clicking replaces dropdown content with a back-navigable sub-menu (nav stack)
+- Added `MenuInfo` type — passive info row with optional inline action button
+- `MenuItem` union extended: `MenuAction | MenuSeparator | MenuDrill | MenuInfo`
+- `createMainMenuPlugin` now returns `CanvasPlugin & { api: MainMenuApi }`
+- `MainMenuApi.setTitle(text)` — dynamically updates the title span
+- `MainMenuApi.setDynamicItems(fn)` — items prepended on each menu open (rebuilt from fn on every open)
+- Theme picker moved behind a `MenuDrill` ("Theme") instead of being flat in the root dropdown
+- Drill-down nav stack: back button + level title shown when inside a drill level
+- Dropdown `min-width` widened to 220 px; added CSS for back row, level title, arrow indicator, info row
+
+### `canvas-plugins/storage`
+- **Sidebar removed** — `sidebar.ts` and `css.ts` emptied; no more toggle button or left panel
+- Depends on `@bpmn-sdk/canvas-plugin-main-menu: workspace:*` (new dep + tsconfig reference)
+- **`StorageApi` additions**: `_currentProjectId` (persisted to `localStorage`); in-memory caches (`_workspaces`, `_projects` map); `initialize()` loads caches + restores last-opened project; `openProject(id)` sets current + opens all files; `saveTabsToProject(projectId, wsId, tabs)` upserts tabs as files
+- All mutating methods update in-memory caches synchronously before calling `_notify()`
+- **`StoragePluginOptions`**: adds `mainMenu`, `getOpenTabs()`, `initialTitle`
+- `createStoragePlugin` wires `mainMenu.api.setDynamicItems` with workspace→project drill-down navigation; "Open Project" drill loads files + sets title; "Save All to Project" drill upserts open tabs; "Leave Project" clears project context + restores title; `onChange` refreshes menu items on next open
+
+### `apps/landing`
+- `mainMenuPlugin` created separately and passed to both `BpmnEditor` and `createStoragePlugin`
+- `openTabConfigs` map tracks latest content of each open tab (name, type, content) for "Save All to Project"
+- `onTabActivate` snapshots content into `openTabConfigs` for bpmn/dmn/form tabs
+
 ## 2026-02-26 — IndexedDB storage plugin
 
 ### `canvas-plugins/storage` (new — `@bpmn-sdk/canvas-plugin-storage`)

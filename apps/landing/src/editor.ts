@@ -4,6 +4,7 @@ import { createConfigPanelPlugin } from "@bpmn-sdk/canvas-plugin-config-panel";
 import { createConfigPanelBpmnPlugin } from "@bpmn-sdk/canvas-plugin-config-panel-bpmn";
 import { createMainMenuPlugin } from "@bpmn-sdk/canvas-plugin-main-menu";
 import { createStoragePlugin } from "@bpmn-sdk/canvas-plugin-storage";
+import type { FileType } from "@bpmn-sdk/canvas-plugin-storage";
 import { InMemoryFileResolver, createTabsPlugin } from "@bpmn-sdk/canvas-plugin-tabs";
 import { createWatermarkPlugin } from "@bpmn-sdk/canvas-plugin-watermark";
 import { createZoomControlsPlugin } from "@bpmn-sdk/canvas-plugin-zoom-controls";
@@ -79,8 +80,10 @@ const resolver = new InMemoryFileResolver();
 const bpmnProcessToTabId = new Map<string, string>();
 
 // Maps tab ID → storage file ID for tabs opened from the storage plugin.
-// Used by onTabActivate to know whether to update the storage current-file pointer.
 const tabIdToStorageFileId = new Map<string, string>();
+
+// Tracks latest content of each open tab for "Save All to Project"
+const openTabConfigs = new Map<string, { name: string; type: FileType; content: string }>();
 
 let editorRef: BpmnEditor | null = null;
 
@@ -122,6 +125,20 @@ const tabsPlugin = createTabsPlugin({
 
 		if (config.type === "bpmn" && config.xml) {
 			editorRef?.load(config.xml);
+			// Snapshot current content for "Save All to Project"
+			openTabConfigs.set(id, { name: config.name ?? "Diagram", type: "bpmn", content: config.xml });
+		} else if (config.type === "dmn") {
+			openTabConfigs.set(id, {
+				name: config.name ?? "Decision",
+				type: "dmn",
+				content: Dmn.export(config.defs),
+			});
+		} else if (config.type === "form") {
+			openTabConfigs.set(id, {
+				name: config.name ?? "Form",
+				type: "form",
+				content: Form.export(config.form),
+			});
 		}
 
 		// Update storage current-file pointer — ensures auto-save targets the right file
@@ -223,9 +240,29 @@ editorContainer.addEventListener("drop", (e) => {
 	}
 });
 
+// ── Main menu ─────────────────────────────────────────────────────────────────
+
+const mainMenuPlugin = createMainMenuPlugin({
+	title: "BPMN SDK",
+	menuItems: [
+		{
+			label: "Import files…",
+			icon: IMPORT_ICON,
+			onClick: () => fileInput.click(),
+		},
+		{
+			label: "FEEL Playground",
+			onClick: () => tabsPlugin.api.openTab({ type: "feel", name: "FEEL Playground" }),
+		},
+	],
+});
+
 // ── Storage plugin ────────────────────────────────────────────────────────────
 
 const storagePlugin = createStoragePlugin({
+	mainMenu: mainMenuPlugin,
+	getOpenTabs: () => [...openTabConfigs.entries()].map(([tabId, v]) => ({ tabId, ...v })),
+	initialTitle: "BPMN SDK",
 	onOpenFile(file, content) {
 		if (file.type === "bpmn") {
 			const tabId = tabsPlugin.api.openTab({ type: "bpmn", xml: content, name: file.name });
@@ -312,20 +349,7 @@ const editor = new BpmnEditor({
 	grid: true,
 	fit: "center",
 	plugins: [
-		createMainMenuPlugin({
-			title: "BPMN SDK",
-			menuItems: [
-				{
-					label: "Import files…",
-					icon: IMPORT_ICON,
-					onClick: () => fileInput.click(),
-				},
-				{
-					label: "FEEL Playground",
-					onClick: () => tabsPlugin.api.openTab({ type: "feel", name: "FEEL Playground" }),
-				},
-			],
-		}),
+		mainMenuPlugin,
 		createZoomControlsPlugin(),
 		createWatermarkPlugin({
 			links: [{ label: "Github", url: "https://github.com/bpmn-sdk/monorepo" }],

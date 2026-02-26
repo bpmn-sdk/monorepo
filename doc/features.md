@@ -1,15 +1,23 @@
 # Features
 
-## IndexedDB Storage Plugin (2026-02-26) — `@bpmn-sdk/canvas-plugin-storage`
+## IndexedDB Storage Plugin (2026-02-26, overhauled 2026-02-26) — `@bpmn-sdk/canvas-plugin-storage`
 
 - **`@bpmn-sdk/canvas-plugin-storage`** — persists BPMN / DMN / Form files in the browser's IndexedDB in a `workspace → project → files` hierarchy
   - **Dexie v4** for IndexedDB access — migrations, compound indexes, type-safe tables
   - **5 record types**: `WorkspaceRecord`, `ProjectRecord`, `FileRecord` (with `isShared` and `gitPath`), `FileContentRecord`
   - **Auto-save** — 500 ms debounce triggered by `diagram:change`; forced flush on page hide / `beforeunload`; multi-tab safe
-  - **File sidebar** — collapsible left panel with a `workspace → project → file` tree; inline CRUD actions (add, rename, delete, toggle shared) using `window.prompt`/`confirm`
+  - **Main-menu integration** — workspace/project navigation via drill-down menu (no sidebar); "Open Project", "Save All to Project", "Leave Project" actions in the ⋮ menu
+  - **Project persistence** — last-opened project restored on page refresh via `localStorage`; title updated to `workspace / project`
   - **Shared files** — any file can be marked `isShared: true` to make it accessible for cross-workspace reference resolution
   - **GitHub-sync ready** — every `FileRecord` carries a `gitPath: string | null` field reserved for future bidirectional GitHub sync
-  - **`createStoragePlugin(options)`** returns `CanvasPlugin & { api: StorageApi }`; integrates into the landing app alongside the tabs plugin
+  - **`createStoragePlugin(options)`** returns `CanvasPlugin & { api: StorageApi }`; requires `mainMenu` and `getOpenTabs` options
+
+## Main Menu Plugin (enhanced 2026-02-26) — `@bpmn-sdk/canvas-plugin-main-menu`
+
+- **`MainMenuApi`** — programmatic API: `setTitle(text)` updates title span; `setDynamicItems(fn)` injects items on every open
+- **`MenuDrill`** — drill-down menu items with back-navigation stack; clicking drills into sub-menu; "← Back" button returns to parent
+- **`MenuInfo`** — passive info row with optional action button (e.g. "Leave" for active project indicator)
+- Theme picker now behind a "Theme" drill item instead of flat in root dropdown
 
 ## BPMN Element Config — Call Activity, Script Task, Sequence Flow (2026-02-26)
 

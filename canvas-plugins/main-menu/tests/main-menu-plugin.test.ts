@@ -90,12 +90,19 @@ describe("createMainMenuPlugin", () => {
 		expect(dropdown?.classList.contains("open")).toBe(false);
 	});
 
-	it("renders three theme options in the dropdown", () => {
+	it("renders three theme options after drilling into Theme", () => {
 		const container = makeContainer();
 		new BpmnCanvas({ container, plugins: [createMainMenuPlugin()] });
 		const btn = container.querySelector<HTMLButtonElement>(".bpmn-menu-btn");
 		if (!btn) throw new Error("menu button not found");
 		btn.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+		// At root: one drill item labelled "Theme"
+		const themeBtn = [...document.querySelectorAll<HTMLButtonElement>(".bpmn-menu-item")].find(
+			(el) => el.querySelector(".bpmn-menu-item-label")?.textContent === "Theme",
+		);
+		if (!themeBtn) throw new Error("Theme drill button not found");
+		themeBtn.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+		// After drilling: three theme action items
 		const items = document.querySelectorAll(".bpmn-menu-item");
 		expect(items.length).toBe(3);
 	});
@@ -110,9 +117,16 @@ describe("createMainMenuPlugin", () => {
 		const btn = container.querySelector<HTMLButtonElement>(".bpmn-menu-btn");
 		if (!btn) throw new Error("menu button not found");
 		btn.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-		// Click "Light" (second item)
-		const items = document.querySelectorAll<HTMLButtonElement>(".bpmn-menu-item");
-		const lightBtn = items[1];
+		// Drill into Theme
+		const themeBtn = [...document.querySelectorAll<HTMLButtonElement>(".bpmn-menu-item")].find(
+			(el) => el.querySelector(".bpmn-menu-item-label")?.textContent === "Theme",
+		);
+		if (!themeBtn) throw new Error("Theme drill button not found");
+		themeBtn.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+		// Click "Light" theme item
+		const lightBtn = [...document.querySelectorAll<HTMLButtonElement>(".bpmn-menu-item")].find(
+			(el) => el.querySelector(".bpmn-menu-item-label")?.textContent === "Light",
+		);
 		if (!lightBtn) throw new Error("light theme button not found");
 		lightBtn.dispatchEvent(new MouseEvent("click", { bubbles: true }));
 		// Theme applied: data-theme attribute removed (light = no dark attr)

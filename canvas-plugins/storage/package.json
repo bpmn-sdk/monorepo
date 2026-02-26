@@ -19,6 +19,7 @@
 	},
 	"dependencies": {
 		"@bpmn-sdk/canvas": "workspace:*",
+		"@bpmn-sdk/canvas-plugin-main-menu": "workspace:*",
 		"@bpmn-sdk/core": "workspace:*",
 		"dexie": "^4.0.10"
 	}

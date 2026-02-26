@@ -1,4 +1,4 @@
-export const MAIN_MENU_STYLE_ID = "bpmn-main-menu-styles-v1";
+export const MAIN_MENU_STYLE_ID = "bpmn-main-menu-styles-v2";
 
 export const MAIN_MENU_CSS = `
 .bpmn-main-menu-panel {
@@ -65,7 +65,7 @@ export const MAIN_MENU_CSS = `
   border-radius: 8px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
   z-index: 1000;
-  min-width: 150px;
+  min-width: 220px;
 }
 .bpmn-menu-dropdown.open { display: flex; }
 .bpmn-menu-drop-label {
@@ -109,10 +109,87 @@ export const MAIN_MENU_CSS = `
   flex-shrink: 0;
   opacity: 0.65;
 }
+.bpmn-menu-item-label {
+  flex: 1;
+}
+.bpmn-menu-item-arrow {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+  opacity: 0.45;
+}
 .bpmn-menu-item-icon svg,
-.bpmn-menu-item-check svg {
+.bpmn-menu-item-check svg,
+.bpmn-menu-item-arrow svg {
   width: 100%;
   height: 100%;
+}
+.bpmn-menu-back-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 4px;
+}
+.bpmn-menu-back-btn {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: var(--bpmn-text, #333333);
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+  transition: background 0.1s;
+}
+.bpmn-menu-back-btn:hover {
+  background: var(--bpmn-overlay-border, rgba(0, 0, 0, 0.06));
+}
+.bpmn-menu-back-btn svg {
+  width: 12px;
+  height: 12px;
+  pointer-events: none;
+}
+.bpmn-menu-level-title {
+  font-size: 12px;
+  font-weight: 600;
+  font-family: system-ui, sans-serif;
+  color: var(--bpmn-text, #333333);
+  flex: 1;
+}
+.bpmn-menu-info-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  font-family: system-ui, sans-serif;
+  font-size: 12px;
+  color: var(--bpmn-text, #333333);
+  opacity: 0.75;
+}
+.bpmn-menu-info-text {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bpmn-menu-info-action {
+  flex-shrink: 0;
+  border: 1px solid var(--bpmn-overlay-border, rgba(0, 0, 0, 0.18));
+  border-radius: 4px;
+  background: transparent;
+  color: var(--bpmn-text, #333333);
+  cursor: pointer;
+  padding: 2px 7px;
+  font-size: 11px;
+  font-family: system-ui, sans-serif;
+  transition: background 0.1s;
+}
+.bpmn-menu-info-action:hover {
+  background: var(--bpmn-overlay-border, rgba(0, 0, 0, 0.06));
 }
 .bpmn-menu-drop-sep {
   height: 1px;
