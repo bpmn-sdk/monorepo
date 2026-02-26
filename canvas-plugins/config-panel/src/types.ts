@@ -2,7 +2,7 @@ import type { CanvasPlugin } from "@bpmn-sdk/canvas";
 import type { BpmnDefinitions } from "@bpmn-sdk/core";
 
 /** Input field types supported by the config panel renderer. */
-export type FieldType = "text" | "select" | "textarea" | "toggle";
+export type FieldType = "text" | "select" | "textarea" | "toggle" | "action";
 
 export interface SelectOption {
 	value: string;
@@ -28,6 +28,11 @@ export interface FieldSchema {
 	required?: boolean;
 	/** If provided, the field is only shown when this returns true. */
 	condition?: (values: Record<string, FieldValue>) => boolean;
+	/**
+	 * For `type: "action"` fields — called when the button is clicked.
+	 * Receives the current field values so the handler can read e.g. `values.formId`.
+	 */
+	onClick?: (values: Record<string, FieldValue>) => void;
 }
 
 /** A named group of fields shown as a section in the full editor. */

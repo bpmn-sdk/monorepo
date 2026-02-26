@@ -97,6 +97,128 @@ export interface FormGroupComponent extends FormComponentBase {
 	showOutline?: boolean;
 }
 
+/** Numeric input field. */
+export interface FormNumberComponent extends FormComponentBase {
+	type: "number";
+	label: string;
+	key: string;
+	validate?: FormValidation;
+	defaultValue?: number;
+}
+
+/** Date and/or time picker. */
+export interface FormDatetimeComponent extends FormComponentBase {
+	type: "datetime";
+	key: string;
+	/** Subtype: "date", "time", or "datetime". */
+	subtype?: string;
+	dateLabel?: string;
+	timeLabel?: string;
+	validate?: FormValidation;
+}
+
+/** Submit or action button. */
+export interface FormButtonComponent extends FormComponentBase {
+	type: "button";
+	label: string;
+	/** Button action: "submit" or "reset". */
+	action?: string;
+}
+
+/** Multi-value tag list input. */
+export interface FormTaglistComponent extends FormComponentBase {
+	type: "taglist";
+	label: string;
+	key: string;
+	values?: FormValueOption[];
+	valuesKey?: string;
+	validate?: FormValidation;
+}
+
+/** Read-only data table. */
+export interface FormTableComponent extends FormComponentBase {
+	type: "table";
+	label?: string;
+	dataSource?: string;
+	rowCount?: number;
+	columns?: Array<{ label: string; key: string }>;
+}
+
+/** Image display component. */
+export interface FormImageComponent extends FormComponentBase {
+	type: "image";
+	/** URL or FEEL expression for the image source. */
+	source?: string;
+	alt?: string;
+}
+
+/** Repeating list of sub-components. */
+export interface FormDynamicListComponent extends FormComponentBase {
+	type: "dynamiclist";
+	label?: string;
+	path?: string;
+	components: FormComponent[];
+	isRepeating?: boolean;
+	allowAddRemove?: boolean;
+	defaultRepetitions?: number;
+	showOutline?: boolean;
+}
+
+/** Embedded iframe component. */
+export interface FormIframeComponent extends FormComponentBase {
+	type: "iframe";
+	label?: string;
+	url?: string;
+	height?: number;
+	security?: { allowScripts?: boolean };
+}
+
+/** Visual separator line. */
+export interface FormSeparatorComponent extends FormComponentBase {
+	type: "separator";
+}
+
+/** Blank spacer. */
+export interface FormSpacerComponent extends FormComponentBase {
+	type: "spacer";
+	height?: number;
+}
+
+/** Document preview component. */
+export interface FormDocumentPreviewComponent extends FormComponentBase {
+	type: "documentPreview";
+	label?: string;
+}
+
+/** Raw HTML content component. */
+export interface FormHtmlComponent extends FormComponentBase {
+	type: "html";
+	content?: string;
+}
+
+/** FEEL expression component. */
+export interface FormExpressionComponent extends FormComponentBase {
+	type: "expression";
+	key?: string;
+	expression?: string;
+	/** When to evaluate: "change" or "submit". */
+	computeOn?: string;
+}
+
+/** File upload picker component. */
+export interface FormFilepickerComponent extends FormComponentBase {
+	type: "filepicker";
+	label?: string;
+	key?: string;
+	multiple?: boolean;
+}
+
+/** Passthrough for unknown/future component types — preserves roundtrip fidelity. */
+export interface FormUnknownComponent extends FormComponentBase {
+	type: string;
+	[key: string]: unknown;
+}
+
 /** Discriminated union of all form component types. */
 export type FormComponent =
 	| FormTextComponent
@@ -106,7 +228,22 @@ export type FormComponent =
 	| FormRadioComponent
 	| FormCheckboxComponent
 	| FormChecklistComponent
-	| FormGroupComponent;
+	| FormGroupComponent
+	| FormNumberComponent
+	| FormDatetimeComponent
+	| FormButtonComponent
+	| FormTaglistComponent
+	| FormTableComponent
+	| FormImageComponent
+	| FormDynamicListComponent
+	| FormIframeComponent
+	| FormSeparatorComponent
+	| FormSpacerComponent
+	| FormDocumentPreviewComponent
+	| FormHtmlComponent
+	| FormExpressionComponent
+	| FormFilepickerComponent
+	| FormUnknownComponent;
 
 /** Exporter metadata. */
 export interface FormExporter {

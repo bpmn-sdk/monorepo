@@ -1,5 +1,47 @@
 # Progress
 
+## 2026-02-26 — DMN Viewer, Form Viewer, Tabs Plugin, Extended Core Model
+
+### `@bpmn-sdk/core` — Zeebe extensions + full Form component set
+- **`ZeebeFormDefinition`** and **`ZeebeCalledDecision`** typed interfaces added to `zeebe-extensions.ts`; `ZeebeExtensions` grows `formDefinition?` and `calledDecision?` fields; `zeebeExtensionsToXmlElements` serialises both
+- **`bpmn-builder.ts`** updated: `userTask()` now writes `formDefinition: { formId }` and `businessRuleTask()` writes `calledDecision: { decisionId, resultVariable }` using typed fields instead of raw `XmlElement[]`
+- **13 new Form component types** — `number`, `datetime`, `button`, `taglist`, `table`, `image`, `dynamiclist`, `iframe`, `separator`, `spacer`, `documentPreview`, `html`, `expression`, `filepicker`
+- **`FormUnknownComponent`** catch-all added; parser now handles unknown types leniently instead of throwing
+- `form-serializer.ts` updated to handle all component types via explicit type assertions (workaround for discriminated union narrowing issue with catch-all type)
+- All new types exported from `packages/bpmn-sdk/src/index.ts`
+
+### `canvas-plugins/dmn-viewer` — New package `@bpmn-sdk/canvas-plugin-dmn-viewer`
+- **`DmnViewer` class** — `load(defs)`, `clear()`, `setTheme()`, `destroy()`; renders `DmnDefinitions` as an HTML decision table with hit policy badge
+- **FEEL syntax highlighting** — `tokenizeFeel()` / `highlightFeel()` tokenize FEEL expressions into keyword, string, number, operator, range, function, comment spans; colored via CSS custom properties
+- **Light/dark themes** — CSS custom properties; `setTheme("light"|"dark"|"auto")`; auto follows `prefers-color-scheme`
+- **`createDmnViewerPlugin(options)`** — thin `CanvasPlugin` wrapper; responds to `element:click` on call activities referencing a decision via `zeebe:calledDecision`
+
+### `canvas-plugins/form-viewer` — New package `@bpmn-sdk/canvas-plugin-form-viewer`
+- **`FormViewer` class** — `load(form)`, `clear()`, `setTheme()`, `destroy()`; renders all 21 `FormComponent` types
+- **Row-based grid layout** — components grouped by `layout.row`; side-by-side rendering within a row
+- **All 21 component types rendered** — textfield, textarea, number, datetime, select, radio, checkbox, checklist, taglist, button, group, dynamiclist, table, image, iframe, separator, spacer, documentPreview, html, expression, filepicker, and unknown passthrough
+- **Minimal markdown** — `text` components support `#`/`##` headers, `**bold**`, `_italic_`
+- **`createFormViewerPlugin(options)`** — thin `CanvasPlugin` wrapper; responds to `element:click` on user tasks with a `zeebe:formDefinition`
+
+### `canvas-plugins/tabs` — New package `@bpmn-sdk/canvas-plugin-tabs`
+- **`FileResolver` interface** — `resolveDmn(decisionId)`, `resolveForm(formId)`, `resolveBpmn(processId)`; pluggable abstraction for in-memory, file system, or SaaS backends
+- **`InMemoryFileResolver`** — default implementation using Maps; `registerDmn(defs)` / `registerForm(form)` / `registerBpmn(id, xml)` to populate at runtime
+- **Tab bar overlay** — fixed overlay inside the canvas container; tabs for BPMN/DMN/Form files; close button per tab; active tab highlighted
+- **`TabsApi`** — `openTab()`, `closeTab()`, `setActiveTab()`, `getActiveTabId()`, `getTabIds()`, `openDecision(decisionId)`, `openForm(formId)` public API
+- **Warning badge** — shown when referenced file is not found in the file resolver registry
+- **`createTabsPlugin(options)`** — factory returning `CanvasPlugin & { api: TabsApi }`
+
+### `canvas-plugins/config-panel` + `config-panel-bpmn` — Typed userTask/businessRuleTask panels
+- **`"action"` FieldType** added to `config-panel`; `FieldSchema.onClick` callback invoked when the action button is clicked
+- **`.bpmn-cfg-action-btn`** button styles added (light and dark themes)
+- **`makeUserTaskSchema(onOpenForm?)`** — config panel schema for user tasks: `formId` text field + conditional "Open Form ↗" action button
+- **`USER_TASK_ADAPTER`** — reads/writes `zeebe:formDefinition/@formId` via typed `ext.formDefinition`
+- **`makeBusinessRuleTaskSchema(onOpenDecision?)`** — schema for business rule tasks: `decisionId`, `resultVariable` fields + conditional "Open Decision ↗" action button
+- **`BUSINESS_RULE_TASK_ADAPTER`** — reads/writes `zeebe:calledDecision` via typed `ext.calledDecision`
+- **`ConfigPanelBpmnOptions`** — `openDecision?` and `openForm?` callback options on the plugin factory
+- `createConfigPanelBpmnPlugin(configPanel, options?)` registers userTask and businessRuleTask with their specific schemas
+- `parseZeebeExtensions` in `util.ts` updated to parse `formDefinition` and `calledDecision` extension elements
+
 ## 2026-02-26 — Landing Page Editor Link + Mobile Editor Responsiveness
 
 ### `apps/landing` — Editor discoverability

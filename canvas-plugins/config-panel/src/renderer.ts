@@ -451,7 +451,9 @@ export class ConfigPanelRenderer {
 			wrapper.classList.add("bpmn-cfg-field--invalid");
 		}
 
-		if (field.type === "toggle") {
+		if (field.type === "action") {
+			wrapper.appendChild(this._renderActionButton(field));
+		} else if (field.type === "toggle") {
 			wrapper.appendChild(this._renderToggle(field, value));
 		} else {
 			const labelRow = document.createElement("div");
@@ -563,5 +565,14 @@ export class ConfigPanelRenderer {
 		row.appendChild(lbl);
 		row.appendChild(labelText);
 		return row;
+	}
+
+	private _renderActionButton(field: FieldSchema): HTMLElement {
+		const btn = document.createElement("button");
+		btn.type = "button";
+		btn.className = "bpmn-cfg-action-btn";
+		btn.textContent = field.label;
+		btn.addEventListener("click", () => field.onClick?.(this._values));
+		return btn;
 	}
 }

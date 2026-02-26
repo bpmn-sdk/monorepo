@@ -395,16 +395,194 @@ function strVal(v: FieldValue): string {
 const GENERAL_TYPES: CreateShapeType[] = [
 	"startEvent",
 	"endEvent",
-	"userTask",
 	"scriptTask",
 	"sendTask",
 	"receiveTask",
-	"businessRuleTask",
 	"exclusiveGateway",
 	"parallelGateway",
 	"inclusiveGateway",
 	"eventBasedGateway",
 ];
+
+// ── User task schema (formId + optional Open Form button) ────────────────────
+
+function makeUserTaskSchema(onOpenForm?: (formId: string) => void): PanelSchema {
+	return {
+		compact: [{ key: "name", label: "Name", type: "text", placeholder: "Task name" }],
+		groups: [
+			{
+				id: "general",
+				label: "General",
+				fields: [
+					{ key: "name", label: "Name", type: "text", placeholder: "Task name" },
+					{
+						key: "formId",
+						label: "Form ID",
+						type: "text",
+						placeholder: "e.g. Form_0h3l094",
+						hint: "ID of the Camunda Form linked to this user task.",
+					},
+					...(onOpenForm
+						? [
+								{
+									key: "__openForm",
+									label: "Open Form ↗",
+									type: "action" as const,
+									condition: (v: Record<string, FieldValue>) =>
+										typeof v.formId === "string" && v.formId.length > 0,
+									onClick: (v: Record<string, FieldValue>) => {
+										const id = v.formId;
+										if (typeof id === "string" && id) onOpenForm(id);
+									},
+								},
+							]
+						: []),
+					{
+						key: "documentation",
+						label: "Documentation",
+						type: "textarea",
+						placeholder: "Add notes or documentation…",
+					},
+				],
+			},
+		],
+	};
+}
+
+const USER_TASK_ADAPTER: PanelAdapter = {
+	read(defs, id) {
+		const el = findFlowElement(defs, id);
+		if (!el) return {};
+		const ext = parseZeebeExtensions(el.extensionElements);
+		return {
+			name: el.name ?? "",
+			documentation: el.documentation ?? "",
+			formId: ext.formDefinition?.formId ?? "",
+		};
+	},
+	write(defs: BpmnDefinitions, id: string, values: Record<string, FieldValue>): BpmnDefinitions {
+		return updateFlowElement(defs, id, (el) => {
+			const formId = strVal(values.formId);
+			const ZEEBE_FORM_NAMES = new Set(["userTask", "formDefinition"]);
+			const otherExts = el.extensionElements.filter(
+				(x) => !ZEEBE_FORM_NAMES.has(xmlLocalName(x.name)),
+			);
+			const formExts = formId ? zeebeExtensionsToXmlElements({ formDefinition: { formId } }) : [];
+			return {
+				...el,
+				name: typeof values.name === "string" ? values.name : el.name,
+				documentation:
+					typeof values.documentation === "string"
+						? values.documentation || undefined
+						: el.documentation,
+				extensionElements: [...otherExts, ...formExts],
+			};
+		});
+	},
+};
+
+// ── Business rule task schema (decisionId + resultVariable + Open Decision button) ──
+
+function makeBusinessRuleTaskSchema(onOpenDecision?: (decisionId: string) => void): PanelSchema {
+	return {
+		compact: [{ key: "name", label: "Name", type: "text", placeholder: "Task name" }],
+		groups: [
+			{
+				id: "general",
+				label: "General",
+				fields: [
+					{ key: "name", label: "Name", type: "text", placeholder: "Task name" },
+					{
+						key: "decisionId",
+						label: "Decision ID",
+						type: "text",
+						placeholder: "e.g. Decision_1m0rvzp",
+						hint: "ID of the DMN decision to evaluate.",
+					},
+					{
+						key: "resultVariable",
+						label: "Result variable",
+						type: "text",
+						placeholder: "result",
+						hint: "Process variable that receives the decision output.",
+					},
+					...(onOpenDecision
+						? [
+								{
+									key: "__openDecision",
+									label: "Open Decision ↗",
+									type: "action" as const,
+									condition: (v: Record<string, FieldValue>) =>
+										typeof v.decisionId === "string" && v.decisionId.length > 0,
+									onClick: (v: Record<string, FieldValue>) => {
+										const id = v.decisionId;
+										if (typeof id === "string" && id) onOpenDecision(id);
+									},
+								},
+							]
+						: []),
+					{
+						key: "documentation",
+						label: "Documentation",
+						type: "textarea",
+						placeholder: "Add notes or documentation…",
+					},
+				],
+			},
+		],
+	};
+}
+
+const BUSINESS_RULE_TASK_ADAPTER: PanelAdapter = {
+	read(defs, id) {
+		const el = findFlowElement(defs, id);
+		if (!el) return {};
+		const ext = parseZeebeExtensions(el.extensionElements);
+		return {
+			name: el.name ?? "",
+			documentation: el.documentation ?? "",
+			decisionId: ext.calledDecision?.decisionId ?? "",
+			resultVariable: ext.calledDecision?.resultVariable ?? "",
+		};
+	},
+	write(defs: BpmnDefinitions, id: string, values: Record<string, FieldValue>): BpmnDefinitions {
+		return updateFlowElement(defs, id, (el) => {
+			const decisionId = strVal(values.decisionId);
+			const resultVariable = strVal(values.resultVariable) || "result";
+			const ZEEBE_DECISION_NAMES = new Set(["calledDecision"]);
+			const otherExts = el.extensionElements.filter(
+				(x) => !ZEEBE_DECISION_NAMES.has(xmlLocalName(x.name)),
+			);
+			const decisionExts = decisionId
+				? zeebeExtensionsToXmlElements({ calledDecision: { decisionId, resultVariable } })
+				: [];
+			return {
+				...el,
+				name: typeof values.name === "string" ? values.name : el.name,
+				documentation:
+					typeof values.documentation === "string"
+						? values.documentation || undefined
+						: el.documentation,
+				extensionElements: [...otherExts, ...decisionExts],
+			};
+		});
+	},
+};
+
+// ── Options for the plugin factory ────────────────────────────────────────────
+
+export interface ConfigPanelBpmnOptions {
+	/**
+	 * Called when the user clicks "Open Decision ↗" in the businessRuleTask panel.
+	 * Typically implemented by calling `tabsPlugin.api.openDecision(decisionId)`.
+	 */
+	openDecision?: (decisionId: string) => void;
+	/**
+	 * Called when the user clicks "Open Form ↗" in the userTask panel.
+	 * Typically implemented by calling `tabsPlugin.api.openForm(formId)`.
+	 */
+	openForm?: (formId: string) => void;
+}
 
 // ── Factory ───────────────────────────────────────────────────────────────────
 
@@ -416,13 +594,23 @@ const GENERAL_TYPES: CreateShapeType[] = [
  * connector template form is rendered; otherwise a generic connector selector
  * is shown. Custom templates can be registered via `registerTemplate`.
  *
+ * Pass `openDecision` / `openForm` callbacks to enable "Open Decision ↗" /
+ * "Open Form ↗" navigation buttons in the respective element panels.
+ *
  * @param configPanel - The base config panel plugin returned by
  *   `createConfigPanelPlugin`.
+ * @param options - Optional callbacks for DMN/form navigation.
  */
-export function createConfigPanelBpmnPlugin(configPanel: ConfigPanelPlugin): CanvasPlugin & {
+export function createConfigPanelBpmnPlugin(
+	configPanel: ConfigPanelPlugin,
+	options: ConfigPanelBpmnOptions = {},
+): CanvasPlugin & {
 	/** Register an additional element template to make it available in the UI. */
 	registerTemplate(template: ElementTemplate): void;
 } {
+	const userTaskSchema = makeUserTaskSchema(options.openForm);
+	const businessRuleTaskSchema = makeBusinessRuleTaskSchema(options.openDecision);
+
 	return {
 		name: "config-panel-bpmn",
 
@@ -431,6 +619,14 @@ export function createConfigPanelBpmnPlugin(configPanel: ConfigPanelPlugin): Can
 			for (const type of GENERAL_TYPES) {
 				configPanel.registerSchema(type, GENERAL_SCHEMA, GENERAL_ADAPTER);
 			}
+			// User task: formId + optional Open Form button
+			configPanel.registerSchema("userTask", userTaskSchema, USER_TASK_ADAPTER);
+			// Business rule task: decisionId + resultVariable + optional Open Decision button
+			configPanel.registerSchema(
+				"businessRuleTask",
+				businessRuleTaskSchema,
+				BUSINESS_RULE_TASK_ADAPTER,
+			);
 			// Service task: template-aware adapter
 			configPanel.registerSchema("serviceTask", GENERIC_SERVICE_TASK_SCHEMA, SERVICE_TASK_ADAPTER);
 			// Ad-hoc subprocess: template-aware adapter (AI Agent pattern)

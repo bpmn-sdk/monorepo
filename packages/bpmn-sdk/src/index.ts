@@ -93,6 +93,8 @@ export type {
 	ZeebeTaskHeaderEntry,
 	ZeebeProperties,
 	ZeebePropertyEntry,
+	ZeebeFormDefinition,
+	ZeebeCalledDecision,
 } from "./bpmn/zeebe-extensions.js";
 export { zeebeExtensionsToXmlElements } from "./bpmn/zeebe-extensions.js";
 export { Dmn } from "./dmn/index.js";
@@ -121,6 +123,21 @@ export type {
 	FormTextFieldComponent,
 	FormValidation,
 	FormValueOption,
+	FormNumberComponent,
+	FormDatetimeComponent,
+	FormButtonComponent,
+	FormTaglistComponent,
+	FormTableComponent,
+	FormImageComponent,
+	FormDynamicListComponent,
+	FormIframeComponent,
+	FormSeparatorComponent,
+	FormSpacerComponent,
+	FormDocumentPreviewComponent,
+	FormHtmlComponent,
+	FormExpressionComponent,
+	FormFilepickerComponent,
+	FormUnknownComponent,
 } from "./form/form-model.js";
 export type {
 	DecisionTableBuilder,

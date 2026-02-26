@@ -1,8 +1,12 @@
 import type {
 	FormComponent,
 	FormDefinition,
+	FormDynamicListComponent,
 	FormGroupComponent,
+	FormIframeComponent,
 	FormLayout,
+	FormTableComponent,
+	FormUnknownComponent,
 } from "./form-model.js";
 
 /** Serializes a FormDefinition to a JSON string. */
@@ -32,7 +36,9 @@ export function exportForm(form: FormDefinition): string {
 }
 
 function serializeComponent(component: FormComponent): Record<string, unknown> {
-	switch (component.type) {
+	// Use the type discriminant, casting where TypeScript can't narrow through FormUnknownComponent
+	const type = component.type;
+	switch (type) {
 		case "text":
 			return buildObj(component, ["text", "label", "type", "layout", "id"]);
 		case "textfield":
@@ -83,7 +89,63 @@ function serializeComponent(component: FormComponent): Record<string, unknown> {
 		case "checklist":
 			return buildObj(component, ["label", "values", "type", "layout", "id", "key", "validate"]);
 		case "group":
-			return buildGroupObj(component);
+			return buildGroupObj(component as FormGroupComponent);
+		case "number":
+			return buildObj(component, [
+				"label",
+				"type",
+				"layout",
+				"id",
+				"key",
+				"validate",
+				"defaultValue",
+			]);
+		case "datetime":
+			return buildObj(component, [
+				"subtype",
+				"dateLabel",
+				"timeLabel",
+				"type",
+				"layout",
+				"id",
+				"key",
+				"validate",
+			]);
+		case "button":
+			return buildObj(component, ["label", "action", "type", "layout", "id"]);
+		case "taglist":
+			return buildObj(component, [
+				"label",
+				"values",
+				"valuesKey",
+				"type",
+				"layout",
+				"id",
+				"key",
+				"validate",
+			]);
+		case "table":
+			return buildTableObj(component as FormTableComponent);
+		case "image":
+			return buildObj(component, ["source", "alt", "type", "layout", "id"]);
+		case "dynamiclist":
+			return buildDynamicListObj(component as FormDynamicListComponent);
+		case "iframe":
+			return buildIframeObj(component as FormIframeComponent);
+		case "separator":
+			return buildObj(component, ["type", "layout", "id"]);
+		case "spacer":
+			return buildObj(component, ["height", "type", "layout", "id"]);
+		case "documentPreview":
+			return buildObj(component, ["label", "type", "layout", "id"]);
+		case "html":
+			return buildObj(component, ["content", "type", "layout", "id"]);
+		case "expression":
+			return buildObj(component, ["computeOn", "type", "layout", "id", "key", "expression"]);
+		case "filepicker":
+			return buildObj(component, ["label", "type", "layout", "id", "key", "multiple"]);
+		default:
+			return buildUnknownObj(component as unknown as FormUnknownComponent);
 	}
 }
 
@@ -128,5 +190,47 @@ function serializeLayout(layout: FormLayout): Record<string, unknown> {
 	} else {
 		out.columns = null;
 	}
+	return out;
+}
+
+function buildTableObj(component: FormTableComponent): Record<string, unknown> {
+	const out: Record<string, unknown> = { type: "table", id: component.id };
+	if (component.label !== undefined) out.label = component.label;
+	if (component.dataSource !== undefined) out.dataSource = component.dataSource;
+	if (component.rowCount !== undefined) out.rowCount = component.rowCount;
+	if (component.columns !== undefined && component.columns !== null) {
+		out.columns = component.columns.map((c) => ({ label: c.label, key: c.key }));
+	}
+	if (component.layout !== undefined) out.layout = serializeLayout(component.layout);
+	return out;
+}
+
+function buildDynamicListObj(component: FormDynamicListComponent): Record<string, unknown> {
+	const out: Record<string, unknown> = { type: "dynamiclist", id: component.id };
+	if (component.label !== undefined) out.label = component.label;
+	out.components = component.components.map(serializeComponent);
+	if (component.path !== undefined) out.path = component.path;
+	if (component.isRepeating !== undefined) out.isRepeating = component.isRepeating;
+	if (component.allowAddRemove !== undefined) out.allowAddRemove = component.allowAddRemove;
+	if (component.defaultRepetitions !== undefined)
+		out.defaultRepetitions = component.defaultRepetitions;
+	if (component.showOutline !== undefined) out.showOutline = component.showOutline;
+	if (component.layout !== undefined) out.layout = serializeLayout(component.layout);
+	return out;
+}
+
+function buildIframeObj(component: FormIframeComponent): Record<string, unknown> {
+	const out: Record<string, unknown> = { type: "iframe", id: component.id };
+	if (component.label !== undefined) out.label = component.label;
+	if (component.url !== undefined) out.url = component.url;
+	if (component.height !== undefined) out.height = component.height;
+	if (component.security !== undefined) out.security = { ...component.security };
+	if (component.layout !== undefined) out.layout = serializeLayout(component.layout);
+	return out;
+}
+
+function buildUnknownObj(component: FormUnknownComponent): Record<string, unknown> {
+	const out: Record<string, unknown> = { ...component };
+	if (component.layout !== undefined) out.layout = serializeLayout(component.layout as FormLayout);
 	return out;
 }

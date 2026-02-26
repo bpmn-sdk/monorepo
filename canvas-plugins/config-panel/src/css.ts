@@ -325,6 +325,25 @@ export const CONFIG_PANEL_CSS = `
 }
 .bpmn-cfg-toggle input:checked ~ .bpmn-cfg-toggle-thumb { transform: translateX(16px); }
 
+/* ── Action button ────────────────────────────────────────────────────────── */
+.bpmn-cfg-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  border-radius: 4px;
+  border: 1px solid rgba(255,255,255,0.15);
+  background: rgba(255,255,255,0.07);
+  color: rgba(255,255,255,0.85);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.bpmn-cfg-action-btn:hover {
+  background: rgba(255,255,255,0.13);
+  border-color: rgba(255,255,255,0.25);
+}
+
 /* ── Light theme overrides ────────────────────────────────────────────────── */
 [data-bpmn-hud-theme="light"] .bpmn-cfg-compact {
   background: rgba(255, 255, 255, 0.96);
@@ -380,6 +399,16 @@ export const CONFIG_PANEL_CSS = `
 
 [data-bpmn-hud-theme="light"] .bpmn-cfg-toggle-label { color: rgba(0,0,0,0.7); }
 [data-bpmn-hud-theme="light"] .bpmn-cfg-toggle-track { background: rgba(0,0,0,0.12); }
+
+[data-bpmn-hud-theme="light"] .bpmn-cfg-action-btn {
+  border-color: rgba(0,0,0,0.15);
+  background: rgba(0,0,0,0.04);
+  color: rgba(0,0,0,0.75);
+}
+[data-bpmn-hud-theme="light"] .bpmn-cfg-action-btn:hover {
+  background: rgba(0,0,0,0.08);
+  border-color: rgba(0,0,0,0.2);
+}
 `;
 
 export function injectConfigPanelStyles(): void {

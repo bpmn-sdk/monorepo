@@ -124,6 +124,18 @@ importers:
         specifier: workspace:*
         version: link:../../packages/editor
 
+  canvas-plugins/dmn-viewer:
+    dependencies:
+      '@bpmn-sdk/core':
+        specifier: workspace:*
+        version: link:../../packages/bpmn-sdk
+
+  canvas-plugins/form-viewer:
+    dependencies:
+      '@bpmn-sdk/core':
+        specifier: workspace:*
+        version: link:../../packages/bpmn-sdk
+
   canvas-plugins/main-menu:
     dependencies:
       '@bpmn-sdk/canvas':
@@ -135,6 +147,21 @@ importers:
       '@bpmn-sdk/canvas':
         specifier: workspace:*
         version: link:../../packages/canvas
+      '@bpmn-sdk/core':
+        specifier: workspace:*
+        version: link:../../packages/bpmn-sdk
+
+  canvas-plugins/tabs:
+    dependencies:
+      '@bpmn-sdk/canvas':
+        specifier: workspace:*
+        version: link:../../packages/canvas
+      '@bpmn-sdk/canvas-plugin-dmn-viewer':
+        specifier: workspace:*
+        version: link:../dmn-viewer
+      '@bpmn-sdk/canvas-plugin-form-viewer':
+        specifier: workspace:*
+        version: link:../form-viewer
       '@bpmn-sdk/core':
         specifier: workspace:*
         version: link:../../packages/bpmn-sdk

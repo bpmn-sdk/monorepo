@@ -1,5 +1,33 @@
 # Features
 
+## DMN Viewer + Form Viewer + Tabs Plugin (2026-02-26)
+
+### `@bpmn-sdk/canvas-plugin-dmn-viewer`
+- **Read-only DMN decision table viewer** — renders any `DmnDefinitions` as an HTML table; hit policy badge; input/output columns with type annotations
+- **FEEL syntax highlighting** — tokenizes FEEL expressions in decision cells; colors keywords, strings, numbers, operators, ranges, function calls
+- **Light/dark/auto themes** via CSS custom properties
+- **`createDmnViewerPlugin(options)`** — canvas plugin wrapper; opens DMN viewer on click of call activities with `zeebe:calledDecision`
+
+### `@bpmn-sdk/canvas-plugin-form-viewer`
+- **Read-only Form viewer** — renders all 21 Camunda Form component types; built entirely in-repo (no `@bpmn-io/form-js` dependency)
+- **Row-based grid layout** — respects `layout.row` grouping from the form schema
+- **`createFormViewerPlugin(options)`** — canvas plugin wrapper; opens Form viewer on click of user tasks with `zeebe:formDefinition`
+
+### `@bpmn-sdk/canvas-plugin-tabs`
+- **Tab bar overlay** — fixed tab strip inside the canvas container for BPMN/DMN/Form tabs
+- **`FileResolver` abstraction** — pluggable interface for resolving file references; `InMemoryFileResolver` default; designed for future FS/SaaS backends
+- **`TabsApi`** — programmatic `openDecision(id)` / `openForm(id)` + full tab lifecycle management
+- **Warning badge** — shown when a referenced DMN/Form file is not registered
+
+### `@bpmn-sdk/core` — Extended form and Zeebe model
+- **13 new Form component types** — number, datetime, button, taglist, table, image, dynamiclist, iframe, separator, spacer, documentPreview, html, expression, filepicker; `FormUnknownComponent` catch-all
+- **`ZeebeFormDefinition`** and **`ZeebeCalledDecision`** typed interfaces in `ZeebeExtensions`
+
+### `@bpmn-sdk/canvas-plugin-config-panel` + `config-panel-bpmn`
+- **`"action"` FieldType** — clickable button fields in the config panel with `onClick` callback
+- **Typed userTask panel** — `formId` field + "Open Form ↗" button wired to the tabs plugin
+- **Typed businessRuleTask panel** — `decisionId` + `resultVariable` fields + "Open Decision ↗" button wired to the tabs plugin
+
 ## SubProcess Containment + Sticky Movement (2026-02-25) — `@bpmn-sdk/editor`
 - **Sticky movement** — moving a subprocess moves all descendant shapes with it
 - **Containment on create** — shapes dropped inside a subprocess become children in the BPMN model

@@ -83,6 +83,13 @@ export function parseZeebeExtensions(extensionElements: XmlElement[]): ZeebeExte
 				}
 			}
 			ext.taskHeaders = { headers };
+		} else if (ln === "formDefinition") {
+			const formId = el.attributes.formId ?? "";
+			ext.formDefinition = { formId };
+		} else if (ln === "calledDecision") {
+			const decisionId = el.attributes.decisionId ?? "";
+			const resultVariable = el.attributes.resultVariable ?? "result";
+			ext.calledDecision = { decisionId, resultVariable };
 		}
 	}
 
