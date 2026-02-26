@@ -68,6 +68,12 @@ export interface TabsPluginOptions {
 	 * `onOpen` callback that opens the relevant tab(s).
 	 */
 	examples?: WelcomeExample[];
+	/**
+	 * Dynamic sections shown below the examples on the welcome screen.
+	 * Each section's `getItems()` is called fresh every time the welcome screen
+	 * becomes visible, so the content stays up to date.
+	 */
+	getWelcomeSections?: () => WelcomeSection[];
 }
 
 /** A single example entry shown on the welcome screen. */
@@ -77,6 +83,22 @@ export interface WelcomeExample {
 	/** Short badge text, e.g. "BPMN", "DMN", "FORM", "MULTI". */
 	badge?: string;
 	onOpen: () => void;
+}
+
+/** A dynamic item inside a welcome screen section. */
+export interface WelcomeSectionItem {
+	label: string;
+	description?: string;
+	onOpen: () => void;
+}
+
+/** A dynamic section shown on the welcome screen, rebuilt on each show. */
+export interface WelcomeSection {
+	label: string;
+	/** Called each time the welcome screen becomes visible to get fresh items. */
+	getItems: () => WelcomeSectionItem[];
+	/** Shown when `getItems` returns an empty array. */
+	emptyText?: string;
 }
 
 /** Public API for the tabs plugin, accessible via `tabsPlugin.api`. */
@@ -135,6 +157,7 @@ export function createTabsPlugin(options: TabsPluginOptions = {}): CanvasPlugin 
 	let tabBar: HTMLDivElement | null = null;
 	let contentArea: HTMLDivElement | null = null;
 	let welcomeEl: HTMLDivElement | null = null;
+	let dynamicSectionsEl: HTMLDivElement | null = null;
 	let dropdownEl: HTMLDivElement | null = null;
 	let theme: "dark" | "light" = "dark";
 
@@ -338,12 +361,83 @@ export function createTabsPlugin(options: TabsPluginOptions = {}): CanvasPlugin 
 			inner.appendChild(list);
 		}
 
+		// Placeholder for dynamic sections (e.g. projects) — populated on each show
+		if (options.getWelcomeSections) {
+			const sectionsContainer = document.createElement("div");
+			sectionsContainer.className = "bpmn-welcome-dynamic-sections";
+			inner.appendChild(sectionsContainer);
+			dynamicSectionsEl = sectionsContainer;
+		}
+
 		el.appendChild(inner);
 		return el;
 	}
 
+	function renderDynamicSections(): void {
+		const container = dynamicSectionsEl;
+		if (!container || !options.getWelcomeSections) return;
+		container.textContent = "";
+		const sections = options.getWelcomeSections();
+		for (const section of sections) {
+			const items = section.getItems();
+
+			const divider = document.createElement("div");
+			divider.className = "bpmn-welcome-divider";
+			container.appendChild(divider);
+
+			const sectionLabel = document.createElement("div");
+			sectionLabel.className = "bpmn-welcome-examples-label";
+			sectionLabel.textContent = section.label;
+			container.appendChild(sectionLabel);
+
+			if (items.length === 0 && section.emptyText) {
+				const empty = document.createElement("div");
+				empty.className = "bpmn-welcome-empty";
+				empty.textContent = section.emptyText;
+				container.appendChild(empty);
+				continue;
+			}
+
+			const list = document.createElement("div");
+			list.className = "bpmn-welcome-examples";
+			for (const item of items) {
+				const btn = document.createElement("button");
+				btn.type = "button";
+				btn.className = "bpmn-welcome-example";
+				btn.addEventListener("click", () => item.onOpen());
+
+				const text = document.createElement("span");
+				text.className = "bpmn-welcome-example-text";
+
+				const labelEl = document.createElement("span");
+				labelEl.className = "bpmn-welcome-example-label";
+				labelEl.textContent = item.label;
+				text.appendChild(labelEl);
+
+				if (item.description) {
+					const descEl = document.createElement("span");
+					descEl.className = "bpmn-welcome-example-desc";
+					descEl.textContent = item.description;
+					text.appendChild(descEl);
+				}
+
+				btn.appendChild(text);
+
+				const arrow = document.createElement("span");
+				arrow.className = "bpmn-welcome-example-arrow";
+				arrow.innerHTML =
+					'<svg viewBox="0 0 8 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="1,1 7,6 1,11"/></svg>';
+				btn.appendChild(arrow);
+
+				list.appendChild(btn);
+			}
+			container.appendChild(list);
+		}
+	}
+
 	function showWelcomeScreen(): void {
 		if (welcomeEl) welcomeEl.style.display = "";
+		renderDynamicSections();
 		// Defer so the callback runs after all synchronous plugin/HUD initialization
 		// completes. On initial install the HUD elements don't exist yet; rAF fires
 		// after the current JS task, by which time initEditorHud() has run.
@@ -754,6 +848,7 @@ export function createTabsPlugin(options: TabsPluginOptions = {}): CanvasPlugin 
 			dropdownEl = null;
 			welcomeEl?.remove();
 			welcomeEl = null;
+			dynamicSectionsEl = null;
 			for (const tab of tabs) {
 				tab.dmnViewer?.destroy();
 				tab.formViewer?.destroy();

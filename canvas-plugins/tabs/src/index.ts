@@ -9,7 +9,14 @@
  */
 
 export { createTabsPlugin } from "./tabs-plugin.js";
-export type { TabConfig, TabsPluginOptions, TabsApi, WelcomeExample } from "./tabs-plugin.js";
+export type {
+	TabConfig,
+	TabsPluginOptions,
+	TabsApi,
+	WelcomeExample,
+	WelcomeSection,
+	WelcomeSectionItem,
+} from "./tabs-plugin.js";
 export { InMemoryFileResolver } from "./file-resolver.js";
 export type { FileResolver, ResolvedFile } from "./file-resolver.js";
 export { TABS_CSS, injectTabsStyles } from "./css.js";

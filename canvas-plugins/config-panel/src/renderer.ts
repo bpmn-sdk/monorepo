@@ -634,7 +634,9 @@ export class ConfigPanelRenderer {
 		btn.type = "button";
 		btn.className = "bpmn-cfg-action-btn";
 		btn.textContent = field.label;
-		btn.addEventListener("click", () => field.onClick?.(this._values));
+		btn.addEventListener("click", () =>
+			field.onClick?.(this._values, (k, v) => this._applyField(k, v)),
+		);
 		return btn;
 	}
 }

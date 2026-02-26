@@ -655,7 +655,11 @@ const SCRIPT_TASK_ADAPTER: PanelAdapter = {
 
 // ── Call activity schema ──────────────────────────────────────────────────────
 
-function makeCallActivitySchema(onOpenProcess?: (processId: string) => void): PanelSchema {
+function makeCallActivitySchema(
+	onOpenProcess: ((processId: string) => void) | undefined,
+	getAvailableProcesses: (() => Array<{ id: string; name?: string }>) | undefined,
+	createProcess: ((name: string, onCreated: (processId: string) => void) => void) | undefined,
+): PanelSchema {
 	return {
 		compact: [{ key: "name", label: "Name", type: "text", placeholder: "Activity name" }],
 		groups: [
@@ -676,6 +680,52 @@ function makeCallActivitySchema(onOpenProcess?: (processId: string) => void): Pa
 						label: "Propagate all child variables",
 						type: "toggle",
 					},
+					...(getAvailableProcesses
+						? [
+								{
+									key: "__selectProcess",
+									label: "Select process…",
+									type: "action" as const,
+									onClick: (
+										_v: Record<string, FieldValue>,
+										setValue: (k: string, v: FieldValue) => void,
+									) => {
+										const procs = getAvailableProcesses();
+										if (procs.length === 0) {
+											alert("No BPMN processes are currently open.");
+											return;
+										}
+										const lines = procs
+											.map((p, i) => `${i + 1}. ${p.id}${p.name ? ` — ${p.name}` : ""}`)
+											.join("\n");
+										const input = prompt(`Select a process (enter number):\n${lines}`);
+										if (!input?.trim()) return;
+										const idx = Number.parseInt(input.trim(), 10) - 1;
+										const chosen = procs[idx];
+										if (chosen) setValue("processId", chosen.id);
+									},
+								},
+							]
+						: []),
+					...(createProcess
+						? [
+								{
+									key: "__newProcess",
+									label: "New process…",
+									type: "action" as const,
+									onClick: (
+										_v: Record<string, FieldValue>,
+										setValue: (k: string, v: FieldValue) => void,
+									) => {
+										const name = prompt("New process name:", "New Process");
+										if (!name?.trim()) return;
+										createProcess(name.trim(), (processId) => {
+											setValue("processId", processId);
+										});
+									},
+								},
+							]
+						: []),
 					...(onOpenProcess
 						? [
 								{
@@ -870,6 +920,17 @@ export interface ConfigPanelBpmnOptions {
 	 */
 	openProcess?: (processId: string) => void;
 	/**
+	 * Returns the list of currently open BPMN processes available for selection
+	 * in the callActivity panel. When provided, a "Select process…" button appears.
+	 */
+	getAvailableProcesses?: () => Array<{ id: string; name?: string }>;
+	/**
+	 * Called when the user clicks "New process…" in the callActivity panel.
+	 * Should create a new BPMN tab and call `onCreated` with its process ID.
+	 * When provided, a "New process…" button appears.
+	 */
+	createProcess?: (name: string, onCreated: (processId: string) => void) => void;
+	/**
 	 * Called when the user clicks "Open in FEEL Playground ↗" in a FEEL expression field.
 	 * Typically implemented by calling `tabsPlugin.api.openTab({ type: "feel", ... })`.
 	 */
@@ -902,7 +963,11 @@ export function createConfigPanelBpmnPlugin(
 } {
 	const userTaskSchema = makeUserTaskSchema(options.openForm);
 	const businessRuleTaskSchema = makeBusinessRuleTaskSchema(options.openDecision);
-	const callActivitySchema = makeCallActivitySchema(options.openProcess);
+	const callActivitySchema = makeCallActivitySchema(
+		options.openProcess,
+		options.getAvailableProcesses,
+		options.createProcess,
+	);
 	const scriptTaskSchema = makeScriptTaskSchema(options.openFeelPlayground);
 	const sequenceFlowSchema = makeSequenceFlowSchema(options.openFeelPlayground);
 

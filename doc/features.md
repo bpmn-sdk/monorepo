@@ -19,9 +19,9 @@
 - **`MenuInfo`** — passive info row with optional action button (e.g. "Leave" for active project indicator)
 - Theme picker now behind a "Theme" drill item instead of flat in root dropdown
 
-## BPMN Element Config — Call Activity, Script Task, Sequence Flow (2026-02-26)
+## BPMN Element Config — Call Activity, Script Task, Sequence Flow (2026-02-26, updated 2026-02-26)
 
-- **Call activity** — configure `zeebe:calledElement processId` and `propagateAllChildVariables` in the config panel; optional "Open Process ↗" action button navigates to the matching BPMN tab; navigate icon button in the element toolbar (HUD) above a selected call activity
+- **Call activity** — configure `zeebe:calledElement processId` and `propagateAllChildVariables` in the config panel; "Select process…" button picks from open BPMN tabs; "New process" button creates a new blank BPMN and auto-links it; optional "Open Process ↗" action button navigates to the matching BPMN tab; navigate icon button in the element toolbar (HUD) above a selected call activity
 - **Script task** — configure `zeebe:script expression` (FEEL expression, textarea) and `resultVariable`; replaces the generic name-only panel
 - **Sequence flow condition expression** — clicking any sequence flow (edge) opens the config panel showing an editable `conditionExpression` FEEL textarea; works for gateway outgoing edges and any other flows; empty expression removes the condition element from the XML
 
@@ -41,6 +41,7 @@
 
 ## Welcome Screen Examples (2026-02-26) — `@bpmn-sdk/canvas-plugin-tabs` + `apps/landing`
 
+- **Dynamic sections on welcome screen** — `getWelcomeSections` option accepts a `() => WelcomeSection[]`; rebuilt on each show; used to surface workspace/project/file links from storage
 - **Example entries on welcome screen** — the `examples` option accepts a `WelcomeExample[]`; each entry has a badge (BPMN / DMN / FORM / MULTI), label, optional description, and an `onOpen()` callback
 - **4 built-in examples in the landing app**:
   - *Order Validation* (BPMN) — linear service-task flow

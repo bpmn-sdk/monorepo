@@ -1,5 +1,25 @@
 # Progress
 
+## 2026-02-26 — Bug fixes: auto-save, welcome screen project navigation, call activity process linking
+
+### `canvas-plugins/config-panel`
+- `FieldSchema.onClick` now receives a `setValue(key, val)` second argument so action buttons can write field values back without re-rendering the whole panel
+
+### `canvas-plugins/config-panel-bpmn`
+- Call Activity panel: added "Select process…" action button (prompt with numbered list of open BPMN tabs) and "New process" action button (prompt for name → create blank BPMN tab → auto-link)
+- `ConfigPanelBpmnOptions` extended with `getAvailableProcesses()` and `createProcess(name, onCreated)` callbacks
+
+### `canvas-plugins/tabs`
+- Added `WelcomeSection` / `WelcomeSectionItem` interfaces and `getWelcomeSections` option to `TabsPluginOptions`
+- Dynamic sections (workspace/project/file links) are rebuilt and injected into the welcome screen on every show
+
+### `apps/landing`
+- **Auto-save fix**: `setCurrentFileId(file.id)` is now called immediately after `tabIdToStorageFileId.set()` inside `onOpenFile`, preventing the race where `onTabActivate` fired before the map was populated
+- `bpmnProcessNames` map tracks BPMN tab names for use in call activity selection dialogs
+- `makeEmptyBpmnXml(processId, processName)` helper generates a minimal BPMN for new process tabs
+- `getWelcomeSections` wired: surfaces workspace → project → file navigation from the welcome screen
+- `getAvailableProcesses` and `createProcess` wired into `createConfigPanelBpmnPlugin`
+
 ## 2026-02-26 — Storage plugin overhaul: main-menu integration, drill-down nav, project persistence
 
 ### `canvas-plugins/main-menu`

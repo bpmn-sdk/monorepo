@@ -30,9 +30,13 @@ export interface FieldSchema {
 	condition?: (values: Record<string, FieldValue>) => boolean;
 	/**
 	 * For `type: "action"` fields — called when the button is clicked.
-	 * Receives the current field values so the handler can read e.g. `values.formId`.
+	 * Receives the current field values and a `setValue` helper that updates a
+	 * field in the panel and immediately writes it back to the diagram.
 	 */
-	onClick?: (values: Record<string, FieldValue>) => void;
+	onClick?: (
+		values: Record<string, FieldValue>,
+		setValue: (key: string, val: FieldValue) => void,
+	) => void;
 	/**
 	 * For `type: "feel-expression"` fields — optional callback to open the
 	 * expression in an external playground/editor.
