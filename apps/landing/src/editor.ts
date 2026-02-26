@@ -3,6 +3,7 @@ import { createCommandPaletteEditorPlugin } from "@bpmn-sdk/canvas-plugin-comman
 import { createConfigPanelPlugin } from "@bpmn-sdk/canvas-plugin-config-panel";
 import { createConfigPanelBpmnPlugin } from "@bpmn-sdk/canvas-plugin-config-panel-bpmn";
 import { createMainMenuPlugin } from "@bpmn-sdk/canvas-plugin-main-menu";
+import { createStoragePlugin } from "@bpmn-sdk/canvas-plugin-storage";
 import { InMemoryFileResolver, createTabsPlugin } from "@bpmn-sdk/canvas-plugin-tabs";
 import { createWatermarkPlugin } from "@bpmn-sdk/canvas-plugin-watermark";
 import { createZoomControlsPlugin } from "@bpmn-sdk/canvas-plugin-zoom-controls";
@@ -77,6 +78,10 @@ const resolver = new InMemoryFileResolver();
 // Maps BPMN process IDs to the tab ID that holds that process, for navigation.
 const bpmnProcessToTabId = new Map<string, string>();
 
+// Maps tab ID → storage file ID for tabs opened from the storage plugin.
+// Used by onTabActivate to know whether to update the storage current-file pointer.
+const tabIdToStorageFileId = new Map<string, string>();
+
 let editorRef: BpmnEditor | null = null;
 
 // Tabs plugin — onTabActivate loads the BPMN into the editor when a BPMN tab is clicked
@@ -109,7 +114,7 @@ const tabsPlugin = createTabsPlugin({
 	onWelcomeShow() {
 		setHudVisible(false);
 	},
-	onTabActivate(_id, config) {
+	onTabActivate(id, config) {
 		const isBpmn = config.type === "bpmn";
 
 		// Restore all HUDs and the main menu when any tab is active
@@ -118,6 +123,9 @@ const tabsPlugin = createTabsPlugin({
 		if (config.type === "bpmn" && config.xml) {
 			editorRef?.load(config.xml);
 		}
+
+		// Update storage current-file pointer — ensures auto-save targets the right file
+		storagePlugin.api.setCurrentFileId(tabIdToStorageFileId.get(id) ?? null);
 
 		// Hide BPMN-only toolbars on non-BPMN views
 		for (const hudId of BPMN_ONLY_HUD) {
@@ -215,6 +223,42 @@ editorContainer.addEventListener("drop", (e) => {
 	}
 });
 
+// ── Storage plugin ────────────────────────────────────────────────────────────
+
+const storagePlugin = createStoragePlugin({
+	onOpenFile(file, content) {
+		if (file.type === "bpmn") {
+			const tabId = tabsPlugin.api.openTab({ type: "bpmn", xml: content, name: file.name });
+			tabIdToStorageFileId.set(tabId, file.id);
+			try {
+				for (const proc of Bpmn.parse(content).processes) {
+					bpmnProcessToTabId.set(proc.id, tabId);
+				}
+			} catch {
+				// malformed XML — tab still opens
+			}
+		} else if (file.type === "dmn") {
+			try {
+				const defs = Dmn.parse(content);
+				resolver.registerDmn(defs);
+				const tabId = tabsPlugin.api.openTab({ type: "dmn", defs, name: file.name });
+				tabIdToStorageFileId.set(tabId, file.id);
+			} catch {
+				console.error("[storage] Failed to parse DMN:", file.name);
+			}
+		} else if (file.type === "form") {
+			try {
+				const form = Form.parse(content);
+				resolver.registerForm(form);
+				const tabId = tabsPlugin.api.openTab({ type: "form", form, name: file.name });
+				tabIdToStorageFileId.set(tabId, file.id);
+			} catch {
+				console.error("[storage] Failed to parse form:", file.name);
+			}
+		}
+	},
+});
+
 // ── Plugins ───────────────────────────────────────────────────────────────────
 
 const palette = createCommandPalettePlugin({
@@ -288,6 +332,7 @@ const editor = new BpmnEditor({
 			logo: LOGO_SVG,
 		}),
 		tabsPlugin,
+		storagePlugin,
 		palette,
 		paletteEditor,
 		configPanel,

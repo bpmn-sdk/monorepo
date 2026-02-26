@@ -1,5 +1,16 @@
 # Features
 
+## IndexedDB Storage Plugin (2026-02-26) — `@bpmn-sdk/canvas-plugin-storage`
+
+- **`@bpmn-sdk/canvas-plugin-storage`** — persists BPMN / DMN / Form files in the browser's IndexedDB in a `workspace → project → files` hierarchy
+  - **Dexie v4** for IndexedDB access — migrations, compound indexes, type-safe tables
+  - **5 record types**: `WorkspaceRecord`, `ProjectRecord`, `FileRecord` (with `isShared` and `gitPath`), `FileContentRecord`
+  - **Auto-save** — 500 ms debounce triggered by `diagram:change`; forced flush on page hide / `beforeunload`; multi-tab safe
+  - **File sidebar** — collapsible left panel with a `workspace → project → file` tree; inline CRUD actions (add, rename, delete, toggle shared) using `window.prompt`/`confirm`
+  - **Shared files** — any file can be marked `isShared: true` to make it accessible for cross-workspace reference resolution
+  - **GitHub-sync ready** — every `FileRecord` carries a `gitPath: string | null` field reserved for future bidirectional GitHub sync
+  - **`createStoragePlugin(options)`** returns `CanvasPlugin & { api: StorageApi }`; integrates into the landing app alongside the tabs plugin
+
 ## BPMN Element Config — Call Activity, Script Task, Sequence Flow (2026-02-26)
 
 - **Call activity** — configure `zeebe:calledElement processId` and `propagateAllChildVariables` in the config panel; optional "Open Process ↗" action button navigates to the matching BPMN tab; navigate icon button in the element toolbar (HUD) above a selected call activity

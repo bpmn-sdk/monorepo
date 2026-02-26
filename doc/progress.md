@@ -1,5 +1,21 @@
 # Progress
 
+## 2026-02-26 — IndexedDB storage plugin
+
+### `canvas-plugins/storage` (new — `@bpmn-sdk/canvas-plugin-storage`)
+- **StorageApi** — full CRUD for workspaces, projects, and files backed by Dexie v4 / IndexedDB; `createWorkspace`, `createProject`, `createFile`, `renameFile`, `setFileShared`, `deleteFile`, `openFile`; `onChange` listeners notify subscribers (sidebar re-renders)
+- **AutoSave** — 500 ms debounce per file; captures content snapshot at schedule time; forced `flush()` on `document.visibilitychange hidden` and `window.beforeunload`
+- **StorageSidebar** — collapsible DOM left panel (260 px); toggle button floats at top-left of the editor container; expandable workspace → project → file tree; inline + / rename / delete / share-toggle action buttons; empty-state messages
+- **File templates** — inline minimal BPMN / DMN / Form XML/JSON templates for new-file creation
+- **`createStoragePlugin(options)`** — factory returning `CanvasPlugin & { api: StorageApi }`; subscribes to `diagram:change` via the BpmnEditor runtime cast pattern; injects CSS via `injectStorageStyles()`
+- **`FileRecord.isShared`** — boolean flag; shared files surface as a cross-workspace reference pool
+- **`FileRecord.gitPath`** — nullable string; reserved for future bidirectional GitHub sync
+
+### `apps/landing`
+- Added `@bpmn-sdk/canvas-plugin-storage` dependency and wired `createStoragePlugin` in `editor.ts`
+- `onOpenFile` callback opens BPMN / DMN / Form tabs via the tabs plugin and populates the existing in-memory resolver
+- `tabIdToStorageFileId` map tracks which tabs were opened from storage; `onTabActivate` updates `storagePlugin.api.setCurrentFileId` so auto-save always targets the correct file
+
 ## 2026-02-26 — Editor UX improvements: default color reset, FEEL = prefix stripping, default gateway edge marker
 
 ### `packages/editor`
