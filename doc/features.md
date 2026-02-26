@@ -1,5 +1,19 @@
 # Features
 
+## Welcome Screen Examples (2026-02-26) — `@bpmn-sdk/canvas-plugin-tabs` + `apps/landing`
+
+- **Example entries on welcome screen** — the `examples` option accepts a `WelcomeExample[]`; each entry has a badge (BPMN / DMN / FORM / MULTI), label, optional description, and an `onOpen()` callback
+- **4 built-in examples in the landing app**:
+  - *Order Validation* (BPMN) — linear service-task flow
+  - *Shipping Cost* (DMN) — FIRST hit-policy decision table: weight × destination
+  - *Support Ticket* (FORM) — subject, category, priority, description, attachment
+  - *Loan Application Flow* (MULTI) — BPMN + Credit Risk DMN + Application Form; opens all three tabs and registers resources in the resolver
+
+## Welcome Screen + Grouped Tabs (2026-02-26) — `@bpmn-sdk/canvas-plugin-tabs`
+
+- **Welcome screen** — shown when no tabs are open; centered card with BPMN icon, title, "New diagram" and "Import files…" buttons; theme-aware (light/dark); `onNewDiagram` / `onImportFiles` option callbacks
+- **Grouped tabs** — at most 3 tabs in the bar (one per type: BPMN, DMN, FORM); each group tab shows the active file name and a type badge; chevron opens a dropdown listing all files of that type; per-file close buttons in dropdown; close button on tab itself when group has only one file
+
 ## Multi-file Import + Tab Navigation in Editor (2026-02-26) — `apps/landing` + `canvas-plugins/*`
 
 - **Import files via menu** — "Import files…" in the top-right menu opens a file picker accepting `.bpmn`, `.xml`, `.dmn`, `.form`, `.json`; each file opens in a separate tab
@@ -26,6 +40,7 @@
 - **`FileResolver` abstraction** — pluggable interface for resolving file references; `InMemoryFileResolver` default; designed for future FS/SaaS backends
 - **`TabsApi`** — programmatic `openDecision(id)` / `openForm(id)` + full tab lifecycle management
 - **Warning badge** — shown when a referenced DMN/Form file is not registered
+- **Close-tab download prompt** — closing a tab with in-memory content shows a dialog (Cancel / Close without saving / Download & Close); the download callback serializes BPMN/DMN/Form to their respective formats and triggers a browser file download
 
 ### `@bpmn-sdk/core` — Extended form and Zeebe model
 - **13 new Form component types** — number, datetime, button, taglist, table, image, dynamiclist, iframe, separator, spacer, documentPreview, html, expression, filepicker; `FormUnknownComponent` catch-all

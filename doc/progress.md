@@ -1,5 +1,45 @@
 # Progress
 
+## 2026-02-26 — Welcome Screen Examples
+
+### `canvas-plugins/tabs`
+- **`WelcomeExample` interface** — `{ label, description?, badge?, onOpen: () => void }`; exported from the plugin
+- **`examples` option** added to `TabsPluginOptions`; when non-empty, the welcome screen renders a divider, "Examples" heading, and a scrollable list of clickable example entries with badge, label, description, and a chevron arrow
+- **CSS** — example list, badges (type-coloured: BPMN=blue, DMN=purple, FORM=green, MULTI=orange), hover and active states; dark/light theme variants
+
+### `apps/landing` — examples.ts + editor.ts
+- **Shipping Cost DMN** — FIRST hit-policy decision table: package weight × destination → shipping cost + carrier; 4 rules
+- **Support Ticket Form** — subject, category (select), priority (radio), description, file attachment, submit button
+- **Loan Application (MULTI)** — BPMN with a `userTask` linked to `form-loan-application` and a `businessRuleTask` linked to `decision-credit-risk`; Credit Risk DMN (UNIQUE, 4 rules: credit score × amount → risk level + approved + max); Loan Application Form (name, DOB, employment, income, amount, purpose, notes, consent, submit); opening the multi-file example registers DMN + Form in the resolver and opens all three tabs
+- **`makeExamples(api, resolver)`** factory exported from `examples.ts`; returns 4 `WelcomeExample` items (Order Validation BPMN, Shipping Cost DMN, Support Ticket FORM, Loan Application MULTI)
+- **`editor.ts`** passes `examples` via a lazy getter so `tabsPlugin.api` is available when the welcome screen renders during `install()`
+
+## 2026-02-26 — Welcome Screen + Grouped Tabs
+
+### `canvas-plugins/tabs`
+- **Welcome screen** — shown on install before any tab is opened; centered card with a BPMN process icon, title, subtitle, "New diagram" and "Import files…" buttons; supports light/dark theme via `data-theme`; hidden when first tab opens, reappears when last tab is closed
+- **`onNewDiagram` / `onImportFiles` options** added to `TabsPluginOptions` to wire up the welcome screen buttons
+- **Grouped tabs** — the tab bar now shows at most three group tabs (one per type: BPMN, DMN, FORM); each group displays the active file's name with a type badge; a chevron (▾) appears when multiple files of the same type are open and opens a fixed-position dropdown listing all files with per-file close buttons; when a group has only one file, the close button is on the tab itself
+- **`groupActiveId` map** — tracks the last-activated tab ID per type so group tabs remember which file was last selected
+- **`renderTabBar()`** — replaces per-tab DOM management with a single function that rebuilds the tab bar from scratch; safe because at most 3 group tabs exist
+- **Body-level dropdown** — appended to `document.body` as `position: fixed` to avoid z-index/clipping issues; outside-click handler closes it; cleaned up on `uninstall()`
+- **Tests** — 17 tests covering welcome screen show/hide, button callbacks, grouping, chevron/close-button logic, active file name, and tab lifecycle
+
+### `apps/landing` — editor.ts
+- **`onNewDiagram`** callback opens a new BPMN tab with `SAMPLE_XML`
+- **`onImportFiles`** callback triggers the existing hidden `<input type="file">` element
+
+## 2026-02-26 — Close-Tab Download Prompt
+
+### `canvas-plugins/tabs`
+- **`onDownloadTab` option** — new `TabsPluginOptions.onDownloadTab?: (config: TabConfig) => void` callback; when provided, the "Download & Close" button appears in the close dialog
+- **`hasContent()` helper** — returns `false` for the initial BPMN tab (`xml: ""`), so closing the main diagram pane skips the dialog entirely
+- **`showCloseDialog()`** — in-canvas modal overlay with Cancel / "Close without saving" / "Download & Close" buttons, Escape key dismissal, and correct light/dark theming via `data-theme`
+- **Dialog CSS** — `.bpmn-close-overlay` / `.bpmn-close-dialog` added to `css.ts` with full light and dark CSS variable sets
+
+### `apps/landing` — editor.ts
+- **`onDownloadTab` callback** — serializes the tab content (`config.xml` for BPMN, `Dmn.export(defs)` for DMN, `Form.export(form)` for Form), creates a `Blob`, triggers a browser download via an `<a>` element with `download` attribute, then revokes the object URL
+
 ## 2026-02-26 — UX Fixes: Theme, Z-index, Toolbar Visibility, Content Width
 
 ### `canvas-plugins/tabs`

@@ -1,3 +1,7 @@
+import type { InMemoryFileResolver, TabsApi, WelcomeExample } from "@bpmn-sdk/canvas-plugin-tabs";
+import type { DmnDefinitions } from "@bpmn-sdk/core";
+import type { FormDefinition } from "@bpmn-sdk/core";
+
 export const examples: Record<string, string> = {
 	simple: `<?xml version="1.0" encoding="UTF-8"?>
 <bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:zeebe="http://camunda.org/schema/zeebe/1.0" xmlns:modeler="http://camunda.org/schema/modeler/1.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" id="Definitions_1" targetNamespace="http://bpmn.io/schema/bpmn" exporter="@bpmn-sdk/core" exporterVersion="0.0.1" modeler:executionPlatform="Camunda Cloud" modeler:executionPlatformVersion="8.6.0">
@@ -445,3 +449,476 @@ export const examples: Record<string, string> = {
   </bpmndi:BPMNDiagram>
 </bpmn:definitions>`,
 };
+
+// ── DMN example: Shipping Cost ─────────────────────────────────────────────────
+
+const DMN_SHIPPING_COST: DmnDefinitions = {
+	id: "shipping-cost-defs",
+	name: "Shipping Cost",
+	namespace: "http://camunda.org/schema/1.0/dmn",
+	namespaces: {},
+	modelerAttributes: {},
+	decisions: [
+		{
+			id: "decision-shipping-cost",
+			name: "Shipping Cost",
+			decisionTable: {
+				id: "shipping-cost-table",
+				hitPolicy: "FIRST",
+				inputs: [
+					{
+						id: "input-weight",
+						label: "Package Weight (kg)",
+						inputExpression: { id: "input-weight-expr", typeRef: "number", text: "weight" },
+					},
+					{
+						id: "input-dest",
+						label: "Destination",
+						inputExpression: { id: "input-dest-expr", typeRef: "string", text: "destination" },
+					},
+				],
+				outputs: [
+					{
+						id: "output-cost",
+						label: "Shipping Cost (€)",
+						name: "shippingCost",
+						typeRef: "number",
+					},
+					{ id: "output-carrier", label: "Carrier", name: "carrier", typeRef: "string" },
+				],
+				rules: [
+					{
+						id: "rule-1",
+						description: "Light domestic",
+						inputEntries: [
+							{ id: "r1-i1", text: "< 5" },
+							{ id: "r1-i2", text: '"domestic"' },
+						],
+						outputEntries: [
+							{ id: "r1-o1", text: "4.99" },
+							{ id: "r1-o2", text: '"DHL"' },
+						],
+					},
+					{
+						id: "rule-2",
+						description: "Heavy domestic",
+						inputEntries: [
+							{ id: "r2-i1", text: ">= 5" },
+							{ id: "r2-i2", text: '"domestic"' },
+						],
+						outputEntries: [
+							{ id: "r2-o1", text: "9.99" },
+							{ id: "r2-o2", text: '"DHL Freight"' },
+						],
+					},
+					{
+						id: "rule-3",
+						description: "Light international",
+						inputEntries: [
+							{ id: "r3-i1", text: "< 5" },
+							{ id: "r3-i2", text: '"international"' },
+						],
+						outputEntries: [
+							{ id: "r3-o1", text: "19.99" },
+							{ id: "r3-o2", text: '"FedEx"' },
+						],
+					},
+					{
+						id: "rule-4",
+						description: "Heavy international",
+						inputEntries: [
+							{ id: "r4-i1", text: ">= 5" },
+							{ id: "r4-i2", text: '"international"' },
+						],
+						outputEntries: [
+							{ id: "r4-o1", text: "49.99" },
+							{ id: "r4-o2", text: '"FedEx Freight"' },
+						],
+					},
+				],
+			},
+		},
+	],
+};
+
+// ── Form example: Support Ticket ───────────────────────────────────────────────
+
+const FORM_SUPPORT_TICKET: FormDefinition = {
+	id: "form-support-ticket",
+	type: "default",
+	components: [
+		{
+			id: "f-subject",
+			type: "textfield",
+			label: "Subject",
+			key: "subject",
+			validate: { required: true },
+		},
+		{
+			id: "f-category",
+			type: "select",
+			label: "Category",
+			key: "category",
+			validate: { required: true },
+			values: [
+				{ label: "Billing", value: "billing" },
+				{ label: "Technical", value: "technical" },
+				{ label: "Account", value: "account" },
+				{ label: "Other", value: "other" },
+			],
+		},
+		{
+			id: "f-priority",
+			type: "radio",
+			label: "Priority",
+			key: "priority",
+			values: [
+				{ label: "Low", value: "low" },
+				{ label: "Medium", value: "medium" },
+				{ label: "High", value: "high" },
+			],
+			defaultValue: "medium",
+		},
+		{
+			id: "f-desc",
+			type: "textarea",
+			label: "Description",
+			key: "description",
+			validate: { required: true },
+		},
+		{
+			id: "f-attach",
+			type: "filepicker",
+			label: "Attachments",
+			key: "attachments",
+			multiple: true,
+		},
+		{ id: "f-sep", type: "separator" },
+		{ id: "f-submit", type: "button", label: "Submit Ticket", action: "submit" },
+	],
+};
+
+// ── Multi-file example: Loan Application ───────────────────────────────────────
+
+export const LOAN_APPLICATION_BPMN = `<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:zeebe="http://camunda.org/schema/zeebe/1.0" xmlns:modeler="http://camunda.org/schema/modeler/1.0" id="loan-app-defs" targetNamespace="http://bpmn.io/schema/bpmn" exporter="@bpmn-sdk/core" exporterVersion="0.0.1" modeler:executionPlatform="Camunda Cloud" modeler:executionPlatformVersion="8.6.0">
+  <bpmn:process id="loan-application" name="Loan Application" isExecutable="true">
+    <bpmn:startEvent id="start" name="Application Received">
+      <bpmn:outgoing>Flow_001</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:userTask id="fill-form" name="Fill Application Form">
+      <bpmn:extensionElements>
+        <zeebe:formDefinition formId="form-loan-application"/>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_001</bpmn:incoming>
+      <bpmn:outgoing>Flow_002</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:businessRuleTask id="assess-risk" name="Assess Credit Risk">
+      <bpmn:extensionElements>
+        <zeebe:calledDecision decisionId="decision-credit-risk" resultVariable="riskResult"/>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_002</bpmn:incoming>
+      <bpmn:outgoing>Flow_003</bpmn:outgoing>
+    </bpmn:businessRuleTask>
+    <bpmn:exclusiveGateway id="check-approval" name="Approved?" default="Flow_006">
+      <bpmn:incoming>Flow_003</bpmn:incoming>
+      <bpmn:outgoing>Flow_004</bpmn:outgoing>
+      <bpmn:outgoing>Flow_006</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="disburse" name="Disburse Funds">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="disburse-loan"/>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_004</bpmn:incoming>
+      <bpmn:outgoing>Flow_005</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:endEvent id="end-approved" name="Loan Approved">
+      <bpmn:incoming>Flow_005</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:serviceTask id="notify-reject" name="Send Rejection Notice">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="send-rejection"/>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_006</bpmn:incoming>
+      <bpmn:outgoing>Flow_007</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:endEvent id="end-rejected" name="Loan Rejected">
+      <bpmn:incoming>Flow_007</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flow_001" sourceRef="start" targetRef="fill-form"/>
+    <bpmn:sequenceFlow id="Flow_002" sourceRef="fill-form" targetRef="assess-risk"/>
+    <bpmn:sequenceFlow id="Flow_003" sourceRef="assess-risk" targetRef="check-approval"/>
+    <bpmn:sequenceFlow id="Flow_004" sourceRef="check-approval" targetRef="disburse" name="approved">
+      <bpmn:conditionExpression>= riskResult.approved = true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_005" sourceRef="disburse" targetRef="end-approved"/>
+    <bpmn:sequenceFlow id="Flow_006" sourceRef="check-approval" targetRef="notify-reject" name="rejected"/>
+    <bpmn:sequenceFlow id="Flow_007" sourceRef="notify-reject" targetRef="end-rejected"/>
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="loan-app-di">
+    <bpmndi:BPMNPlane id="loan-app-di-plane" bpmnElement="loan-application">
+      <bpmndi:BPMNShape id="start_di" bpmnElement="start">
+        <dc:Bounds x="82" y="182" width="36" height="36"/>
+        <bpmndi:BPMNLabel><dc:Bounds x="40" y="222" width="120" height="14"/></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="fill-form_di" bpmnElement="fill-form">
+        <dc:Bounds x="250" y="160" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="assess-risk_di" bpmnElement="assess-risk">
+        <dc:Bounds x="450" y="160" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="check-approval_di" bpmnElement="check-approval">
+        <dc:Bounds x="652" y="182" width="36" height="36"/>
+        <bpmndi:BPMNLabel><dc:Bounds x="692" y="164" width="63" height="14"/></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="disburse_di" bpmnElement="disburse">
+        <dc:Bounds x="820" y="80" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="end-approved_di" bpmnElement="end-approved">
+        <dc:Bounds x="982" y="102" width="36" height="36"/>
+        <bpmndi:BPMNLabel><dc:Bounds x="958" y="142" width="84" height="14"/></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="notify-reject_di" bpmnElement="notify-reject">
+        <dc:Bounds x="820" y="260" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="end-rejected_di" bpmnElement="end-rejected">
+        <dc:Bounds x="982" y="282" width="36" height="36"/>
+        <bpmndi:BPMNLabel><dc:Bounds x="958" y="322" width="84" height="14"/></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_001_di" bpmnElement="Flow_001">
+        <di:waypoint x="118" y="200"/><di:waypoint x="250" y="200"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_002_di" bpmnElement="Flow_002">
+        <di:waypoint x="350" y="200"/><di:waypoint x="450" y="200"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_003_di" bpmnElement="Flow_003">
+        <di:waypoint x="550" y="200"/><di:waypoint x="652" y="200"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_004_di" bpmnElement="Flow_004">
+        <di:waypoint x="670" y="182"/><di:waypoint x="670" y="120"/><di:waypoint x="820" y="120"/>
+        <bpmndi:BPMNLabel><dc:Bounds x="724" y="96" width="56" height="14"/></bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_005_di" bpmnElement="Flow_005">
+        <di:waypoint x="920" y="120"/><di:waypoint x="982" y="120"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_006_di" bpmnElement="Flow_006">
+        <di:waypoint x="670" y="218"/><di:waypoint x="670" y="300"/><di:waypoint x="820" y="300"/>
+        <bpmndi:BPMNLabel><dc:Bounds x="724" y="276" width="56" height="14"/></bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_007_di" bpmnElement="Flow_007">
+        <di:waypoint x="920" y="300"/><di:waypoint x="982" y="300"/>
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>`;
+
+export const LOAN_DMN: DmnDefinitions = {
+	id: "credit-risk-defs",
+	name: "Credit Risk Assessment",
+	namespace: "http://camunda.org/schema/1.0/dmn",
+	namespaces: {},
+	modelerAttributes: {},
+	decisions: [
+		{
+			id: "decision-credit-risk",
+			name: "Credit Risk Assessment",
+			decisionTable: {
+				id: "credit-risk-table",
+				hitPolicy: "UNIQUE",
+				inputs: [
+					{
+						id: "input-score",
+						label: "Credit Score",
+						inputExpression: { id: "input-score-expr", typeRef: "number", text: "creditScore" },
+					},
+					{
+						id: "input-amount",
+						label: "Requested Amount (€)",
+						inputExpression: {
+							id: "input-amount-expr",
+							typeRef: "number",
+							text: "requestedAmount",
+						},
+					},
+				],
+				outputs: [
+					{ id: "output-risk", label: "Risk Level", name: "riskLevel", typeRef: "string" },
+					{ id: "output-approved", label: "Approved", name: "approved", typeRef: "boolean" },
+					{ id: "output-max", label: "Max Amount (€)", name: "maxAmount", typeRef: "number" },
+				],
+				rules: [
+					{
+						id: "rule-1",
+						description: "Excellent credit, small loan",
+						inputEntries: [
+							{ id: "r1-i1", text: ">= 750" },
+							{ id: "r1-i2", text: "<= 50000" },
+						],
+						outputEntries: [
+							{ id: "r1-o1", text: '"low"' },
+							{ id: "r1-o2", text: "true" },
+							{ id: "r1-o3", text: "50000" },
+						],
+					},
+					{
+						id: "rule-2",
+						description: "Good credit, medium loan",
+						inputEntries: [
+							{ id: "r2-i1", text: "[650..750)" },
+							{ id: "r2-i2", text: "<= 25000" },
+						],
+						outputEntries: [
+							{ id: "r2-o1", text: '"medium"' },
+							{ id: "r2-o2", text: "true" },
+							{ id: "r2-o3", text: "25000" },
+						],
+					},
+					{
+						id: "rule-3",
+						description: "Fair credit, large loan — reject",
+						inputEntries: [
+							{ id: "r3-i1", text: "[550..650)" },
+							{ id: "r3-i2", text: "> 10000" },
+						],
+						outputEntries: [
+							{ id: "r3-o1", text: '"high"' },
+							{ id: "r3-o2", text: "false" },
+							{ id: "r3-o3", text: "0" },
+						],
+					},
+					{
+						id: "rule-4",
+						description: "Poor credit — always reject",
+						inputEntries: [
+							{ id: "r4-i1", text: "< 550" },
+							{ id: "r4-i2", text: "" },
+						],
+						outputEntries: [
+							{ id: "r4-o1", text: '"very high"' },
+							{ id: "r4-o2", text: "false" },
+							{ id: "r4-o3", text: "0" },
+						],
+					},
+				],
+			},
+		},
+	],
+};
+
+export const LOAN_FORM: FormDefinition = {
+	id: "form-loan-application",
+	type: "default",
+	components: [
+		{
+			id: "lf-name",
+			type: "textfield",
+			label: "Full Name",
+			key: "fullName",
+			validate: { required: true },
+		},
+		{
+			id: "lf-dob",
+			type: "datetime",
+			key: "dateOfBirth",
+			subtype: "date",
+			dateLabel: "Date of Birth",
+			validate: { required: true },
+		},
+		{
+			id: "lf-employment",
+			type: "select",
+			label: "Employment Status",
+			key: "employmentStatus",
+			validate: { required: true },
+			values: [
+				{ label: "Employed (full-time)", value: "full-time" },
+				{ label: "Employed (part-time)", value: "part-time" },
+				{ label: "Self-employed", value: "self-employed" },
+				{ label: "Unemployed", value: "unemployed" },
+			],
+		},
+		{
+			id: "lf-income",
+			type: "number",
+			label: "Annual Income (€)",
+			key: "annualIncome",
+			validate: { required: true },
+		},
+		{
+			id: "lf-amount",
+			type: "number",
+			label: "Requested Amount (€)",
+			key: "requestedAmount",
+			validate: { required: true },
+		},
+		{
+			id: "lf-purpose",
+			type: "select",
+			label: "Loan Purpose",
+			key: "loanPurpose",
+			validate: { required: true },
+			values: [
+				{ label: "Home improvement", value: "home" },
+				{ label: "Vehicle", value: "vehicle" },
+				{ label: "Education", value: "education" },
+				{ label: "Business", value: "business" },
+				{ label: "Other", value: "other" },
+			],
+		},
+		{ id: "lf-notes", type: "textarea", label: "Additional Notes", key: "notes" },
+		{
+			id: "lf-consent",
+			type: "checkbox",
+			label: "I consent to a credit check",
+			key: "creditCheckConsent",
+			validate: { required: true },
+		},
+		{ id: "lf-sep", type: "separator" },
+		{ id: "lf-submit", type: "button", label: "Submit Application", action: "submit" },
+	],
+};
+
+// ── Welcome screen example entries ─────────────────────────────────────────────
+
+export function makeExamples(api: TabsApi, resolver: InMemoryFileResolver): WelcomeExample[] {
+	return [
+		{
+			label: "Order Validation",
+			description: "Linear service-task flow with start, validate, notify, and end events",
+			badge: "BPMN",
+			onOpen() {
+				api.openTab({ type: "bpmn", xml: examples.simple ?? "", name: "Order Validation" });
+			},
+		},
+		{
+			label: "Shipping Cost",
+			description:
+				"Decision table: package weight × destination → cost and carrier (FIRST hit policy)",
+			badge: "DMN",
+			onOpen() {
+				api.openTab({ type: "dmn", defs: DMN_SHIPPING_COST, name: "Shipping Cost" });
+			},
+		},
+		{
+			label: "Support Ticket",
+			description:
+				"Support request form with subject, category, priority, description, and file upload",
+			badge: "FORM",
+			onOpen() {
+				api.openTab({ type: "form", form: FORM_SUPPORT_TICKET, name: "Support Ticket" });
+			},
+		},
+		{
+			label: "Loan Application Flow",
+			description: "BPMN process linked to a Credit Risk DMN table and an Application Form",
+			badge: "MULTI",
+			onOpen() {
+				resolver.registerDmn(LOAN_DMN);
+				resolver.registerForm(LOAN_FORM);
+				api.openTab({ type: "form", form: LOAN_FORM, name: "Loan Application Form" });
+				api.openTab({ type: "dmn", defs: LOAN_DMN, name: "Credit Risk Assessment" });
+				api.openTab({ type: "bpmn", xml: LOAN_APPLICATION_BPMN, name: "Loan Application Flow" });
+			},
+		},
+	];
+}

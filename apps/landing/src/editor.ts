@@ -9,6 +9,7 @@ import { createZoomControlsPlugin } from "@bpmn-sdk/canvas-plugin-zoom-controls"
 import { Bpmn, Dmn, Form } from "@bpmn-sdk/core";
 import { BpmnEditor, initEditorHud } from "@bpmn-sdk/editor";
 import type { Tool } from "@bpmn-sdk/editor";
+import { makeExamples } from "./examples.js";
 
 const LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
   <rect width="24" height="24" rx="4" fill="#0062ff"/>
@@ -79,16 +80,40 @@ let editorRef: BpmnEditor | null = null;
 // and shows/hides BPMN-specific HUD toolbars for non-BPMN views.
 const BPMN_ONLY_HUD = ["hud-top-center", "hud-bottom-left", "hud-bottom-center"];
 
+function setHudVisible(visible: boolean): void {
+	for (const el of document.querySelectorAll<HTMLElement>(".hud")) {
+		el.style.display = visible ? "" : "none";
+	}
+	const menuPanel = document.querySelector<HTMLElement>(".bpmn-main-menu-panel");
+	if (menuPanel) menuPanel.style.display = visible ? "" : "none";
+}
+
 const tabsPlugin = createTabsPlugin({
 	resolver,
+	// examples getter is called during install(), after tabsPlugin is assigned.
+	get examples() {
+		return makeExamples(tabsPlugin.api, resolver);
+	},
+	onNewDiagram() {
+		tabsPlugin.api.openTab({ type: "bpmn", xml: SAMPLE_XML, name: "New Diagram" });
+	},
+	onImportFiles() {
+		fileInput.click();
+	},
+	onWelcomeShow() {
+		setHudVisible(false);
+	},
 	onTabActivate(_id, config) {
 		const isBpmn = config.type === "bpmn";
+
+		// Restore all HUDs and the main menu when any tab is active
+		setHudVisible(true);
 
 		if (config.type === "bpmn" && config.xml) {
 			editorRef?.load(config.xml);
 		}
 
-		// Show/hide BPMN-only toolbars
+		// Hide BPMN-only toolbars on non-BPMN views
 		for (const hudId of BPMN_ONLY_HUD) {
 			const el = document.getElementById(hudId);
 			if (el) el.style.display = isBpmn ? "" : "none";
@@ -98,6 +123,27 @@ const tabsPlugin = createTabsPlugin({
 		if (!isBpmn) {
 			editorRef?.setSelection([]);
 		}
+	},
+	onDownloadTab(config) {
+		let content: string;
+		let filename: string;
+		if (config.type === "bpmn") {
+			content = config.xml;
+			filename = config.name ?? "diagram.bpmn";
+		} else if (config.type === "dmn") {
+			content = Dmn.export(config.defs);
+			filename = config.name ?? "decision.dmn";
+		} else {
+			content = Form.export(config.form);
+			filename = config.name ?? "form.form";
+		}
+		const blob = new Blob([content], { type: "application/octet-stream" });
+		const url = URL.createObjectURL(blob);
+		const a = document.createElement("a");
+		a.href = url;
+		a.download = filename;
+		a.click();
+		URL.revokeObjectURL(url);
 	},
 });
 
