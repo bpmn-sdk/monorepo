@@ -920,5 +920,13 @@ export function makeExamples(api: TabsApi, resolver: InMemoryFileResolver): Welc
 				api.openTab({ type: "bpmn", xml: LOAN_APPLICATION_BPMN, name: "Loan Application Flow" });
 			},
 		},
+		{
+			label: "FEEL Playground",
+			description: "Interactive FEEL expression evaluator with syntax highlighting",
+			badge: "FEEL",
+			onOpen() {
+				api.openTab({ type: "feel", name: "FEEL Playground" });
+			},
+		},
 	];
 }

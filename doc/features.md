@@ -1,5 +1,19 @@
 # Features
 
+## FEEL Language Support (2026-02-26) — `@bpmn-sdk/feel` + `@bpmn-sdk/canvas-plugin-feel-playground`
+
+- **`@bpmn-sdk/feel`** — pure TypeScript FEEL engine; zero runtime dependencies; works in Node.js and browser
+  - **Lexer** — position-aware tokenizer with full FEEL token set (temporal literals, backtick names, `..`, `**`, comments)
+  - **Parser** — Pratt parser; `parseExpression()` and `parseUnaryTests()` entry points; greedy multi-word name resolution; error recovery
+  - **Evaluator** — tree-walking evaluator; three-valued logic; ~60 built-in functions (string, numeric, list, context, temporal, range)
+  - **Formatter** — pretty printer with configurable line-length-aware wrapping
+  - **Highlighter** — `annotate()` / `highlightToHtml()` / `highlightFeel`; semantic token classification
+- **`@bpmn-sdk/canvas-plugin-feel-playground`** — interactive FEEL panel in the editor
+  - Expression and Unary-Tests modes; syntax-highlighted textarea; JSON context input; live evaluation; theme-aware (light/dark)
+  - Opens as a full tab via `tabsPlugin.api.openTab({ type: "feel" })` — accessible from the command palette (Ctrl+K), the ⋯ main menu, and the welcome screen
+  - `buildFeelPlaygroundPanel(onClose?)` exported for embedding in any container; `createFeelPlaygroundPlugin()` retained as a standalone overlay variant
+- **`@bpmn-sdk/canvas-plugin-dmn-viewer` migration** — `feel.ts` now re-exports from `@bpmn-sdk/feel`; DMN cell highlighting uses the full FEEL highlighter
+
 ## Welcome Screen Examples (2026-02-26) — `@bpmn-sdk/canvas-plugin-tabs` + `apps/landing`
 
 - **Example entries on welcome screen** — the `examples` option accepts a `WelcomeExample[]`; each entry has a badge (BPMN / DMN / FORM / MULTI), label, optional description, and an `onOpen()` callback

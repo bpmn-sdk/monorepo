@@ -1748,6 +1748,14 @@ export class BpmnEditor {
 	};
 
 	private readonly _onKeyDown = (e: KeyboardEvent): void => {
+		// Don't intercept keys typed into form controls or editable elements
+		const _kbTarget = e.target as HTMLElement;
+		if (
+			_kbTarget.tagName === "INPUT" ||
+			_kbTarget.tagName === "TEXTAREA" ||
+			_kbTarget.isContentEditable
+		)
+			return;
 		if (this._readOnly) return;
 		this._stateMachine.onKeyDown(e);
 

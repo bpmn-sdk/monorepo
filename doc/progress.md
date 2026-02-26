@@ -1,5 +1,47 @@
 # Progress
 
+## 2026-02-26 — FEEL Playground tab integration + fixes
+
+### `packages/canvas` + `packages/editor` — keyboard fix
+- `KeyboardHandler._onKeyDown` now skips handling when the event target is `INPUT`, `TEXTAREA`, or a `contenteditable` element — fixes arrow keys being captured while typing in overlaid form controls
+- `BpmnEditor._onKeyDown` (and via it, the state machine) gets the same guard — fixes Delete/Backspace being `preventDefault`-ed when typing in the FEEL playground, because the tabs plugin mounts content inside `api.container` (`this._host`) so textarea events bubble to the editor's keydown handler
+
+### `canvas-plugins/feel-playground`
+- `buildFeelPlaygroundPanel(onClose?: () => void): HTMLDivElement` extracted as a public export — used by both the overlay plugin and the tabs plugin
+- `createFeelPlaygroundPlugin()` refactored to a thin wrapper using a `.feel-playground-overlay` div with a close callback
+- CSS rewritten with light/dark theme support via `[data-theme="dark"]` ancestor selectors matching the canvas container; previously used hardcoded dark colors
+
+### `canvas-plugins/tabs` — FEEL tab type
+- `TabConfig` union extended with `{ type: "feel"; name?: string }`
+- `GROUP_TYPES` includes `"feel"`; feel badge colors added (amber: `#d97706` light, `#fab387` dark)
+- `mountTabContent` for `feel` type: injects playground styles and mounts `buildFeelPlaygroundPanel()` in the pane (no close button, fills the pane)
+- Welcome screen badge `feel` style added
+
+### `apps/landing`
+- FEEL Playground opened as a proper tab (`tabsPlugin.api.openTab({ type: "feel" })`) instead of an overlay — accessible from the command palette, the ⋯ main menu, and the welcome screen examples list
+- `createFeelPlaygroundPlugin()` removed from the editor plugins array; direct `@bpmn-sdk/canvas-plugin-feel-playground` dependency removed from `landing/package.json` (tabs handles it)
+- "FEEL Playground" added to `makeExamples()` with FEEL badge
+
+## 2026-02-26 — FEEL Language Support
+
+### `packages/feel` — `@bpmn-sdk/feel`
+- **Lexer** (`lexer.ts`) — position-aware tokenizer; handles temporal literals (`@"..."`), backtick names, `..`/`**` operators, block/line comments; 16 tests
+- **AST** (`ast.ts`) — discriminated union `FeelNode` with start/end positions on every node; range nodes use `low`/`high` to avoid position field conflicts
+- **Parser** (`parser.ts`) — Pratt recursive-descent; two entry points: `parseExpression()` and `parseUnaryTests()`; greedy multi-word name resolution via `BUILTIN_PREFIXES`; error recovery with synchronization points; 42 tests
+- **Built-ins** (`builtins.ts`) — ~60 functions across conversion, string, numeric, list, context, temporal, and range categories; dual calling convention (scalar and list arguments)
+- **Evaluator** (`evaluator.ts`) — tree-walking evaluator; three-valued `and`/`or` logic; path access, filter, `for`/`some`/`every`, named args; `evaluateUnaryTests()` entry point; 75 tests
+- **Formatter** (`formatter.ts`) — pretty printer with line-length-aware wrapping; round-trip tests; 20 tests
+- **Highlighter** (`highlighter.ts`) — `annotate()` returns `AnnotatedToken[]`; `highlightToHtml()` returns HTML with `feel-*` CSS classes; `highlightFeel` backward-compat alias
+- Zero runtime dependencies; 153 tests total; passes biome and TypeScript strict mode
+
+### `canvas-plugins/feel-playground` — `@bpmn-sdk/canvas-plugin-feel-playground`
+- **Interactive FEEL panel** — Expression / Unary-Tests mode toggle; syntax-highlighted textarea overlay; JSON context input; live result display with type-colored output; error display; 10 pre-built examples
+- **`createFeelPlaygroundPlugin()`** — returns `FeelPlaygroundPlugin` (extends `CanvasPlugin` with `show()`)
+- Wired into the landing page editor via a "FEEL Playground" command palette entry (Ctrl+K)
+
+### `canvas-plugins/dmn-viewer` — migrated
+- `src/feel.ts` replaced with thin re-exports from `@bpmn-sdk/feel`; `highlightFeel`/`tokenizeFeel` now use the full FEEL lexer and highlighter; `FeelToken`/`FeelTokenType` re-exported as `AnnotatedToken`/`HighlightKind`
+
 ## 2026-02-26 — Welcome Screen Examples
 
 ### `canvas-plugins/tabs`

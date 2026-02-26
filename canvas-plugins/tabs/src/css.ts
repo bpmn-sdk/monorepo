@@ -32,6 +32,7 @@ export const TABS_CSS = `
   --tab-warn-fg: #d97706;
   --tab-type-bpmn: #3b82f6;
   --tab-type-dmn: #8b5cf6;
+  --tab-type-feel: #d97706;
   --tab-type-form: #10b981;
 }
 
@@ -47,6 +48,7 @@ export const TABS_CSS = `
   --tab-warn-fg: #fab387;
   --tab-type-bpmn: #89b4fa;
   --tab-type-dmn: #cba6f7;
+  --tab-type-feel: #fab387;
   --tab-type-form: #a6e3a1;
 }
 
@@ -85,9 +87,10 @@ export const TABS_CSS = `
   opacity: 0.7;
 }
 
-.bpmn-tab-type.bpmn { color: var(--tab-type-bpmn); }
-.bpmn-tab-type.dmn  { color: var(--tab-type-dmn); }
-.bpmn-tab-type.form { color: var(--tab-type-form); }
+.bpmn-tab-type.bpmn  { color: var(--tab-type-bpmn); }
+.bpmn-tab-type.dmn   { color: var(--tab-type-dmn); }
+.bpmn-tab-type.feel  { color: var(--tab-type-feel); }
+.bpmn-tab-type.form  { color: var(--tab-type-form); }
 
 .bpmn-tab-name {
   flex: 1;
@@ -305,14 +308,16 @@ export const TABS_CSS = `
   text-transform: uppercase;
 }
 
-.bpmn-welcome-example-badge.bpmn { background: rgba(59,130,246,0.15); color: #3b82f6; }
-.bpmn-welcome-example-badge.dmn  { background: rgba(139,92,246,0.15); color: #8b5cf6; }
-.bpmn-welcome-example-badge.form { background: rgba(16,185,129,0.15); color: #10b981; }
-.bpmn-welcome-example-badge.multi { background: rgba(249,115,22,0.15); color: #f97316; }
+.bpmn-welcome-example-badge.bpmn  { background: rgba(59,130,246,0.15);  color: #3b82f6; }
+.bpmn-welcome-example-badge.dmn   { background: rgba(139,92,246,0.15);  color: #8b5cf6; }
+.bpmn-welcome-example-badge.feel  { background: rgba(217,119,6,0.15);   color: #d97706; }
+.bpmn-welcome-example-badge.form  { background: rgba(16,185,129,0.15);  color: #10b981; }
+.bpmn-welcome-example-badge.multi { background: rgba(249,115,22,0.15);  color: #f97316; }
 
-.bpmn-welcome[data-theme="dark"] .bpmn-welcome-example-badge.bpmn { color: #89b4fa; }
-.bpmn-welcome[data-theme="dark"] .bpmn-welcome-example-badge.dmn  { color: #cba6f7; }
-.bpmn-welcome[data-theme="dark"] .bpmn-welcome-example-badge.form { color: #a6e3a1; }
+.bpmn-welcome[data-theme="dark"] .bpmn-welcome-example-badge.bpmn  { color: #89b4fa; }
+.bpmn-welcome[data-theme="dark"] .bpmn-welcome-example-badge.dmn   { color: #cba6f7; }
+.bpmn-welcome[data-theme="dark"] .bpmn-welcome-example-badge.feel  { color: #fab387; }
+.bpmn-welcome[data-theme="dark"] .bpmn-welcome-example-badge.form  { color: #a6e3a1; }
 .bpmn-welcome[data-theme="dark"] .bpmn-welcome-example-badge.multi { color: #fab387; }
 
 .bpmn-welcome-example-text {

@@ -1,5 +1,5 @@
 {
-	"name": "@bpmn-sdk/canvas-plugin-tabs",
+	"name": "@bpmn-sdk/feel",
 	"version": "0.0.1",
 	"private": false,
 	"type": "module",
@@ -11,17 +11,12 @@
 	},
 	"main": "./dist/index.js",
 	"types": "./dist/index.d.ts",
+	"files": ["dist"],
 	"scripts": {
 		"build": "tsc",
 		"typecheck": "tsc --noEmit",
 		"check": "biome check .",
 		"test": "vitest run"
 	},
-	"dependencies": {
-		"@bpmn-sdk/canvas": "workspace:*",
-		"@bpmn-sdk/canvas-plugin-dmn-viewer": "workspace:*",
-		"@bpmn-sdk/canvas-plugin-feel-playground": "workspace:*",
-		"@bpmn-sdk/canvas-plugin-form-viewer": "workspace:*",
-		"@bpmn-sdk/core": "workspace:*"
-	}
+	"dependencies": {}
 }

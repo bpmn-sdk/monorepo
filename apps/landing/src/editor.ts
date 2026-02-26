@@ -133,9 +133,11 @@ const tabsPlugin = createTabsPlugin({
 		} else if (config.type === "dmn") {
 			content = Dmn.export(config.defs);
 			filename = config.name ?? "decision.dmn";
-		} else {
+		} else if (config.type === "form") {
 			content = Form.export(config.form);
 			filename = config.name ?? "form.form";
+		} else {
+			return; // feel tabs have no file content to download
 		}
 		const blob = new Blob([content], { type: "application/octet-stream" });
 		const url = URL.createObjectURL(blob);
@@ -232,6 +234,14 @@ const configPanelBpmn = createConfigPanelBpmnPlugin(configPanel, {
 	openForm: (formId) => tabsPlugin.api.openForm(formId),
 });
 
+palette.addCommands([
+	{
+		id: "feel-playground",
+		title: "FEEL Playground",
+		action: () => tabsPlugin.api.openTab({ type: "feel", name: "FEEL Playground" }),
+	},
+]);
+
 // ── Editor ────────────────────────────────────────────────────────────────────
 
 const editor = new BpmnEditor({
@@ -248,6 +258,10 @@ const editor = new BpmnEditor({
 					label: "Import files…",
 					icon: IMPORT_ICON,
 					onClick: () => fileInput.click(),
+				},
+				{
+					label: "FEEL Playground",
+					onClick: () => tabsPlugin.api.openTab({ type: "feel", name: "FEEL Playground" }),
 				},
 			],
 		}),
