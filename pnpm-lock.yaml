@@ -69,12 +69,18 @@ importers:
       '@bpmn-sdk/canvas-plugin-minimap':
         specifier: workspace:*
         version: link:../../canvas-plugins/minimap
+      '@bpmn-sdk/canvas-plugin-tabs':
+        specifier: workspace:*
+        version: link:../../canvas-plugins/tabs
       '@bpmn-sdk/canvas-plugin-watermark':
         specifier: workspace:*
         version: link:../../canvas-plugins/watermark
       '@bpmn-sdk/canvas-plugin-zoom-controls':
         specifier: workspace:*
         version: link:../../canvas-plugins/zoom-controls
+      '@bpmn-sdk/core':
+        specifier: workspace:*
+        version: link:../../packages/bpmn-sdk
       '@bpmn-sdk/editor':
         specifier: workspace:*
         version: link:../../packages/editor

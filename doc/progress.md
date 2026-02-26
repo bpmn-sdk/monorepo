@@ -1,5 +1,25 @@
 # Progress
 
+## 2026-02-26 — Editor Integration: Multi-file Import + Tabs
+
+### `apps/landing` — editor.ts
+- **`InMemoryFileResolver`** created and shared between the tabs plugin and the config panel bpmn callbacks
+- **`createTabsPlugin`** added to the editor plugin stack with `onTabActivate` wired to `editor.load(xml)` for BPMN tabs
+- **`createConfigPanelBpmnPlugin`** now receives `openDecision` and `openForm` callbacks that delegate to `tabsPlugin.api.openDecision/openForm`
+- **Multi-file import via menu** — "Import files…" entry in the main-menu dropdown opens a `<input type="file" multiple>` accepting `.bpmn`, `.xml`, `.dmn`, `.form`, `.json`; each file is parsed and opened in its own tab
+- **Drag-and-drop** — `dragover`/`drop` handlers on `#editor-container` accept dropped files; same parsing and tab-opening logic
+- `.bpmn`/`.xml` → BPMN tab (loaded into the editor via `onTabActivate`); `.dmn` → DMN tab (registered in resolver); `.form`/`.json` → Form tab (registered in resolver)
+
+### `canvas-plugins/main-menu` — menuItems extension
+- **`menuItems?: MenuItem[]`** added to `MainMenuOptions`; supports `MenuAction` (label + optional icon + onClick) and `MenuSeparator`
+- Custom items render above the Theme section with an automatic separator; theme section wrapped in a `display:contents` div so `buildThemeItems` rebuilds only that portion
+- **`.bpmn-menu-drop-sep`** CSS added for the separator rule
+
+### `canvas-plugins/tabs` — onTabActivate + transparent BPMN panes
+- **`onTabActivate?: (id, config) => void`** added to `TabsPluginOptions`; called in `setActiveTab` after the tab is made active
+- **BPMN panes** are now empty (no text note) and transparent — the main canvas SVG shows through
+- **`pointer-events: none`** applied to the content area when a BPMN tab is active so the canvas remains fully interactive; restored when a DMN/Form tab is active
+
 ## 2026-02-26 — DMN Viewer, Form Viewer, Tabs Plugin, Extended Core Model
 
 ### `@bpmn-sdk/core` — Zeebe extensions + full Form component set

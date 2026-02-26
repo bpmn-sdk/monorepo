@@ -1,5 +1,13 @@
 # Features
 
+## Multi-file Import + Tab Navigation in Editor (2026-02-26) — `apps/landing` + `canvas-plugins/*`
+
+- **Import files via menu** — "Import files…" in the top-right menu opens a file picker accepting `.bpmn`, `.xml`, `.dmn`, `.form`, `.json`; each file opens in a separate tab
+- **Drag-and-drop import** — drop any supported file onto the canvas to open it in a new tab
+- **BPMN tab switching** — clicking a BPMN tab loads that diagram into the editor; BPMN panes are transparent so the editor canvas shows through
+- **DMN/Form cross-navigation** — "Open Decision ↗" / "Open Form ↗" buttons in the config panel open the referenced file in a tab using the same `InMemoryFileResolver` populated by imports
+- **`menuItems` option** added to main-menu plugin for injecting custom actions above the Theme section
+
 ## DMN Viewer + Form Viewer + Tabs Plugin (2026-02-26)
 
 ### `@bpmn-sdk/canvas-plugin-dmn-viewer`

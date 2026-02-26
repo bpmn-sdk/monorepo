@@ -114,6 +114,11 @@ export const MAIN_MENU_CSS = `
   width: 100%;
   height: 100%;
 }
+.bpmn-menu-drop-sep {
+  height: 1px;
+  background: var(--bpmn-overlay-border, rgba(0,0,0,0.1));
+  margin: 3px 4px;
+}
 `;
 
 export function injectMainMenuStyles(): void {

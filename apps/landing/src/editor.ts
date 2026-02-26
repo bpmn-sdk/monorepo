@@ -3,8 +3,10 @@ import { createCommandPaletteEditorPlugin } from "@bpmn-sdk/canvas-plugin-comman
 import { createConfigPanelPlugin } from "@bpmn-sdk/canvas-plugin-config-panel";
 import { createConfigPanelBpmnPlugin } from "@bpmn-sdk/canvas-plugin-config-panel-bpmn";
 import { createMainMenuPlugin } from "@bpmn-sdk/canvas-plugin-main-menu";
+import { InMemoryFileResolver, createTabsPlugin } from "@bpmn-sdk/canvas-plugin-tabs";
 import { createWatermarkPlugin } from "@bpmn-sdk/canvas-plugin-watermark";
 import { createZoomControlsPlugin } from "@bpmn-sdk/canvas-plugin-zoom-controls";
+import { Bpmn, Dmn, Form } from "@bpmn-sdk/core";
 import { BpmnEditor, initEditorHud } from "@bpmn-sdk/editor";
 import type { Tool } from "@bpmn-sdk/editor";
 
@@ -16,6 +18,9 @@ const LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
   <line x1="15" y1="12" x2="16.5" y2="12" stroke="white" stroke-width="1.5"/>
   <circle cx="19" cy="12" r="2.5" fill="none" stroke="white" stroke-width="2.5"/>
 </svg>`;
+
+const IMPORT_ICON =
+	'<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v8M5 5l3-3 3 3"/><path d="M2 13h12"/></svg>';
 
 const SAMPLE_XML = `<?xml version="1.0" encoding="UTF-8"?>
 <bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
@@ -60,8 +65,85 @@ const SAMPLE_XML = `<?xml version="1.0" encoding="UTF-8"?>
   </bpmndi:BPMNDiagram>
 </bpmn:definitions>`;
 
+// ── Setup ──────────────────────────────────────────────────────────────────────
+
 const editorContainer = document.getElementById("editor-container");
 if (!editorContainer) throw new Error("missing #editor-container");
+
+// File resolver — shared between the tabs plugin and the config panel callbacks
+const resolver = new InMemoryFileResolver();
+
+let editorRef: BpmnEditor | null = null;
+
+// Tabs plugin — onTabActivate loads the BPMN into the editor when a BPMN tab is clicked
+const tabsPlugin = createTabsPlugin({
+	resolver,
+	onTabActivate(_id, config) {
+		if (config.type === "bpmn" && config.xml) {
+			editorRef?.load(config.xml);
+		}
+	},
+});
+
+// ── File import logic ──────────────────────────────────────────────────────────
+
+async function importFiles(files: FileList | File[]): Promise<void> {
+	for (const file of Array.from(files)) {
+		const name = file.name;
+		const ext = name.slice(name.lastIndexOf(".")).toLowerCase();
+
+		try {
+			const text = await file.text();
+
+			if (ext === ".bpmn" || ext === ".xml") {
+				// Validate first; onTabActivate will call editor.load(xml)
+				Bpmn.parse(text);
+				tabsPlugin.api.openTab({ type: "bpmn", xml: text, name });
+			} else if (ext === ".dmn") {
+				const defs = Dmn.parse(text);
+				resolver.registerDmn(defs);
+				tabsPlugin.api.openTab({ type: "dmn", defs, name: defs.name ?? name });
+			} else if (ext === ".form" || ext === ".json") {
+				const form = Form.parse(text);
+				resolver.registerForm(form);
+				tabsPlugin.api.openTab({ type: "form", form, name: form.id ?? name });
+			}
+		} catch (err) {
+			console.error(`[bpmn-sdk] Failed to import ${name}:`, err);
+		}
+	}
+}
+
+// ── Hidden file input for the "Import" menu action ────────────────────────────
+
+const fileInput = document.createElement("input");
+fileInput.type = "file";
+fileInput.multiple = true;
+fileInput.accept = ".bpmn,.xml,.dmn,.form,.json";
+fileInput.style.display = "none";
+document.body.appendChild(fileInput);
+fileInput.addEventListener("change", () => {
+	if (fileInput.files) {
+		void importFiles(fileInput.files);
+		fileInput.value = "";
+	}
+});
+
+// ── Drag-and-drop ──────────────────────────────────────────────────────────────
+
+editorContainer.addEventListener("dragover", (e) => {
+	e.preventDefault();
+});
+
+editorContainer.addEventListener("drop", (e) => {
+	e.preventDefault();
+	const files = e.dataTransfer?.files;
+	if (files && files.length > 0) {
+		void importFiles(files);
+	}
+});
+
+// ── Plugins ───────────────────────────────────────────────────────────────────
 
 const palette = createCommandPalettePlugin({
 	onZenModeChange(active) {
@@ -72,7 +154,6 @@ const palette = createCommandPalettePlugin({
 	},
 });
 
-let editorRef: BpmnEditor | null = null;
 const paletteEditor = createCommandPaletteEditorPlugin(palette, (tool) => {
 	editorRef?.setTool(tool as Tool);
 });
@@ -83,7 +164,13 @@ const configPanel = createConfigPanelPlugin({
 		editorRef?.applyChange(fn);
 	},
 });
-const configPanelBpmn = createConfigPanelBpmnPlugin(configPanel);
+
+const configPanelBpmn = createConfigPanelBpmnPlugin(configPanel, {
+	openDecision: (decisionId) => tabsPlugin.api.openDecision(decisionId),
+	openForm: (formId) => tabsPlugin.api.openForm(formId),
+});
+
+// ── Editor ────────────────────────────────────────────────────────────────────
 
 const editor = new BpmnEditor({
 	container: editorContainer,
@@ -92,12 +179,22 @@ const editor = new BpmnEditor({
 	grid: true,
 	fit: "center",
 	plugins: [
-		createMainMenuPlugin({ title: "BPMN SDK" }),
+		createMainMenuPlugin({
+			title: "BPMN SDK",
+			menuItems: [
+				{
+					label: "Import files…",
+					icon: IMPORT_ICON,
+					onClick: () => fileInput.click(),
+				},
+			],
+		}),
 		createZoomControlsPlugin(),
 		createWatermarkPlugin({
 			links: [{ label: "Github", url: "https://github.com/bpmn-sdk/monorepo" }],
 			logo: LOGO_SVG,
 		}),
+		tabsPlugin,
 		palette,
 		paletteEditor,
 		configPanel,

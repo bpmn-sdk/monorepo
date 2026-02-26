@@ -29,6 +29,12 @@ export interface TabsPluginOptions {
 	 * to enable "Open Decision" / "Open Form" navigation.
 	 */
 	resolver?: FileResolver;
+	/**
+	 * Called whenever a tab becomes active.
+	 * Use this to react to tab switches — e.g. reload the BPMN editor
+	 * when a BPMN tab is activated.
+	 */
+	onTabActivate?: (id: string, config: TabConfig) => void;
 }
 
 /** Public API for the tabs plugin, accessible via `tabsPlugin.api`. */
@@ -143,12 +149,8 @@ export function createTabsPlugin(options: TabsPluginOptions = {}): CanvasPlugin 
 			tab.formViewer = new FormViewer({ container: pane, theme });
 			tab.formViewer.load(tab.config.form);
 		} else if (tab.config.type === "bpmn") {
-			// BPMN tabs: the main canvas SVG is shown; additional BPMN panes show read-only info
-			const bpmnNote = document.createElement("div");
-			bpmnNote.style.cssText =
-				"padding:16px;font-size:13px;color:var(--dmn-fg,#cdd6f4);font-family:sans-serif;";
-			bpmnNote.textContent = `BPMN: ${tab.config.name ?? tab.config.xml.slice(0, 60)}…`;
-			pane.appendChild(bpmnNote);
+			// BPMN pane is intentionally empty and transparent — the main canvas SVG
+			// shows through. pointer-events are set to none in setActiveTab.
 		}
 	}
 
@@ -221,6 +223,13 @@ export function createTabsPlugin(options: TabsPluginOptions = {}): CanvasPlugin 
 			activeId = id;
 			tab.tabEl.classList.add("active");
 			tab.pane.classList.remove("hidden");
+
+			// BPMN panes are transparent; disable pointer-events so the canvas is interactive
+			if (contentArea) {
+				contentArea.style.pointerEvents = tab.config.type === "bpmn" ? "none" : "";
+			}
+
+			options.onTabActivate?.(id, tab.config);
 		},
 
 		getActiveTabId(): string | null {

@@ -25,9 +25,25 @@ import { injectMainMenuStyles } from "./css.js";
 
 export { MAIN_MENU_CSS, MAIN_MENU_STYLE_ID, injectMainMenuStyles } from "./css.js";
 
+/** A clickable action item in the main menu dropdown. */
+export interface MenuAction {
+	label: string;
+	icon?: string;
+	onClick: () => void;
+}
+
+/** A visual separator between groups of menu items. */
+export interface MenuSeparator {
+	type: "separator";
+}
+
+export type MenuItem = MenuAction | MenuSeparator;
+
 export interface MainMenuOptions {
 	/** Optional title text shown to the left of the menu button. */
 	title?: string;
+	/** Extra items rendered above the Theme section in the dropdown. */
+	menuItems?: MenuItem[];
 }
 
 const DOTS_ICON =
@@ -100,15 +116,60 @@ export function createMainMenuPlugin(options: MainMenuOptions = {}): CanvasPlugi
 			const dropdown = document.createElement("div");
 			dropdown.className = "bpmn-menu-dropdown";
 
+			// Custom items (rendered before the Theme section)
+			if (options.menuItems && options.menuItems.length > 0) {
+				for (const item of options.menuItems) {
+					if ("type" in item && item.type === "separator") {
+						const sep = document.createElement("div");
+						sep.className = "bpmn-menu-drop-sep";
+						dropdown.appendChild(sep);
+					} else {
+						const action = item as MenuAction;
+						const btn = document.createElement("button");
+						btn.className = "bpmn-menu-item";
+						btn.type = "button";
+
+						const checkSpan = document.createElement("span");
+						checkSpan.className = "bpmn-menu-item-check";
+						btn.appendChild(checkSpan);
+
+						const iconSpan = document.createElement("span");
+						iconSpan.className = "bpmn-menu-item-icon";
+						if (action.icon) iconSpan.innerHTML = action.icon;
+						btn.appendChild(iconSpan);
+
+						const labelSpan = document.createElement("span");
+						labelSpan.textContent = action.label;
+						btn.appendChild(labelSpan);
+
+						btn.addEventListener("click", () => {
+							closeDropdown();
+							action.onClick();
+						});
+						dropdown.appendChild(btn);
+					}
+				}
+
+				const sep = document.createElement("div");
+				sep.className = "bpmn-menu-drop-sep";
+				dropdown.appendChild(sep);
+			}
+
+			// Theme section — wrapped in a display:contents div so buildThemeItems
+			// can rebuild only this portion without affecting custom items above.
+			const themeWrapper = document.createElement("div");
+			themeWrapper.style.display = "contents";
+			dropdown.appendChild(themeWrapper);
+
 			const themeLabel = document.createElement("div");
 			themeLabel.className = "bpmn-menu-drop-label";
 			themeLabel.textContent = "Theme";
-			dropdown.appendChild(themeLabel);
+			themeWrapper.appendChild(themeLabel);
 
 			function buildThemeItems(): void {
-				// Remove existing theme items (keep the label)
-				while (dropdown.children.length > 1) {
-					dropdown.removeChild(dropdown.lastChild as Node);
+				// Remove existing theme buttons (keep the label)
+				while (themeWrapper.children.length > 1) {
+					themeWrapper.removeChild(themeWrapper.lastChild as Node);
 				}
 				for (const t of THEMES) {
 					const btn = document.createElement("button");
@@ -136,7 +197,7 @@ export function createMainMenuPlugin(options: MainMenuOptions = {}): CanvasPlugi
 						buildThemeItems();
 						closeDropdown();
 					});
-					dropdown.appendChild(btn);
+					themeWrapper.appendChild(btn);
 				}
 			}
 
