@@ -14,7 +14,7 @@ export type TabConfig =
 	| { type: "bpmn"; xml: string; name?: string }
 	| { type: "dmn"; defs: DmnDefinitions; name?: string }
 	| { type: "form"; form: FormDefinition; name?: string }
-	| { type: "feel"; name?: string };
+	| { type: "feel"; name?: string; expression?: string };
 
 /** Internal tab state. */
 interface TabState {
@@ -527,7 +527,7 @@ export function createTabsPlugin(options: TabsPluginOptions = {}): CanvasPlugin 
 			tab.formViewer.load(tab.config.form);
 		} else if (tab.config.type === "feel") {
 			injectPlaygroundStyles();
-			pane.appendChild(buildFeelPlaygroundPanel());
+			pane.appendChild(buildFeelPlaygroundPanel(undefined, tab.config.expression));
 		}
 		// BPMN pane is intentionally empty and transparent — the main canvas SVG
 		// shows through. pointer-events are set to none in setActiveTab.

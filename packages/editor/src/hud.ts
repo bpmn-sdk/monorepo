@@ -307,6 +307,123 @@ export function initEditorHud(editor: BpmnEditor, options: HudOptions = {}): voi
 		setTimeout(() => document.addEventListener("pointerdown", onOutside), 0);
 	}
 
+	// ── Type-change picker (used by cfgToolbar) ────────────────────────────────
+
+	function showTypePicker(
+		anchor: HTMLButtonElement,
+		group: GroupDef,
+		sourceId: string,
+		sourceType: string,
+	): void {
+		closeGroupPicker();
+		closeAllDropdowns();
+
+		const picker = document.createElement("div");
+		picker.className = "group-picker";
+
+		const label = document.createElement("span");
+		label.className = "group-picker-label";
+		label.textContent = group.title;
+		picker.appendChild(label);
+
+		for (const item of group.items) {
+			const btn = document.createElement("button");
+			btn.className = item.type === sourceType ? "hud-btn active" : "hud-btn";
+			btn.innerHTML = item.icon;
+			btn.title = item.title;
+			btn.addEventListener("click", (e) => {
+				e.stopPropagation();
+				if (item.type !== sourceType) editor.changeElementType(sourceId, item.type);
+				closeGroupPicker();
+			});
+			picker.appendChild(btn);
+		}
+
+		document.body.appendChild(picker);
+		openGroupPicker = picker;
+
+		const rect = anchor.getBoundingClientRect();
+		const pickerW = group.items.length * 36 + 80;
+		const left = Math.max(
+			4,
+			Math.min(rect.left + rect.width / 2 - pickerW / 2, window.innerWidth - pickerW - 4),
+		);
+		picker.style.bottom = `${window.innerHeight - rect.top + 6}px`;
+		picker.style.left = `${left}px`;
+
+		const onOutside = (e: PointerEvent) => {
+			if (!picker.contains(e.target as Node) && e.target !== anchor) {
+				closeGroupPicker();
+				document.removeEventListener("pointerdown", onOutside);
+			}
+		};
+		setTimeout(() => document.addEventListener("pointerdown", onOutside), 0);
+	}
+
+	// ── Color picker (used by ctxToolbar) ──────────────────────────────────────
+
+	function showColorPicker(
+		anchor: HTMLButtonElement,
+		sourceId: string,
+		currentFill: string | undefined,
+	): void {
+		closeGroupPicker();
+		closeAllDropdowns();
+
+		const picker = document.createElement("div");
+		picker.className = "group-picker";
+
+		// "Default" (no-color) swatch
+		const clearSwatch = document.createElement("button");
+		const isDefault = !currentFill;
+		clearSwatch.className = isDefault
+			? "bpmn-color-swatch bpmn-color-swatch--default active"
+			: "bpmn-color-swatch bpmn-color-swatch--default";
+		clearSwatch.title = "Default color";
+		clearSwatch.addEventListener("click", (e) => {
+			e.stopPropagation();
+			editor.updateColor(sourceId, {});
+			closeGroupPicker();
+		});
+		picker.appendChild(clearSwatch);
+
+		for (const { fill, stroke } of COLOR_PALETTE) {
+			const isActive = currentFill === fill;
+			const swatch = document.createElement("button");
+			swatch.className = isActive ? "bpmn-color-swatch active" : "bpmn-color-swatch";
+			swatch.style.background = fill;
+			swatch.style.outlineColor = stroke;
+			swatch.title = "Apply color";
+			swatch.addEventListener("click", (e) => {
+				e.stopPropagation();
+				editor.updateColor(sourceId, { fill, stroke });
+				closeGroupPicker();
+			});
+			picker.appendChild(swatch);
+		}
+
+		document.body.appendChild(picker);
+		openGroupPicker = picker;
+
+		const rect = anchor.getBoundingClientRect();
+		const pickerW = (COLOR_PALETTE.length + 1) * 30 + 20;
+		const left = Math.max(
+			4,
+			Math.min(rect.left + rect.width / 2 - pickerW / 2, window.innerWidth - pickerW - 4),
+		);
+		picker.style.top = `${rect.bottom + 6}px`;
+		picker.style.bottom = "auto";
+		picker.style.left = `${left}px`;
+
+		const onOutside = (e: PointerEvent) => {
+			if (!picker.contains(e.target as Node) && e.target !== anchor) {
+				closeGroupPicker();
+				document.removeEventListener("pointerdown", onOutside);
+			}
+		};
+		setTimeout(() => document.addEventListener("pointerdown", onOutside), 0);
+	}
+
 	// ── Build group buttons ────────────────────────────────────────────────────
 
 	for (const group of GROUPS) {
@@ -651,24 +768,22 @@ export function initEditorHud(editor: BpmnEditor, options: HudOptions = {}): voi
 			const defs = editor.getDefinitions();
 			const diShape = defs?.diagrams[0]?.plane.shapes.find((s) => s.bpmnElement === sourceId);
 			const currentColor = diShape ? readDiColor(diShape.unknownAttributes) : {};
+			const currentFill = currentColor.fill;
 
-			const swatchRow = document.createElement("div");
-			swatchRow.className = "bpmn-color-swatches";
-
-			for (const { fill, stroke } of COLOR_PALETTE) {
-				const swatch = document.createElement("button");
-				const isActive = currentColor.fill === fill;
-				swatch.className = isActive ? "bpmn-color-swatch active" : "bpmn-color-swatch";
-				swatch.style.background = fill;
-				swatch.style.outlineColor = stroke;
-				swatch.title = "Apply color";
-				swatch.addEventListener("click", () => {
-					// Toggle: clicking active swatch clears the color
-					editor.updateColor(sourceId, isActive ? {} : { fill, stroke });
-				});
-				swatchRow.appendChild(swatch);
+			const singleSwatch = document.createElement("button");
+			singleSwatch.className = currentFill
+				? "bpmn-color-swatch active"
+				: "bpmn-color-swatch bpmn-color-swatch--default";
+			if (currentFill) {
+				singleSwatch.style.background = currentFill;
+				const palette = COLOR_PALETTE.find((p) => p.fill === currentFill);
+				if (palette) singleSwatch.style.outlineColor = palette.stroke;
 			}
-			ctxToolbar.appendChild(swatchRow);
+			singleSwatch.title = "Color (click for options)";
+			singleSwatch.addEventListener("click", () =>
+				showColorPicker(singleSwatch, sourceId, currentFill),
+			);
+			ctxToolbar.appendChild(singleSwatch);
 
 			// Add annotation button
 			const annotBtn = document.createElement("button");
@@ -692,18 +807,13 @@ export function initEditorHud(editor: BpmnEditor, options: HudOptions = {}): voi
 		const group = eGroup ? GROUPS.find((g) => g.id === eGroup.id) : undefined;
 
 		if (group && group.items.length > 1) {
-			for (const opt of group.items) {
-				const btn = document.createElement("button");
-				btn.className = opt.type === sourceType ? "hud-btn active" : "hud-btn";
-				btn.innerHTML = opt.icon;
-				btn.title = opt.title;
-				btn.addEventListener("click", () => {
-					if (opt.type !== sourceType) {
-						editor.changeElementType(sourceId, opt.type);
-					}
-				});
-				cfgToolbar.appendChild(btn);
-			}
+			const currentItem = group.items.find((i) => i.type === sourceType);
+			const typeBtn = document.createElement("button");
+			typeBtn.className = "hud-btn active";
+			typeBtn.innerHTML = currentItem?.icon ?? group.groupIcon;
+			typeBtn.title = `${currentItem?.title ?? group.title} (click to change)`;
+			typeBtn.addEventListener("click", () => showTypePicker(typeBtn, group, sourceId, sourceType));
+			cfgToolbar.appendChild(typeBtn);
 		}
 
 		if (EXTERNAL_LABEL_TYPES.has(sourceType as CreateShapeType)) {

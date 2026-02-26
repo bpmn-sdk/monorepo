@@ -574,38 +574,48 @@ const BUSINESS_RULE_TASK_ADAPTER: PanelAdapter = {
 
 // ── Script task schema ────────────────────────────────────────────────────────
 
-const SCRIPT_TASK_SCHEMA: PanelSchema = {
-	compact: [{ key: "name", label: "Name", type: "text", placeholder: "Task name" }],
-	groups: [
-		{
-			id: "general",
-			label: "General",
-			fields: [
-				{ key: "name", label: "Name", type: "text", placeholder: "Task name" },
-				{
-					key: "expression",
-					label: "FEEL expression",
-					type: "textarea",
-					placeholder: "= someVariable",
-					hint: "FEEL expression evaluated by the script engine.",
-				},
-				{
-					key: "resultVariable",
-					label: "Result variable",
-					type: "text",
-					placeholder: "result",
-					hint: "Process variable that receives the script output.",
-				},
-				{
-					key: "documentation",
-					label: "Documentation",
-					type: "textarea",
-					placeholder: "Add notes or documentation…",
-				},
-			],
-		},
-	],
-};
+function makeScriptTaskSchema(onOpenFeelPlayground?: (expression: string) => void): PanelSchema {
+	return {
+		compact: [{ key: "name", label: "Name", type: "text", placeholder: "Task name" }],
+		groups: [
+			{
+				id: "general",
+				label: "General",
+				fields: [
+					{ key: "name", label: "Name", type: "text", placeholder: "Task name" },
+					{
+						key: "expression",
+						label: "FEEL expression",
+						type: "feel-expression",
+						placeholder: "= someVariable",
+						hint: "FEEL expression evaluated by the script engine.",
+						...(onOpenFeelPlayground
+							? {
+									openInPlayground: (v) => {
+										const expr = v.expression;
+										if (typeof expr === "string") onOpenFeelPlayground(expr.replace(/^=\s*/, ""));
+									},
+								}
+							: {}),
+					},
+					{
+						key: "resultVariable",
+						label: "Result variable",
+						type: "text",
+						placeholder: "result",
+						hint: "Process variable that receives the script output.",
+					},
+					{
+						key: "documentation",
+						label: "Documentation",
+						type: "textarea",
+						placeholder: "Add notes or documentation…",
+					},
+				],
+			},
+		],
+	};
+}
 
 const SCRIPT_TASK_ADAPTER: PanelAdapter = {
 	read(defs, id) {
@@ -737,53 +747,107 @@ const CALL_ACTIVITY_ADAPTER: PanelAdapter = {
 
 // ── Sequence flow schema ──────────────────────────────────────────────────────
 
-const SEQUENCE_FLOW_SCHEMA: PanelSchema = {
-	compact: [
-		{
-			key: "conditionExpression",
-			label: "Condition",
-			type: "text",
-			placeholder: "= expression",
-		},
-	],
-	groups: [
-		{
-			id: "general",
-			label: "General",
-			fields: [
-				{ key: "name", label: "Name", type: "text", placeholder: "Edge label" },
-				{
-					key: "conditionExpression",
-					label: "Condition expression (FEEL)",
-					type: "textarea",
-					placeholder: '= someVariable = "value"',
-					hint: "FEEL expression that must evaluate to true for this path to be taken.",
-				},
-			],
-		},
-	],
-};
+function makeSequenceFlowSchema(onOpenFeelPlayground?: (expression: string) => void): PanelSchema {
+	return {
+		compact: [
+			{
+				key: "conditionExpression",
+				label: "Condition",
+				type: "text",
+				placeholder: "= expression",
+			},
+		],
+		groups: [
+			{
+				id: "general",
+				label: "General",
+				fields: [
+					{ key: "name", label: "Name", type: "text", placeholder: "Edge label" },
+					{
+						key: "conditionExpression",
+						label: "Condition expression (FEEL)",
+						type: "feel-expression",
+						placeholder: '= someVariable = "value"',
+						hint: "FEEL expression that must evaluate to true for this path to be taken.",
+						...(onOpenFeelPlayground
+							? {
+									openInPlayground: (v) => {
+										const expr = v.conditionExpression;
+										if (typeof expr === "string") onOpenFeelPlayground(expr.replace(/^=\s*/, ""));
+									},
+								}
+							: {}),
+					},
+					{
+						key: "isDefault",
+						label: "Default flow",
+						type: "toggle",
+						hint: "Mark as default path taken when no other condition evaluates to true.",
+					},
+				],
+			},
+		],
+	};
+}
 
 const SEQUENCE_FLOW_ADAPTER: PanelAdapter = {
 	read(defs, id) {
 		const sf = findSequenceFlow(defs, id);
 		if (!sf) return {};
+		// Check whether this flow is the default of its source gateway
+		const sourceEl = findFlowElement(defs, sf.sourceRef);
+		const isDefault =
+			sourceEl &&
+			(sourceEl.type === "exclusiveGateway" ||
+				sourceEl.type === "inclusiveGateway" ||
+				sourceEl.type === "complexGateway") &&
+			sourceEl.default === sf.id;
 		return {
 			name: sf.name ?? "",
 			conditionExpression: sf.conditionExpression?.text ?? "",
+			isDefault: isDefault ?? false,
 		};
 	},
 	write(defs: BpmnDefinitions, id: string, values: Record<string, FieldValue>): BpmnDefinitions {
-		return updateSequenceFlow(defs, id, (sf) => {
+		const sf = findSequenceFlow(defs, id);
+		const sourceRef = sf?.sourceRef;
+
+		// Update the sequence flow itself
+		let result = updateSequenceFlow(defs, id, (flow) => {
 			const expr = strVal(values.conditionExpression);
 			return {
-				...sf,
-				name: typeof values.name === "string" ? values.name || undefined : sf.name,
+				...flow,
+				name: typeof values.name === "string" ? values.name || undefined : flow.name,
 				conditionExpression: expr
 					? { text: expr, attributes: { "xsi:type": "bpmn:tFormalExpression" } }
 					: undefined,
 			};
 		});
+
+		// Update the source gateway's default attribute
+		if (sourceRef) {
+			const sourceEl = findFlowElement(result, sourceRef);
+			if (
+				sourceEl &&
+				(sourceEl.type === "exclusiveGateway" ||
+					sourceEl.type === "inclusiveGateway" ||
+					sourceEl.type === "complexGateway")
+			) {
+				const makeDefault = values.isDefault === true;
+				result = updateFlowElement(result, sourceRef, (el) => {
+					if (
+						el.type === "exclusiveGateway" ||
+						el.type === "inclusiveGateway" ||
+						el.type === "complexGateway"
+					) {
+						return { ...el, default: makeDefault ? id : undefined };
+					}
+					return el;
+				});
+			}
+		}
+
+		return result;
 	},
 };
 
@@ -805,6 +869,11 @@ export interface ConfigPanelBpmnOptions {
 	 * Typically implemented by navigating to the BPMN tab with the matching process ID.
 	 */
 	openProcess?: (processId: string) => void;
+	/**
+	 * Called when the user clicks "Open in FEEL Playground ↗" in a FEEL expression field.
+	 * Typically implemented by calling `tabsPlugin.api.openTab({ type: "feel", ... })`.
+	 */
+	openFeelPlayground?: (expression: string) => void;
 }
 
 // ── Factory ───────────────────────────────────────────────────────────────────
@@ -834,6 +903,8 @@ export function createConfigPanelBpmnPlugin(
 	const userTaskSchema = makeUserTaskSchema(options.openForm);
 	const businessRuleTaskSchema = makeBusinessRuleTaskSchema(options.openDecision);
 	const callActivitySchema = makeCallActivitySchema(options.openProcess);
+	const scriptTaskSchema = makeScriptTaskSchema(options.openFeelPlayground);
+	const sequenceFlowSchema = makeSequenceFlowSchema(options.openFeelPlayground);
 
 	return {
 		name: "config-panel-bpmn",
@@ -856,11 +927,11 @@ export function createConfigPanelBpmnPlugin(
 			// Ad-hoc subprocess: template-aware adapter (AI Agent pattern)
 			configPanel.registerSchema("adHocSubProcess", GENERIC_ADHOC_SCHEMA, ADHOC_SUBPROCESS_ADAPTER);
 			// Script task: FEEL expression + result variable
-			configPanel.registerSchema("scriptTask", SCRIPT_TASK_SCHEMA, SCRIPT_TASK_ADAPTER);
+			configPanel.registerSchema("scriptTask", scriptTaskSchema, SCRIPT_TASK_ADAPTER);
 			// Call activity: called process ID + navigate button
 			configPanel.registerSchema("callActivity", callActivitySchema, CALL_ACTIVITY_ADAPTER);
 			// Sequence flow: condition expression (for gateway edges)
-			configPanel.registerSchema("sequenceFlow", SEQUENCE_FLOW_SCHEMA, SEQUENCE_FLOW_ADAPTER);
+			configPanel.registerSchema("sequenceFlow", sequenceFlowSchema, SEQUENCE_FLOW_ADAPTER);
 		},
 
 		registerTemplate(template: ElementTemplate): void {

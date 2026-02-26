@@ -360,6 +360,17 @@ export const HUD_CSS = `
 .bpmn-color-swatch:hover { transform: scale(1.2); }
 .bpmn-color-swatch.active { border-color: rgba(255,255,255,0.8); }
 [data-bpmn-hud-theme="light"] .bpmn-color-swatch.active { border-color: rgba(0,0,0,0.5); }
+.bpmn-color-swatch--default {
+  background: transparent; border-color: rgba(255,255,255,0.25);
+  position: relative; overflow: hidden;
+}
+[data-bpmn-hud-theme="light"] .bpmn-color-swatch--default { border-color: rgba(0,0,0,0.2); }
+.bpmn-color-swatch--default::after {
+  content: ''; position: absolute;
+  top: 1px; left: 50%; transform: translateX(-50%) rotate(-45deg);
+  width: 1.5px; height: calc(100% - 2px);
+  background: rgba(200,50,50,0.65); border-radius: 1px;
+}
 
 /* ── Mobile: collapsible center toolbars ─────────────────────────── */
 #btn-bc-toggle, #btn-tc-toggle { display: none; }

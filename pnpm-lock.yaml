@@ -129,6 +129,9 @@ importers:
       '@bpmn-sdk/editor':
         specifier: workspace:*
         version: link:../../packages/editor
+      '@bpmn-sdk/feel':
+        specifier: workspace:*
+        version: link:../../packages/feel
 
   canvas-plugins/dmn-viewer:
     dependencies:

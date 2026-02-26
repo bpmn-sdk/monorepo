@@ -153,6 +153,10 @@ export const CANVAS_CSS = `
   stroke-width: 1.5;
   stroke-dasharray: 5 3;
 }
+.bpmn-edge-default-slash {
+  stroke: var(--bpmn-flow-stroke, #404040);
+  stroke-width: 1.5;
+}
 .bpmn-arrow-fill {
   fill: var(--bpmn-flow-stroke, #404040);
 }
@@ -165,6 +169,11 @@ export const CANVAS_CSS = `
   text-anchor: middle;
   dominant-baseline: central;
   pointer-events: none;
+  /* White halo behind text so labels never visually merge with edge lines */
+  paint-order: stroke;
+  stroke: var(--bpmn-bg, #f8f9fa);
+  stroke-width: 4px;
+  stroke-linejoin: round;
 }
 
 /* ── Light theme (default) ───────────────────────────────────────── */

@@ -279,6 +279,43 @@ export const CONFIG_PANEL_CSS = `
   line-height: 1.4;
 }
 
+/* ── FEEL expression field ────────────────────────────────────────────────── */
+.bpmn-cfg-feel-ta {
+  width: 100%;
+  min-height: 68px;
+  padding: 7px 10px;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 6px;
+  font-size: 11px;
+  font-family: ui-monospace, "SF Mono", monospace;
+  line-height: 1.5;
+  resize: vertical;
+  outline: none;
+  transition: border-color 0.15s;
+  box-sizing: border-box;
+}
+
+.bpmn-cfg-feel-playground-btn {
+  display: inline-flex;
+  margin-top: 4px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: none;
+  color: #4c8ef7;
+  font-size: 11px;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+.bpmn-cfg-feel-playground-btn:hover { background: rgba(76,142,247,0.1); }
+
+/* Light theme overrides */
+[data-bpmn-hud-theme="light"] .bpmn-cfg-feel-playground-btn {
+  border-color: rgba(0,0,0,0.12);
+  color: #1a56db;
+}
+[data-bpmn-hud-theme="light"] .bpmn-cfg-feel-playground-btn:hover { background: rgba(26,86,219,0.08); }
+
 /* ── Toggle ───────────────────────────────────────────────────────────────── */
 .bpmn-cfg-toggle-row {
   display: flex;

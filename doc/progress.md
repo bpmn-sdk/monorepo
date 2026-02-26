@@ -1,5 +1,46 @@
 # Progress
 
+## 2026-02-26 — Editor UX improvements: default color reset, FEEL = prefix stripping, default gateway edge marker
+
+### `packages/editor`
+- **Color picker — default option** — added a "no color" swatch (shown first with a diagonal slash indicator) to the color picker; clicking it calls `editor.updateColor(sourceId, {})` to revert to the default styling; swatch is shown as active when no custom color is set
+
+### `packages/canvas`
+- **Default gateway edge** — `renderEdge` now renders a small perpendicular slash mark near the source end of sequence flows that are the default flow of their source gateway (exclusive / inclusive / complex); `buildIndex` tracks `defaultFlowIds` by scanning gateway `default` attributes
+
+### `canvas-plugins/config-panel-bpmn`
+- **FEEL `=` prefix stripping** — "Open in FEEL Playground ↗" callbacks now strip a leading `= ` (Camunda notation) before passing the expression to the playground, preventing a parse error in expression mode
+- **Default flow toggle** — sequence flow config panel gains an `isDefault` toggle field; `SEQUENCE_FLOW_ADAPTER.read` checks whether the source gateway's `default` equals the flow ID; `write` updates the gateway's `default` attribute accordingly
+
+## 2026-02-26 — Editor UX improvements: collapsed toolbars, entity decoding, FEEL expression fields, edge config
+
+### `packages/editor`
+- **cfgToolbar type button** — collapsed all element-type variant buttons into a single icon button showing the current type; clicking opens a type-change picker above (same appearance as the group picker in the bottom toolbar)
+- **ctxToolbar color swatch** — collapsed the 6 color swatches into a single swatch showing the current color; clicking opens a color picker below the toolbar
+- **Edge selection** — `_setEdgeSelected` now emits `editor:select` with `[edgeId]` so subscribers (config panel, HUD) are notified when an edge is selected; `getElementType` returns `"sequenceFlow"` for edge IDs
+
+### `packages/bpmn-sdk`
+- **XML entity decoding** — `readAttrValue` and `readText` in `xml-parser.ts` now decode XML entities (`&amp;`, `&lt;`, `&gt;`, `&quot;`, `&apos;`) and numeric character references (`&#10;`, `&#xA;`, etc.); `escapeAttr` and `escapeText` updated to properly re-encode decoded values on serialization; attribute whitespace (`\n`, `\r`, `\t`) re-encoded as `&#10;` / `&#13;` / `&#9;`
+
+### `canvas-plugins/config-panel`
+- New `"feel-expression"` `FieldType`: renders a syntax-highlighted textarea overlay + optional "Open in FEEL Playground ↗" button
+- `FieldSchema` gains optional `highlight?: (text: string) => string` and `openInPlayground?: (values) => void` callbacks
+- Added FEEL token CSS classes to the config panel stylesheet
+
+### `canvas-plugins/config-panel-bpmn`
+- `expression` field on script task and `conditionExpression` on sequence flow now use `type: "feel-expression"` with `highlightToHtml` from `@bpmn-sdk/feel`
+- Added `openFeelPlayground?: (expression: string) => void` to `ConfigPanelBpmnOptions`
+- Added `@bpmn-sdk/feel` as a dependency
+
+### `canvas-plugins/feel-playground`
+- `buildFeelPlaygroundPanel` gains optional `initialExpression?: string` parameter that pre-fills and evaluates the expression on open
+
+### `canvas-plugins/tabs`
+- `TabConfig` feel variant gains optional `expression?: string` field; tabs plugin passes it to `buildFeelPlaygroundPanel`
+
+### `apps/landing`
+- `openFeelPlayground` callback wired up in `createConfigPanelBpmnPlugin` — opens a feel tab with the expression pre-filled
+
 ## 2026-02-26 — Call activity, script task & sequence flow config panel support
 
 ### `canvas-plugins/config-panel-bpmn`

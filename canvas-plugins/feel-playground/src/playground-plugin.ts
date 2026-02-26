@@ -70,8 +70,12 @@ function renderValue(v: FeelValue): { html: string; cssClass: string } {
  * Builds the FEEL Playground panel DOM.
  * When `onClose` is provided a close button is rendered that calls it.
  * Omit `onClose` when embedding in a full-screen tab.
+ * Pass `initialExpression` to pre-fill the expression textarea.
  */
-export function buildFeelPlaygroundPanel(onClose?: () => void): HTMLDivElement {
+export function buildFeelPlaygroundPanel(
+	onClose?: () => void,
+	initialExpression?: string,
+): HTMLDivElement {
 	let mode: "expression" | "unary-tests" = "expression";
 	let exprEl: HTMLTextAreaElement | null = null;
 	let contextEl: HTMLTextAreaElement | null = null;
@@ -241,6 +245,8 @@ export function buildFeelPlaygroundPanel(onClose?: () => void): HTMLDivElement {
 		highlightEl.scrollTop = exprEl.scrollTop;
 	});
 
+	if (initialExpression) exprEl.value = initialExpression;
+
 	inputWrap.appendChild(highlightEl);
 	inputWrap.appendChild(exprEl);
 
@@ -287,6 +293,11 @@ export function buildFeelPlaygroundPanel(onClose?: () => void): HTMLDivElement {
 
 	div.appendChild(header);
 	div.appendChild(body);
+
+	if (initialExpression) {
+		updateHighlight();
+		evaluate_();
+	}
 
 	return div;
 }

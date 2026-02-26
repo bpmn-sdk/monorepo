@@ -246,6 +246,9 @@ const configPanelBpmn = createConfigPanelBpmnPlugin(configPanel, {
 			tabsPlugin.api.setActiveTab(tabId);
 		}
 	},
+	openFeelPlayground: (expression) => {
+		tabsPlugin.api.openTab({ type: "feel", name: "FEEL Playground", expression });
+	},
 });
 
 palette.addCommands([

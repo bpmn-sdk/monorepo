@@ -516,6 +516,8 @@ export class ConfigPanelRenderer {
 				wrapper.appendChild(this._renderSelect(field, value));
 			} else if (field.type === "textarea") {
 				wrapper.appendChild(this._renderTextarea(field, value));
+			} else if (field.type === "feel-expression") {
+				wrapper.appendChild(this._renderFeelExpression(field, value));
 			} else {
 				wrapper.appendChild(this._renderTextInput(field, value));
 			}
@@ -529,6 +531,33 @@ export class ConfigPanelRenderer {
 		}
 
 		return wrapper;
+	}
+
+	private _renderFeelExpression(field: FieldSchema, value: FieldValue): HTMLElement {
+		const text = typeof value === "string" ? value : "";
+
+		const wrap = document.createElement("div");
+		wrap.className = "bpmn-cfg-feel-wrap";
+
+		const ta = document.createElement("textarea");
+		ta.className = "bpmn-cfg-feel-ta bpmn-cfg-textarea";
+		ta.placeholder = field.placeholder ?? "";
+		ta.value = text;
+		ta.setAttribute("data-field-key", field.key);
+		ta.setAttribute("spellcheck", "false");
+		ta.addEventListener("change", () => this._applyField(field.key, ta.value));
+		wrap.appendChild(ta);
+
+		if (field.openInPlayground) {
+			const btn = document.createElement("button");
+			btn.type = "button";
+			btn.className = "bpmn-cfg-feel-playground-btn";
+			btn.textContent = "Open in FEEL Playground ↗";
+			btn.addEventListener("click", () => field.openInPlayground?.(this._values));
+			wrap.appendChild(btn);
+		}
+
+		return wrap;
 	}
 
 	private _renderTextInput(field: FieldSchema, value: FieldValue): HTMLInputElement {

@@ -53,13 +53,19 @@ function wrapText(text: string, maxPx: number): string[] {
 	return lines.length > 0 ? lines : [text];
 }
 
-/** Creates a `<text>` element (or multi-line group) centred at (`cx`, `cy`). */
+/**
+ * Creates a `<text>` element (or multi-line group) centred at (`cx`, `cy`).
+ * When `topAlign` is true, multi-line text flows downward from `cy` rather
+ * than being centred around it — used for external labels below shapes so
+ * that long wrapped labels never extend upward into the shape.
+ */
 function makeLabel(
 	text: string,
 	cx: number,
 	cy: number,
 	maxWidth: number,
 	cls = "bpmn-label",
+	topAlign = false,
 ): SVGElement {
 	const lines = wrapText(text, maxWidth);
 	const lineH = 14;
@@ -71,7 +77,7 @@ function makeLabel(
 	}
 	const g = svgEl("g");
 	const totalH = lines.length * lineH;
-	const startY = cy - totalH / 2 + lineH / 2;
+	const startY = topAlign ? lineH / 2 : cy - totalH / 2 + lineH / 2;
 	for (let i = 0; i < lines.length; i++) {
 		const t = svgEl("text");
 		attr(t, { class: cls, x: cx, y: startY + i * lineH });
@@ -79,6 +85,62 @@ function makeLabel(
 		g.appendChild(t);
 	}
 	return g;
+}
+
+/**
+ * Converts a list of waypoints into an SVG path `d` attribute string
+ * with rounded corners at intermediate waypoints (quadratic bezier arcs).
+ */
+function waypointsToRoundedPath(waypoints: ReadonlyArray<{ x: number; y: number }>): string {
+	if (waypoints.length < 2) return "";
+	const r = 4; // corner radius in diagram units
+	const parts: string[] = [];
+
+	for (let i = 0; i < waypoints.length; i++) {
+		const wp = waypoints[i];
+		if (!wp) continue;
+
+		if (i === 0) {
+			parts.push(`M${wp.x},${wp.y}`);
+			continue;
+		}
+
+		if (i === waypoints.length - 1) {
+			parts.push(`L${wp.x},${wp.y}`);
+			continue;
+		}
+
+		// Intermediate waypoint — round the corner with a quadratic bezier
+		const prev = waypoints[i - 1];
+		const next = waypoints[i + 1];
+		if (!prev || !next) continue;
+
+		const dx1 = wp.x - prev.x;
+		const dy1 = wp.y - prev.y;
+		const d1 = Math.sqrt(dx1 * dx1 + dy1 * dy1);
+
+		const dx2 = next.x - wp.x;
+		const dy2 = next.y - wp.y;
+		const d2 = Math.sqrt(dx2 * dx2 + dy2 * dy2);
+
+		if (d1 < 0.01 || d2 < 0.01) {
+			parts.push(`L${wp.x},${wp.y}`);
+			continue;
+		}
+
+		const radius = Math.min(r, d1 / 2, d2 / 2);
+		// Approach point: step back from the corner along the incoming segment
+		const ax = wp.x - (dx1 / d1) * radius;
+		const ay = wp.y - (dy1 / d1) * radius;
+		// Departure point: step forward from the corner along the outgoing segment
+		const bx = wp.x + (dx2 / d2) * radius;
+		const by = wp.y + (dy2 / d2) * radius;
+
+		parts.push(`L${ax},${ay}`);
+		parts.push(`Q${wp.x},${wp.y} ${bx},${by}`);
+	}
+
+	return parts.join(" ");
 }
 
 // ── Task type icons (14×14, origin at 0,0) ───────────────────────────────────
@@ -203,6 +265,8 @@ interface ModelIndex {
 	lanes: Map<string, BpmnLane>;
 	/** id → messageFlow (stored by id for edge rendering) */
 	messageFlowIds: Set<string>;
+	/** IDs of sequence flows that are the default flow of their source gateway */
+	defaultFlowIds: Set<string>;
 }
 
 function buildIndex(defs: BpmnDefinitions): ModelIndex {
@@ -212,6 +276,7 @@ function buildIndex(defs: BpmnDefinitions): ModelIndex {
 	const participants = new Map<string, BpmnParticipant>();
 	const lanes = new Map<string, BpmnLane>();
 	const messageFlowIds = new Set<string>();
+	const defaultFlowIds = new Set<string>();
 
 	function indexProcess(flowElements: BpmnFlowElement[], sequenceFlows: BpmnSequenceFlow[]): void {
 		for (const el of flowElements) {
@@ -223,6 +288,14 @@ function buildIndex(defs: BpmnDefinitions): ModelIndex {
 				el.type === "transaction"
 			) {
 				indexProcess(el.flowElements, el.sequenceFlows);
+			}
+			if (
+				(el.type === "exclusiveGateway" ||
+					el.type === "inclusiveGateway" ||
+					el.type === "complexGateway") &&
+				el.default
+			) {
+				defaultFlowIds.add(el.default);
 			}
 		}
 		for (const sf of sequenceFlows) {
@@ -255,7 +328,7 @@ function buildIndex(defs: BpmnDefinitions): ModelIndex {
 			messageFlowIds.add(mf.id);
 		}
 	}
-	return { elements, flows, annotations, participants, lanes, messageFlowIds };
+	return { elements, flows, annotations, participants, lanes, messageFlowIds, defaultFlowIds };
 }
 
 // ── Color helper ─────────────────────────────────────────────────────────────
@@ -590,7 +663,9 @@ function renderAnnotation(
 
 /**
  * Renders an external label at absolute diagram coordinates.
- * Used for events and gateways whose labels live outside the shape bounds.
+ * Used for events, gateways, and edge midpoints.
+ * Pass `topAlign = true` for labels below shapes — multi-line text then flows
+ * downward from the top of the bounds, preventing upward overlap with the shape.
  */
 function renderExternalLabel(
 	absX: number,
@@ -598,10 +673,11 @@ function renderExternalLabel(
 	labelW: number,
 	labelH: number,
 	text: string,
+	topAlign = false,
 ): SVGGElement {
 	const g = svgEl("g");
 	attr(g, { transform: `translate(${absX} ${absY})` });
-	const labelEl = makeLabel(text, labelW / 2, labelH / 2, labelW - 4);
+	const labelEl = makeLabel(text, labelW / 2, labelH / 2, labelW - 4, "bpmn-label", topAlign);
 	g.appendChild(labelEl);
 	return g;
 }
@@ -612,6 +688,7 @@ function renderEdge(
 	edge: BpmnDiEdge,
 	flow: BpmnSequenceFlow | undefined,
 	markerId: string,
+	isDefault: boolean,
 ): SVGGElement {
 	const g = svgEl("g");
 	attr(g, {
@@ -621,15 +698,41 @@ function renderEdge(
 
 	if (edge.waypoints.length < 2) return g;
 
-	const points = edge.waypoints.map((wp) => `${wp.x},${wp.y}`).join(" ");
-
-	const path = svgEl("polyline");
+	const path = svgEl("path");
 	attr(path, {
-		points,
+		d: waypointsToRoundedPath(edge.waypoints),
 		class: "bpmn-edge-path",
 		"marker-end": `url(#${markerId})`,
 	});
 	g.appendChild(path);
+
+	// Default-flow slash mark near the source end
+	if (isDefault) {
+		const wp0 = edge.waypoints[0];
+		const wp1 = edge.waypoints[1];
+		if (wp0 && wp1) {
+			const dx = wp1.x - wp0.x;
+			const dy = wp1.y - wp0.y;
+			const len = Math.sqrt(dx * dx + dy * dy);
+			if (len > 0) {
+				const nx = dx / len;
+				const ny = dy / len;
+				const t = Math.min(10, len * 0.25);
+				const cx = wp0.x + nx * t;
+				const cy = wp0.y + ny * t;
+				const s = 5;
+				const slash = svgEl("line");
+				attr(slash, {
+					x1: cx - ny * s,
+					y1: cy + nx * s,
+					x2: cx + ny * s,
+					y2: cy - nx * s,
+					class: "bpmn-edge-default-slash",
+				});
+				g.appendChild(slash);
+			}
+		}
+	}
 
 	// Edge label
 	if (flow?.name && edge.label?.bounds) {
@@ -645,9 +748,8 @@ function renderAssociation(edge: BpmnDiEdge): SVGGElement {
 	const g = svgEl("g");
 	attr(g, { class: "bpmn-edge", "data-bpmn-id": edge.bpmnElement });
 
-	const points = edge.waypoints.map((wp) => `${wp.x},${wp.y}`).join(" ");
-	const path = svgEl("polyline");
-	attr(path, { points, class: "bpmn-edge-assoc" });
+	const path = svgEl("path");
+	attr(path, { d: waypointsToRoundedPath(edge.waypoints), class: "bpmn-edge-assoc" });
 	g.appendChild(path);
 	return g;
 }
@@ -747,15 +849,18 @@ export function render(
 		let g: SVGGElement;
 
 		if (flow) {
-			g = renderEdge(edge, flow, markerId);
+			g = renderEdge(edge, flow, markerId, index.defaultFlowIds.has(edge.bpmnElement));
 		} else if (index.messageFlowIds.has(edge.bpmnElement)) {
 			// Message flow — dashed arrow between pools
 			g = svgEl("g");
 			attr(g, { class: "bpmn-edge", "data-bpmn-id": edge.bpmnElement });
 			if (edge.waypoints.length >= 2) {
-				const points = edge.waypoints.map((wp) => `${wp.x},${wp.y}`).join(" ");
-				const path = svgEl("polyline");
-				attr(path, { points, class: "bpmn-msgflow-path", "marker-end": `url(#${markerId})` });
+				const path = svgEl("path");
+				attr(path, {
+					d: waypointsToRoundedPath(edge.waypoints),
+					class: "bpmn-msgflow-path",
+					"marker-end": `url(#${markerId})`,
+				});
 				g.appendChild(path);
 			}
 		} else {
@@ -841,7 +946,9 @@ export function render(
 				width: 80,
 				height: 20,
 			};
-			const labelG = renderExternalLabel(lb.x, lb.y, lb.width, lb.height, el.name);
+			// topAlign=true: multi-line text flows downward from the top of the
+			// label bounds, so long labels never extend upward into the shape.
+			const labelG = renderExternalLabel(lb.x, lb.y, lb.width, lb.height, el.name, true);
 			labelsLayer.appendChild(labelG);
 		}
 	}

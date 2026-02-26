@@ -993,7 +993,10 @@ export class BpmnEditor {
 	/** Returns the BPMN element type for a given id, or null if not found. */
 	getElementType(id: string): string | null {
 		const shape = this._shapes.find((s) => s.id === id);
-		if (!shape) return null;
+		if (!shape) {
+			if (this._edges.some((e) => e.id === id)) return "sequenceFlow";
+			return null;
+		}
 		if (shape.annotation !== undefined) return "textAnnotation";
 		const bpmnType = shape.flowElement?.type ?? null;
 		if (!bpmnType) return null;
@@ -1218,14 +1221,15 @@ export class BpmnEditor {
 		if (edgeId && this._selectedIds.length > 0) {
 			this._selectedIds = [];
 			this._overlay.setSelection([], this._shapes);
-			this._emit("editor:select", []);
 		}
 		this._selectedEdgeId = edgeId;
 		if (edgeId) {
 			const edge = this._edges.find((e) => e.id === edgeId);
 			this._overlay.setEdgeEndpoints(edge?.edge.waypoints ?? null, edgeId);
+			this._emit("editor:select", [edgeId]);
 		} else {
 			this._overlay.setEdgeEndpoints(null, "");
+			this._emit("editor:select", []);
 		}
 	}
 
