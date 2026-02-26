@@ -13,7 +13,7 @@ export const MAIN_MENU_CSS = `
   border: 1px solid var(--bpmn-overlay-border, rgba(0, 0, 0, 0.12));
   border-radius: 8px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
-  z-index: 10;
+  z-index: 110;
 }
 .bpmn-main-menu-title {
   padding: 0 6px;

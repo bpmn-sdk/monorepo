@@ -81,7 +81,10 @@ export class FormViewer {
 	private _render(): void {
 		if (!this._form) return;
 		this._root.innerHTML = "";
-		renderComponents(this._form.components, this._root);
+		const body = document.createElement("div");
+		body.className = "form-viewer-body";
+		renderComponents(this._form.components, body);
+		this._root.appendChild(body);
 	}
 }
 

@@ -5,9 +5,14 @@ export const FORM_VIEWER_CSS = `
   overflow: auto;
   height: 100%;
   box-sizing: border-box;
-  padding: 20px;
   background: var(--fv-bg, #1e1e2e);
   color: var(--fv-fg, #cdd6f4);
+}
+
+.form-viewer-body {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 24px;
 }
 
 .form-viewer.light {

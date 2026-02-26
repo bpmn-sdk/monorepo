@@ -59,14 +59,21 @@ export class DmnViewer {
 		if (!this._defs) return;
 		this._root.innerHTML = "";
 
+		const body = document.createElement("div");
+		body.className = "dmn-viewer-body";
+
 		if (this._defs.decisions.length === 0) {
-			this._root.innerHTML = `<div class="dmn-empty">No decisions found.</div>`;
-			return;
+			const empty = document.createElement("div");
+			empty.className = "dmn-empty";
+			empty.textContent = "No decisions found.";
+			body.appendChild(empty);
+		} else {
+			for (const decision of this._defs.decisions) {
+				body.appendChild(this._renderDecision(decision));
+			}
 		}
 
-		for (const decision of this._defs.decisions) {
-			this._root.appendChild(this._renderDecision(decision));
-		}
+		this._root.appendChild(body);
 	}
 
 	private _renderDecision(decision: DmnDecision): HTMLElement {

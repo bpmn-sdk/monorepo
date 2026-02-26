@@ -1,5 +1,23 @@
 # Progress
 
+## 2026-02-26 — UX Fixes: Theme, Z-index, Toolbar Visibility, Content Width
+
+### `canvas-plugins/tabs`
+- **Theme detection fix** — the tabs plugin was watching `data-bpmn-theme` via MutationObserver, but the canvas sets `data-theme` (absent = light, `"dark"` = dark). Fixed both the initial detection and the observer attribute filter/callback to use `data-theme`
+
+### `canvas-plugins/main-menu`
+- **Z-index raised** — `.bpmn-main-menu-panel` z-index increased from 10 to 110 so the title/menu button renders above the tab bar (which is z-index 100)
+
+### `canvas-plugins/dmn-viewer`
+- **Content width** — `.dmn-viewer` no longer has `padding`; a new `.dmn-viewer-body` inner wrapper provides `max-width: 1100px; margin: 0 auto; padding: 24px`, centering the decision table horizontally with a reasonable max-width
+
+### `canvas-plugins/form-viewer`
+- **Content width** — same pattern: `.form-viewer-body` with `max-width: 680px; margin: 0 auto; padding: 24px`; the form renders narrower, centered, matching standard form UX conventions
+
+### `apps/landing` — editor.ts
+- **Toolbar visibility** — `onTabActivate` now toggles `display: none` on `#hud-top-center`, `#hud-bottom-left`, `#hud-bottom-center` when switching to DMN/Form tabs; toolbars reappear on return to BPMN
+- **Config panel auto-close** — `onTabActivate` calls `editor.setSelection([])` on non-BPMN tabs, which fires `editor:select` with empty IDs, causing the config panel and contextual toolbars to close automatically; also closes the panel when "Open Decision ↗" / "Open Form ↗" navigation triggers a tab switch
+
 ## 2026-02-26 — Editor Integration: Multi-file Import + Tabs
 
 ### `apps/landing` — editor.ts

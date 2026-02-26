@@ -5,9 +5,14 @@ export const DMN_VIEWER_CSS = `
   overflow: auto;
   height: 100%;
   box-sizing: border-box;
-  padding: 16px;
   background: var(--dmn-bg, #1e1e2e);
   color: var(--dmn-fg, #cdd6f4);
+}
+
+.dmn-viewer-body {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 24px;
 }
 
 .dmn-viewer.light {

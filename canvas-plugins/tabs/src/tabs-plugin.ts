@@ -308,10 +308,9 @@ export function createTabsPlugin(options: TabsPluginOptions = {}): CanvasPlugin 
 			canvasApi = cApi;
 			injectTabsStyles();
 
-			// Detect theme from canvas
+			// Detect theme from canvas (canvas sets data-theme="dark" for dark, removes it for light)
 			const container = cApi.container;
-			const themeAttr = container.dataset.bpmnTheme;
-			if (themeAttr === "light") theme = "light";
+			theme = container.dataset.theme === "dark" ? "dark" : "light";
 
 			// Expand container to be position:relative for absolute children
 			if (getComputedStyle(container).position === "static") {
@@ -336,14 +335,14 @@ export function createTabsPlugin(options: TabsPluginOptions = {}): CanvasPlugin 
 			const bpmnTab = tabs.find((t) => t.id === initId);
 			if (bpmnTab) bpmnTab.pane.style.display = "none";
 
-			// Listen for theme changes
+			// Listen for theme changes (canvas toggles data-theme="dark"; absence means light)
 			const observer = new MutationObserver(() => {
-				const t = container.dataset.bpmnTheme;
-				theme = t === "light" ? "light" : "dark";
+				const t = container.dataset.theme;
+				theme = t === "dark" ? "dark" : "light";
 				if (tabBar) tabBar.dataset.theme = theme;
 				for (const tab of tabs) applyThemeToTab(tab);
 			});
-			observer.observe(container, { attributes: true, attributeFilter: ["data-bpmn-theme"] });
+			observer.observe(container, { attributes: true, attributeFilter: ["data-theme"] });
 		},
 
 		uninstall(): void {

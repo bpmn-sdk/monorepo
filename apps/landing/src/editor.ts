@@ -76,11 +76,27 @@ const resolver = new InMemoryFileResolver();
 let editorRef: BpmnEditor | null = null;
 
 // Tabs plugin — onTabActivate loads the BPMN into the editor when a BPMN tab is clicked
+// and shows/hides BPMN-specific HUD toolbars for non-BPMN views.
+const BPMN_ONLY_HUD = ["hud-top-center", "hud-bottom-left", "hud-bottom-center"];
+
 const tabsPlugin = createTabsPlugin({
 	resolver,
 	onTabActivate(_id, config) {
+		const isBpmn = config.type === "bpmn";
+
 		if (config.type === "bpmn" && config.xml) {
 			editorRef?.load(config.xml);
+		}
+
+		// Show/hide BPMN-only toolbars
+		for (const hudId of BPMN_ONLY_HUD) {
+			const el = document.getElementById(hudId);
+			if (el) el.style.display = isBpmn ? "" : "none";
+		}
+
+		// Deselect all — closes the config panel and contextual toolbars
+		if (!isBpmn) {
+			editorRef?.setSelection([]);
 		}
 	},
 });
