@@ -47,6 +47,9 @@ export const IC = {
 	eventBasedGateway: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="8,1.5 14.5,8 8,14.5 1.5,8"/><circle cx="8" cy="8" r="3.5" stroke-width="1"/><circle cx="8" cy="8" r="2" stroke-width="1"/></svg>`,
 	complexGateway: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="8,1.5 14.5,8 8,14.5 1.5,8"/><path d="M8 5v6M5 8h6M5.5 5.5l5 5M10.5 5.5l-5 5" stroke-linecap="round" stroke-width="1.5"/></svg>`,
 
+	// ── Navigation ─────────────────────────────────────────────────────────
+	openProcess: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h4v4M13 3l-6 6"/><path d="M7 5H3v8h8V9"/></svg>`,
+
 	// ── BPMN Annotation ────────────────────────────────────────────────────
 	textAnnotation: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M6 3L3 3L3 13L6 13"/><line x1="7" y1="6" x2="13" y2="6"/><line x1="7" y1="9" x2="12" y2="9"/><line x1="7" y1="12" x2="10" y2="12"/></svg>`,
 

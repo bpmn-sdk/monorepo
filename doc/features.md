@@ -1,5 +1,11 @@
 # Features
 
+## BPMN Element Config — Call Activity, Script Task, Sequence Flow (2026-02-26)
+
+- **Call activity** — configure `zeebe:calledElement processId` and `propagateAllChildVariables` in the config panel; optional "Open Process ↗" action button navigates to the matching BPMN tab; navigate icon button in the element toolbar (HUD) above a selected call activity
+- **Script task** — configure `zeebe:script expression` (FEEL expression, textarea) and `resultVariable`; replaces the generic name-only panel
+- **Sequence flow condition expression** — clicking any sequence flow (edge) opens the config panel showing an editable `conditionExpression` FEEL textarea; works for gateway outgoing edges and any other flows; empty expression removes the condition element from the XML
+
 ## FEEL Language Support (2026-02-26) — `@bpmn-sdk/feel` + `@bpmn-sdk/canvas-plugin-feel-playground`
 
 - **`@bpmn-sdk/feel`** — pure TypeScript FEEL engine; zero runtime dependencies; works in Node.js and browser

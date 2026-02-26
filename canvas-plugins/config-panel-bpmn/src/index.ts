@@ -43,10 +43,14 @@ export { CAMUNDA_CONNECTOR_TEMPLATES } from "./templates/generated.js";
 export { templateToServiceTaskOptions } from "./template-to-service-task.js";
 import {
 	findFlowElement,
+	findSequenceFlow,
 	getIoInput,
 	getTaskHeader,
+	parseCalledElement,
 	parseZeebeExtensions,
+	parseZeebeScript,
 	updateFlowElement,
+	updateSequenceFlow,
 	xmlLocalName,
 } from "./util.js";
 
@@ -395,7 +399,6 @@ function strVal(v: FieldValue): string {
 const GENERAL_TYPES: CreateShapeType[] = [
 	"startEvent",
 	"endEvent",
-	"scriptTask",
 	"sendTask",
 	"receiveTask",
 	"exclusiveGateway",
@@ -569,6 +572,221 @@ const BUSINESS_RULE_TASK_ADAPTER: PanelAdapter = {
 	},
 };
 
+// ── Script task schema ────────────────────────────────────────────────────────
+
+const SCRIPT_TASK_SCHEMA: PanelSchema = {
+	compact: [{ key: "name", label: "Name", type: "text", placeholder: "Task name" }],
+	groups: [
+		{
+			id: "general",
+			label: "General",
+			fields: [
+				{ key: "name", label: "Name", type: "text", placeholder: "Task name" },
+				{
+					key: "expression",
+					label: "FEEL expression",
+					type: "textarea",
+					placeholder: "= someVariable",
+					hint: "FEEL expression evaluated by the script engine.",
+				},
+				{
+					key: "resultVariable",
+					label: "Result variable",
+					type: "text",
+					placeholder: "result",
+					hint: "Process variable that receives the script output.",
+				},
+				{
+					key: "documentation",
+					label: "Documentation",
+					type: "textarea",
+					placeholder: "Add notes or documentation…",
+				},
+			],
+		},
+	],
+};
+
+const SCRIPT_TASK_ADAPTER: PanelAdapter = {
+	read(defs, id) {
+		const el = findFlowElement(defs, id);
+		if (!el) return {};
+		const script = parseZeebeScript(el.extensionElements);
+		return {
+			name: el.name ?? "",
+			documentation: el.documentation ?? "",
+			expression: script.expression,
+			resultVariable: script.resultVariable,
+		};
+	},
+	write(defs: BpmnDefinitions, id: string, values: Record<string, FieldValue>): BpmnDefinitions {
+		return updateFlowElement(defs, id, (el) => {
+			const expression = strVal(values.expression);
+			const resultVariable = strVal(values.resultVariable);
+			const ZEEBE_SCRIPT = new Set(["script"]);
+			const otherExts = el.extensionElements.filter((x) => !ZEEBE_SCRIPT.has(xmlLocalName(x.name)));
+			const scriptAttrs: Record<string, string> = { expression };
+			if (resultVariable) scriptAttrs.resultVariable = resultVariable;
+			const scriptExt = expression
+				? { name: "zeebe:script", attributes: scriptAttrs, children: [] }
+				: null;
+			return {
+				...el,
+				name: typeof values.name === "string" ? values.name : el.name,
+				documentation:
+					typeof values.documentation === "string"
+						? values.documentation || undefined
+						: el.documentation,
+				extensionElements: scriptExt ? [...otherExts, scriptExt] : otherExts,
+			};
+		});
+	},
+};
+
+// ── Call activity schema ──────────────────────────────────────────────────────
+
+function makeCallActivitySchema(onOpenProcess?: (processId: string) => void): PanelSchema {
+	return {
+		compact: [{ key: "name", label: "Name", type: "text", placeholder: "Activity name" }],
+		groups: [
+			{
+				id: "general",
+				label: "General",
+				fields: [
+					{ key: "name", label: "Name", type: "text", placeholder: "Activity name" },
+					{
+						key: "processId",
+						label: "Called process ID",
+						type: "text",
+						placeholder: "e.g. pdp-get-project-data",
+						hint: "ID of the process definition to call.",
+					},
+					{
+						key: "propagateAllChildVariables",
+						label: "Propagate all child variables",
+						type: "toggle",
+					},
+					...(onOpenProcess
+						? [
+								{
+									key: "__openProcess",
+									label: "Open Process ↗",
+									type: "action" as const,
+									condition: (v: Record<string, FieldValue>) =>
+										typeof v.processId === "string" && v.processId.length > 0,
+									onClick: (v: Record<string, FieldValue>) => {
+										const id = v.processId;
+										if (typeof id === "string" && id) onOpenProcess(id);
+									},
+								},
+							]
+						: []),
+					{
+						key: "documentation",
+						label: "Documentation",
+						type: "textarea",
+						placeholder: "Add notes or documentation…",
+					},
+				],
+			},
+		],
+	};
+}
+
+const CALL_ACTIVITY_ADAPTER: PanelAdapter = {
+	read(defs, id) {
+		const el = findFlowElement(defs, id);
+		if (!el) return {};
+		const called = parseCalledElement(el.extensionElements);
+		return {
+			name: el.name ?? "",
+			documentation: el.documentation ?? "",
+			processId: called.processId,
+			propagateAllChildVariables: called.propagateAllChildVariables,
+		};
+	},
+	write(defs: BpmnDefinitions, id: string, values: Record<string, FieldValue>): BpmnDefinitions {
+		return updateFlowElement(defs, id, (el) => {
+			const pid = strVal(values.processId);
+			const propagate =
+				values.propagateAllChildVariables === true || values.propagateAllChildVariables === "true";
+			const ZEEBE_CALLED = new Set(["calledElement"]);
+			const otherExts = el.extensionElements.filter((x) => !ZEEBE_CALLED.has(xmlLocalName(x.name)));
+			const calledExt = pid
+				? {
+						name: "zeebe:calledElement",
+						attributes: {
+							processId: pid,
+							propagateAllChildVariables: String(propagate),
+						},
+						children: [],
+					}
+				: null;
+			return {
+				...el,
+				name: typeof values.name === "string" ? values.name : el.name,
+				documentation:
+					typeof values.documentation === "string"
+						? values.documentation || undefined
+						: el.documentation,
+				extensionElements: calledExt ? [...otherExts, calledExt] : otherExts,
+			};
+		});
+	},
+};
+
+// ── Sequence flow schema ──────────────────────────────────────────────────────
+
+const SEQUENCE_FLOW_SCHEMA: PanelSchema = {
+	compact: [
+		{
+			key: "conditionExpression",
+			label: "Condition",
+			type: "text",
+			placeholder: "= expression",
+		},
+	],
+	groups: [
+		{
+			id: "general",
+			label: "General",
+			fields: [
+				{ key: "name", label: "Name", type: "text", placeholder: "Edge label" },
+				{
+					key: "conditionExpression",
+					label: "Condition expression (FEEL)",
+					type: "textarea",
+					placeholder: '= someVariable = "value"',
+					hint: "FEEL expression that must evaluate to true for this path to be taken.",
+				},
+			],
+		},
+	],
+};
+
+const SEQUENCE_FLOW_ADAPTER: PanelAdapter = {
+	read(defs, id) {
+		const sf = findSequenceFlow(defs, id);
+		if (!sf) return {};
+		return {
+			name: sf.name ?? "",
+			conditionExpression: sf.conditionExpression?.text ?? "",
+		};
+	},
+	write(defs: BpmnDefinitions, id: string, values: Record<string, FieldValue>): BpmnDefinitions {
+		return updateSequenceFlow(defs, id, (sf) => {
+			const expr = strVal(values.conditionExpression);
+			return {
+				...sf,
+				name: typeof values.name === "string" ? values.name || undefined : sf.name,
+				conditionExpression: expr
+					? { text: expr, attributes: { "xsi:type": "bpmn:tFormalExpression" } }
+					: undefined,
+			};
+		});
+	},
+};
+
 // ── Options for the plugin factory ────────────────────────────────────────────
 
 export interface ConfigPanelBpmnOptions {
@@ -582,6 +800,11 @@ export interface ConfigPanelBpmnOptions {
 	 * Typically implemented by calling `tabsPlugin.api.openForm(formId)`.
 	 */
 	openForm?: (formId: string) => void;
+	/**
+	 * Called when the user clicks "Open Process ↗" in the callActivity panel.
+	 * Typically implemented by navigating to the BPMN tab with the matching process ID.
+	 */
+	openProcess?: (processId: string) => void;
 }
 
 // ── Factory ───────────────────────────────────────────────────────────────────
@@ -610,6 +833,7 @@ export function createConfigPanelBpmnPlugin(
 } {
 	const userTaskSchema = makeUserTaskSchema(options.openForm);
 	const businessRuleTaskSchema = makeBusinessRuleTaskSchema(options.openDecision);
+	const callActivitySchema = makeCallActivitySchema(options.openProcess);
 
 	return {
 		name: "config-panel-bpmn",
@@ -631,6 +855,12 @@ export function createConfigPanelBpmnPlugin(
 			configPanel.registerSchema("serviceTask", GENERIC_SERVICE_TASK_SCHEMA, SERVICE_TASK_ADAPTER);
 			// Ad-hoc subprocess: template-aware adapter (AI Agent pattern)
 			configPanel.registerSchema("adHocSubProcess", GENERIC_ADHOC_SCHEMA, ADHOC_SUBPROCESS_ADAPTER);
+			// Script task: FEEL expression + result variable
+			configPanel.registerSchema("scriptTask", SCRIPT_TASK_SCHEMA, SCRIPT_TASK_ADAPTER);
+			// Call activity: called process ID + navigate button
+			configPanel.registerSchema("callActivity", callActivitySchema, CALL_ACTIVITY_ADAPTER);
+			// Sequence flow: condition expression (for gateway edges)
+			configPanel.registerSchema("sequenceFlow", SEQUENCE_FLOW_SCHEMA, SEQUENCE_FLOW_ADAPTER);
 		},
 
 		registerTemplate(template: ElementTemplate): void {

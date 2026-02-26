@@ -19,3 +19,4 @@ export {
 } from "./element-groups.js";
 export type { ElementGroup } from "./element-groups.js";
 export { initEditorHud } from "./hud.js";
+export type { HudOptions } from "./hud.js";

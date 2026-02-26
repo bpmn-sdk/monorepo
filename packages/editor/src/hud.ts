@@ -66,7 +66,15 @@ const POSITION_LABELS: Record<LabelPosition, string> = {
 	"top-right": "Top right",
 };
 
-export function initEditorHud(editor: BpmnEditor): void {
+export interface HudOptions {
+	/**
+	 * Called when the user clicks the "Open Process" navigate button above a
+	 * call activity. Receives the `processId` from `zeebe:calledElement`.
+	 */
+	openProcess?: (processId: string) => void;
+}
+
+export function initEditorHud(editor: BpmnEditor, options: HudOptions = {}): void {
 	injectHudStyles();
 
 	// ── Create and inject HUD DOM ──────────────────────────────────────────────
@@ -721,6 +729,39 @@ export function initEditorHud(editor: BpmnEditor): void {
 			});
 			cfgToolbar.appendChild(labelBtn);
 		}
+
+		if (sourceType === "callActivity" && options.openProcess) {
+			const processId = getCallActivityProcessId(sourceId);
+			if (processId) {
+				if (cfgToolbar.children.length > 0) {
+					const sep = document.createElement("div");
+					sep.className = "hud-sep";
+					cfgToolbar.appendChild(sep);
+				}
+				const navBtn = document.createElement("button");
+				navBtn.className = "hud-btn";
+				navBtn.innerHTML = IC.openProcess;
+				navBtn.title = `Open process: ${processId}`;
+				navBtn.addEventListener("click", () => {
+					options.openProcess?.(processId);
+				});
+				cfgToolbar.appendChild(navBtn);
+			}
+		}
+	}
+
+	function getCallActivityProcessId(id: string): string | null {
+		const defs = editor.getDefinitions();
+		if (!defs) return null;
+		for (const process of defs.processes) {
+			const el = process.flowElements.find((e) => e.id === id);
+			if (!el) continue;
+			for (const ext of el.extensionElements) {
+				const ln = ext.name.includes(":") ? ext.name.slice(ext.name.indexOf(":") + 1) : ext.name;
+				if (ln === "calledElement") return ext.attributes.processId ?? null;
+			}
+		}
+		return null;
 	}
 
 	function positionCfgToolbar(): void {

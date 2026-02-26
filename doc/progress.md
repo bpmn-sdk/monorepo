@@ -1,5 +1,26 @@
 # Progress
 
+## 2026-02-26 — Call activity, script task & sequence flow config panel support
+
+### `canvas-plugins/config-panel-bpmn`
+- **Call activity** — new schema and adapter: `name`, `processId` (called process ID), `propagateAllChildVariables` (toggle), optional "Open Process ↗" action button, `documentation`; reads and writes `zeebe:calledElement` raw extension element
+- **Script task** — replaced GENERAL_SCHEMA entry with a dedicated schema: `name`, `expression` (FEEL textarea), `resultVariable`, `documentation`; reads and writes `zeebe:script` raw extension element
+- **Sequence flow / condition expression** — new `SEQUENCE_FLOW_SCHEMA` and `SEQUENCE_FLOW_ADAPTER`: `name` + `conditionExpression` (FEEL textarea); reads and writes `BpmnSequenceFlow.conditionExpression`; registered under the key `"sequenceFlow"`
+- Added `openProcess?` to `ConfigPanelBpmnOptions`; new `findSequenceFlow`, `updateSequenceFlow`, `parseCalledElement`, `parseZeebeScript` helpers in `util.ts`
+
+### `canvas-plugins/config-panel`
+- `onSelect` now passes `api.getEdges()` to the renderer
+- `ConfigPanelRenderer.onSelect(ids, shapes, edges)` — when the selected ID matches no shape, falls back to edge lookup: checks if the ID is in the rendered edges and is a sequence flow in the definitions, then opens the `"sequenceFlow"` schema
+
+### `packages/editor` — HUD navigate button
+- `initEditorHud(editor, options?)` gains an optional `HudOptions` parameter with `openProcess?: (processId: string) => void`
+- `buildCfgToolbar` adds an "Open Process" icon button above a selected call activity when `processId` is set and `options.openProcess` is provided
+- `HudOptions` exported from `@bpmn-sdk/editor`
+
+### `apps/landing`
+- `bpmnProcessToTabId` map tracks process ID → tab ID when BPMN files are imported or new diagrams are created
+- `initEditorHud` and `createConfigPanelBpmnPlugin` both receive `openProcess` callbacks that activate the matching BPMN tab
+
 ## 2026-02-26 — FEEL Playground tab integration + fixes
 
 ### `packages/canvas` + `packages/editor` — keyboard fix

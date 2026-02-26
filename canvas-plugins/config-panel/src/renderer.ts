@@ -1,4 +1,4 @@
-import type { RenderedShape, ViewportState } from "@bpmn-sdk/canvas";
+import type { RenderedEdge, RenderedShape, ViewportState } from "@bpmn-sdk/canvas";
 import type { BpmnDefinitions } from "@bpmn-sdk/core";
 import type { FieldSchema, FieldValue, GroupSchema, PanelAdapter, PanelSchema } from "./types.js";
 
@@ -46,7 +46,7 @@ export class ConfigPanelRenderer {
 		this._setViewport = setViewport;
 	}
 
-	onSelect(ids: string[], shapes: RenderedShape[]): void {
+	onSelect(ids: string[], shapes: RenderedShape[], edges: RenderedEdge[] = []): void {
 		if (ids.length !== 1) {
 			this._close();
 			return;
@@ -58,32 +58,65 @@ export class ConfigPanelRenderer {
 		}
 		const shape = shapes.find((s) => s.id === id);
 		const elementType = shape?.flowElement?.type;
-		if (!elementType) {
-			this._close();
-			return;
-		}
-		const reg = this._schemas.get(elementType);
-		if (!reg) {
-			this._close();
-			return;
-		}
 
-		this._selectedId = id;
-		this._selectedType = elementType;
-		this._selectedBounds = shape?.shape?.bounds ?? null;
-		this._elementName = shape?.flowElement?.name ?? "";
+		if (elementType) {
+			// Shape selection
+			const reg = this._schemas.get(elementType);
+			if (!reg) {
+				this._close();
+				return;
+			}
 
-		// Resolve optional template override
-		const defs = this._getDefinitions();
-		const resolved = defs ? (reg.adapter.resolve?.(defs, id) ?? null) : null;
-		this._effectiveReg = resolved ?? reg;
+			this._selectedId = id;
+			this._selectedType = elementType;
+			this._selectedBounds = shape?.shape?.bounds ?? null;
+			this._elementName = shape?.flowElement?.name ?? "";
 
-		this._refreshValues(this._effectiveReg);
+			// Resolve optional template override
+			const defs = this._getDefinitions();
+			const resolved = defs ? (reg.adapter.resolve?.(defs, id) ?? null) : null;
+			this._effectiveReg = resolved ?? reg;
 
-		if (this._fullOpen) {
-			this._showFull(this._effectiveReg);
+			this._refreshValues(this._effectiveReg);
+
+			if (this._fullOpen) {
+				this._showFull(this._effectiveReg);
+			} else {
+				this._showCompact(this._effectiveReg);
+			}
 		} else {
-			this._showCompact(this._effectiveReg);
+			// Edge selection — check if it's a sequence flow
+			const isEdge = edges.some((e) => e.id === id);
+			if (!isEdge) {
+				this._close();
+				return;
+			}
+			const defs = this._getDefinitions();
+			const isSequenceFlow = defs?.processes.some((p) => p.sequenceFlows.some((f) => f.id === id));
+			if (!isSequenceFlow) {
+				this._close();
+				return;
+			}
+			const reg = this._schemas.get("sequenceFlow");
+			if (!reg) {
+				this._close();
+				return;
+			}
+
+			this._selectedId = id;
+			this._selectedType = "sequenceFlow";
+			this._selectedBounds = null;
+			const sf = defs?.processes.flatMap((p) => p.sequenceFlows).find((f) => f.id === id);
+			this._elementName = sf?.name ?? "";
+			this._effectiveReg = reg;
+
+			this._refreshValues(reg);
+
+			if (this._fullOpen) {
+				this._showFull(reg);
+			} else {
+				this._showCompact(reg);
+			}
 		}
 	}
 

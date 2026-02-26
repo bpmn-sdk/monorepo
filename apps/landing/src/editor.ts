@@ -74,6 +74,9 @@ if (!editorContainer) throw new Error("missing #editor-container");
 // File resolver — shared between the tabs plugin and the config panel callbacks
 const resolver = new InMemoryFileResolver();
 
+// Maps BPMN process IDs to the tab ID that holds that process, for navigation.
+const bpmnProcessToTabId = new Map<string, string>();
+
 let editorRef: BpmnEditor | null = null;
 
 // Tabs plugin — onTabActivate loads the BPMN into the editor when a BPMN tab is clicked
@@ -95,7 +98,10 @@ const tabsPlugin = createTabsPlugin({
 		return makeExamples(tabsPlugin.api, resolver);
 	},
 	onNewDiagram() {
-		tabsPlugin.api.openTab({ type: "bpmn", xml: SAMPLE_XML, name: "New Diagram" });
+		const tabId = tabsPlugin.api.openTab({ type: "bpmn", xml: SAMPLE_XML, name: "New Diagram" });
+		for (const proc of Bpmn.parse(SAMPLE_XML).processes) {
+			bpmnProcessToTabId.set(proc.id, tabId);
+		}
 	},
 	onImportFiles() {
 		fileInput.click();
@@ -160,9 +166,11 @@ async function importFiles(files: FileList | File[]): Promise<void> {
 			const text = await file.text();
 
 			if (ext === ".bpmn" || ext === ".xml") {
-				// Validate first; onTabActivate will call editor.load(xml)
-				Bpmn.parse(text);
-				tabsPlugin.api.openTab({ type: "bpmn", xml: text, name });
+				const bpmnDefs = Bpmn.parse(text);
+				const tabId = tabsPlugin.api.openTab({ type: "bpmn", xml: text, name });
+				for (const proc of bpmnDefs.processes) {
+					bpmnProcessToTabId.set(proc.id, tabId);
+				}
 			} else if (ext === ".dmn") {
 				const defs = Dmn.parse(text);
 				resolver.registerDmn(defs);
@@ -232,6 +240,12 @@ const configPanel = createConfigPanelPlugin({
 const configPanelBpmn = createConfigPanelBpmnPlugin(configPanel, {
 	openDecision: (decisionId) => tabsPlugin.api.openDecision(decisionId),
 	openForm: (formId) => tabsPlugin.api.openForm(formId),
+	openProcess: (processId) => {
+		const tabId = bpmnProcessToTabId.get(processId);
+		if (tabId && tabsPlugin.api.getTabIds().includes(tabId)) {
+			tabsPlugin.api.setActiveTab(tabId);
+		}
+	},
 });
 
 palette.addCommands([
@@ -279,4 +293,11 @@ const editor = new BpmnEditor({
 });
 editorRef = editor;
 
-initEditorHud(editor);
+initEditorHud(editor, {
+	openProcess: (processId) => {
+		const tabId = bpmnProcessToTabId.get(processId);
+		if (tabId && tabsPlugin.api.getTabIds().includes(tabId)) {
+			tabsPlugin.api.setActiveTab(tabId);
+		}
+	},
+});
