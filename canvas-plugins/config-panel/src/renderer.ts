@@ -1,4 +1,4 @@
-import type { RenderedShape, ViewportState } from "@bpmn-sdk/canvas";
+import type { RenderedEdge, RenderedShape, ViewportState } from "@bpmn-sdk/canvas";
 import type { BpmnDefinitions } from "@bpmn-sdk/core";
 import type { FieldSchema, FieldValue, GroupSchema, PanelAdapter, PanelSchema } from "./types.js";
 
@@ -46,7 +46,7 @@ export class ConfigPanelRenderer {
 		this._setViewport = setViewport;
 	}
 
-	onSelect(ids: string[], shapes: RenderedShape[]): void {
+	onSelect(ids: string[], shapes: RenderedShape[], edges: RenderedEdge[] = []): void {
 		if (ids.length !== 1) {
 			this._close();
 			return;
@@ -58,32 +58,65 @@ export class ConfigPanelRenderer {
 		}
 		const shape = shapes.find((s) => s.id === id);
 		const elementType = shape?.flowElement?.type;
-		if (!elementType) {
-			this._close();
-			return;
-		}
-		const reg = this._schemas.get(elementType);
-		if (!reg) {
-			this._close();
-			return;
-		}
 
-		this._selectedId = id;
-		this._selectedType = elementType;
-		this._selectedBounds = shape?.shape?.bounds ?? null;
-		this._elementName = shape?.flowElement?.name ?? "";
+		if (elementType) {
+			// Shape selection
+			const reg = this._schemas.get(elementType);
+			if (!reg) {
+				this._close();
+				return;
+			}
 
-		// Resolve optional template override
-		const defs = this._getDefinitions();
-		const resolved = defs ? (reg.adapter.resolve?.(defs, id) ?? null) : null;
-		this._effectiveReg = resolved ?? reg;
+			this._selectedId = id;
+			this._selectedType = elementType;
+			this._selectedBounds = shape?.shape?.bounds ?? null;
+			this._elementName = shape?.flowElement?.name ?? "";
 
-		this._refreshValues(this._effectiveReg);
+			// Resolve optional template override
+			const defs = this._getDefinitions();
+			const resolved = defs ? (reg.adapter.resolve?.(defs, id) ?? null) : null;
+			this._effectiveReg = resolved ?? reg;
 
-		if (this._fullOpen) {
-			this._showFull(this._effectiveReg);
+			this._refreshValues(this._effectiveReg);
+
+			if (this._fullOpen) {
+				this._showFull(this._effectiveReg);
+			} else {
+				this._showCompact(this._effectiveReg);
+			}
 		} else {
-			this._showCompact(this._effectiveReg);
+			// Edge selection — check if it's a sequence flow
+			const isEdge = edges.some((e) => e.id === id);
+			if (!isEdge) {
+				this._close();
+				return;
+			}
+			const defs = this._getDefinitions();
+			const isSequenceFlow = defs?.processes.some((p) => p.sequenceFlows.some((f) => f.id === id));
+			if (!isSequenceFlow) {
+				this._close();
+				return;
+			}
+			const reg = this._schemas.get("sequenceFlow");
+			if (!reg) {
+				this._close();
+				return;
+			}
+
+			this._selectedId = id;
+			this._selectedType = "sequenceFlow";
+			this._selectedBounds = null;
+			const sf = defs?.processes.flatMap((p) => p.sequenceFlows).find((f) => f.id === id);
+			this._elementName = sf?.name ?? "";
+			this._effectiveReg = reg;
+
+			this._refreshValues(reg);
+
+			if (this._fullOpen) {
+				this._showFull(reg);
+			} else {
+				this._showCompact(reg);
+			}
 		}
 	}
 
@@ -451,7 +484,9 @@ export class ConfigPanelRenderer {
 			wrapper.classList.add("bpmn-cfg-field--invalid");
 		}
 
-		if (field.type === "toggle") {
+		if (field.type === "action") {
+			wrapper.appendChild(this._renderActionButton(field));
+		} else if (field.type === "toggle") {
 			wrapper.appendChild(this._renderToggle(field, value));
 		} else {
 			const labelRow = document.createElement("div");
@@ -481,6 +516,8 @@ export class ConfigPanelRenderer {
 				wrapper.appendChild(this._renderSelect(field, value));
 			} else if (field.type === "textarea") {
 				wrapper.appendChild(this._renderTextarea(field, value));
+			} else if (field.type === "feel-expression") {
+				wrapper.appendChild(this._renderFeelExpression(field, value));
 			} else {
 				wrapper.appendChild(this._renderTextInput(field, value));
 			}
@@ -494,6 +531,33 @@ export class ConfigPanelRenderer {
 		}
 
 		return wrapper;
+	}
+
+	private _renderFeelExpression(field: FieldSchema, value: FieldValue): HTMLElement {
+		const text = typeof value === "string" ? value : "";
+
+		const wrap = document.createElement("div");
+		wrap.className = "bpmn-cfg-feel-wrap";
+
+		const ta = document.createElement("textarea");
+		ta.className = "bpmn-cfg-feel-ta bpmn-cfg-textarea";
+		ta.placeholder = field.placeholder ?? "";
+		ta.value = text;
+		ta.setAttribute("data-field-key", field.key);
+		ta.setAttribute("spellcheck", "false");
+		ta.addEventListener("change", () => this._applyField(field.key, ta.value));
+		wrap.appendChild(ta);
+
+		if (field.openInPlayground) {
+			const btn = document.createElement("button");
+			btn.type = "button";
+			btn.className = "bpmn-cfg-feel-playground-btn";
+			btn.textContent = "Open in FEEL Playground ↗";
+			btn.addEventListener("click", () => field.openInPlayground?.(this._values));
+			wrap.appendChild(btn);
+		}
+
+		return wrap;
 	}
 
 	private _renderTextInput(field: FieldSchema, value: FieldValue): HTMLInputElement {
@@ -563,5 +627,16 @@ export class ConfigPanelRenderer {
 		row.appendChild(lbl);
 		row.appendChild(labelText);
 		return row;
+	}
+
+	private _renderActionButton(field: FieldSchema): HTMLElement {
+		const btn = document.createElement("button");
+		btn.type = "button";
+		btn.className = "bpmn-cfg-action-btn";
+		btn.textContent = field.label;
+		btn.addEventListener("click", () =>
+			field.onClick?.(this._values, (k, v) => this._applyField(k, v)),
+		);
+		return btn;
 	}
 }

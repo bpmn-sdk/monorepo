@@ -68,6 +68,30 @@ describe("XML Serializer", () => {
 	});
 });
 
+describe("XML entity decoding", () => {
+	it("decodes numeric character references in attribute values", () => {
+		const xml = '<root name="Data Mapping&#10;epicIssueNumber"/>';
+		const el = parseXml(xml);
+		expect(el.attributes.name).toBe("Data Mapping\nepicIssueNumber");
+	});
+
+	it("decodes predefined XML entities in attribute values", () => {
+		const xml = '<root title="a &amp; b &lt; c &gt; d"/>';
+		const el = parseXml(xml);
+		expect(el.attributes.title).toBe("a & b < c > d");
+	});
+
+	it("preserves round-trip for attribute values with special chars", () => {
+		const xml = '<root name="a &amp; b"/>';
+		const el = parseXml(xml);
+		expect(el.attributes.name).toBe("a & b");
+		const out = serializeXml(el);
+		expect(out).toContain('name="a &amp; b"');
+		const re = parseXml(out);
+		expect(re.attributes.name).toBe("a & b");
+	});
+});
+
 describe("XML attribute escaping", () => {
 	it("escapes double quotes in attribute values", () => {
 		const element = {
@@ -86,9 +110,9 @@ describe("XML attribute escaping", () => {
 		expect(xml).toContain("&quot;/path&quot;");
 		expect(xml).not.toContain('"/path"');
 
-		// Roundtrip: parse the escaped XML and verify value is preserved
+		// Roundtrip: parse the escaped XML and verify value is decoded
 		const parsed = parseXml(xml);
 		const child = parsed.children[0];
-		expect(child?.attributes.source).toBe("=x + &quot;/path&quot;");
+		expect(child?.attributes.source).toBe('=x + "/path"');
 	});
 });

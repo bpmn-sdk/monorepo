@@ -66,7 +66,15 @@ const POSITION_LABELS: Record<LabelPosition, string> = {
 	"top-right": "Top right",
 };
 
-export function initEditorHud(editor: BpmnEditor): void {
+export interface HudOptions {
+	/**
+	 * Called when the user clicks the "Open Process" navigate button above a
+	 * call activity. Receives the `processId` from `zeebe:calledElement`.
+	 */
+	openProcess?: (processId: string) => void;
+}
+
+export function initEditorHud(editor: BpmnEditor, options: HudOptions = {}): void {
 	injectHudStyles();
 
 	// ── Create and inject HUD DOM ──────────────────────────────────────────────
@@ -96,6 +104,11 @@ export function initEditorHud(editor: BpmnEditor): void {
 	hudTopCenter.id = "hud-top-center";
 	hudTopCenter.className = "hud panel";
 	hudTopCenter.append(btnUndo, btnRedo, hudSep(), btnDelete, btnDuplicate, hudSep(), btnTopMore);
+
+	// Mobile collapse toggle — top center (hidden on desktop via CSS)
+	const btnTcToggle = hudBtn("btn-tc-toggle", "Actions");
+	btnTcToggle.innerHTML = IC.undo;
+	hudTopCenter.insertBefore(btnTcToggle, hudTopCenter.firstChild);
 
 	// Zoom widget — bottom left
 	const btnZoomCurrent = document.createElement("button");
@@ -132,6 +145,11 @@ export function initEditorHud(editor: BpmnEditor): void {
 	hudBottomCenter.id = "hud-bottom-center";
 	hudBottomCenter.className = "hud panel";
 	hudBottomCenter.append(btnSelect, btnPan, btnSpace, hudSep(), toolGroupsEl);
+
+	// Mobile collapse toggle — bottom center (hidden on desktop via CSS)
+	const btnBcToggle = hudBtn("btn-bc-toggle", "Tools");
+	btnBcToggle.innerHTML = IC.select;
+	hudBottomCenter.insertBefore(btnBcToggle, hudBottomCenter.firstChild);
 
 	// Contextual toolbars (positioned dynamically)
 	const cfgToolbar = document.createElement("div");
@@ -178,6 +196,28 @@ export function initEditorHud(editor: BpmnEditor): void {
 	let openGroupPicker: HTMLElement | null = null;
 	let openDropdown: HTMLElement | null = null;
 	let zoomOpen = false;
+
+	function collapseOnMobile(panel: HTMLElement): void {
+		if (window.innerWidth <= 600) panel.classList.remove("expanded");
+	}
+
+	btnBcToggle.addEventListener("click", () => {
+		if (hudBottomCenter.classList.contains("expanded")) {
+			hudBottomCenter.classList.remove("expanded");
+		} else {
+			hudBottomCenter.classList.add("expanded");
+			hudTopCenter.classList.remove("expanded");
+		}
+	});
+
+	btnTcToggle.addEventListener("click", () => {
+		if (hudTopCenter.classList.contains("expanded")) {
+			hudTopCenter.classList.remove("expanded");
+		} else {
+			hudTopCenter.classList.add("expanded");
+			hudBottomCenter.classList.remove("expanded");
+		}
+	});
 
 	const groupActiveType: Record<string, CreateShapeType> = {
 		startEvents: "startEvent",
@@ -241,6 +281,7 @@ export function initEditorHud(editor: BpmnEditor): void {
 				updateGroupButton(group.id);
 				editor.setTool(`create:${item.type}`);
 				closeGroupPicker();
+				collapseOnMobile(hudBottomCenter);
 			});
 			picker.appendChild(btn);
 		}
@@ -255,6 +296,123 @@ export function initEditorHud(editor: BpmnEditor): void {
 			Math.min(rect.left + rect.width / 2 - pickerW / 2, window.innerWidth - pickerW - 4),
 		);
 		picker.style.bottom = `${window.innerHeight - rect.top + 6}px`;
+		picker.style.left = `${left}px`;
+
+		const onOutside = (e: PointerEvent) => {
+			if (!picker.contains(e.target as Node) && e.target !== anchor) {
+				closeGroupPicker();
+				document.removeEventListener("pointerdown", onOutside);
+			}
+		};
+		setTimeout(() => document.addEventListener("pointerdown", onOutside), 0);
+	}
+
+	// ── Type-change picker (used by cfgToolbar) ────────────────────────────────
+
+	function showTypePicker(
+		anchor: HTMLButtonElement,
+		group: GroupDef,
+		sourceId: string,
+		sourceType: string,
+	): void {
+		closeGroupPicker();
+		closeAllDropdowns();
+
+		const picker = document.createElement("div");
+		picker.className = "group-picker";
+
+		const label = document.createElement("span");
+		label.className = "group-picker-label";
+		label.textContent = group.title;
+		picker.appendChild(label);
+
+		for (const item of group.items) {
+			const btn = document.createElement("button");
+			btn.className = item.type === sourceType ? "hud-btn active" : "hud-btn";
+			btn.innerHTML = item.icon;
+			btn.title = item.title;
+			btn.addEventListener("click", (e) => {
+				e.stopPropagation();
+				if (item.type !== sourceType) editor.changeElementType(sourceId, item.type);
+				closeGroupPicker();
+			});
+			picker.appendChild(btn);
+		}
+
+		document.body.appendChild(picker);
+		openGroupPicker = picker;
+
+		const rect = anchor.getBoundingClientRect();
+		const pickerW = group.items.length * 36 + 80;
+		const left = Math.max(
+			4,
+			Math.min(rect.left + rect.width / 2 - pickerW / 2, window.innerWidth - pickerW - 4),
+		);
+		picker.style.bottom = `${window.innerHeight - rect.top + 6}px`;
+		picker.style.left = `${left}px`;
+
+		const onOutside = (e: PointerEvent) => {
+			if (!picker.contains(e.target as Node) && e.target !== anchor) {
+				closeGroupPicker();
+				document.removeEventListener("pointerdown", onOutside);
+			}
+		};
+		setTimeout(() => document.addEventListener("pointerdown", onOutside), 0);
+	}
+
+	// ── Color picker (used by ctxToolbar) ──────────────────────────────────────
+
+	function showColorPicker(
+		anchor: HTMLButtonElement,
+		sourceId: string,
+		currentFill: string | undefined,
+	): void {
+		closeGroupPicker();
+		closeAllDropdowns();
+
+		const picker = document.createElement("div");
+		picker.className = "group-picker";
+
+		// "Default" (no-color) swatch
+		const clearSwatch = document.createElement("button");
+		const isDefault = !currentFill;
+		clearSwatch.className = isDefault
+			? "bpmn-color-swatch bpmn-color-swatch--default active"
+			: "bpmn-color-swatch bpmn-color-swatch--default";
+		clearSwatch.title = "Default color";
+		clearSwatch.addEventListener("click", (e) => {
+			e.stopPropagation();
+			editor.updateColor(sourceId, {});
+			closeGroupPicker();
+		});
+		picker.appendChild(clearSwatch);
+
+		for (const { fill, stroke } of COLOR_PALETTE) {
+			const isActive = currentFill === fill;
+			const swatch = document.createElement("button");
+			swatch.className = isActive ? "bpmn-color-swatch active" : "bpmn-color-swatch";
+			swatch.style.background = fill;
+			swatch.style.outlineColor = stroke;
+			swatch.title = "Apply color";
+			swatch.addEventListener("click", (e) => {
+				e.stopPropagation();
+				editor.updateColor(sourceId, { fill, stroke });
+				closeGroupPicker();
+			});
+			picker.appendChild(swatch);
+		}
+
+		document.body.appendChild(picker);
+		openGroupPicker = picker;
+
+		const rect = anchor.getBoundingClientRect();
+		const pickerW = (COLOR_PALETTE.length + 1) * 30 + 20;
+		const left = Math.max(
+			4,
+			Math.min(rect.left + rect.width / 2 - pickerW / 2, window.innerWidth - pickerW - 4),
+		);
+		picker.style.top = `${rect.bottom + 6}px`;
+		picker.style.bottom = "auto";
 		picker.style.left = `${left}px`;
 
 		const onOutside = (e: PointerEvent) => {
@@ -294,7 +452,10 @@ export function initEditorHud(editor: BpmnEditor): void {
 			}
 			if (!isLongPress) {
 				const activeType = groupActiveType[group.id];
-				if (activeType) editor.setTool(`create:${activeType}`);
+				if (activeType) {
+					editor.setTool(`create:${activeType}`);
+					collapseOnMobile(hudBottomCenter);
+				}
 			}
 		});
 
@@ -334,11 +495,34 @@ export function initEditorHud(editor: BpmnEditor): void {
 				}
 			}
 		}
+
+		// Update bottom-center toggle icon to reflect the active tool
+		if (tool === "select") btnBcToggle.innerHTML = IC.select;
+		else if (tool === "pan") btnBcToggle.innerHTML = IC.hand;
+		else if (tool === "space") btnBcToggle.innerHTML = IC.space;
+		else {
+			for (const group of GROUPS) {
+				if (group.items.some((item) => tool === `create:${item.type}`)) {
+					const btn = groupBtns[group.id];
+					if (btn) btnBcToggle.innerHTML = btn.innerHTML;
+					break;
+				}
+			}
+		}
 	}
 
-	btnSelect.addEventListener("click", () => editor.setTool("select"));
-	btnPan.addEventListener("click", () => editor.setTool("pan"));
-	btnSpace.addEventListener("click", () => editor.setTool("space"));
+	btnSelect.addEventListener("click", () => {
+		editor.setTool("select");
+		collapseOnMobile(hudBottomCenter);
+	});
+	btnPan.addEventListener("click", () => {
+		editor.setTool("pan");
+		collapseOnMobile(hudBottomCenter);
+	});
+	btnSpace.addEventListener("click", () => {
+		editor.setTool("space");
+		collapseOnMobile(hudBottomCenter);
+	});
 
 	// ── Dropdown management ────────────────────────────────────────────────────
 
@@ -373,6 +557,17 @@ export function initEditorHud(editor: BpmnEditor): void {
 	document.addEventListener("pointerdown", (e) => {
 		if (openDropdown && !openDropdown.contains(e.target as Node)) {
 			closeAllDropdowns();
+		}
+		if (window.innerWidth <= 600) {
+			if (
+				hudBottomCenter.classList.contains("expanded") &&
+				!hudBottomCenter.contains(e.target as Node)
+			) {
+				hudBottomCenter.classList.remove("expanded");
+			}
+			if (hudTopCenter.classList.contains("expanded") && !hudTopCenter.contains(e.target as Node)) {
+				hudTopCenter.classList.remove("expanded");
+			}
 		}
 	});
 
@@ -484,10 +679,22 @@ export function initEditorHud(editor: BpmnEditor): void {
 
 	updateActionBar();
 
-	btnUndo.addEventListener("click", () => editor.undo());
-	btnRedo.addEventListener("click", () => editor.redo());
-	btnDelete.addEventListener("click", () => editor.deleteSelected());
-	btnDuplicate.addEventListener("click", () => editor.duplicate());
+	btnUndo.addEventListener("click", () => {
+		editor.undo();
+		collapseOnMobile(hudTopCenter);
+	});
+	btnRedo.addEventListener("click", () => {
+		editor.redo();
+		collapseOnMobile(hudTopCenter);
+	});
+	btnDelete.addEventListener("click", () => {
+		editor.deleteSelected();
+		collapseOnMobile(hudTopCenter);
+	});
+	btnDuplicate.addEventListener("click", () => {
+		editor.duplicate();
+		collapseOnMobile(hudTopCenter);
+	});
 
 	// ── Label position menu ────────────────────────────────────────────────────
 
@@ -561,24 +768,22 @@ export function initEditorHud(editor: BpmnEditor): void {
 			const defs = editor.getDefinitions();
 			const diShape = defs?.diagrams[0]?.plane.shapes.find((s) => s.bpmnElement === sourceId);
 			const currentColor = diShape ? readDiColor(diShape.unknownAttributes) : {};
+			const currentFill = currentColor.fill;
 
-			const swatchRow = document.createElement("div");
-			swatchRow.className = "bpmn-color-swatches";
-
-			for (const { fill, stroke } of COLOR_PALETTE) {
-				const swatch = document.createElement("button");
-				const isActive = currentColor.fill === fill;
-				swatch.className = isActive ? "bpmn-color-swatch active" : "bpmn-color-swatch";
-				swatch.style.background = fill;
-				swatch.style.outlineColor = stroke;
-				swatch.title = "Apply color";
-				swatch.addEventListener("click", () => {
-					// Toggle: clicking active swatch clears the color
-					editor.updateColor(sourceId, isActive ? {} : { fill, stroke });
-				});
-				swatchRow.appendChild(swatch);
+			const singleSwatch = document.createElement("button");
+			singleSwatch.className = currentFill
+				? "bpmn-color-swatch active"
+				: "bpmn-color-swatch bpmn-color-swatch--default";
+			if (currentFill) {
+				singleSwatch.style.background = currentFill;
+				const palette = COLOR_PALETTE.find((p) => p.fill === currentFill);
+				if (palette) singleSwatch.style.outlineColor = palette.stroke;
 			}
-			ctxToolbar.appendChild(swatchRow);
+			singleSwatch.title = "Color (click for options)";
+			singleSwatch.addEventListener("click", () =>
+				showColorPicker(singleSwatch, sourceId, currentFill),
+			);
+			ctxToolbar.appendChild(singleSwatch);
 
 			// Add annotation button
 			const annotBtn = document.createElement("button");
@@ -602,18 +807,13 @@ export function initEditorHud(editor: BpmnEditor): void {
 		const group = eGroup ? GROUPS.find((g) => g.id === eGroup.id) : undefined;
 
 		if (group && group.items.length > 1) {
-			for (const opt of group.items) {
-				const btn = document.createElement("button");
-				btn.className = opt.type === sourceType ? "hud-btn active" : "hud-btn";
-				btn.innerHTML = opt.icon;
-				btn.title = opt.title;
-				btn.addEventListener("click", () => {
-					if (opt.type !== sourceType) {
-						editor.changeElementType(sourceId, opt.type);
-					}
-				});
-				cfgToolbar.appendChild(btn);
-			}
+			const currentItem = group.items.find((i) => i.type === sourceType);
+			const typeBtn = document.createElement("button");
+			typeBtn.className = "hud-btn active";
+			typeBtn.innerHTML = currentItem?.icon ?? group.groupIcon;
+			typeBtn.title = `${currentItem?.title ?? group.title} (click to change)`;
+			typeBtn.addEventListener("click", () => showTypePicker(typeBtn, group, sourceId, sourceType));
+			cfgToolbar.appendChild(typeBtn);
 		}
 
 		if (EXTERNAL_LABEL_TYPES.has(sourceType as CreateShapeType)) {
@@ -639,6 +839,39 @@ export function initEditorHud(editor: BpmnEditor): void {
 			});
 			cfgToolbar.appendChild(labelBtn);
 		}
+
+		if (sourceType === "callActivity" && options.openProcess) {
+			const processId = getCallActivityProcessId(sourceId);
+			if (processId) {
+				if (cfgToolbar.children.length > 0) {
+					const sep = document.createElement("div");
+					sep.className = "hud-sep";
+					cfgToolbar.appendChild(sep);
+				}
+				const navBtn = document.createElement("button");
+				navBtn.className = "hud-btn";
+				navBtn.innerHTML = IC.openProcess;
+				navBtn.title = `Open process: ${processId}`;
+				navBtn.addEventListener("click", () => {
+					options.openProcess?.(processId);
+				});
+				cfgToolbar.appendChild(navBtn);
+			}
+		}
+	}
+
+	function getCallActivityProcessId(id: string): string | null {
+		const defs = editor.getDefinitions();
+		if (!defs) return null;
+		for (const process of defs.processes) {
+			const el = process.flowElements.find((e) => e.id === id);
+			if (!el) continue;
+			for (const ext of el.extensionElements) {
+				const ln = ext.name.includes(":") ? ext.name.slice(ext.name.indexOf(":") + 1) : ext.name;
+				if (ln === "calledElement") return ext.attributes.processId ?? null;
+			}
+		}
+		return null;
 	}
 
 	function positionCfgToolbar(): void {

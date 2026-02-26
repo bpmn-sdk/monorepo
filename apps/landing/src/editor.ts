@@ -3,10 +3,16 @@ import { createCommandPaletteEditorPlugin } from "@bpmn-sdk/canvas-plugin-comman
 import { createConfigPanelPlugin } from "@bpmn-sdk/canvas-plugin-config-panel";
 import { createConfigPanelBpmnPlugin } from "@bpmn-sdk/canvas-plugin-config-panel-bpmn";
 import { createMainMenuPlugin } from "@bpmn-sdk/canvas-plugin-main-menu";
+import { createStoragePlugin } from "@bpmn-sdk/canvas-plugin-storage";
+import type { FileType } from "@bpmn-sdk/canvas-plugin-storage";
+import { InMemoryFileResolver, createTabsPlugin } from "@bpmn-sdk/canvas-plugin-tabs";
+import type { WelcomeSection } from "@bpmn-sdk/canvas-plugin-tabs";
 import { createWatermarkPlugin } from "@bpmn-sdk/canvas-plugin-watermark";
 import { createZoomControlsPlugin } from "@bpmn-sdk/canvas-plugin-zoom-controls";
+import { Bpmn, Dmn, Form } from "@bpmn-sdk/core";
 import { BpmnEditor, initEditorHud } from "@bpmn-sdk/editor";
 import type { Tool } from "@bpmn-sdk/editor";
+import { makeExamples } from "./examples.js";
 
 const LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
   <rect width="24" height="24" rx="4" fill="#0062ff"/>
@@ -16,6 +22,9 @@ const LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
   <line x1="15" y1="12" x2="16.5" y2="12" stroke="white" stroke-width="1.5"/>
   <circle cx="19" cy="12" r="2.5" fill="none" stroke="white" stroke-width="2.5"/>
 </svg>`;
+
+const IMPORT_ICON =
+	'<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v8M5 5l3-3 3 3"/><path d="M2 13h12"/></svg>';
 
 const SAMPLE_XML = `<?xml version="1.0" encoding="UTF-8"?>
 <bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
@@ -60,8 +69,289 @@ const SAMPLE_XML = `<?xml version="1.0" encoding="UTF-8"?>
   </bpmndi:BPMNDiagram>
 </bpmn:definitions>`;
 
+// ── Helpers ────────────────────────────────────────────────────────────────────
+
+function makeEmptyBpmnXml(processId: string, processName: string): string {
+	const startId = `StartEvent_${processId}`;
+	return `<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+  xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+  xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
+  id="Definitions_${processId}" targetNamespace="http://bpmn.io/schema/bpmn">
+  <bpmn:process id="${processId}" name="${processName}" isExecutable="true">
+    <bpmn:startEvent id="${startId}"/>
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_${processId}">
+    <bpmndi:BPMNPlane id="BPMNPlane_${processId}" bpmnElement="${processId}">
+      <bpmndi:BPMNShape id="${startId}_di" bpmnElement="${startId}">
+        <dc:Bounds x="152" y="82" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>`;
+}
+
+// ── Setup ──────────────────────────────────────────────────────────────────────
+
 const editorContainer = document.getElementById("editor-container");
 if (!editorContainer) throw new Error("missing #editor-container");
+
+// File resolver — shared between the tabs plugin and the config panel callbacks
+const resolver = new InMemoryFileResolver();
+
+// Maps BPMN process IDs to the tab ID that holds that process, for navigation.
+const bpmnProcessToTabId = new Map<string, string>();
+// Maps BPMN process IDs to the process name, for display in the call activity picker.
+const bpmnProcessNames = new Map<string, string>();
+
+// Maps tab ID → storage file ID for tabs opened from the storage plugin.
+const tabIdToStorageFileId = new Map<string, string>();
+
+// Tracks latest content of each open tab for "Save All to Project"
+const openTabConfigs = new Map<string, { name: string; type: FileType; content: string }>();
+
+let editorRef: BpmnEditor | null = null;
+
+// Tabs plugin — onTabActivate loads the BPMN into the editor when a BPMN tab is clicked
+// and shows/hides BPMN-specific HUD toolbars for non-BPMN views.
+const BPMN_ONLY_HUD = ["hud-top-center", "hud-bottom-left", "hud-bottom-center"];
+
+function setHudVisible(visible: boolean): void {
+	for (const el of document.querySelectorAll<HTMLElement>(".hud")) {
+		el.style.display = visible ? "" : "none";
+	}
+	const menuPanel = document.querySelector<HTMLElement>(".bpmn-main-menu-panel");
+	if (menuPanel) menuPanel.style.display = visible ? "" : "none";
+}
+
+const tabsPlugin = createTabsPlugin({
+	resolver,
+	// examples getter is called during install(), after tabsPlugin is assigned.
+	get examples() {
+		return makeExamples(tabsPlugin.api, resolver);
+	},
+	getWelcomeSections(): WelcomeSection[] {
+		const workspaces = storagePlugin.api.getCachedWorkspaces();
+		const items: Array<{ label: string; description: string; onOpen: () => void }> = [];
+		for (const ws of workspaces) {
+			for (const proj of storagePlugin.api.getCachedProjects(ws.id)) {
+				const wsName = ws.name;
+				const projName = proj.name;
+				const projId = proj.id;
+				items.push({
+					label: projName,
+					description: wsName,
+					onOpen: () => {
+						void storagePlugin.api.openProject(projId).then(() => {
+							mainMenuPlugin.api.setTitle(`${wsName} / ${projName}`);
+						});
+					},
+				});
+			}
+		}
+		if (items.length === 0) return [];
+		return [{ label: "Projects", getItems: () => items }];
+	},
+	onNewDiagram() {
+		const tabId = tabsPlugin.api.openTab({ type: "bpmn", xml: SAMPLE_XML, name: "New Diagram" });
+		for (const proc of Bpmn.parse(SAMPLE_XML).processes) {
+			bpmnProcessToTabId.set(proc.id, tabId);
+			bpmnProcessNames.set(proc.id, proc.name ?? proc.id);
+		}
+	},
+	onImportFiles() {
+		fileInput.click();
+	},
+	onWelcomeShow() {
+		setHudVisible(false);
+	},
+	onTabActivate(id, config) {
+		const isBpmn = config.type === "bpmn";
+
+		// Restore all HUDs and the main menu when any tab is active
+		setHudVisible(true);
+
+		if (config.type === "bpmn" && config.xml) {
+			editorRef?.load(config.xml);
+			// Snapshot current content for "Save All to Project"
+			openTabConfigs.set(id, { name: config.name ?? "Diagram", type: "bpmn", content: config.xml });
+		} else if (config.type === "dmn") {
+			openTabConfigs.set(id, {
+				name: config.name ?? "Decision",
+				type: "dmn",
+				content: Dmn.export(config.defs),
+			});
+		} else if (config.type === "form") {
+			openTabConfigs.set(id, {
+				name: config.name ?? "Form",
+				type: "form",
+				content: Form.export(config.form),
+			});
+		}
+
+		// Update storage current-file pointer — ensures auto-save targets the right file
+		storagePlugin.api.setCurrentFileId(tabIdToStorageFileId.get(id) ?? null);
+
+		// Hide BPMN-only toolbars on non-BPMN views
+		for (const hudId of BPMN_ONLY_HUD) {
+			const el = document.getElementById(hudId);
+			if (el) el.style.display = isBpmn ? "" : "none";
+		}
+
+		// Deselect all — closes the config panel and contextual toolbars
+		if (!isBpmn) {
+			editorRef?.setSelection([]);
+		}
+	},
+	onDownloadTab(config) {
+		let content: string;
+		let filename: string;
+		if (config.type === "bpmn") {
+			content = config.xml;
+			filename = config.name ?? "diagram.bpmn";
+		} else if (config.type === "dmn") {
+			content = Dmn.export(config.defs);
+			filename = config.name ?? "decision.dmn";
+		} else if (config.type === "form") {
+			content = Form.export(config.form);
+			filename = config.name ?? "form.form";
+		} else {
+			return; // feel tabs have no file content to download
+		}
+		const blob = new Blob([content], { type: "application/octet-stream" });
+		const url = URL.createObjectURL(blob);
+		const a = document.createElement("a");
+		a.href = url;
+		a.download = filename;
+		a.click();
+		URL.revokeObjectURL(url);
+	},
+});
+
+// ── File import logic ──────────────────────────────────────────────────────────
+
+async function importFiles(files: FileList | File[]): Promise<void> {
+	for (const file of Array.from(files)) {
+		const name = file.name;
+		const ext = name.slice(name.lastIndexOf(".")).toLowerCase();
+
+		try {
+			const text = await file.text();
+
+			if (ext === ".bpmn" || ext === ".xml") {
+				const bpmnDefs = Bpmn.parse(text);
+				const tabId = tabsPlugin.api.openTab({ type: "bpmn", xml: text, name });
+				for (const proc of bpmnDefs.processes) {
+					bpmnProcessToTabId.set(proc.id, tabId);
+					bpmnProcessNames.set(proc.id, proc.name ?? proc.id);
+				}
+			} else if (ext === ".dmn") {
+				const defs = Dmn.parse(text);
+				resolver.registerDmn(defs);
+				tabsPlugin.api.openTab({ type: "dmn", defs, name: defs.name ?? name });
+			} else if (ext === ".form" || ext === ".json") {
+				const form = Form.parse(text);
+				resolver.registerForm(form);
+				tabsPlugin.api.openTab({ type: "form", form, name: form.id ?? name });
+			}
+		} catch (err) {
+			console.error(`[bpmn-sdk] Failed to import ${name}:`, err);
+		}
+	}
+}
+
+// ── Hidden file input for the "Import" menu action ────────────────────────────
+
+const fileInput = document.createElement("input");
+fileInput.type = "file";
+fileInput.multiple = true;
+fileInput.accept = ".bpmn,.xml,.dmn,.form,.json";
+fileInput.style.display = "none";
+document.body.appendChild(fileInput);
+fileInput.addEventListener("change", () => {
+	if (fileInput.files) {
+		void importFiles(fileInput.files);
+		fileInput.value = "";
+	}
+});
+
+// ── Drag-and-drop ──────────────────────────────────────────────────────────────
+
+editorContainer.addEventListener("dragover", (e) => {
+	e.preventDefault();
+});
+
+editorContainer.addEventListener("drop", (e) => {
+	e.preventDefault();
+	const files = e.dataTransfer?.files;
+	if (files && files.length > 0) {
+		void importFiles(files);
+	}
+});
+
+// ── Main menu ─────────────────────────────────────────────────────────────────
+
+const mainMenuPlugin = createMainMenuPlugin({
+	title: "BPMN SDK",
+	menuItems: [
+		{
+			label: "Import files…",
+			icon: IMPORT_ICON,
+			onClick: () => fileInput.click(),
+		},
+		{
+			label: "FEEL Playground",
+			onClick: () => tabsPlugin.api.openTab({ type: "feel", name: "FEEL Playground" }),
+		},
+	],
+});
+
+// ── Storage plugin ────────────────────────────────────────────────────────────
+
+const storagePlugin = createStoragePlugin({
+	mainMenu: mainMenuPlugin,
+	getOpenTabs: () => [...openTabConfigs.entries()].map(([tabId, v]) => ({ tabId, ...v })),
+	initialTitle: "BPMN SDK",
+	onOpenFile(file, content) {
+		if (file.type === "bpmn") {
+			const tabId = tabsPlugin.api.openTab({ type: "bpmn", xml: content, name: file.name });
+			tabIdToStorageFileId.set(tabId, file.id);
+			// onTabActivate fires synchronously inside openTab before the map is set,
+			// so we correct currentFileId explicitly here.
+			storagePlugin.api.setCurrentFileId(file.id);
+			try {
+				for (const proc of Bpmn.parse(content).processes) {
+					bpmnProcessToTabId.set(proc.id, tabId);
+					bpmnProcessNames.set(proc.id, proc.name ?? proc.id);
+				}
+			} catch {
+				// malformed XML — tab still opens
+			}
+		} else if (file.type === "dmn") {
+			try {
+				const defs = Dmn.parse(content);
+				resolver.registerDmn(defs);
+				const tabId = tabsPlugin.api.openTab({ type: "dmn", defs, name: file.name });
+				tabIdToStorageFileId.set(tabId, file.id);
+				storagePlugin.api.setCurrentFileId(file.id);
+			} catch {
+				console.error("[storage] Failed to parse DMN:", file.name);
+			}
+		} else if (file.type === "form") {
+			try {
+				const form = Form.parse(content);
+				resolver.registerForm(form);
+				const tabId = tabsPlugin.api.openTab({ type: "form", form, name: file.name });
+				tabIdToStorageFileId.set(tabId, file.id);
+				storagePlugin.api.setCurrentFileId(file.id);
+			} catch {
+				console.error("[storage] Failed to parse form:", file.name);
+			}
+		}
+	},
+});
+
+// ── Plugins ───────────────────────────────────────────────────────────────────
 
 const palette = createCommandPalettePlugin({
 	onZenModeChange(active) {
@@ -72,7 +362,6 @@ const palette = createCommandPalettePlugin({
 	},
 });
 
-let editorRef: BpmnEditor | null = null;
 const paletteEditor = createCommandPaletteEditorPlugin(palette, (tool) => {
 	editorRef?.setTool(tool as Tool);
 });
@@ -83,7 +372,40 @@ const configPanel = createConfigPanelPlugin({
 		editorRef?.applyChange(fn);
 	},
 });
-const configPanelBpmn = createConfigPanelBpmnPlugin(configPanel);
+
+const configPanelBpmn = createConfigPanelBpmnPlugin(configPanel, {
+	openDecision: (decisionId) => tabsPlugin.api.openDecision(decisionId),
+	openForm: (formId) => tabsPlugin.api.openForm(formId),
+	openProcess: (processId) => {
+		const tabId = bpmnProcessToTabId.get(processId);
+		if (tabId && tabsPlugin.api.getTabIds().includes(tabId)) {
+			tabsPlugin.api.setActiveTab(tabId);
+		}
+	},
+	getAvailableProcesses: () =>
+		[...bpmnProcessToTabId.keys()].map((id) => ({ id, name: bpmnProcessNames.get(id) })),
+	createProcess: (name, onCreated) => {
+		const processId = `Process_${Math.random().toString(36).slice(2, 9)}`;
+		const xml = makeEmptyBpmnXml(processId, name);
+		const tabId = tabsPlugin.api.openTab({ type: "bpmn", xml, name });
+		bpmnProcessToTabId.set(processId, tabId);
+		bpmnProcessNames.set(processId, name);
+		onCreated(processId);
+	},
+	openFeelPlayground: (expression) => {
+		tabsPlugin.api.openTab({ type: "feel", name: "FEEL Playground", expression });
+	},
+});
+
+palette.addCommands([
+	{
+		id: "feel-playground",
+		title: "FEEL Playground",
+		action: () => tabsPlugin.api.openTab({ type: "feel", name: "FEEL Playground" }),
+	},
+]);
+
+// ── Editor ────────────────────────────────────────────────────────────────────
 
 const editor = new BpmnEditor({
 	container: editorContainer,
@@ -92,12 +414,14 @@ const editor = new BpmnEditor({
 	grid: true,
 	fit: "center",
 	plugins: [
-		createMainMenuPlugin({ title: "BPMN SDK" }),
+		mainMenuPlugin,
 		createZoomControlsPlugin(),
 		createWatermarkPlugin({
 			links: [{ label: "Github", url: "https://github.com/bpmn-sdk/monorepo" }],
 			logo: LOGO_SVG,
 		}),
+		tabsPlugin,
+		storagePlugin,
 		palette,
 		paletteEditor,
 		configPanel,
@@ -106,4 +430,11 @@ const editor = new BpmnEditor({
 });
 editorRef = editor;
 
-initEditorHud(editor);
+initEditorHud(editor, {
+	openProcess: (processId) => {
+		const tabId = bpmnProcessToTabId.get(processId);
+		if (tabId && tabsPlugin.api.getTabIds().includes(tabId)) {
+			tabsPlugin.api.setActiveTab(tabId);
+		}
+	},
+});

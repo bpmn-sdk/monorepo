@@ -1,5 +1,96 @@
 # Features
 
+## IndexedDB Storage Plugin (2026-02-26, overhauled 2026-02-26) — `@bpmn-sdk/canvas-plugin-storage`
+
+- **`@bpmn-sdk/canvas-plugin-storage`** — persists BPMN / DMN / Form files in the browser's IndexedDB in a `workspace → project → files` hierarchy
+  - **Dexie v4** for IndexedDB access — migrations, compound indexes, type-safe tables
+  - **5 record types**: `WorkspaceRecord`, `ProjectRecord`, `FileRecord` (with `isShared` and `gitPath`), `FileContentRecord`
+  - **Auto-save** — 500 ms debounce triggered by `diagram:change`; forced flush on page hide / `beforeunload`; multi-tab safe
+  - **Main-menu integration** — workspace/project navigation via drill-down menu (no sidebar); "Open Project", "Save All to Project", "Leave Project" actions in the ⋮ menu
+  - **Project persistence** — last-opened project restored on page refresh via `localStorage`; title updated to `workspace / project`
+  - **Shared files** — any file can be marked `isShared: true` to make it accessible for cross-workspace reference resolution
+  - **GitHub-sync ready** — every `FileRecord` carries a `gitPath: string | null` field reserved for future bidirectional GitHub sync
+  - **`createStoragePlugin(options)`** returns `CanvasPlugin & { api: StorageApi }`; requires `mainMenu` and `getOpenTabs` options
+
+## Main Menu Plugin (enhanced 2026-02-26) — `@bpmn-sdk/canvas-plugin-main-menu`
+
+- **`MainMenuApi`** — programmatic API: `setTitle(text)` updates title span; `setDynamicItems(fn)` injects items on every open
+- **`MenuDrill`** — drill-down menu items with back-navigation stack; clicking drills into sub-menu; "← Back" button returns to parent
+- **`MenuInfo`** — passive info row with optional action button (e.g. "Leave" for active project indicator)
+- Theme picker now behind a "Theme" drill item instead of flat in root dropdown
+
+## BPMN Element Config — Call Activity, Script Task, Sequence Flow (2026-02-26, updated 2026-02-26)
+
+- **Call activity** — configure `zeebe:calledElement processId` and `propagateAllChildVariables` in the config panel; "Select process…" button picks from open BPMN tabs; "New process" button creates a new blank BPMN and auto-links it; optional "Open Process ↗" action button navigates to the matching BPMN tab; navigate icon button in the element toolbar (HUD) above a selected call activity
+- **Script task** — configure `zeebe:script expression` (FEEL expression, textarea) and `resultVariable`; replaces the generic name-only panel
+- **Sequence flow condition expression** — clicking any sequence flow (edge) opens the config panel showing an editable `conditionExpression` FEEL textarea; works for gateway outgoing edges and any other flows; empty expression removes the condition element from the XML
+
+## FEEL Language Support (2026-02-26) — `@bpmn-sdk/feel` + `@bpmn-sdk/canvas-plugin-feel-playground`
+
+- **`@bpmn-sdk/feel`** — pure TypeScript FEEL engine; zero runtime dependencies; works in Node.js and browser
+  - **Lexer** — position-aware tokenizer with full FEEL token set (temporal literals, backtick names, `..`, `**`, comments)
+  - **Parser** — Pratt parser; `parseExpression()` and `parseUnaryTests()` entry points; greedy multi-word name resolution; error recovery
+  - **Evaluator** — tree-walking evaluator; three-valued logic; ~60 built-in functions (string, numeric, list, context, temporal, range)
+  - **Formatter** — pretty printer with configurable line-length-aware wrapping
+  - **Highlighter** — `annotate()` / `highlightToHtml()` / `highlightFeel`; semantic token classification
+- **`@bpmn-sdk/canvas-plugin-feel-playground`** — interactive FEEL panel in the editor
+  - Expression and Unary-Tests modes; syntax-highlighted textarea; JSON context input; live evaluation; theme-aware (light/dark)
+  - Opens as a full tab via `tabsPlugin.api.openTab({ type: "feel" })` — accessible from the command palette (Ctrl+K), the ⋯ main menu, and the welcome screen
+  - `buildFeelPlaygroundPanel(onClose?)` exported for embedding in any container; `createFeelPlaygroundPlugin()` retained as a standalone overlay variant
+- **`@bpmn-sdk/canvas-plugin-dmn-viewer` migration** — `feel.ts` now re-exports from `@bpmn-sdk/feel`; DMN cell highlighting uses the full FEEL highlighter
+
+## Welcome Screen Examples (2026-02-26) — `@bpmn-sdk/canvas-plugin-tabs` + `apps/landing`
+
+- **Dynamic sections on welcome screen** — `getWelcomeSections` option accepts a `() => WelcomeSection[]`; rebuilt on each show; used to surface workspace/project/file links from storage
+- **Example entries on welcome screen** — the `examples` option accepts a `WelcomeExample[]`; each entry has a badge (BPMN / DMN / FORM / MULTI), label, optional description, and an `onOpen()` callback
+- **4 built-in examples in the landing app**:
+  - *Order Validation* (BPMN) — linear service-task flow
+  - *Shipping Cost* (DMN) — FIRST hit-policy decision table: weight × destination
+  - *Support Ticket* (FORM) — subject, category, priority, description, attachment
+  - *Loan Application Flow* (MULTI) — BPMN + Credit Risk DMN + Application Form; opens all three tabs and registers resources in the resolver
+
+## Welcome Screen + Grouped Tabs (2026-02-26) — `@bpmn-sdk/canvas-plugin-tabs`
+
+- **Welcome screen** — shown when no tabs are open; centered card with BPMN icon, title, "New diagram" and "Import files…" buttons; theme-aware (light/dark); `onNewDiagram` / `onImportFiles` option callbacks
+- **Grouped tabs** — at most 3 tabs in the bar (one per type: BPMN, DMN, FORM); each group tab shows the active file name and a type badge; chevron opens a dropdown listing all files of that type; per-file close buttons in dropdown; close button on tab itself when group has only one file
+
+## Multi-file Import + Tab Navigation in Editor (2026-02-26) — `apps/landing` + `canvas-plugins/*`
+
+- **Import files via menu** — "Import files…" in the top-right menu opens a file picker accepting `.bpmn`, `.xml`, `.dmn`, `.form`, `.json`; each file opens in a separate tab
+- **Drag-and-drop import** — drop any supported file onto the canvas to open it in a new tab
+- **BPMN tab switching** — clicking a BPMN tab loads that diagram into the editor; BPMN panes are transparent so the editor canvas shows through
+- **DMN/Form cross-navigation** — "Open Decision ↗" / "Open Form ↗" buttons in the config panel open the referenced file in a tab using the same `InMemoryFileResolver` populated by imports
+- **`menuItems` option** added to main-menu plugin for injecting custom actions above the Theme section
+
+## DMN Viewer + Form Viewer + Tabs Plugin (2026-02-26)
+
+### `@bpmn-sdk/canvas-plugin-dmn-viewer`
+- **Read-only DMN decision table viewer** — renders any `DmnDefinitions` as an HTML table; hit policy badge; input/output columns with type annotations
+- **FEEL syntax highlighting** — tokenizes FEEL expressions in decision cells; colors keywords, strings, numbers, operators, ranges, function calls
+- **Light/dark/auto themes** via CSS custom properties
+- **`createDmnViewerPlugin(options)`** — canvas plugin wrapper; opens DMN viewer on click of call activities with `zeebe:calledDecision`
+
+### `@bpmn-sdk/canvas-plugin-form-viewer`
+- **Read-only Form viewer** — renders all 21 Camunda Form component types; built entirely in-repo (no `@bpmn-io/form-js` dependency)
+- **Row-based grid layout** — respects `layout.row` grouping from the form schema
+- **`createFormViewerPlugin(options)`** — canvas plugin wrapper; opens Form viewer on click of user tasks with `zeebe:formDefinition`
+
+### `@bpmn-sdk/canvas-plugin-tabs`
+- **Tab bar overlay** — fixed tab strip inside the canvas container for BPMN/DMN/Form tabs
+- **`FileResolver` abstraction** — pluggable interface for resolving file references; `InMemoryFileResolver` default; designed for future FS/SaaS backends
+- **`TabsApi`** — programmatic `openDecision(id)` / `openForm(id)` + full tab lifecycle management
+- **Warning badge** — shown when a referenced DMN/Form file is not registered
+- **Close-tab download prompt** — closing a tab with in-memory content shows a dialog (Cancel / Close without saving / Download & Close); the download callback serializes BPMN/DMN/Form to their respective formats and triggers a browser file download
+
+### `@bpmn-sdk/core` — Extended form and Zeebe model
+- **13 new Form component types** — number, datetime, button, taglist, table, image, dynamiclist, iframe, separator, spacer, documentPreview, html, expression, filepicker; `FormUnknownComponent` catch-all
+- **`ZeebeFormDefinition`** and **`ZeebeCalledDecision`** typed interfaces in `ZeebeExtensions`
+
+### `@bpmn-sdk/canvas-plugin-config-panel` + `config-panel-bpmn`
+- **`"action"` FieldType** — clickable button fields in the config panel with `onClick` callback
+- **Typed userTask panel** — `formId` field + "Open Form ↗" button wired to the tabs plugin
+- **Typed businessRuleTask panel** — `decisionId` + `resultVariable` fields + "Open Decision ↗" button wired to the tabs plugin
+
 ## SubProcess Containment + Sticky Movement (2026-02-25) — `@bpmn-sdk/editor`
 - **Sticky movement** — moving a subprocess moves all descendant shapes with it
 - **Containment on create** — shapes dropped inside a subprocess become children in the BPMN model

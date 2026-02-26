@@ -79,7 +79,7 @@ export function createConfigPanelPlugin(options: ConfigPanelOptions): ConfigPane
 
 			_unsubs.push(
 				anyOn("editor:select", (rawIds) => {
-					_renderer?.onSelect(rawIds as string[], api.getShapes());
+					_renderer?.onSelect(rawIds as string[], api.getShapes(), api.getEdges());
 				}),
 			);
 			_unsubs.push(

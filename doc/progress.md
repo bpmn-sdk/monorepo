@@ -1,5 +1,304 @@
 # Progress
 
+## 2026-02-26 — Bug fixes: auto-save, welcome screen project navigation, call activity process linking
+
+### `canvas-plugins/config-panel`
+- `FieldSchema.onClick` now receives a `setValue(key, val)` second argument so action buttons can write field values back without re-rendering the whole panel
+
+### `canvas-plugins/config-panel-bpmn`
+- Call Activity panel: added "Select process…" action button (prompt with numbered list of open BPMN tabs) and "New process" action button (prompt for name → create blank BPMN tab → auto-link)
+- `ConfigPanelBpmnOptions` extended with `getAvailableProcesses()` and `createProcess(name, onCreated)` callbacks
+
+### `canvas-plugins/tabs`
+- Added `WelcomeSection` / `WelcomeSectionItem` interfaces and `getWelcomeSections` option to `TabsPluginOptions`
+- Dynamic sections (workspace/project/file links) are rebuilt and injected into the welcome screen on every show
+
+### `apps/landing`
+- **Auto-save fix**: `setCurrentFileId(file.id)` is now called immediately after `tabIdToStorageFileId.set()` inside `onOpenFile`, preventing the race where `onTabActivate` fired before the map was populated
+- `bpmnProcessNames` map tracks BPMN tab names for use in call activity selection dialogs
+- `makeEmptyBpmnXml(processId, processName)` helper generates a minimal BPMN for new process tabs
+- `getWelcomeSections` wired: surfaces workspace → project → file navigation from the welcome screen
+- `getAvailableProcesses` and `createProcess` wired into `createConfigPanelBpmnPlugin`
+
+## 2026-02-26 — Storage plugin overhaul: main-menu integration, drill-down nav, project persistence
+
+### `canvas-plugins/main-menu`
+- Added `MenuDrill` type — clicking replaces dropdown content with a back-navigable sub-menu (nav stack)
+- Added `MenuInfo` type — passive info row with optional inline action button
+- `MenuItem` union extended: `MenuAction | MenuSeparator | MenuDrill | MenuInfo`
+- `createMainMenuPlugin` now returns `CanvasPlugin & { api: MainMenuApi }`
+- `MainMenuApi.setTitle(text)` — dynamically updates the title span
+- `MainMenuApi.setDynamicItems(fn)` — items prepended on each menu open (rebuilt from fn on every open)
+- Theme picker moved behind a `MenuDrill` ("Theme") instead of being flat in the root dropdown
+- Drill-down nav stack: back button + level title shown when inside a drill level
+- Dropdown `min-width` widened to 220 px; added CSS for back row, level title, arrow indicator, info row
+
+### `canvas-plugins/storage`
+- **Sidebar removed** — `sidebar.ts` and `css.ts` emptied; no more toggle button or left panel
+- Depends on `@bpmn-sdk/canvas-plugin-main-menu: workspace:*` (new dep + tsconfig reference)
+- **`StorageApi` additions**: `_currentProjectId` (persisted to `localStorage`); in-memory caches (`_workspaces`, `_projects` map); `initialize()` loads caches + restores last-opened project; `openProject(id)` sets current + opens all files; `saveTabsToProject(projectId, wsId, tabs)` upserts tabs as files
+- All mutating methods update in-memory caches synchronously before calling `_notify()`
+- **`StoragePluginOptions`**: adds `mainMenu`, `getOpenTabs()`, `initialTitle`
+- `createStoragePlugin` wires `mainMenu.api.setDynamicItems` with workspace→project drill-down navigation; "Open Project" drill loads files + sets title; "Save All to Project" drill upserts open tabs; "Leave Project" clears project context + restores title; `onChange` refreshes menu items on next open
+
+### `apps/landing`
+- `mainMenuPlugin` created separately and passed to both `BpmnEditor` and `createStoragePlugin`
+- `openTabConfigs` map tracks latest content of each open tab (name, type, content) for "Save All to Project"
+- `onTabActivate` snapshots content into `openTabConfigs` for bpmn/dmn/form tabs
+
+## 2026-02-26 — IndexedDB storage plugin
+
+### `canvas-plugins/storage` (new — `@bpmn-sdk/canvas-plugin-storage`)
+- **StorageApi** — full CRUD for workspaces, projects, and files backed by Dexie v4 / IndexedDB; `createWorkspace`, `createProject`, `createFile`, `renameFile`, `setFileShared`, `deleteFile`, `openFile`; `onChange` listeners notify subscribers (sidebar re-renders)
+- **AutoSave** — 500 ms debounce per file; captures content snapshot at schedule time; forced `flush()` on `document.visibilitychange hidden` and `window.beforeunload`
+- **StorageSidebar** — collapsible DOM left panel (260 px); toggle button floats at top-left of the editor container; expandable workspace → project → file tree; inline + / rename / delete / share-toggle action buttons; empty-state messages
+- **File templates** — inline minimal BPMN / DMN / Form XML/JSON templates for new-file creation
+- **`createStoragePlugin(options)`** — factory returning `CanvasPlugin & { api: StorageApi }`; subscribes to `diagram:change` via the BpmnEditor runtime cast pattern; injects CSS via `injectStorageStyles()`
+- **`FileRecord.isShared`** — boolean flag; shared files surface as a cross-workspace reference pool
+- **`FileRecord.gitPath`** — nullable string; reserved for future bidirectional GitHub sync
+
+### `apps/landing`
+- Added `@bpmn-sdk/canvas-plugin-storage` dependency and wired `createStoragePlugin` in `editor.ts`
+- `onOpenFile` callback opens BPMN / DMN / Form tabs via the tabs plugin and populates the existing in-memory resolver
+- `tabIdToStorageFileId` map tracks which tabs were opened from storage; `onTabActivate` updates `storagePlugin.api.setCurrentFileId` so auto-save always targets the correct file
+
+## 2026-02-26 — Editor UX improvements: default color reset, FEEL = prefix stripping, default gateway edge marker
+
+### `packages/editor`
+- **Color picker — default option** — added a "no color" swatch (shown first with a diagonal slash indicator) to the color picker; clicking it calls `editor.updateColor(sourceId, {})` to revert to the default styling; swatch is shown as active when no custom color is set
+
+### `packages/canvas`
+- **Default gateway edge** — `renderEdge` now renders a small perpendicular slash mark near the source end of sequence flows that are the default flow of their source gateway (exclusive / inclusive / complex); `buildIndex` tracks `defaultFlowIds` by scanning gateway `default` attributes
+
+### `canvas-plugins/config-panel-bpmn`
+- **FEEL `=` prefix stripping** — "Open in FEEL Playground ↗" callbacks now strip a leading `= ` (Camunda notation) before passing the expression to the playground, preventing a parse error in expression mode
+- **Default flow toggle** — sequence flow config panel gains an `isDefault` toggle field; `SEQUENCE_FLOW_ADAPTER.read` checks whether the source gateway's `default` equals the flow ID; `write` updates the gateway's `default` attribute accordingly
+
+## 2026-02-26 — Editor UX improvements: collapsed toolbars, entity decoding, FEEL expression fields, edge config
+
+### `packages/editor`
+- **cfgToolbar type button** — collapsed all element-type variant buttons into a single icon button showing the current type; clicking opens a type-change picker above (same appearance as the group picker in the bottom toolbar)
+- **ctxToolbar color swatch** — collapsed the 6 color swatches into a single swatch showing the current color; clicking opens a color picker below the toolbar
+- **Edge selection** — `_setEdgeSelected` now emits `editor:select` with `[edgeId]` so subscribers (config panel, HUD) are notified when an edge is selected; `getElementType` returns `"sequenceFlow"` for edge IDs
+
+### `packages/bpmn-sdk`
+- **XML entity decoding** — `readAttrValue` and `readText` in `xml-parser.ts` now decode XML entities (`&amp;`, `&lt;`, `&gt;`, `&quot;`, `&apos;`) and numeric character references (`&#10;`, `&#xA;`, etc.); `escapeAttr` and `escapeText` updated to properly re-encode decoded values on serialization; attribute whitespace (`\n`, `\r`, `\t`) re-encoded as `&#10;` / `&#13;` / `&#9;`
+
+### `canvas-plugins/config-panel`
+- New `"feel-expression"` `FieldType`: renders a syntax-highlighted textarea overlay + optional "Open in FEEL Playground ↗" button
+- `FieldSchema` gains optional `highlight?: (text: string) => string` and `openInPlayground?: (values) => void` callbacks
+- Added FEEL token CSS classes to the config panel stylesheet
+
+### `canvas-plugins/config-panel-bpmn`
+- `expression` field on script task and `conditionExpression` on sequence flow now use `type: "feel-expression"` with `highlightToHtml` from `@bpmn-sdk/feel`
+- Added `openFeelPlayground?: (expression: string) => void` to `ConfigPanelBpmnOptions`
+- Added `@bpmn-sdk/feel` as a dependency
+
+### `canvas-plugins/feel-playground`
+- `buildFeelPlaygroundPanel` gains optional `initialExpression?: string` parameter that pre-fills and evaluates the expression on open
+
+### `canvas-plugins/tabs`
+- `TabConfig` feel variant gains optional `expression?: string` field; tabs plugin passes it to `buildFeelPlaygroundPanel`
+
+### `apps/landing`
+- `openFeelPlayground` callback wired up in `createConfigPanelBpmnPlugin` — opens a feel tab with the expression pre-filled
+
+## 2026-02-26 — Call activity, script task & sequence flow config panel support
+
+### `canvas-plugins/config-panel-bpmn`
+- **Call activity** — new schema and adapter: `name`, `processId` (called process ID), `propagateAllChildVariables` (toggle), optional "Open Process ↗" action button, `documentation`; reads and writes `zeebe:calledElement` raw extension element
+- **Script task** — replaced GENERAL_SCHEMA entry with a dedicated schema: `name`, `expression` (FEEL textarea), `resultVariable`, `documentation`; reads and writes `zeebe:script` raw extension element
+- **Sequence flow / condition expression** — new `SEQUENCE_FLOW_SCHEMA` and `SEQUENCE_FLOW_ADAPTER`: `name` + `conditionExpression` (FEEL textarea); reads and writes `BpmnSequenceFlow.conditionExpression`; registered under the key `"sequenceFlow"`
+- Added `openProcess?` to `ConfigPanelBpmnOptions`; new `findSequenceFlow`, `updateSequenceFlow`, `parseCalledElement`, `parseZeebeScript` helpers in `util.ts`
+
+### `canvas-plugins/config-panel`
+- `onSelect` now passes `api.getEdges()` to the renderer
+- `ConfigPanelRenderer.onSelect(ids, shapes, edges)` — when the selected ID matches no shape, falls back to edge lookup: checks if the ID is in the rendered edges and is a sequence flow in the definitions, then opens the `"sequenceFlow"` schema
+
+### `packages/editor` — HUD navigate button
+- `initEditorHud(editor, options?)` gains an optional `HudOptions` parameter with `openProcess?: (processId: string) => void`
+- `buildCfgToolbar` adds an "Open Process" icon button above a selected call activity when `processId` is set and `options.openProcess` is provided
+- `HudOptions` exported from `@bpmn-sdk/editor`
+
+### `apps/landing`
+- `bpmnProcessToTabId` map tracks process ID → tab ID when BPMN files are imported or new diagrams are created
+- `initEditorHud` and `createConfigPanelBpmnPlugin` both receive `openProcess` callbacks that activate the matching BPMN tab
+
+## 2026-02-26 — FEEL Playground tab integration + fixes
+
+### `packages/canvas` + `packages/editor` — keyboard fix
+- `KeyboardHandler._onKeyDown` now skips handling when the event target is `INPUT`, `TEXTAREA`, or a `contenteditable` element — fixes arrow keys being captured while typing in overlaid form controls
+- `BpmnEditor._onKeyDown` (and via it, the state machine) gets the same guard — fixes Delete/Backspace being `preventDefault`-ed when typing in the FEEL playground, because the tabs plugin mounts content inside `api.container` (`this._host`) so textarea events bubble to the editor's keydown handler
+
+### `canvas-plugins/feel-playground`
+- `buildFeelPlaygroundPanel(onClose?: () => void): HTMLDivElement` extracted as a public export — used by both the overlay plugin and the tabs plugin
+- `createFeelPlaygroundPlugin()` refactored to a thin wrapper using a `.feel-playground-overlay` div with a close callback
+- CSS rewritten with light/dark theme support via `[data-theme="dark"]` ancestor selectors matching the canvas container; previously used hardcoded dark colors
+
+### `canvas-plugins/tabs` — FEEL tab type
+- `TabConfig` union extended with `{ type: "feel"; name?: string }`
+- `GROUP_TYPES` includes `"feel"`; feel badge colors added (amber: `#d97706` light, `#fab387` dark)
+- `mountTabContent` for `feel` type: injects playground styles and mounts `buildFeelPlaygroundPanel()` in the pane (no close button, fills the pane)
+- Welcome screen badge `feel` style added
+
+### `apps/landing`
+- FEEL Playground opened as a proper tab (`tabsPlugin.api.openTab({ type: "feel" })`) instead of an overlay — accessible from the command palette, the ⋯ main menu, and the welcome screen examples list
+- `createFeelPlaygroundPlugin()` removed from the editor plugins array; direct `@bpmn-sdk/canvas-plugin-feel-playground` dependency removed from `landing/package.json` (tabs handles it)
+- "FEEL Playground" added to `makeExamples()` with FEEL badge
+
+## 2026-02-26 — FEEL Language Support
+
+### `packages/feel` — `@bpmn-sdk/feel`
+- **Lexer** (`lexer.ts`) — position-aware tokenizer; handles temporal literals (`@"..."`), backtick names, `..`/`**` operators, block/line comments; 16 tests
+- **AST** (`ast.ts`) — discriminated union `FeelNode` with start/end positions on every node; range nodes use `low`/`high` to avoid position field conflicts
+- **Parser** (`parser.ts`) — Pratt recursive-descent; two entry points: `parseExpression()` and `parseUnaryTests()`; greedy multi-word name resolution via `BUILTIN_PREFIXES`; error recovery with synchronization points; 42 tests
+- **Built-ins** (`builtins.ts`) — ~60 functions across conversion, string, numeric, list, context, temporal, and range categories; dual calling convention (scalar and list arguments)
+- **Evaluator** (`evaluator.ts`) — tree-walking evaluator; three-valued `and`/`or` logic; path access, filter, `for`/`some`/`every`, named args; `evaluateUnaryTests()` entry point; 75 tests
+- **Formatter** (`formatter.ts`) — pretty printer with line-length-aware wrapping; round-trip tests; 20 tests
+- **Highlighter** (`highlighter.ts`) — `annotate()` returns `AnnotatedToken[]`; `highlightToHtml()` returns HTML with `feel-*` CSS classes; `highlightFeel` backward-compat alias
+- Zero runtime dependencies; 153 tests total; passes biome and TypeScript strict mode
+
+### `canvas-plugins/feel-playground` — `@bpmn-sdk/canvas-plugin-feel-playground`
+- **Interactive FEEL panel** — Expression / Unary-Tests mode toggle; syntax-highlighted textarea overlay; JSON context input; live result display with type-colored output; error display; 10 pre-built examples
+- **`createFeelPlaygroundPlugin()`** — returns `FeelPlaygroundPlugin` (extends `CanvasPlugin` with `show()`)
+- Wired into the landing page editor via a "FEEL Playground" command palette entry (Ctrl+K)
+
+### `canvas-plugins/dmn-viewer` — migrated
+- `src/feel.ts` replaced with thin re-exports from `@bpmn-sdk/feel`; `highlightFeel`/`tokenizeFeel` now use the full FEEL lexer and highlighter; `FeelToken`/`FeelTokenType` re-exported as `AnnotatedToken`/`HighlightKind`
+
+## 2026-02-26 — Welcome Screen Examples
+
+### `canvas-plugins/tabs`
+- **`WelcomeExample` interface** — `{ label, description?, badge?, onOpen: () => void }`; exported from the plugin
+- **`examples` option** added to `TabsPluginOptions`; when non-empty, the welcome screen renders a divider, "Examples" heading, and a scrollable list of clickable example entries with badge, label, description, and a chevron arrow
+- **CSS** — example list, badges (type-coloured: BPMN=blue, DMN=purple, FORM=green, MULTI=orange), hover and active states; dark/light theme variants
+
+### `apps/landing` — examples.ts + editor.ts
+- **Shipping Cost DMN** — FIRST hit-policy decision table: package weight × destination → shipping cost + carrier; 4 rules
+- **Support Ticket Form** — subject, category (select), priority (radio), description, file attachment, submit button
+- **Loan Application (MULTI)** — BPMN with a `userTask` linked to `form-loan-application` and a `businessRuleTask` linked to `decision-credit-risk`; Credit Risk DMN (UNIQUE, 4 rules: credit score × amount → risk level + approved + max); Loan Application Form (name, DOB, employment, income, amount, purpose, notes, consent, submit); opening the multi-file example registers DMN + Form in the resolver and opens all three tabs
+- **`makeExamples(api, resolver)`** factory exported from `examples.ts`; returns 4 `WelcomeExample` items (Order Validation BPMN, Shipping Cost DMN, Support Ticket FORM, Loan Application MULTI)
+- **`editor.ts`** passes `examples` via a lazy getter so `tabsPlugin.api` is available when the welcome screen renders during `install()`
+
+## 2026-02-26 — Welcome Screen + Grouped Tabs
+
+### `canvas-plugins/tabs`
+- **Welcome screen** — shown on install before any tab is opened; centered card with a BPMN process icon, title, subtitle, "New diagram" and "Import files…" buttons; supports light/dark theme via `data-theme`; hidden when first tab opens, reappears when last tab is closed
+- **`onNewDiagram` / `onImportFiles` options** added to `TabsPluginOptions` to wire up the welcome screen buttons
+- **Grouped tabs** — the tab bar now shows at most three group tabs (one per type: BPMN, DMN, FORM); each group displays the active file's name with a type badge; a chevron (▾) appears when multiple files of the same type are open and opens a fixed-position dropdown listing all files with per-file close buttons; when a group has only one file, the close button is on the tab itself
+- **`groupActiveId` map** — tracks the last-activated tab ID per type so group tabs remember which file was last selected
+- **`renderTabBar()`** — replaces per-tab DOM management with a single function that rebuilds the tab bar from scratch; safe because at most 3 group tabs exist
+- **Body-level dropdown** — appended to `document.body` as `position: fixed` to avoid z-index/clipping issues; outside-click handler closes it; cleaned up on `uninstall()`
+- **Tests** — 17 tests covering welcome screen show/hide, button callbacks, grouping, chevron/close-button logic, active file name, and tab lifecycle
+
+### `apps/landing` — editor.ts
+- **`onNewDiagram`** callback opens a new BPMN tab with `SAMPLE_XML`
+- **`onImportFiles`** callback triggers the existing hidden `<input type="file">` element
+
+## 2026-02-26 — Close-Tab Download Prompt
+
+### `canvas-plugins/tabs`
+- **`onDownloadTab` option** — new `TabsPluginOptions.onDownloadTab?: (config: TabConfig) => void` callback; when provided, the "Download & Close" button appears in the close dialog
+- **`hasContent()` helper** — returns `false` for the initial BPMN tab (`xml: ""`), so closing the main diagram pane skips the dialog entirely
+- **`showCloseDialog()`** — in-canvas modal overlay with Cancel / "Close without saving" / "Download & Close" buttons, Escape key dismissal, and correct light/dark theming via `data-theme`
+- **Dialog CSS** — `.bpmn-close-overlay` / `.bpmn-close-dialog` added to `css.ts` with full light and dark CSS variable sets
+
+### `apps/landing` — editor.ts
+- **`onDownloadTab` callback** — serializes the tab content (`config.xml` for BPMN, `Dmn.export(defs)` for DMN, `Form.export(form)` for Form), creates a `Blob`, triggers a browser download via an `<a>` element with `download` attribute, then revokes the object URL
+
+## 2026-02-26 — UX Fixes: Theme, Z-index, Toolbar Visibility, Content Width
+
+### `canvas-plugins/tabs`
+- **Theme detection fix** — the tabs plugin was watching `data-bpmn-theme` via MutationObserver, but the canvas sets `data-theme` (absent = light, `"dark"` = dark). Fixed both the initial detection and the observer attribute filter/callback to use `data-theme`
+
+### `canvas-plugins/main-menu`
+- **Z-index raised** — `.bpmn-main-menu-panel` z-index increased from 10 to 110 so the title/menu button renders above the tab bar (which is z-index 100)
+
+### `canvas-plugins/dmn-viewer`
+- **Content width** — `.dmn-viewer` no longer has `padding`; a new `.dmn-viewer-body` inner wrapper provides `max-width: 1100px; margin: 0 auto; padding: 24px`, centering the decision table horizontally with a reasonable max-width
+
+### `canvas-plugins/form-viewer`
+- **Content width** — same pattern: `.form-viewer-body` with `max-width: 680px; margin: 0 auto; padding: 24px`; the form renders narrower, centered, matching standard form UX conventions
+
+### `apps/landing` — editor.ts
+- **Toolbar visibility** — `onTabActivate` now toggles `display: none` on `#hud-top-center`, `#hud-bottom-left`, `#hud-bottom-center` when switching to DMN/Form tabs; toolbars reappear on return to BPMN
+- **Config panel auto-close** — `onTabActivate` calls `editor.setSelection([])` on non-BPMN tabs, which fires `editor:select` with empty IDs, causing the config panel and contextual toolbars to close automatically; also closes the panel when "Open Decision ↗" / "Open Form ↗" navigation triggers a tab switch
+
+## 2026-02-26 — Editor Integration: Multi-file Import + Tabs
+
+### `apps/landing` — editor.ts
+- **`InMemoryFileResolver`** created and shared between the tabs plugin and the config panel bpmn callbacks
+- **`createTabsPlugin`** added to the editor plugin stack with `onTabActivate` wired to `editor.load(xml)` for BPMN tabs
+- **`createConfigPanelBpmnPlugin`** now receives `openDecision` and `openForm` callbacks that delegate to `tabsPlugin.api.openDecision/openForm`
+- **Multi-file import via menu** — "Import files…" entry in the main-menu dropdown opens a `<input type="file" multiple>` accepting `.bpmn`, `.xml`, `.dmn`, `.form`, `.json`; each file is parsed and opened in its own tab
+- **Drag-and-drop** — `dragover`/`drop` handlers on `#editor-container` accept dropped files; same parsing and tab-opening logic
+- `.bpmn`/`.xml` → BPMN tab (loaded into the editor via `onTabActivate`); `.dmn` → DMN tab (registered in resolver); `.form`/`.json` → Form tab (registered in resolver)
+
+### `canvas-plugins/main-menu` — menuItems extension
+- **`menuItems?: MenuItem[]`** added to `MainMenuOptions`; supports `MenuAction` (label + optional icon + onClick) and `MenuSeparator`
+- Custom items render above the Theme section with an automatic separator; theme section wrapped in a `display:contents` div so `buildThemeItems` rebuilds only that portion
+- **`.bpmn-menu-drop-sep`** CSS added for the separator rule
+
+### `canvas-plugins/tabs` — onTabActivate + transparent BPMN panes
+- **`onTabActivate?: (id, config) => void`** added to `TabsPluginOptions`; called in `setActiveTab` after the tab is made active
+- **BPMN panes** are now empty (no text note) and transparent — the main canvas SVG shows through
+- **`pointer-events: none`** applied to the content area when a BPMN tab is active so the canvas remains fully interactive; restored when a DMN/Form tab is active
+
+## 2026-02-26 — DMN Viewer, Form Viewer, Tabs Plugin, Extended Core Model
+
+### `@bpmn-sdk/core` — Zeebe extensions + full Form component set
+- **`ZeebeFormDefinition`** and **`ZeebeCalledDecision`** typed interfaces added to `zeebe-extensions.ts`; `ZeebeExtensions` grows `formDefinition?` and `calledDecision?` fields; `zeebeExtensionsToXmlElements` serialises both
+- **`bpmn-builder.ts`** updated: `userTask()` now writes `formDefinition: { formId }` and `businessRuleTask()` writes `calledDecision: { decisionId, resultVariable }` using typed fields instead of raw `XmlElement[]`
+- **13 new Form component types** — `number`, `datetime`, `button`, `taglist`, `table`, `image`, `dynamiclist`, `iframe`, `separator`, `spacer`, `documentPreview`, `html`, `expression`, `filepicker`
+- **`FormUnknownComponent`** catch-all added; parser now handles unknown types leniently instead of throwing
+- `form-serializer.ts` updated to handle all component types via explicit type assertions (workaround for discriminated union narrowing issue with catch-all type)
+- All new types exported from `packages/bpmn-sdk/src/index.ts`
+
+### `canvas-plugins/dmn-viewer` — New package `@bpmn-sdk/canvas-plugin-dmn-viewer`
+- **`DmnViewer` class** — `load(defs)`, `clear()`, `setTheme()`, `destroy()`; renders `DmnDefinitions` as an HTML decision table with hit policy badge
+- **FEEL syntax highlighting** — `tokenizeFeel()` / `highlightFeel()` tokenize FEEL expressions into keyword, string, number, operator, range, function, comment spans; colored via CSS custom properties
+- **Light/dark themes** — CSS custom properties; `setTheme("light"|"dark"|"auto")`; auto follows `prefers-color-scheme`
+- **`createDmnViewerPlugin(options)`** — thin `CanvasPlugin` wrapper; responds to `element:click` on call activities referencing a decision via `zeebe:calledDecision`
+
+### `canvas-plugins/form-viewer` — New package `@bpmn-sdk/canvas-plugin-form-viewer`
+- **`FormViewer` class** — `load(form)`, `clear()`, `setTheme()`, `destroy()`; renders all 21 `FormComponent` types
+- **Row-based grid layout** — components grouped by `layout.row`; side-by-side rendering within a row
+- **All 21 component types rendered** — textfield, textarea, number, datetime, select, radio, checkbox, checklist, taglist, button, group, dynamiclist, table, image, iframe, separator, spacer, documentPreview, html, expression, filepicker, and unknown passthrough
+- **Minimal markdown** — `text` components support `#`/`##` headers, `**bold**`, `_italic_`
+- **`createFormViewerPlugin(options)`** — thin `CanvasPlugin` wrapper; responds to `element:click` on user tasks with a `zeebe:formDefinition`
+
+### `canvas-plugins/tabs` — New package `@bpmn-sdk/canvas-plugin-tabs`
+- **`FileResolver` interface** — `resolveDmn(decisionId)`, `resolveForm(formId)`, `resolveBpmn(processId)`; pluggable abstraction for in-memory, file system, or SaaS backends
+- **`InMemoryFileResolver`** — default implementation using Maps; `registerDmn(defs)` / `registerForm(form)` / `registerBpmn(id, xml)` to populate at runtime
+- **Tab bar overlay** — fixed overlay inside the canvas container; tabs for BPMN/DMN/Form files; close button per tab; active tab highlighted
+- **`TabsApi`** — `openTab()`, `closeTab()`, `setActiveTab()`, `getActiveTabId()`, `getTabIds()`, `openDecision(decisionId)`, `openForm(formId)` public API
+- **Warning badge** — shown when referenced file is not found in the file resolver registry
+- **`createTabsPlugin(options)`** — factory returning `CanvasPlugin & { api: TabsApi }`
+
+### `canvas-plugins/config-panel` + `config-panel-bpmn` — Typed userTask/businessRuleTask panels
+- **`"action"` FieldType** added to `config-panel`; `FieldSchema.onClick` callback invoked when the action button is clicked
+- **`.bpmn-cfg-action-btn`** button styles added (light and dark themes)
+- **`makeUserTaskSchema(onOpenForm?)`** — config panel schema for user tasks: `formId` text field + conditional "Open Form ↗" action button
+- **`USER_TASK_ADAPTER`** — reads/writes `zeebe:formDefinition/@formId` via typed `ext.formDefinition`
+- **`makeBusinessRuleTaskSchema(onOpenDecision?)`** — schema for business rule tasks: `decisionId`, `resultVariable` fields + conditional "Open Decision ↗" action button
+- **`BUSINESS_RULE_TASK_ADAPTER`** — reads/writes `zeebe:calledDecision` via typed `ext.calledDecision`
+- **`ConfigPanelBpmnOptions`** — `openDecision?` and `openForm?` callback options on the plugin factory
+- `createConfigPanelBpmnPlugin(configPanel, options?)` registers userTask and businessRuleTask with their specific schemas
+- `parseZeebeExtensions` in `util.ts` updated to parse `formDefinition` and `calledDecision` extension elements
+
+## 2026-02-26 — Landing Page Editor Link + Mobile Editor Responsiveness
+
+### `apps/landing` — Editor discoverability
+- **"Try the Editor →" button** added to hero section with a gradient `btn-editor` style (accent → green)
+- **Footer link** to `/editor` added alongside GitHub and npm links
+
+### `@bpmn-sdk/editor` — Collapsible HUD toolbars on mobile (≤600px)
+- **Bottom-center toolbar** (`#hud-bottom-center`) starts collapsed on mobile; tapping the toggle button expands it to full width; auto-collapses after selecting any tool or element group
+- **Top-center toolbar** (`#hud-top-center`) same pattern; auto-collapses after undo/redo/delete/duplicate
+- Toggle button icons update to reflect the currently active tool (bottom-center) or show the undo icon (top-center)
+- Tapping outside an expanded toolbar collapses it; expanding one collapses the other
+- Desktop layout unchanged — toggle buttons hidden via CSS media query
+
 ## 2026-02-25 — SubProcess Containment + Sticky Movement
 
 ### `@bpmn-sdk/editor` — Container-aware modeling operations

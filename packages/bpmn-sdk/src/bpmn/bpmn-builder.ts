@@ -605,15 +605,7 @@ export class BranchBuilder {
 
 	userTask(id: string, options?: UserTaskOptions): this {
 		const ext = options?.formId
-			? zeebeExtensionsToXmlElements({
-					unknownElements: [
-						{
-							name: "zeebe:formDefinition",
-							attributes: { formId: options.formId },
-							children: [],
-						},
-					],
-				})
+			? zeebeExtensionsToXmlElements({ formDefinition: { formId: options.formId } })
 			: [];
 		return this.addElement(
 			makeFlowElement(id, "userTask", {
@@ -652,17 +644,14 @@ export class BranchBuilder {
 	}
 
 	businessRuleTask(id: string, options?: BusinessRuleTaskOptions): this {
-		const ext: XmlElement[] = [];
-		if (options?.decisionId) {
-			ext.push({
-				name: "zeebe:calledDecision",
-				attributes: {
-					decisionId: options.decisionId,
-					resultVariable: options.resultVariable ?? "result",
-				},
-				children: [],
-			});
-		}
+		const ext = options?.decisionId
+			? zeebeExtensionsToXmlElements({
+					calledDecision: {
+						decisionId: options.decisionId,
+						resultVariable: options.resultVariable ?? "result",
+					},
+				})
+			: [];
 		return this.addElement(
 			makeFlowElement(id, "businessRuleTask", {
 				name: options?.name,
@@ -1102,15 +1091,7 @@ export class ProcessBuilder {
 	/** Add a user task with optional form reference. */
 	userTask(id: string, options?: UserTaskOptions): this {
 		const extensionElements = options?.formId
-			? zeebeExtensionsToXmlElements({
-					unknownElements: [
-						{
-							name: "zeebe:formDefinition",
-							attributes: { formId: options.formId },
-							children: [],
-						},
-					],
-				})
+			? zeebeExtensionsToXmlElements({ formDefinition: { formId: options.formId } })
 			: [];
 		this.addFlowElement(
 			makeFlowElement(id, "userTask", {
@@ -1137,21 +1118,17 @@ export class ProcessBuilder {
 	businessRuleTask(id: string, options?: BusinessRuleTaskOptions): this {
 		const ext: XmlElement[] = [];
 		if (options?.taskType) {
-			ext.push(
-				...zeebeExtensionsToXmlElements({
-					taskDefinition: { type: options.taskType },
-				}),
-			);
+			ext.push(...zeebeExtensionsToXmlElements({ taskDefinition: { type: options.taskType } }));
 		}
 		if (options?.decisionId) {
-			ext.push({
-				name: "zeebe:calledDecision",
-				attributes: {
-					decisionId: options.decisionId,
-					resultVariable: options.resultVariable ?? "result",
-				},
-				children: [],
-			});
+			ext.push(
+				...zeebeExtensionsToXmlElements({
+					calledDecision: {
+						decisionId: options.decisionId,
+						resultVariable: options.resultVariable ?? "result",
+					},
+				}),
+			);
 		}
 		this.addFlowElement(
 			makeFlowElement(id, "businessRuleTask", {

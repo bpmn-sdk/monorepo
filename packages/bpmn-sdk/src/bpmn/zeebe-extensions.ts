@@ -50,6 +50,20 @@ export interface ZeebeAdHoc {
 	activeElementsCollection?: string;
 }
 
+/** Zeebe form definition extension for user tasks. */
+export interface ZeebeFormDefinition {
+	/** ID of the Camunda Form linked to this user task. */
+	formId: string;
+}
+
+/** Zeebe called decision extension for business rule tasks. */
+export interface ZeebeCalledDecision {
+	/** ID of the DMN decision to invoke. */
+	decisionId: string;
+	/** Process variable that receives the decision result. */
+	resultVariable: string;
+}
+
 /** Collected Zeebe extensions on a service task. */
 export interface ZeebeExtensions {
 	taskDefinition?: ZeebeTaskDefinition;
@@ -57,6 +71,10 @@ export interface ZeebeExtensions {
 	taskHeaders?: ZeebeTaskHeaders;
 	properties?: ZeebeProperties;
 	adHoc?: ZeebeAdHoc;
+	/** Camunda Form linked to a user task (zeebe:formDefinition). */
+	formDefinition?: ZeebeFormDefinition;
+	/** DMN decision invoked by a business rule task (zeebe:calledDecision). */
+	calledDecision?: ZeebeCalledDecision;
 	/** Unrecognized extension elements preserved for roundtrip. */
 	unknownElements?: XmlElement[];
 }
@@ -135,6 +153,25 @@ export function zeebeExtensionsToXmlElements(extensions: ZeebeExtensions): XmlEl
 		if (outputElement) attrs.outputElement = outputElement;
 		if (activeElementsCollection) attrs.activeElementsCollection = activeElementsCollection;
 		elements.push({ name: "zeebe:adHoc", attributes: attrs, children: [] });
+	}
+
+	if (extensions.formDefinition) {
+		elements.push({
+			name: "zeebe:formDefinition",
+			attributes: { formId: extensions.formDefinition.formId },
+			children: [],
+		});
+	}
+
+	if (extensions.calledDecision) {
+		elements.push({
+			name: "zeebe:calledDecision",
+			attributes: {
+				decisionId: extensions.calledDecision.decisionId,
+				resultVariable: extensions.calledDecision.resultVariable,
+			},
+			children: [],
+		});
 	}
 
 	if (extensions.unknownElements) {

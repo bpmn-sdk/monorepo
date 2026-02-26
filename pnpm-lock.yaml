@@ -69,12 +69,21 @@ importers:
       '@bpmn-sdk/canvas-plugin-minimap':
         specifier: workspace:*
         version: link:../../canvas-plugins/minimap
+      '@bpmn-sdk/canvas-plugin-storage':
+        specifier: workspace:*
+        version: link:../../canvas-plugins/storage
+      '@bpmn-sdk/canvas-plugin-tabs':
+        specifier: workspace:*
+        version: link:../../canvas-plugins/tabs
       '@bpmn-sdk/canvas-plugin-watermark':
         specifier: workspace:*
         version: link:../../canvas-plugins/watermark
       '@bpmn-sdk/canvas-plugin-zoom-controls':
         specifier: workspace:*
         version: link:../../canvas-plugins/zoom-controls
+      '@bpmn-sdk/core':
+        specifier: workspace:*
+        version: link:../../packages/bpmn-sdk
       '@bpmn-sdk/editor':
         specifier: workspace:*
         version: link:../../packages/editor
@@ -124,6 +133,30 @@ importers:
         specifier: workspace:*
         version: link:../../packages/editor
 
+  canvas-plugins/dmn-viewer:
+    dependencies:
+      '@bpmn-sdk/core':
+        specifier: workspace:*
+        version: link:../../packages/bpmn-sdk
+      '@bpmn-sdk/feel':
+        specifier: workspace:*
+        version: link:../../packages/feel
+
+  canvas-plugins/feel-playground:
+    dependencies:
+      '@bpmn-sdk/canvas':
+        specifier: workspace:*
+        version: link:../../packages/canvas
+      '@bpmn-sdk/feel':
+        specifier: workspace:*
+        version: link:../../packages/feel
+
+  canvas-plugins/form-viewer:
+    dependencies:
+      '@bpmn-sdk/core':
+        specifier: workspace:*
+        version: link:../../packages/bpmn-sdk
+
   canvas-plugins/main-menu:
     dependencies:
       '@bpmn-sdk/canvas':
@@ -135,6 +168,39 @@ importers:
       '@bpmn-sdk/canvas':
         specifier: workspace:*
         version: link:../../packages/canvas
+      '@bpmn-sdk/core':
+        specifier: workspace:*
+        version: link:../../packages/bpmn-sdk
+
+  canvas-plugins/storage:
+    dependencies:
+      '@bpmn-sdk/canvas':
+        specifier: workspace:*
+        version: link:../../packages/canvas
+      '@bpmn-sdk/canvas-plugin-main-menu':
+        specifier: workspace:*
+        version: link:../main-menu
+      '@bpmn-sdk/core':
+        specifier: workspace:*
+        version: link:../../packages/bpmn-sdk
+      dexie:
+        specifier: ^4.0.10
+        version: 4.3.0
+
+  canvas-plugins/tabs:
+    dependencies:
+      '@bpmn-sdk/canvas':
+        specifier: workspace:*
+        version: link:../../packages/canvas
+      '@bpmn-sdk/canvas-plugin-dmn-viewer':
+        specifier: workspace:*
+        version: link:../dmn-viewer
+      '@bpmn-sdk/canvas-plugin-feel-playground':
+        specifier: workspace:*
+        version: link:../feel-playground
+      '@bpmn-sdk/canvas-plugin-form-viewer':
+        specifier: workspace:*
+        version: link:../form-viewer
       '@bpmn-sdk/core':
         specifier: workspace:*
         version: link:../../packages/bpmn-sdk
@@ -167,6 +233,8 @@ importers:
       '@bpmn-sdk/core':
         specifier: workspace:*
         version: link:../bpmn-sdk
+
+  packages/feel: {}
 
 packages:
 
@@ -721,6 +789,9 @@ packages:
   detect-indent@6.1.0:
     resolution: {integrity: sha512-reYkTUJAZb9gUuZ2RvVCNhVHdg62RHnJ7WJl8ftMi4diZ6NWlciOzQN88pUhSELEwflJht4oQDv0F0BMlwaYtA==}
     engines: {node: '>=8'}
+
+  dexie@4.3.0:
+    resolution: {integrity: sha512-5EeoQpJvMKHe6zWt/FSIIuRa3CWlZeIl6zKXt+Lz7BU6RoRRLgX9dZEynRfXrkLcldKYCBiz7xekTEylnie1Ug==}
 
   dir-glob@3.0.1:
     resolution: {integrity: sha512-WkrWp9GR4KXfKGYzOLmTuGVi1UWFfws377n9cc55/tb6DuqyF6pcQ5AbiHEshaDpY9v6oaSr2XCDidGmMwdzIA==}
@@ -1752,6 +1823,8 @@ snapshots:
   deep-eql@5.0.2: {}
 
   detect-indent@6.1.0: {}
+
+  dexie@4.3.0: {}
 
   dir-glob@3.0.1:
     dependencies:

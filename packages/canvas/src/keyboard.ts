@@ -70,6 +70,11 @@ export class KeyboardHandler {
 	}
 
 	private readonly _onKeyDown = (e: KeyboardEvent): void => {
+		// Don't intercept keys typed into form controls or editable elements
+		const target = e.target as HTMLElement;
+		if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)
+			return;
+
 		const svgRect = this._container.getBoundingClientRect();
 		const cx = svgRect.width / 2;
 		const cy = svgRect.height / 2;

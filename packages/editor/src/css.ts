@@ -360,6 +360,38 @@ export const HUD_CSS = `
 .bpmn-color-swatch:hover { transform: scale(1.2); }
 .bpmn-color-swatch.active { border-color: rgba(255,255,255,0.8); }
 [data-bpmn-hud-theme="light"] .bpmn-color-swatch.active { border-color: rgba(0,0,0,0.5); }
+.bpmn-color-swatch--default {
+  background: transparent; border-color: rgba(255,255,255,0.25);
+  position: relative; overflow: hidden;
+}
+[data-bpmn-hud-theme="light"] .bpmn-color-swatch--default { border-color: rgba(0,0,0,0.2); }
+.bpmn-color-swatch--default::after {
+  content: ''; position: absolute;
+  top: 1px; left: 50%; transform: translateX(-50%) rotate(-45deg);
+  width: 1.5px; height: calc(100% - 2px);
+  background: rgba(200,50,50,0.65); border-radius: 1px;
+}
+
+/* ── Mobile: collapsible center toolbars ─────────────────────────── */
+#btn-bc-toggle, #btn-tc-toggle { display: none; }
+
+@media (max-width: 600px) {
+  #btn-bc-toggle, #btn-tc-toggle { display: flex; }
+
+  /* Collapsed: hide all children except the toggle button */
+  #hud-bottom-center:not(.expanded) > *:not(#btn-bc-toggle) { display: none; }
+  #hud-top-center:not(.expanded) > *:not(#btn-tc-toggle) { display: none; }
+
+  /* Expanded: highlight the toggle button as a close affordance */
+  #hud-bottom-center.expanded #btn-bc-toggle,
+  #hud-top-center.expanded #btn-tc-toggle {
+    background: rgba(255,255,255,0.08); color: #fff;
+  }
+  [data-bpmn-hud-theme="light"] #hud-bottom-center.expanded #btn-bc-toggle,
+  [data-bpmn-hud-theme="light"] #hud-top-center.expanded #btn-tc-toggle {
+    background: rgba(0,0,0,0.06); color: rgba(0,0,0,0.9);
+  }
+}
 `;
 
 /** Injects the HUD stylesheet into `<head>` if not already present. */

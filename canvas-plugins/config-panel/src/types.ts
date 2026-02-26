@@ -2,7 +2,7 @@ import type { CanvasPlugin } from "@bpmn-sdk/canvas";
 import type { BpmnDefinitions } from "@bpmn-sdk/core";
 
 /** Input field types supported by the config panel renderer. */
-export type FieldType = "text" | "select" | "textarea" | "toggle";
+export type FieldType = "text" | "select" | "textarea" | "feel-expression" | "toggle" | "action";
 
 export interface SelectOption {
 	value: string;
@@ -28,6 +28,20 @@ export interface FieldSchema {
 	required?: boolean;
 	/** If provided, the field is only shown when this returns true. */
 	condition?: (values: Record<string, FieldValue>) => boolean;
+	/**
+	 * For `type: "action"` fields — called when the button is clicked.
+	 * Receives the current field values and a `setValue` helper that updates a
+	 * field in the panel and immediately writes it back to the diagram.
+	 */
+	onClick?: (
+		values: Record<string, FieldValue>,
+		setValue: (key: string, val: FieldValue) => void,
+	) => void;
+	/**
+	 * For `type: "feel-expression"` fields — optional callback to open the
+	 * expression in an external playground/editor.
+	 */
+	openInPlayground?: (values: Record<string, FieldValue>) => void;
 }
 
 /** A named group of fields shown as a section in the full editor. */

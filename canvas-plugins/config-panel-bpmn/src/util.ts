@@ -1,4 +1,9 @@
-import type { BpmnDefinitions, BpmnFlowElement, XmlElement } from "@bpmn-sdk/core";
+import type {
+	BpmnDefinitions,
+	BpmnFlowElement,
+	BpmnSequenceFlow,
+	XmlElement,
+} from "@bpmn-sdk/core";
 import type { ZeebeExtensions, ZeebeIoMappingEntry, ZeebeTaskHeaderEntry } from "@bpmn-sdk/core";
 
 // ── XML helpers ───────────────────────────────────────────────────────────────
@@ -83,6 +88,13 @@ export function parseZeebeExtensions(extensionElements: XmlElement[]): ZeebeExte
 				}
 			}
 			ext.taskHeaders = { headers };
+		} else if (ln === "formDefinition") {
+			const formId = el.attributes.formId ?? "";
+			ext.formDefinition = { formId };
+		} else if (ln === "calledDecision") {
+			const decisionId = el.attributes.decisionId ?? "";
+			const resultVariable = el.attributes.resultVariable ?? "result";
+			ext.calledDecision = { decisionId, resultVariable };
 		}
 	}
 
@@ -97,6 +109,66 @@ export function getIoInput(ext: ZeebeExtensions, target: string): string | undef
 /** Get the value of a zeebe:taskHeader by key. */
 export function getTaskHeader(ext: ZeebeExtensions, key: string): string | undefined {
 	return ext.taskHeaders?.headers.find((h) => h.key === key)?.value;
+}
+
+// ── Sequence flow lookup / update ─────────────────────────────────────────────
+
+export function findSequenceFlow(defs: BpmnDefinitions, id: string): BpmnSequenceFlow | undefined {
+	for (const process of defs.processes) {
+		const sf = process.sequenceFlows.find((f) => f.id === id);
+		if (sf) return sf;
+	}
+	return undefined;
+}
+
+export function updateSequenceFlow(
+	defs: BpmnDefinitions,
+	id: string,
+	fn: (sf: BpmnSequenceFlow) => BpmnSequenceFlow,
+): BpmnDefinitions {
+	const processIdx = defs.processes.findIndex((p) => p.sequenceFlows.some((f) => f.id === id));
+	if (processIdx < 0) return defs;
+	const process = defs.processes[processIdx];
+	if (!process) return defs;
+	const sfIdx = process.sequenceFlows.findIndex((f) => f.id === id);
+	if (sfIdx < 0) return defs;
+	const sf = process.sequenceFlows[sfIdx];
+	if (!sf) return defs;
+	const newSf = fn(sf);
+	const newFlows = process.sequenceFlows.map((f, i) => (i === sfIdx ? newSf : f));
+	const newProcess = { ...process, sequenceFlows: newFlows };
+	return {
+		...defs,
+		processes: defs.processes.map((p, i) => (i === processIdx ? newProcess : p)),
+	};
+}
+
+// ── Zeebe extension helpers ───────────────────────────────────────────────────
+
+export interface CalledElementInfo {
+	processId: string;
+	propagateAllChildVariables: boolean;
+}
+
+export function parseCalledElement(extensionElements: XmlElement[]): CalledElementInfo {
+	const el = extensionElements.find((x) => xmlLocalName(x.name) === "calledElement");
+	return {
+		processId: el?.attributes.processId ?? "",
+		propagateAllChildVariables: el?.attributes.propagateAllChildVariables === "true",
+	};
+}
+
+export interface ZeebeScriptInfo {
+	expression: string;
+	resultVariable: string;
+}
+
+export function parseZeebeScript(extensionElements: XmlElement[]): ZeebeScriptInfo {
+	const el = extensionElements.find((x) => xmlLocalName(x.name) === "script");
+	return {
+		expression: el?.attributes.expression ?? "",
+		resultVariable: el?.attributes.resultVariable ?? "",
+	};
 }
 
 /** Get an attribute from the zeebe:adHoc extension element. */

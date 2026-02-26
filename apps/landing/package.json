@@ -13,12 +13,15 @@
 		"@bpmn-sdk/canvas": "workspace:*",
 		"@bpmn-sdk/canvas-plugin-main-menu": "workspace:*",
 		"@bpmn-sdk/canvas-plugin-minimap": "workspace:*",
+		"@bpmn-sdk/canvas-plugin-tabs": "workspace:*",
 		"@bpmn-sdk/canvas-plugin-zoom-controls": "workspace:*",
 		"@bpmn-sdk/canvas-plugin-command-palette": "workspace:*",
 		"@bpmn-sdk/canvas-plugin-command-palette-editor": "workspace:*",
 		"@bpmn-sdk/canvas-plugin-config-panel": "workspace:*",
 		"@bpmn-sdk/canvas-plugin-config-panel-bpmn": "workspace:*",
+		"@bpmn-sdk/canvas-plugin-storage": "workspace:*",
 		"@bpmn-sdk/canvas-plugin-watermark": "workspace:*",
+		"@bpmn-sdk/core": "workspace:*",
 		"@bpmn-sdk/editor": "workspace:*"
 	}
 }

@@ -128,7 +128,7 @@ class XmlReader {
 		}
 		const value = this.s.substring(start, this.i);
 		this.i++; // skip closing quote
-		return value;
+		return decodeXmlEntities(value);
 	}
 
 	private readText(): string {
@@ -136,7 +136,7 @@ class XmlReader {
 		while (this.i < this.s.length && this.s[this.i] !== "<") {
 			this.i++;
 		}
-		return this.s.substring(start, this.i);
+		return decodeXmlEntities(this.s.substring(start, this.i));
 	}
 
 	private readName(): string {
@@ -211,6 +211,24 @@ class XmlReader {
 }
 
 // ---------------------------------------------------------------------------
+// Entity helpers
+// ---------------------------------------------------------------------------
+
+/** Decode XML predefined and numeric character entities in a string. */
+function decodeXmlEntities(s: string): string {
+	if (!s.includes("&")) return s;
+	return s.replace(/&(?:amp|lt|gt|quot|apos|#x[0-9a-fA-F]+|#[0-9]+);/g, (m) => {
+		if (m === "&amp;") return "&";
+		if (m === "&lt;") return "<";
+		if (m === "&gt;") return ">";
+		if (m === "&quot;") return '"';
+		if (m === "&apos;") return "'";
+		if (m.startsWith("&#x")) return String.fromCodePoint(Number.parseInt(m.slice(3, -1), 16));
+		return String.fromCodePoint(Number.parseInt(m.slice(2, -1), 10));
+	});
+}
+
+// ---------------------------------------------------------------------------
 // Serializer
 // ---------------------------------------------------------------------------
 
@@ -244,7 +262,7 @@ function writeElement(parts: string[], el: XmlElement, depth: number): void {
 	parts.push(">");
 
 	if (hasText) {
-		parts.push(el.text as string);
+		parts.push(escapeText(el.text as string));
 	}
 
 	if (hasChildren) {
@@ -258,9 +276,13 @@ function writeElement(parts: string[], el: XmlElement, depth: number): void {
 	parts.push("</", el.name, ">\n");
 }
 
-// Matches the original processEntities:false behaviour — text and attribute
-// values are passed through unchanged except for quotes in attributes, which
-// must be escaped to produce well-formed XML attribute syntax.
 function escapeAttr(value: string): string {
-	return value.replaceAll('"', "&quot;");
+	let s = value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll('"', "&quot;");
+	// Re-encode whitespace that XML parsers would normalize in attribute values
+	s = s.replaceAll("\n", "&#10;").replaceAll("\r", "&#13;").replaceAll("\t", "&#9;");
+	return s;
+}
+
+function escapeText(value: string): string {
+	return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
 }
