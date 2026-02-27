@@ -426,4 +426,5 @@ editorRef = editor;
 
 initEditorHud(editor, {
 	openProcess: (processId) => tabsPlugin.api.navigateToProcess(processId),
+	rawModeButton: tabsPlugin.api.rawModeButton,
 });

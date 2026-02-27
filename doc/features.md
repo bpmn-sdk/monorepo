@@ -20,7 +20,7 @@
 - **`MenuDrill`** — drill-down menu items with back-navigation stack; clicking drills into sub-menu; "← Back" button returns to parent
 - **`MenuInfo`** — passive info row with optional action button (e.g. "Leave" for active project indicator)
 - Theme picker now behind a "Theme" drill item instead of flat in root dropdown
-- **Integrated into tab bar** — panel is flush with the tab bar (right-anchored, 36px tall, matching dark/light background colors); auto-reserves 160px via CSS `:has()` so the raw-mode button is never hidden
+- **Integrated into tab bar** — panel is flush with the tab bar (right-anchored, 36px tall, matching dark/light background colors); auto-reserves 160px via CSS `:has()` so the tab labels are never hidden behind it
 
 ## BPMN Element Config — Call Activity, Script Task, Sequence Flow (2026-02-26, updated 2026-02-26)
 
@@ -58,7 +58,7 @@
 - **Welcome screen** — shown when no tabs are open (and always on initial load); centered card with BPMN icon, title, "New diagram", "Import files…", and optional "Open recent" dropdown button; theme-aware (light/dark); `onNewDiagram` / `onImportFiles` / `onWelcomeShow` option callbacks
 - **Plugin-managed tab XML** — subscribes to `diagram:change` internally; keeps `tab.config.xml` up to date for all open BPMN tabs; eliminates the need for client apps to track per-tab XML manually
 - **Plugin-managed process tracking** — automatically parses BPMN XML on `openTab` and `diagram:change`; exposes `navigateToProcess(id)`, `getAvailableProcesses()`, `getAllTabContent()`, `closeAllTabs()` on `TabsApi`
-- **Raw source toggle** — `</>` icon button at the right end of the tab bar; overlays a monospace `<pre>` with BPMN XML / DMN XML / Form JSON; stays in sync with live edits; disabled for FEEL tabs
+- **Raw source toggle** — `</>` icon button in the bottom-left HUD panel; overlays a monospace `<pre>` with BPMN XML / DMN XML / Form JSON; stays in sync with live edits; disabled for FEEL tabs; button exposed via `TabsApi.rawModeButton` and placed in the HUD by `initEditorHud()`
 - **Grouped tabs** — at most 3 tabs in the bar (one per type: BPMN, DMN, FORM); each group tab shows the active file name and a type badge; chevron opens a dropdown listing all files of that type; per-file close buttons in dropdown; close button on tab itself when group has only one file
 
 ## Multi-file Import + Tab Navigation in Editor (2026-02-26) — `apps/landing` + `canvas-plugins/*`
@@ -173,6 +173,9 @@
 - **Group toolbar** — bottom toolbar shows one button per BPMN group (Events, Activities, Gateways); click to use last-selected type; long-press (500ms) opens a horizontal picker with all types in the group; standard BPMN notation icons throughout
 - **`changeElementType(id, newType)`** — changes a flow element's type while preserving id, name, and connections
 - **Orthogonal edges** — all sequence flows rendered as H/V-only Z-shaped paths; routes recomputed on shape move; endpoint repositioning via drag
+- **Obstacle-avoiding edge routing** — new edges automatically route around existing shapes by trying all 16 port combinations and picking the first non-intersecting route
+- **Edge segment drag** — hover over an edge segment to reveal a blue dot (projected cursor position) and a resize cursor (`ns-resize` for horizontal, `ew-resize` for vertical); drag perpendicularly to move the entire segment while keeping adjacent segments orthogonal
+- **Edge waypoint insertion** — drag an edge at a shallower (more parallel) angle to insert a free-form bend point; diagonal edges allowed for waypoint insertion only
 - **Edge endpoint repositioning** — click edge to select; drag start/end balls to reposition on source/target port (top/right/bottom/left); route recomputed via port-aware orthogonal routing
 - **External label positions** — events and gateways show labels outside the shape; 8 positions via `setLabelPosition(id, pos)`; contextual toolbar compass icon to choose
 - **Magnet snap** — shapes snap to aligned edges/centers of neighbors during drag; blue dashed guide lines shown

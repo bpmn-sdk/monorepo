@@ -1018,6 +1018,73 @@ export function updateEdgeEndpoint(
 	};
 }
 
+// ── Edge segment / waypoint manipulation ──────────────────────────────────────
+
+/**
+ * Moves an orthogonal edge segment perpendicularly by `delta` units.
+ * For horizontal segments delta shifts Y; for vertical segments delta shifts X.
+ * Both waypoints of the segment move together, stretching adjacent segments.
+ */
+export function moveEdgeSegment(
+	defs: BpmnDefinitions,
+	edgeId: string,
+	segIdx: number,
+	isHoriz: boolean,
+	delta: number,
+): BpmnDefinitions {
+	const diagram = defs.diagrams[0];
+	if (!diagram) return defs;
+	const edge = diagram.plane.edges.find((e) => e.bpmnElement === edgeId);
+	if (!edge || segIdx >= edge.waypoints.length - 1) return defs;
+	const newWaypoints = edge.waypoints.map((wp, i) => {
+		if (i === segIdx || i === segIdx + 1) {
+			return isHoriz ? { ...wp, y: wp.y + delta } : { ...wp, x: wp.x + delta };
+		}
+		return wp;
+	});
+	const newEdges = diagram.plane.edges.map((e) =>
+		e.bpmnElement === edgeId ? { ...e, waypoints: newWaypoints } : e,
+	);
+	return {
+		...defs,
+		diagrams: [
+			{ ...diagram, plane: { ...diagram.plane, edges: newEdges } },
+			...defs.diagrams.slice(1),
+		],
+	};
+}
+
+/**
+ * Inserts a new waypoint between waypoints[segIdx] and waypoints[segIdx+1].
+ * Used for free-form bend creation (diagonal movement allowed).
+ */
+export function insertEdgeWaypoint(
+	defs: BpmnDefinitions,
+	edgeId: string,
+	segIdx: number,
+	pt: { x: number; y: number },
+): BpmnDefinitions {
+	const diagram = defs.diagrams[0];
+	if (!diagram) return defs;
+	const edge = diagram.plane.edges.find((e) => e.bpmnElement === edgeId);
+	if (!edge) return defs;
+	const newWaypoints = [
+		...edge.waypoints.slice(0, segIdx + 1),
+		pt,
+		...edge.waypoints.slice(segIdx + 1),
+	];
+	const newEdges = diagram.plane.edges.map((e) =>
+		e.bpmnElement === edgeId ? { ...e, waypoints: newWaypoints } : e,
+	);
+	return {
+		...defs,
+		diagrams: [
+			{ ...diagram, plane: { ...diagram.plane, edges: newEdges } },
+			...defs.diagrams.slice(1),
+		],
+	};
+}
+
 // ── Change element type ───────────────────────────────────────────────────────
 
 /**

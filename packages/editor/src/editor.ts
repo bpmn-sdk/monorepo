@@ -23,6 +23,7 @@ import { injectEditorStyles } from "./css.js";
 import {
 	closestPort,
 	computeWaypoints,
+	computeWaypointsAvoiding,
 	computeWaypointsWithPorts,
 	diagramToScreen,
 	labelBoundsForPosition,
@@ -40,7 +41,9 @@ import {
 	createEmptyDefinitions,
 	createShape,
 	deleteElements,
+	insertEdgeWaypoint,
 	insertShapeOnEdge,
+	moveEdgeSegment,
 	moveShapes,
 	pasteElements,
 	resizeShape,
@@ -412,6 +415,41 @@ export class BpmnEditor {
 					const edge = this._edges.find((e) => e.id === this._selectedEdgeId);
 					this._overlay.setEdgeEndpoints(edge?.edge.waypoints ?? null, this._selectedEdgeId);
 				}
+			},
+			previewSegmentMove: (edgeId, segIdx, isHoriz, delta) => {
+				if (!this._defs) return;
+				const preview = moveEdgeSegment(this._defs, edgeId, segIdx, isHoriz, delta);
+				const edge = preview.diagrams[0]?.plane.edges.find((e) => e.bpmnElement === edgeId);
+				this._overlay.setEndpointDragGhost(edge?.waypoints ?? null);
+			},
+			commitSegmentMove: (edgeId, segIdx, isHoriz, delta) => {
+				this._overlay.setEndpointDragGhost(null);
+				this._executeCommand((d) => moveEdgeSegment(d, edgeId, segIdx, isHoriz, delta));
+			},
+			cancelSegmentMove: () => {
+				this._overlay.setEndpointDragGhost(null);
+			},
+			previewWaypointInsert: (edgeId, segIdx, pt) => {
+				if (!this._defs) return;
+				const preview = insertEdgeWaypoint(this._defs, edgeId, segIdx, pt);
+				const edge = preview.diagrams[0]?.plane.edges.find((e) => e.bpmnElement === edgeId);
+				this._overlay.setEndpointDragGhost(edge?.waypoints ?? null);
+			},
+			commitWaypointInsert: (edgeId, segIdx, pt) => {
+				this._overlay.setEndpointDragGhost(null);
+				this._executeCommand((d) => insertEdgeWaypoint(d, edgeId, segIdx, pt));
+			},
+			cancelWaypointInsert: () => {
+				this._overlay.setEndpointDragGhost(null);
+			},
+			setCursor: (cursor) => {
+				this._svg.style.cursor = cursor ?? "";
+			},
+			showEdgeHoverDot: (pt) => {
+				this._overlay.setEdgeHoverDot(pt);
+			},
+			hideEdgeHoverDot: () => {
+				this._overlay.setEdgeHoverDot(null);
 			},
 			previewSpace: (origin, current, axis) => this._previewSpace(origin, current, axis),
 			commitSpace: (origin, current, axis) => this._commitSpace(origin, current, axis),
@@ -924,7 +962,14 @@ export class BpmnEditor {
 		const srcType = srcShape.flowElement?.type;
 		const tgtType = tgtShape.flowElement?.type;
 		if (srcType && tgtType && !canConnect(srcType, tgtType)) return;
-		const waypoints = computeWaypoints(srcShape.shape.bounds, tgtShape.shape.bounds);
+		const obstacles = this._shapes
+			.filter((s) => s.id !== srcId && s.id !== tgtId)
+			.map((s) => s.shape.bounds);
+		const waypoints = computeWaypointsAvoiding(
+			srcShape.shape.bounds,
+			tgtShape.shape.bounds,
+			obstacles,
+		);
 		this._executeCommand((d) => createConnection(d, srcId, tgtId, waypoints).defs);
 	}
 
@@ -1044,8 +1089,9 @@ export class BpmnEditor {
 		}
 
 		const newBounds = this._smartPlaceBounds(srcBounds, sourceId, w, h);
+		const obstacles = this._shapes.filter((s) => s.id !== sourceId).map((s) => s.shape.bounds);
 		const r1 = createShape(this._defs, type, newBounds);
-		const waypoints = computeWaypoints(srcBounds, newBounds);
+		const waypoints = computeWaypointsAvoiding(srcBounds, newBounds, obstacles);
 		const r2 = createConnection(r1.defs, sourceId, r1.id, waypoints);
 
 		this._selectedIds = [r1.id];
@@ -1824,7 +1870,13 @@ export class BpmnEditor {
 		const edgeHitEl = el.closest("[data-bpmn-edge-hit]");
 		if (edgeHitEl) {
 			const id = edgeHitEl.getAttribute("data-bpmn-edge-hit");
-			if (id) return { type: "edge", id };
+			if (id) {
+				const rect = this._svg.getBoundingClientRect();
+				const diag = screenToDiagram(clientX, clientY, this._viewport.state, rect);
+				const seg = this._nearestSegment(id, diag);
+				if (seg) return { type: "edge-segment", id, ...seg };
+				return { type: "edge", id };
+			}
 		}
 
 		const shapeEl = el.closest("[data-bpmn-id]");
@@ -1834,6 +1886,48 @@ export class BpmnEditor {
 		}
 
 		return { type: "canvas" };
+	}
+
+	/** Returns the nearest segment info for the given edge and diagram point. */
+	private _nearestSegment(
+		edgeId: string,
+		diag: DiagPoint,
+	): { segIdx: number; isHoriz: boolean; projPt: DiagPoint } | null {
+		const edge = this._edges.find((e) => e.id === edgeId);
+		if (!edge) return null;
+		const wps = edge.edge.waypoints;
+		if (wps.length < 2) return null;
+
+		let bestIdx = 0;
+		let bestDist = Number.POSITIVE_INFINITY;
+		let bestProj: DiagPoint = { x: 0, y: 0 };
+		let bestHoriz = true;
+
+		for (let i = 0; i < wps.length - 1; i++) {
+			const a = wps[i];
+			const b = wps[i + 1];
+			if (!a || !b) continue;
+			const isHoriz = Math.abs(a.y - b.y) < 1;
+			let proj: DiagPoint;
+			let dist: number;
+			if (isHoriz) {
+				const clampedX = Math.max(Math.min(a.x, b.x), Math.min(diag.x, Math.max(a.x, b.x)));
+				proj = { x: clampedX, y: a.y };
+				dist = Math.abs(diag.y - a.y);
+			} else {
+				const clampedY = Math.max(Math.min(a.y, b.y), Math.min(diag.y, Math.max(a.y, b.y)));
+				proj = { x: a.x, y: clampedY };
+				dist = Math.abs(diag.x - a.x);
+			}
+			if (dist < bestDist) {
+				bestDist = dist;
+				bestIdx = i;
+				bestProj = proj;
+				bestHoriz = isHoriz;
+			}
+		}
+
+		return { segIdx: bestIdx, isHoriz: bestHoriz, projPt: bestProj };
 	}
 
 	// ── Theme + controls ──────────────────────────────────────────────

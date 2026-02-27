@@ -1,5 +1,22 @@
 # Progress
 
+## 2026-02-27 — Edge improvements, raw mode button relocation, obstacle routing
+
+### `canvas-plugins/tabs`
+- **Raw mode button relocated** — raw source toggle button removed from the tab bar; exposed via `TabsApi.rawModeButton`; tab bar CSS for `.bpmn-raw-mode-btn` removed
+
+### `packages/editor`
+- **Raw mode button in HUD** — `HudOptions` accepts `rawModeButton?: HTMLButtonElement | null`; when provided the button is styled as a `hud-btn` and appended (with a separator) to the bottom-left HUD panel
+- **Obstacle-avoiding edge routing** — new `computeWaypointsAvoiding(src, tgt, obstacles)` in `geometry.ts`; tries all 16 port combinations and returns the first route that does not intersect any obstacle shape (2 px margin); used in `_doConnect()` and `addConnectedElement()` so new edges automatically route around existing elements
+- **Edge segment drag** — hovering over an edge segment shows a blue dot at the projected cursor position and changes the cursor to `ns-resize` (horizontal segment) or `ew-resize` (vertical); dragging perpendicularly (steeper than 45°) moves the entire segment while maintaining orthogonality of the adjacent segments; state machine states: `pointing-edge-segment`, `dragging-edge-segment`
+- **Edge waypoint insertion** — dragging an edge at a shallower angle (more parallel than perpendicular) inserts a new free-form waypoint at the drag position; diagonal movements allowed; state machine state: `dragging-edge-waypoint-new`
+- **`HitResult` extended** — new `edge-segment` variant `{ type, id, segIdx, isHoriz, projPt }` returned by `_hitTest()` when hovering an edge; `_nearestSegment()` helper computes the nearest segment and its projection
+- **`modeling.ts` additions** — `moveEdgeSegment(defs, edgeId, segIdx, isHoriz, delta)` and `insertEdgeWaypoint(defs, edgeId, segIdx, pt)`
+- **Overlay** — new `_edgeHoverDotG` SVG layer and `setEdgeHoverDot(pt|null)` method; blue dot styled with `.bpmn-edge-hover-dot`
+
+### `apps/landing`
+- Passes `rawModeButton: tabsPlugin.api.rawModeButton` to `initEditorHud()`
+
 ## 2026-02-27 — Unified tab bar (HUD + main menu integration)
 
 ### `canvas-plugins/main-menu`

@@ -172,6 +172,11 @@ export interface TabsApi {
 	 * Call this after async data loads to update the welcome screen if it is visible.
 	 */
 	refreshWelcomeScreen(): void;
+	/**
+	 * The raw mode toggle button element. Pass this to `initEditorHud` to place it
+	 * in the bottom-left HUD panel instead of the tab bar.
+	 */
+	rawModeButton: HTMLButtonElement | null;
 }
 
 let _tabCounter = 0;
@@ -680,8 +685,6 @@ export function createTabsPlugin(options: TabsPluginOptions = {}): CanvasPlugin 
 			createGroupTabEl(type, group, isGroupActive);
 		}
 
-		// Re-attach raw mode button (cleared by innerHTML = "")
-		if (rawModeBtn) tabBar.appendChild(rawModeBtn);
 		updateRawModeBtn();
 	}
 
@@ -989,6 +992,10 @@ export function createTabsPlugin(options: TabsPluginOptions = {}): CanvasPlugin 
 			renderDynamicSections();
 		},
 
+		get rawModeButton(): HTMLButtonElement | null {
+			return rawModeBtn;
+		},
+
 		openDecision(decisionId: string): void {
 			// Check if already open
 			const existing = tabs.find(
@@ -1092,10 +1099,9 @@ export function createTabsPlugin(options: TabsPluginOptions = {}): CanvasPlugin 
 			rawPaneEl.appendChild(rawPreEl);
 			contentArea.appendChild(rawPaneEl);
 
-			// Raw mode toggle button — appended to tabBar; re-attached by renderTabBar()
+			// Raw mode toggle button — exposed via api.rawModeButton; caller places it in the HUD
 			rawModeBtn = document.createElement("button");
 			rawModeBtn.type = "button";
-			rawModeBtn.className = "bpmn-raw-mode-btn";
 			rawModeBtn.title = "Toggle raw source";
 			rawModeBtn.disabled = true;
 			rawModeBtn.innerHTML = RAW_MODE_ICON;
@@ -1108,7 +1114,6 @@ export function createTabsPlugin(options: TabsPluginOptions = {}): CanvasPlugin 
 				updateRawPane();
 				updateRawModeBtn();
 			});
-			tabBar.appendChild(rawModeBtn);
 
 			// Create body-level dropdown for groups with multiple files
 			dropdownEl = document.createElement("div");

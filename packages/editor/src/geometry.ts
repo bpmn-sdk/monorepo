@@ -348,6 +348,60 @@ export function computeWaypointsWithPorts(
 	return [E, { x: E.x, y: P.y }, P];
 }
 
+// ── Obstacle-avoiding routing ─────────────────────────────────────────────────
+
+const ALL_PORTS: PortDir[] = ["right", "bottom", "left", "top"];
+
+function hSegIntersectsRect(x1: number, x2: number, y: number, r: BpmnBounds, m: number): boolean {
+	if (y <= r.y + m || y >= r.y + r.height - m) return false;
+	return Math.max(x1, x2) > r.x + m && Math.min(x1, x2) < r.x + r.width - m;
+}
+
+function vSegIntersectsRect(y1: number, y2: number, x: number, r: BpmnBounds, m: number): boolean {
+	if (x <= r.x + m || x >= r.x + r.width - m) return false;
+	return Math.max(y1, y2) > r.y + m && Math.min(y1, y2) < r.y + r.height - m;
+}
+
+function waypointsIntersectObstacles(wps: BpmnWaypoint[], obstacles: BpmnBounds[]): boolean {
+	const m = 2;
+	for (let i = 0; i < wps.length - 1; i++) {
+		const a = wps[i];
+		const b = wps[i + 1];
+		if (!a || !b) continue;
+		const isH = Math.abs(a.y - b.y) < 1;
+		for (const obs of obstacles) {
+			if (
+				isH ? hSegIntersectsRect(a.x, b.x, a.y, obs, m) : vSegIntersectsRect(a.y, b.y, a.x, obs, m)
+			)
+				return true;
+		}
+	}
+	return false;
+}
+
+/**
+ * Computes waypoints between two shapes, routing around obstacle shapes.
+ * Tries all 16 port combinations and picks the first that avoids obstacles.
+ * Falls back to the default route if no clear path is found.
+ */
+export function computeWaypointsAvoiding(
+	src: BpmnBounds,
+	tgt: BpmnBounds,
+	obstacles: BpmnBounds[],
+): BpmnWaypoint[] {
+	const defaultWps = computeWaypoints(src, tgt);
+	if (obstacles.length === 0 || !waypointsIntersectObstacles(defaultWps, obstacles))
+		return defaultWps;
+
+	for (const srcPort of ALL_PORTS) {
+		for (const tgtPort of ALL_PORTS) {
+			const wps = computeWaypointsWithPorts(src, srcPort, tgt, tgtPort);
+			if (!waypointsIntersectObstacles(wps, obstacles)) return wps;
+		}
+	}
+	return defaultWps;
+}
+
 // ── Selection bounds ──────────────────────────────────────────────────────────
 
 /**

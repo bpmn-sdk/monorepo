@@ -38,7 +38,25 @@ type SelectSub =
 			screenX: number;
 			screenY: number;
 	  }
-	| { name: "dragging-edge-endpoint"; edgeId: string; isStart: boolean; origin: DiagPoint };
+	| { name: "dragging-edge-endpoint"; edgeId: string; isStart: boolean; origin: DiagPoint }
+	| {
+			name: "pointing-edge-segment";
+			edgeId: string;
+			segIdx: number;
+			isHoriz: boolean;
+			projPt: DiagPoint;
+			origin: DiagPoint;
+			screenX: number;
+			screenY: number;
+	  }
+	| {
+			name: "dragging-edge-segment";
+			edgeId: string;
+			segIdx: number;
+			isHoriz: boolean;
+			origin: DiagPoint;
+	  }
+	| { name: "dragging-edge-waypoint-new"; edgeId: string; segIdx: number; origin: DiagPoint };
 
 type SpaceSub =
 	| { name: "idle" }
@@ -82,6 +100,15 @@ export interface Callbacks {
 	previewEndpointMove(edgeId: string, isStart: boolean, diagPoint: DiagPoint): void;
 	commitEndpointMove(edgeId: string, isStart: boolean, diagPoint: DiagPoint): void;
 	cancelEndpointMove(): void;
+	previewSegmentMove(edgeId: string, segIdx: number, isHoriz: boolean, delta: number): void;
+	commitSegmentMove(edgeId: string, segIdx: number, isHoriz: boolean, delta: number): void;
+	cancelSegmentMove(): void;
+	previewWaypointInsert(edgeId: string, segIdx: number, pt: DiagPoint): void;
+	commitWaypointInsert(edgeId: string, segIdx: number, pt: DiagPoint): void;
+	cancelWaypointInsert(): void;
+	setCursor(cursor: string | null): void;
+	showEdgeHoverDot(pt: DiagPoint): void;
+	hideEdgeHoverDot(): void;
 	previewSpace(origin: DiagPoint, current: DiagPoint, axis: "h" | "v" | null): void;
 	commitSpace(origin: DiagPoint, current: DiagPoint, axis: "h" | "v" | null): void;
 	cancelSpace(): void;
@@ -223,6 +250,24 @@ export class EditorStateMachine {
 				break;
 			}
 
+			case "edge-segment": {
+				this._cb.lockViewport(true);
+				this._mode = {
+					mode: "select",
+					sub: {
+						name: "pointing-edge-segment",
+						edgeId: hit.id,
+						segIdx: hit.segIdx,
+						isHoriz: hit.isHoriz,
+						projPt: hit.projPt,
+						origin: diag,
+						screenX: e.clientX,
+						screenY: e.clientY,
+					},
+				};
+				break;
+			}
+
 			case "edge-endpoint": {
 				this._cb.lockViewport(true);
 				this._mode = {
@@ -296,6 +341,13 @@ export class EditorStateMachine {
 				if (hoveredId !== sub.hoveredId) {
 					this._cb.setHovered(hoveredId);
 					this._mode = { mode: "select", sub: { name: "idle", hoveredId } };
+				}
+				if (hit.type === "edge-segment") {
+					this._cb.showEdgeHoverDot(hit.projPt);
+					this._cb.setCursor(hit.isHoriz ? "ns-resize" : "ew-resize");
+				} else {
+					this._cb.hideEdgeHoverDot();
+					this._cb.setCursor(null);
 				}
 				break;
 			}
@@ -389,6 +441,53 @@ export class EditorStateMachine {
 
 			case "dragging-edge-endpoint": {
 				this._cb.previewEndpointMove(sub.edgeId, sub.isStart, diag);
+				break;
+			}
+
+			case "pointing-edge-segment": {
+				const dist = screenDist(e.clientX, e.clientY, sub.screenX, sub.screenY);
+				if (dist > DRAG_THRESHOLD) {
+					const dx = diag.x - sub.origin.x;
+					const dy = diag.y - sub.origin.y;
+					const perpDelta = sub.isHoriz ? dy : dx;
+					const parallelDelta = sub.isHoriz ? dx : dy;
+					// Perpendicular drag (steep angle) → segment drag; otherwise → waypoint insert
+					if (Math.abs(perpDelta) >= Math.abs(parallelDelta)) {
+						this._mode = {
+							mode: "select",
+							sub: {
+								name: "dragging-edge-segment",
+								edgeId: sub.edgeId,
+								segIdx: sub.segIdx,
+								isHoriz: sub.isHoriz,
+								origin: sub.origin,
+							},
+						};
+						this._cb.previewSegmentMove(sub.edgeId, sub.segIdx, sub.isHoriz, perpDelta);
+					} else {
+						this._mode = {
+							mode: "select",
+							sub: {
+								name: "dragging-edge-waypoint-new",
+								edgeId: sub.edgeId,
+								segIdx: sub.segIdx,
+								origin: sub.origin,
+							},
+						};
+						this._cb.previewWaypointInsert(sub.edgeId, sub.segIdx, diag);
+					}
+				}
+				break;
+			}
+
+			case "dragging-edge-segment": {
+				const delta = sub.isHoriz ? diag.y - sub.origin.y : diag.x - sub.origin.x;
+				this._cb.previewSegmentMove(sub.edgeId, sub.segIdx, sub.isHoriz, delta);
+				break;
+			}
+
+			case "dragging-edge-waypoint-new": {
+				this._cb.previewWaypointInsert(sub.edgeId, sub.segIdx, diag);
 				break;
 			}
 
@@ -501,6 +600,29 @@ export class EditorStateMachine {
 				break;
 			}
 
+			case "pointing-edge-segment": {
+				this._cb.lockViewport(false);
+				// Tap without drag: select the edge
+				this._cb.setEdgeSelected(sub.edgeId);
+				this._mode = { mode: "select", sub: { name: "idle", hoveredId: null } };
+				break;
+			}
+
+			case "dragging-edge-segment": {
+				const delta = sub.isHoriz ? diag.y - sub.origin.y : diag.x - sub.origin.x;
+				this._cb.lockViewport(false);
+				this._cb.commitSegmentMove(sub.edgeId, sub.segIdx, sub.isHoriz, delta);
+				this._mode = { mode: "select", sub: { name: "idle", hoveredId: null } };
+				break;
+			}
+
+			case "dragging-edge-waypoint-new": {
+				this._cb.lockViewport(false);
+				this._cb.commitWaypointInsert(sub.edgeId, sub.segIdx, diag);
+				this._mode = { mode: "select", sub: { name: "idle", hoveredId: null } };
+				break;
+			}
+
 			case "pointing-canvas": {
 				if (!this._cb.viewportDidPan()) {
 					this._cb.setSelection([]);
@@ -566,6 +688,12 @@ export class EditorStateMachine {
 			} else if (sub.name === "pointing-edge-endpoint" || sub.name === "dragging-edge-endpoint") {
 				this._cb.lockViewport(false);
 				this._cb.cancelEndpointMove();
+			} else if (sub.name === "pointing-edge-segment" || sub.name === "dragging-edge-segment") {
+				this._cb.lockViewport(false);
+				this._cb.cancelSegmentMove();
+			} else if (sub.name === "dragging-edge-waypoint-new") {
+				this._cb.lockViewport(false);
+				this._cb.cancelWaypointInsert();
 			}
 			this._cb.setSelection([]);
 			this._mode = { mode: "select", sub: { name: "idle", hoveredId: null } };

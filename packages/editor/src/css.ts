@@ -96,6 +96,16 @@ export const EDITOR_CSS = `
   cursor: pointer;
 }
 
+/* Edge hover dot (segment drag / waypoint insertion indicator) */
+.bpmn-edge-hover-dot {
+  fill: #0066cc;
+  stroke: #fff;
+  stroke-width: 1.5;
+  pointer-events: none;
+  opacity: 0.85;
+}
+[data-theme="dark"] .bpmn-edge-hover-dot { fill: #4c8ef7; }
+
 /* Edge endpoint drag handles */
 .bpmn-edge-endpoint {
   fill: #0066cc;
