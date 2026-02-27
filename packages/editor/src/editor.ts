@@ -419,33 +419,43 @@ export class BpmnEditor {
 			},
 			previewWaypointInsert: (edgeId, segIdx, pt) => {
 				if (!this._defs) return;
-				const preview = insertEdgeWaypoint(this._defs, edgeId, segIdx, pt);
+				const snap = this._snapWaypoint(pt);
+				const preview = insertEdgeWaypoint(this._defs, edgeId, segIdx, snap.pt);
 				const edge = preview.diagrams[0]?.plane.edges.find((e) => e.bpmnElement === edgeId);
 				this._overlay.setEndpointDragGhost(edge?.waypoints ?? null);
+				this._overlay.setAlignmentGuides(snap.guides);
 			},
 			commitWaypointInsert: (edgeId, segIdx, pt) => {
 				this._overlay.setEndpointDragGhost(null);
+				this._overlay.setAlignmentGuides([]);
+				const snap = this._snapWaypoint(pt);
 				this._executeCommand((d) =>
-					removeCollinearWaypoints(insertEdgeWaypoint(d, edgeId, segIdx, pt), edgeId),
+					removeCollinearWaypoints(insertEdgeWaypoint(d, edgeId, segIdx, snap.pt), edgeId),
 				);
 			},
 			cancelWaypointInsert: () => {
 				this._overlay.setEndpointDragGhost(null);
+				this._overlay.setAlignmentGuides([]);
 			},
 			previewWaypointMove: (edgeId, wpIdx, pt) => {
 				if (!this._defs) return;
-				const preview = moveEdgeWaypoint(this._defs, edgeId, wpIdx, pt);
+				const snap = this._snapWaypoint(pt);
+				const preview = moveEdgeWaypoint(this._defs, edgeId, wpIdx, snap.pt);
 				const edge = preview.diagrams[0]?.plane.edges.find((e) => e.bpmnElement === edgeId);
 				this._overlay.setEndpointDragGhost(edge?.waypoints ?? null);
+				this._overlay.setAlignmentGuides(snap.guides);
 			},
 			commitWaypointMove: (edgeId, wpIdx, pt) => {
 				this._overlay.setEndpointDragGhost(null);
+				this._overlay.setAlignmentGuides([]);
+				const snap = this._snapWaypoint(pt);
 				this._executeCommand((d) =>
-					removeCollinearWaypoints(moveEdgeWaypoint(d, edgeId, wpIdx, pt), edgeId),
+					removeCollinearWaypoints(moveEdgeWaypoint(d, edgeId, wpIdx, snap.pt), edgeId),
 				);
 			},
 			cancelWaypointMove: () => {
 				this._overlay.setEndpointDragGhost(null);
+				this._overlay.setAlignmentGuides([]);
 			},
 			showEdgeHoverDot: (pt) => {
 				this._overlay.setEdgeHoverDot(pt);
@@ -1928,27 +1938,75 @@ export class BpmnEditor {
 			const a = wps[i];
 			const b = wps[i + 1];
 			if (!a || !b) continue;
-			const isHoriz = Math.abs(a.y - b.y) < 1;
+			const dx = b.x - a.x;
+			const dy = b.y - a.y;
+			const lenSq = dx * dx + dy * dy;
 			let proj: DiagPoint;
-			let dist: number;
-			if (isHoriz) {
-				const clampedX = Math.max(Math.min(a.x, b.x), Math.min(diag.x, Math.max(a.x, b.x)));
-				proj = { x: clampedX, y: a.y };
-				dist = Math.abs(diag.y - a.y);
+			if (lenSq < 0.001) {
+				proj = { x: a.x, y: a.y };
 			} else {
-				const clampedY = Math.max(Math.min(a.y, b.y), Math.min(diag.y, Math.max(a.y, b.y)));
-				proj = { x: a.x, y: clampedY };
-				dist = Math.abs(diag.x - a.x);
+				const t = Math.max(0, Math.min(1, ((diag.x - a.x) * dx + (diag.y - a.y) * dy) / lenSq));
+				proj = { x: a.x + t * dx, y: a.y + t * dy };
 			}
+			const dist = Math.hypot(diag.x - proj.x, diag.y - proj.y);
 			if (dist < bestDist) {
 				bestDist = dist;
 				bestIdx = i;
 				bestProj = proj;
-				bestHoriz = isHoriz;
+				bestHoriz = Math.abs(dy) <= Math.abs(dx);
 			}
 		}
 
 		return { segIdx: bestIdx, isHoriz: bestHoriz, projPt: bestProj };
+	}
+
+	/** Snaps a diagram point to nearby shape/waypoint positions and returns guide lines. */
+	private _snapWaypoint(pt: DiagPoint): {
+		pt: DiagPoint;
+		guides: Array<{ x1: number; y1: number; x2: number; y2: number }>;
+	} {
+		const scale = this._viewport.state.scale;
+		const threshold = 8 / scale;
+		const EXT = 10000;
+
+		const xTargets: number[] = [];
+		const yTargets: number[] = [];
+
+		for (const shape of this._shapes) {
+			const b = shape.shape.bounds;
+			xTargets.push(b.x, b.x + b.width / 2, b.x + b.width);
+			yTargets.push(b.y, b.y + b.height / 2, b.y + b.height);
+		}
+		for (const edge of this._edges) {
+			for (const wp of edge.edge.waypoints) {
+				xTargets.push(wp.x);
+				yTargets.push(wp.y);
+			}
+		}
+
+		let snapX = pt.x;
+		let snapY = pt.y;
+		let minDx = threshold;
+		let minDy = threshold;
+
+		for (const tx of xTargets) {
+			if (Math.abs(pt.x - tx) < minDx) {
+				minDx = Math.abs(pt.x - tx);
+				snapX = tx;
+			}
+		}
+		for (const ty of yTargets) {
+			if (Math.abs(pt.y - ty) < minDy) {
+				minDy = Math.abs(pt.y - ty);
+				snapY = ty;
+			}
+		}
+
+		const guides: Array<{ x1: number; y1: number; x2: number; y2: number }> = [];
+		if (minDx < threshold) guides.push({ x1: snapX, y1: -EXT, x2: snapX, y2: EXT });
+		if (minDy < threshold) guides.push({ x1: -EXT, y1: snapY, x2: EXT, y2: snapY });
+
+		return { pt: { x: snapX, y: snapY }, guides };
 	}
 
 	// ── Theme + controls ──────────────────────────────────────────────

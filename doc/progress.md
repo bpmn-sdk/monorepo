@@ -1,5 +1,11 @@
 # Progress
 
+## 2026-02-27 — Edge waypoint hover dot fix + snap guides
+
+### `packages/editor`
+- **Fix: `_nearestSegment` for diagonal edges** — replaced the orthogonal-only projection (`x = a.x` / `y = a.y`) with a proper perpendicular dot-product projection onto the segment line (`t = clamp((P-A)·(B-A)/|B-A|², 0, 1)`, `proj = A + t*(B-A)`); the hover dot now appears at the geometrically correct nearest point on any segment orientation; `isHoriz` is now determined by `|dy| ≤ |dx|` (predominant direction) rather than requiring near-zero delta
+- **Waypoint snap (magnet lines)** — new `_snapWaypoint(pt)` helper snaps a diagram point to shape bounds key positions (left/center-x/right + top/center-y/bottom) and all edge waypoints within an 8px/scale threshold; returns snapped point and alignment guide lines; applied to both `previewWaypointInsert` / `commitWaypointInsert` and `previewWaypointMove` / `commitWaypointMove`; alignment guides cleared on commit and cancel
+
 ## 2026-02-27 — Edge waypoint interaction redesign
 
 ### `packages/editor`
