@@ -80,6 +80,14 @@ export class StorageApi {
 		return this._projects.get(wsId) ?? [];
 	}
 
+	getProjectName(id: string): string | null {
+		for (const projects of this._projects.values()) {
+			const p = projects.find((pr) => pr.id === id);
+			if (p) return p.name;
+		}
+		return null;
+	}
+
 	/** Open a project: sets it as current and returns its files. */
 	async openProject(id: string): Promise<FileRecord[]> {
 		this.setCurrentProjectId(id);

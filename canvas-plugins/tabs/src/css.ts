@@ -555,6 +555,70 @@ export const TABS_CSS = `
   color: var(--cd-primary-fg);
 }
 .bpmn-close-dialog-btn.primary:hover { opacity: 0.88; }
+
+/* ── Raw source pane ─────────────────────────────────────────────────────── */
+
+.bpmn-raw-pane {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  overflow: auto;
+  background: var(--raw-bg, #1e1e2e);
+  pointer-events: auto;
+}
+
+.bpmn-raw-pane[data-theme="light"] { --raw-bg: #f8f9fa; }
+
+.bpmn-raw-content {
+  margin: 0;
+  padding: 16px 20px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--raw-fg, #cdd6f4);
+  white-space: pre;
+  tab-size: 2;
+}
+
+.bpmn-raw-pane[data-theme="light"] .bpmn-raw-content { --raw-fg: #374151; }
+
+/* ── Raw mode toggle button ──────────────────────────────────────────────── */
+
+.bpmn-raw-mode-btn {
+  margin-left: auto;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 10px;
+  background: transparent;
+  border: none;
+  border-left: 1px solid var(--tabs-border);
+  color: var(--tab-fg);
+  font-size: 11px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  height: 100%;
+  opacity: 0.6;
+  transition: opacity 0.1s, background 0.1s;
+}
+
+.bpmn-raw-mode-btn svg { width: 14px; height: 14px; }
+
+.bpmn-raw-mode-btn:not(:disabled):hover {
+  opacity: 1;
+  background: var(--tab-hover-bg);
+}
+
+.bpmn-raw-mode-btn:disabled { opacity: 0.25; cursor: not-allowed; }
+
+.bpmn-raw-mode-btn.active {
+  opacity: 1;
+  color: var(--tab-active-fg);
+  background: var(--tab-active-bg);
+}
 `.trim();
 
 const STYLE_ID = "bpmn-sdk-tabs-css";

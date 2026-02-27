@@ -89,6 +89,19 @@ function makeEmptyBpmnXml(processId: string, processName: string): string {
 </bpmn:definitions>`;
 }
 
+function makeEmptyDmnXml(): string {
+	const id = Math.random().toString(36).slice(2, 9);
+	return `<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/"
+  id="Definitions_${id}" name="New Decision" namespace="http://bpmn.io/schema/dmn">
+  <decision id="Decision_${id}" name="Decision 1">
+    <decisionTable id="decisionTable_${id}" hitPolicy="UNIQUE">
+      <output id="output_${id}" label="Result" name="result" typeRef="string"/>
+    </decisionTable>
+  </decision>
+</definitions>`;
+}
+
 // ── Setup ──────────────────────────────────────────────────────────────────────
 
 const editorContainer = document.getElementById("editor-container");
@@ -254,7 +267,43 @@ const mainMenuPlugin = createMainMenuPlugin({
 	title: "BPMN SDK",
 	menuItems: [
 		{
-			label: "Import files…",
+			type: "drill",
+			label: "New\u2026",
+			items: [
+				{
+					label: "New BPMN diagram",
+					onClick: () => {
+						const processId = `Process_${Math.random().toString(36).slice(2, 9)}`;
+						tabsPlugin.api.openTab({
+							type: "bpmn",
+							xml: makeEmptyBpmnXml(processId, "New Process"),
+							name: "New Diagram",
+						});
+					},
+				},
+				{
+					label: "New DMN table",
+					onClick: () => {
+						const defs = Dmn.parse(makeEmptyDmnXml());
+						resolver.registerDmn(defs);
+						tabsPlugin.api.openTab({ type: "dmn", defs, name: "New Decision" });
+					},
+				},
+				{
+					label: "New Form",
+					onClick: () => {
+						const id = `Form_${Math.random().toString(36).slice(2, 9)}`;
+						tabsPlugin.api.openTab({
+							type: "form",
+							form: { id, type: "default", components: [] },
+							name: "New Form",
+						});
+					},
+				},
+			],
+		},
+		{
+			label: "Import files\u2026",
 			icon: IMPORT_ICON,
 			onClick: () => fileInput.click(),
 		},

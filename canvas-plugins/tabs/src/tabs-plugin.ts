@@ -176,6 +176,9 @@ export interface TabsApi {
 
 let _tabCounter = 0;
 
+const RAW_MODE_ICON =
+	'<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="5,3 1,8 5,13"/><polyline points="11,3 15,8 11,13"/></svg>';
+
 /** The order in which type groups appear in the tab bar. */
 const GROUP_TYPES: Array<TabConfig["type"]> = ["bpmn", "dmn", "form", "feel"];
 
@@ -212,6 +215,10 @@ export function createTabsPlugin(options: TabsPluginOptions = {}): CanvasPlugin 
 	let recentListEl: HTMLDivElement | null = null;
 	let theme: "dark" | "light" = "dark";
 	let offDiagramChange: (() => void) | undefined;
+	let isRawMode = false;
+	let rawPaneEl: HTMLDivElement | null = null;
+	let rawPreEl: HTMLPreElement | null = null;
+	let rawModeBtn: HTMLButtonElement | null = null;
 
 	/** Tracks which tab ID each BPMN process ID belongs to. */
 	const bpmnProcessToTabId = new Map<string, string>();
@@ -672,6 +679,10 @@ export function createTabsPlugin(options: TabsPluginOptions = {}): CanvasPlugin 
 			const isGroupActive = group.some((t) => t.id === activeId);
 			createGroupTabEl(type, group, isGroupActive);
 		}
+
+		// Re-attach raw mode button (cleared by innerHTML = "")
+		if (rawModeBtn) tabBar.appendChild(rawModeBtn);
+		updateRawModeBtn();
 	}
 
 	function createGroupTabEl(
@@ -794,6 +805,33 @@ export function createTabsPlugin(options: TabsPluginOptions = {}): CanvasPlugin 
 		}
 	}
 
+	// --- Raw mode ---
+
+	function getTabSource(tab: TabState): string {
+		if (tab.config.type === "bpmn") return tab.config.xml;
+		if (tab.config.type === "dmn") return Dmn.export(tab.config.defs);
+		if (tab.config.type === "form") return Form.export(tab.config.form);
+		return "";
+	}
+
+	function updateRawModeBtn(): void {
+		if (!rawModeBtn) return;
+		const activeTab = activeId !== null ? tabs.find((t) => t.id === activeId) : undefined;
+		rawModeBtn.disabled = activeTab === undefined || activeTab.config.type === "feel";
+		rawModeBtn.classList.toggle("active", isRawMode);
+	}
+
+	function updateRawPane(): void {
+		if (!rawPaneEl || !rawPreEl) return;
+		const activeTab = activeId !== null ? tabs.find((t) => t.id === activeId) : undefined;
+		if (!isRawMode || !activeTab || activeTab.config.type === "feel") {
+			rawPaneEl.style.display = "none";
+			return;
+		}
+		rawPreEl.textContent = getTabSource(activeTab);
+		rawPaneEl.style.display = "";
+	}
+
 	// --- Public API ---
 
 	const api: TabsApi = {
@@ -853,6 +891,7 @@ export function createTabsPlugin(options: TabsPluginOptions = {}): CanvasPlugin 
 		closeAllTabs(): void {
 			bpmnProcessToTabId.clear();
 			bpmnProcessNames.clear();
+			isRawMode = false;
 			for (const tab of [...tabs]) {
 				tab.dmnViewer?.destroy();
 				tab.formViewer?.destroy();
@@ -862,6 +901,7 @@ export function createTabsPlugin(options: TabsPluginOptions = {}): CanvasPlugin 
 			activeId = null;
 			groupActiveId.clear();
 			if (contentArea) contentArea.style.pointerEvents = "";
+			if (rawPaneEl) rawPaneEl.style.display = "none";
 			renderTabBar();
 			showWelcomeScreen();
 		},
@@ -881,13 +921,15 @@ export function createTabsPlugin(options: TabsPluginOptions = {}): CanvasPlugin 
 			tab.pane.classList.remove("hidden");
 			groupActiveId.set(tab.config.type, id);
 
-			// BPMN panes are transparent; disable pointer-events so the canvas is interactive
+			// BPMN panes are transparent; disable pointer-events so the canvas is interactive.
+			// In raw mode the raw pane overlays everything so pointer-events must stay on.
 			if (contentArea) {
-				contentArea.style.pointerEvents = tab.config.type === "bpmn" ? "none" : "";
+				contentArea.style.pointerEvents = tab.config.type === "bpmn" && !isRawMode ? "none" : "";
 			}
 
 			renderTabBar();
 			options.onTabActivate?.(id, tab.config);
+			updateRawPane();
 		},
 
 		getActiveTabId(): string | null {
@@ -1040,6 +1082,34 @@ export function createTabsPlugin(options: TabsPluginOptions = {}): CanvasPlugin 
 			contentArea.appendChild(welcomeEl);
 			showWelcomeScreen();
 
+			// Create raw source pane (overlaid on top of content when raw mode is on)
+			rawPaneEl = document.createElement("div");
+			rawPaneEl.className = "bpmn-raw-pane";
+			rawPaneEl.dataset.theme = theme;
+			rawPaneEl.style.display = "none";
+			rawPreEl = document.createElement("pre");
+			rawPreEl.className = "bpmn-raw-content";
+			rawPaneEl.appendChild(rawPreEl);
+			contentArea.appendChild(rawPaneEl);
+
+			// Raw mode toggle button — appended to tabBar; re-attached by renderTabBar()
+			rawModeBtn = document.createElement("button");
+			rawModeBtn.type = "button";
+			rawModeBtn.className = "bpmn-raw-mode-btn";
+			rawModeBtn.title = "Toggle raw source";
+			rawModeBtn.disabled = true;
+			rawModeBtn.innerHTML = RAW_MODE_ICON;
+			rawModeBtn.addEventListener("click", () => {
+				isRawMode = !isRawMode;
+				const activeTab = activeId !== null ? tabs.find((t) => t.id === activeId) : undefined;
+				if (contentArea && activeTab?.config.type === "bpmn") {
+					contentArea.style.pointerEvents = isRawMode ? "" : "none";
+				}
+				updateRawPane();
+				updateRawModeBtn();
+			});
+			tabBar.appendChild(rawModeBtn);
+
 			// Create body-level dropdown for groups with multiple files
 			dropdownEl = document.createElement("div");
 			dropdownEl.className = "bpmn-tab-dropdown";
@@ -1071,6 +1141,8 @@ export function createTabsPlugin(options: TabsPluginOptions = {}): CanvasPlugin 
 				// Refresh process map for this tab
 				untrackBpmnProcesses(activeId);
 				trackBpmnProcesses(activeId, xml);
+				// Keep raw pane in sync
+				if (isRawMode) updateRawPane();
 			});
 
 			// Listen for theme changes (canvas toggles data-theme="dark"; absence means light)
@@ -1080,6 +1152,7 @@ export function createTabsPlugin(options: TabsPluginOptions = {}): CanvasPlugin 
 				if (tabBar) tabBar.dataset.theme = theme;
 				if (welcomeEl) welcomeEl.dataset.theme = theme;
 				if (dropdownEl) dropdownEl.dataset.theme = theme;
+				if (rawPaneEl) rawPaneEl.dataset.theme = theme;
 				for (const tab of tabs) applyThemeToTab(tab);
 			});
 			observer.observe(container, { attributes: true, attributeFilter: ["data-theme"] });
@@ -1099,6 +1172,10 @@ export function createTabsPlugin(options: TabsPluginOptions = {}): CanvasPlugin 
 			dynamicSectionsEl = null;
 			recentBtnEl = null;
 			recentListEl = null;
+			isRawMode = false;
+			rawPaneEl = null;
+			rawPreEl = null;
+			rawModeBtn = null;
 			bpmnProcessToTabId.clear();
 			bpmnProcessNames.clear();
 			for (const tab of tabs) {

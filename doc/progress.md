@@ -1,5 +1,18 @@
 # Progress
 
+## 2026-02-27 — Export project ZIP, new file shortcuts, raw source toggle
+
+### `canvas-plugins/storage`
+- **Export project as ZIP** — new "Export Project…" action in the main menu when a project is open; builds a ZIP (STORE method, no external deps) from all project files and triggers a browser download named `<project>.zip`; pure TypeScript ZIP implementation in `src/export.ts` with CRC-32 and full central directory
+- **`StorageApi.getProjectName(id)`** — looks up a project name from the in-memory cache; used by the ZIP exporter
+
+### `canvas-plugins/tabs`
+- **Raw/rendered toggle** — `</>` icon button at the right end of the tab bar; toggles a raw source overlay (`<pre>`) showing the current tab's BPMN XML, DMN XML, or Form JSON; disabled for FEEL tabs; stays in sync with `diagram:change` events; per-session state persists while tabs are open, resets on `closeAllTabs()`
+
+### `apps/landing`
+- **"New…" drill menu** — top-right menu now has a "New…" drill-down with three entries: "New BPMN diagram" (empty with a start event), "New DMN table" (minimal decision table), "New Form" (empty form)
+- New helper `makeEmptyDmnXml()` for blank DMN table XML
+
 ## 2026-02-27 — Leave workspace, recent projects dropdown, plugin-managed tab XML/processes
 
 ### `canvas-plugins/tabs`

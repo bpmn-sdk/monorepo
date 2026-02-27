@@ -9,6 +9,7 @@
   - **Main-menu integration** — workspace/project navigation via drill-down menu (no sidebar); "Open Project", "Save All to Project", "Leave Project" actions in the ⋮ menu
   - **Welcome screen on load** — always shows welcome screen on startup; no auto-restore; `getRecentProjects()` provides top-10 recently-saved projects for the welcome dropdown
   - **`onLeaveProject` callback** — called when "Leave" is clicked; wired to close all tabs and show the welcome screen
+  - **Export project as ZIP** — "Export Project…" in the main menu downloads a `.zip` of all project files; built-in CRC-32 + ZIP STORE implementation, no external dependencies
   - **Shared files** — any file can be marked `isShared: true` to make it accessible for cross-workspace reference resolution
   - **GitHub-sync ready** — every `FileRecord` carries a `gitPath: string | null` field reserved for future bidirectional GitHub sync
   - **`createStoragePlugin(options)`** returns `CanvasPlugin & { api: StorageApi }`; requires `mainMenu` and `getOpenTabs` options
@@ -56,6 +57,7 @@
 - **Welcome screen** — shown when no tabs are open (and always on initial load); centered card with BPMN icon, title, "New diagram", "Import files…", and optional "Open recent" dropdown button; theme-aware (light/dark); `onNewDiagram` / `onImportFiles` / `onWelcomeShow` option callbacks
 - **Plugin-managed tab XML** — subscribes to `diagram:change` internally; keeps `tab.config.xml` up to date for all open BPMN tabs; eliminates the need for client apps to track per-tab XML manually
 - **Plugin-managed process tracking** — automatically parses BPMN XML on `openTab` and `diagram:change`; exposes `navigateToProcess(id)`, `getAvailableProcesses()`, `getAllTabContent()`, `closeAllTabs()` on `TabsApi`
+- **Raw source toggle** — `</>` icon button at the right end of the tab bar; overlays a monospace `<pre>` with BPMN XML / DMN XML / Form JSON; stays in sync with live edits; disabled for FEEL tabs
 - **Grouped tabs** — at most 3 tabs in the bar (one per type: BPMN, DMN, FORM); each group tab shows the active file name and a type badge; chevron opens a dropdown listing all files of that type; per-file close buttons in dropdown; close button on tab itself when group has only one file
 
 ## Multi-file Import + Tab Navigation in Editor (2026-02-26) — `apps/landing` + `canvas-plugins/*`

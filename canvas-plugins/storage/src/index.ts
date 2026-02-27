@@ -2,6 +2,7 @@ import type { CanvasApi, CanvasPlugin } from "@bpmn-sdk/canvas";
 import type { MainMenuApi, MenuItem } from "@bpmn-sdk/canvas-plugin-main-menu";
 import { Bpmn } from "@bpmn-sdk/core";
 import type { BpmnDefinitions } from "@bpmn-sdk/core";
+import { exportProjectAsZip } from "./export.js";
 import { StorageApi, type StorageApiOptions } from "./storage-api.js";
 import type { FileType, ProjectRecord, WorkspaceRecord } from "./types.js";
 
@@ -161,6 +162,10 @@ export function createStoragePlugin(
 					options.mainMenu.api.setTitle(options.initialTitle ?? "");
 					options.onLeaveProject?.();
 				},
+			});
+			items.push({
+				label: "Export Project\u2026",
+				onClick: () => void exportProjectAsZip(storageApi),
 			});
 			items.push({ type: "separator" });
 		}
