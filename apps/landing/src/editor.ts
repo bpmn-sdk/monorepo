@@ -519,6 +519,8 @@ const FILE_ICON =
 
 let fileSwitcherEl: HTMLDivElement | null = null;
 let _fileSwitcherKeyHandler: ((e: KeyboardEvent) => void) | null = null;
+let _fileSwitcherCtrlRelease: ((e: KeyboardEvent) => void) | null = null;
+let _fileSwitcherCycle: (() => void) | null = null;
 
 function closeFileSwitcher(): void {
 	fileSwitcherEl?.remove();
@@ -527,17 +529,19 @@ function closeFileSwitcher(): void {
 		document.removeEventListener("keydown", _fileSwitcherKeyHandler);
 		_fileSwitcherKeyHandler = null;
 	}
+	if (_fileSwitcherCtrlRelease) {
+		document.removeEventListener("keyup", _fileSwitcherCtrlRelease);
+		_fileSwitcherCtrlRelease = null;
+	}
+	_fileSwitcherCycle = null;
 }
 
 function openFileSwitcher(): void {
-	if (fileSwitcherEl) {
-		closeFileSwitcher();
-		return;
-	}
 	if (!storagePlugin.api.getCurrentProjectId()) return;
 
 	const isLight = editorContainer?.dataset.theme !== "dark";
 	let focusIdx = 0;
+	let isSearchMode = false;
 
 	const overlay = document.createElement("div");
 	overlay.className = `bpmn-palette-overlay${isLight ? " bpmn-palette--light" : ""}`;
@@ -566,9 +570,7 @@ function openFileSwitcher(): void {
 
 	const kbdHint = document.createElement("span");
 	kbdHint.className = "bpmn-palette-kbd";
-	const kbdKey = document.createElement("kbd");
-	kbdKey.textContent = "Esc";
-	kbdHint.appendChild(kbdKey);
+	kbdHint.innerHTML = "<kbd>E</kbd> cycle &nbsp;<kbd>Tab</kbd> search &nbsp;<kbd>Esc</kbd> close";
 	searchRow.appendChild(kbdHint);
 
 	const list = document.createElement("div");
@@ -653,13 +655,26 @@ function openFileSwitcher(): void {
 			item.classList.toggle("bpmn-palette-focused", i === focusIdx);
 			item.setAttribute("aria-selected", String(i === focusIdx));
 		});
+		list.querySelector<HTMLDivElement>(".bpmn-palette-focused")?.scrollIntoView({
+			block: "nearest",
+		});
 	}
 
-	// Pre-focus the second entry (most recently previous file)
+	function enterSearchMode(): void {
+		if (isSearchMode) return;
+		isSearchMode = true;
+		// Detach Ctrl-release commit — switcher now stays open until Enter/Esc/click
+		if (_fileSwitcherCtrlRelease) {
+			document.removeEventListener("keyup", _fileSwitcherCtrlRelease);
+			_fileSwitcherCtrlRelease = null;
+		}
+		input.focus();
+	}
+
+	// Pre-focus the second entry (most recently previous file); no input focus in cycle mode
 	const initial = getEntries("");
 	focusIdx = initial.length > 1 ? 1 : 0;
 	renderList("");
-	input.focus();
 
 	input.addEventListener("input", () => {
 		focusIdx = 0;
@@ -669,6 +684,27 @@ function openFileSwitcher(): void {
 	overlay.addEventListener("pointerdown", (e) => {
 		if (e.target === overlay) closeFileSwitcher();
 	});
+
+	// Ctrl/Meta release → commit the highlighted file (cycle mode only)
+	_fileSwitcherCtrlRelease = (e: KeyboardEvent) => {
+		if (e.key === "Control" || e.key === "Meta") {
+			const entries = getEntries(input.value);
+			const entry = entries[focusIdx];
+			if (entry) tabsPlugin.api.setActiveTab(entry.tabId);
+			closeFileSwitcher();
+		}
+	};
+	document.addEventListener("keyup", _fileSwitcherCtrlRelease);
+
+	// Exposed to the global Ctrl+E handler for cycling
+	_fileSwitcherCycle = () => {
+		if (isSearchMode) return;
+		const entries = getEntries("");
+		if (entries.length > 0) {
+			focusIdx = (focusIdx + 1) % entries.length;
+			updateFocus();
+		}
+	};
 
 	_fileSwitcherKeyHandler = (e: KeyboardEvent) => {
 		const entries = getEntries(input.value);
@@ -685,6 +721,12 @@ function openFileSwitcher(): void {
 				focusIdx = (focusIdx - 1 + count) % count;
 				updateFocus();
 			}
+		} else if (e.key === "Tab") {
+			e.preventDefault();
+			enterSearchMode();
+		} else if (e.key === "ArrowRight" && document.activeElement !== input) {
+			e.preventDefault();
+			enterSearchMode();
 		} else if (e.key === "Enter") {
 			e.preventDefault();
 			const entry = entries[focusIdx];
@@ -700,11 +742,15 @@ function openFileSwitcher(): void {
 	document.addEventListener("keydown", _fileSwitcherKeyHandler);
 }
 
-// Ctrl+E / Cmd+E — file switcher (IntelliJ "Recent Files", left-hand accessible)
+// Ctrl+E / Cmd+E — open switcher or cycle to next file while Ctrl is held
 document.addEventListener("keydown", (e) => {
 	if ((e.ctrlKey || e.metaKey) && e.key === "e" && !e.shiftKey && !e.altKey) {
 		e.preventDefault();
-		openFileSwitcher();
+		if (fileSwitcherEl && _fileSwitcherCycle) {
+			_fileSwitcherCycle();
+		} else {
+			openFileSwitcher();
+		}
 	}
 });
 

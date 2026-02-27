@@ -1,5 +1,13 @@
 # Progress
 
+## 2026-02-27 — File switcher: Alt-Tab-style cycle mode
+
+### `apps/landing`
+- **Ctrl+E (hold) cycle behavior** — pressing Ctrl+E opens the file switcher pre-focused on the second MRU entry; each additional E press (while Ctrl is still held) cycles to the next file in the list; releasing Ctrl commits the selection and switches to that file
+- **Search mode via Tab / ArrowRight** — pressing Tab or ArrowRight while in cycle mode focuses the search input and detaches the Ctrl-release commit; the switcher now stays open until Enter (commit), Esc (cancel), or a click; ArrowDown/Up navigate the list from either mode
+- **kbd hint updated** — hint row now shows `E cycle  Tab search  Esc close`
+- **scrollIntoView** — `updateFocus()` scrolls the highlighted item into view when the list overflows
+
 ## 2026-02-27 — Properties panel feature parity
 
 ### `canvas-plugins/config-panel-bpmn`
