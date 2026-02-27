@@ -1,5 +1,29 @@
 # Features
 
+## DMN Editor + Form Editor (2026-02-27) — `@bpmn-sdk/canvas-plugin-dmn-editor` + `@bpmn-sdk/canvas-plugin-form-editor`
+
+- **`@bpmn-sdk/canvas-plugin-dmn-editor`** — native editable decision table; zero external dependencies
+  - **`DmnEditor`** class with `loadXML(xml)`, `getXML()`, `onChange(handler)`, `destroy()` API
+  - Parses XML via `Dmn.parse`; serializes on demand via `Dmn.export`; model kept in memory
+  - Editable decision name + hit policy dropdown per decision
+  - Add / remove input columns, output columns, and rules (rows)
+  - Each cell is a `<textarea>` bound directly to the model; structural changes trigger full re-render from model
+  - CSS injected via `injectDmnEditorStyles()` — `--dme-*` CSS variables; dark default / `.light` override pattern
+
+- **`@bpmn-sdk/canvas-plugin-form-editor`** — native two-panel form component editor; zero external dependencies
+  - **`FormEditor`** class with `loadSchema(schema)`, `getSchema()`, `onChange(handler)`, `destroy()` API
+  - Parses schema via `Form.parse`; exports via `Form.export`
+  - Left panel: component list with type badge, label, up/down reorder, delete; nested containers shown indented
+  - Right panel: property editor for selected component (label, key, required, options list, etc.)
+  - "Add" dropdown grouped by Fields / Display / Advanced / Layout; all standard form component types supported
+  - CSS injected via `injectFormEditorStyles()` — `--fe-*` CSS variables; dark default / `.light` override pattern
+
+- **Tabs plugin wired for editing** — `@bpmn-sdk/canvas-plugin-tabs` mounts `DmnEditor` / `FormEditor`; `tab.config` kept in sync on every change
+  - **`onTabChange(tabId, config)`** callback — fires whenever a DMN or Form tab's content changes; used for auto-save
+  - Cleanup on tab close / `destroy()`
+
+- **Auto-save wired in landing app** — `onTabChange` triggers `storagePlugin.api.scheduleSave()` for DMN and Form tabs
+
 ## IndexedDB Storage Plugin (2026-02-26, overhauled 2026-02-27) — `@bpmn-sdk/canvas-plugin-storage`
 
 - **`@bpmn-sdk/canvas-plugin-storage`** — persists BPMN / DMN / Form files in the browser's IndexedDB in a `workspace → project → files` hierarchy

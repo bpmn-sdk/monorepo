@@ -133,6 +133,12 @@ importers:
         specifier: workspace:*
         version: link:../../packages/editor
 
+  canvas-plugins/dmn-editor:
+    dependencies:
+      '@bpmn-sdk/core':
+        specifier: workspace:*
+        version: link:../../packages/bpmn-sdk
+
   canvas-plugins/dmn-viewer:
     dependencies:
       '@bpmn-sdk/core':
@@ -150,6 +156,12 @@ importers:
       '@bpmn-sdk/feel':
         specifier: workspace:*
         version: link:../../packages/feel
+
+  canvas-plugins/form-editor:
+    dependencies:
+      '@bpmn-sdk/core':
+        specifier: workspace:*
+        version: link:../../packages/bpmn-sdk
 
   canvas-plugins/form-viewer:
     dependencies:
@@ -189,15 +201,15 @@ importers:
       '@bpmn-sdk/canvas':
         specifier: workspace:*
         version: link:../../packages/canvas
-      '@bpmn-sdk/canvas-plugin-dmn-viewer':
+      '@bpmn-sdk/canvas-plugin-dmn-editor':
         specifier: workspace:*
-        version: link:../dmn-viewer
+        version: link:../dmn-editor
       '@bpmn-sdk/canvas-plugin-feel-playground':
         specifier: workspace:*
         version: link:../feel-playground
-      '@bpmn-sdk/canvas-plugin-form-viewer':
+      '@bpmn-sdk/canvas-plugin-form-editor':
         specifier: workspace:*
-        version: link:../form-viewer
+        version: link:../form-editor
       '@bpmn-sdk/core':
         specifier: workspace:*
         version: link:../../packages/bpmn-sdk

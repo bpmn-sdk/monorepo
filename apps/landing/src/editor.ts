@@ -225,6 +225,17 @@ const tabsPlugin = createTabsPlugin({
 		a.click();
 		URL.revokeObjectURL(url);
 	},
+	onTabChange(tabId, _config) {
+		// Auto-save DMN/Form content when edited
+		const fileId = tabIdToStorageFileId.get(tabId);
+		if (!fileId) return;
+		// getAllTabContent() pulls the latest content from the editor via the parsed defs/form
+		const snapshots = tabsPlugin.api.getAllTabContent();
+		const snapshot = snapshots.find((s) => s.tabId === tabId);
+		if (snapshot) {
+			storagePlugin.api.scheduleSave(fileId, snapshot.content);
+		}
+	},
 });
 
 // ── File import logic ──────────────────────────────────────────────────────────

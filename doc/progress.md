@@ -1,5 +1,53 @@
 # Progress
 
+## 2026-02-27 — Native DMN + Form editors (zero external deps)
+
+Replaced `dmn-js` and `@bpmn-io/form-js-editor` with fully in-repo native implementations.
+
+### `canvas-plugins/dmn-editor`
+- **Rewrote `DmnEditor`** — native editable decision table; no external deps
+  - Parses XML once via `Dmn.parse`; serializes on demand via `Dmn.export`; model stays in memory during editing
+  - Editable name input + hit policy `<select>` per decision
+  - Add / remove input and output columns; add / remove rules (rows)
+  - Each cell is a `<textarea>` bound directly to the model entry; re-render only on structural changes
+  - New **`css.ts`** — `injectDmnEditorStyles()` injects scoped `--dme-*` CSS variables; same dark-default / `.light` override pattern as the viewer
+  - Removed `dmn-js` dependency; added `@bpmn-sdk/core: workspace:*`
+
+### `canvas-plugins/form-editor`
+- **Rewrote `FormEditor`** — native two-panel component editor; no external deps
+  - Parses schema via `Form.parse`; exports via `Form.export`
+  - Left panel: scrollable list of all components (flat + nested groups); click to select; up/down reorder; delete
+  - Right panel: property editor for selected component (label, key, required, options list, etc.)
+  - "Add" button opens a popup dropdown grouped by category (Fields / Display / Advanced / Layout)
+  - Supports all component types: `textfield`, `textarea`, `number`, `select`, `radio`, `checkbox`, `checklist`, `taglist`, `filepicker`, `datetime`, `expression`, `table`, `text`, `html`, `image`, `button`, `separator`, `spacer`, `iframe`, `group`, `dynamiclist`
+  - New **`css.ts`** — `injectFormEditorStyles()` injects scoped `--fe-*` CSS variables
+  - Removed `@bpmn-io/form-js-editor` dependency; added `@bpmn-sdk/core: workspace:*`
+
+### Other changes
+- **Root `package.json`** — removed `dmn-js` and `@bpmn-io/form-js-editor` from `dependencies`
+- **`apps/landing/src/editor.ts`** — removed the 6 CSS import lines for dmn-js / form-js-editor assets
+- **`canvas-plugins/tabs/tests/tabs-plugin.test.ts`** — removed `vi.mock` blocks; native DOM editors run fine in happy-dom
+
+## 2026-02-27 — DMN and Form editing
+
+### New packages
+- **`canvas-plugins/dmn-editor`** → `@bpmn-sdk/canvas-plugin-dmn-editor` — thin wrapper around `dmn-js` DmnModeler; exports `DmnEditor` class with `loadXML(xml)`, `getXML()`, `onChange(handler)`, and `destroy()` API; no TypeScript types shipped by dmn-js so uses `@ts-expect-error` import suppression
+- **`canvas-plugins/form-editor`** → `@bpmn-sdk/canvas-plugin-form-editor` — wraps `@bpmn-io/form-js-editor` FormEditor; exports `FormEditor` class with `loadSchema(schema)`, `getSchema()`, `onChange(handler)`, and `destroy()` API
+
+### `canvas-plugins/tabs`
+- **DMN tabs now editable** — replaces the read-only `DmnViewer` with `DmnEditor` (dmn-js DmnModeler); the editor is initialized with the XML exported from the tab's `DmnDefinitions`; on every `commandStack.changed` event the XML is re-exported, parsed back to `DmnDefinitions`, and stored in the tab config
+- **Form tabs now editable** — replaces the read-only `FormViewer` with `FormEditor` (`@bpmn-io/form-js-editor`); the editor is initialized with the JSON exported from the tab's `FormDefinition`; on every `changed` event the schema is exported, parsed, and stored in the tab config
+- **`onTabChange` callback** — new optional `TabsPluginOptions.onTabChange(tabId, config)` called whenever a DMN or Form tab's content changes; used by the landing app to trigger auto-save
+- **Dependency swap** — `@bpmn-sdk/canvas-plugin-dmn-viewer` and `@bpmn-sdk/canvas-plugin-form-viewer` removed from deps; `@bpmn-sdk/canvas-plugin-dmn-editor` and `@bpmn-sdk/canvas-plugin-form-editor` added
+- **Tests updated** — DMN fixture updated to correct `DmnDefinitions` structure (with proper `decisionTable` + namespace); editor packages mocked in tests so dmn-js/inferno rendering is skipped in happy-dom
+
+### `apps/landing`
+- **CSS assets** — dmn-js and form-js-editor CSS files imported as Vite side-effects at the top of `editor.ts`; `vite-env.d.ts` added with `/// <reference types="vite/client" />` so TypeScript accepts CSS imports
+- **Auto-save for DMN/Form** — `onTabChange` callback wired to `storagePlugin.api.scheduleSave()` so edits in the DMN or Form editor are auto-saved with the same 500 ms debounce as BPMN
+
+### Root
+- `dmn-js ^17.7.0` and `@bpmn-io/form-js-editor ^1.19.0` added to root `package.json` devDependencies
+
 ## 2026-02-27 — File switcher: Alt-Tab-style cycle mode
 
 ### `apps/landing`

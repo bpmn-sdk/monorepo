@@ -16,17 +16,20 @@ function makeContainer(): HTMLElement {
 const DMN_DEFS = {
 	id: "dmn1",
 	name: "My Decision",
-	namespace: "",
-	namespaces: {},
+	namespace: "http://bpmn.io/schema/dmn",
+	namespaces: { "": "https://www.omg.org/spec/DMN/20191111/MODEL/" },
 	modelerAttributes: {},
 	decisions: [
 		{
 			id: "dec1",
 			name: "Decide",
-			hitPolicy: "UNIQUE" as const,
-			inputs: [],
-			outputs: [],
-			rules: [],
+			decisionTable: {
+				id: "dt1",
+				hitPolicy: "UNIQUE" as const,
+				inputs: [],
+				outputs: [],
+				rules: [],
+			},
 		},
 	],
 };

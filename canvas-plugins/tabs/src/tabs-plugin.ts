@@ -1,10 +1,10 @@
 import type { CanvasApi, CanvasPlugin } from "@bpmn-sdk/canvas";
-import { DmnViewer } from "@bpmn-sdk/canvas-plugin-dmn-viewer";
+import { DmnEditor } from "@bpmn-sdk/canvas-plugin-dmn-editor";
 import {
 	buildFeelPlaygroundPanel,
 	injectPlaygroundStyles,
 } from "@bpmn-sdk/canvas-plugin-feel-playground";
-import { FormViewer } from "@bpmn-sdk/canvas-plugin-form-viewer";
+import { FormEditor } from "@bpmn-sdk/canvas-plugin-form-editor";
 import {
 	Bpmn,
 	type BpmnDefinitions,
@@ -29,8 +29,10 @@ interface TabState {
 	config: TabConfig;
 	pane: HTMLDivElement;
 	hasWarning: boolean;
-	dmnViewer?: DmnViewer;
-	formViewer?: FormViewer;
+	dmnEditor?: DmnEditor;
+	formEditor?: FormEditor;
+	offDmnChange?: () => void;
+	offFormChange?: () => void;
 }
 
 /** A recent project item shown in the welcome screen dropdown. */
@@ -101,6 +103,12 @@ export interface TabsPluginOptions {
 	 * dropdown button. Return null or an empty array to disable the button.
 	 */
 	getRecentProjects?: () => WelcomeRecentItem[] | null;
+	/**
+	 * Called whenever a DMN or Form tab's content changes (i.e. the user made an edit).
+	 * Use this to trigger auto-save for the active file. Not called for BPMN tabs
+	 * (use the `diagram:change` canvas event for those).
+	 */
+	onTabChange?: (tabId: string, config: TabConfig) => void;
 }
 
 /** A single example entry shown on the welcome screen. */
@@ -778,11 +786,43 @@ export function createTabsPlugin(options: TabsPluginOptions = {}): CanvasPlugin 
 		tab.pane = pane;
 
 		if (tab.config.type === "dmn") {
-			tab.dmnViewer = new DmnViewer({ container: pane, theme });
-			tab.dmnViewer.load(tab.config.defs);
+			const editor = new DmnEditor({ container: pane });
+			tab.dmnEditor = editor;
+			const xml = Dmn.export(tab.config.defs);
+			void editor.loadXML(xml);
+			tab.offDmnChange = editor.onChange(() => {
+				void (async () => {
+					const newXml = await editor.getXML();
+					if (tab.config.type === "dmn") {
+						try {
+							tab.config = { type: "dmn", defs: Dmn.parse(newXml), name: tab.config.name };
+						} catch {
+							// keep old defs if parse fails
+						}
+						options.onTabChange?.(tab.id, tab.config);
+					}
+				})();
+			});
 		} else if (tab.config.type === "form") {
-			tab.formViewer = new FormViewer({ container: pane, theme });
-			tab.formViewer.load(tab.config.form);
+			const editor = new FormEditor({ container: pane });
+			tab.formEditor = editor;
+			const schema = JSON.parse(Form.export(tab.config.form)) as Record<string, unknown>;
+			void editor.loadSchema(schema);
+			tab.offFormChange = editor.onChange(() => {
+				if (tab.config.type === "form") {
+					const newSchema = editor.getSchema();
+					try {
+						tab.config = {
+							type: "form",
+							form: Form.parse(JSON.stringify(newSchema)),
+							name: tab.config.name,
+						};
+					} catch {
+						// keep old form if parse fails
+					}
+					options.onTabChange?.(tab.id, tab.config);
+				}
+			});
 		} else if (tab.config.type === "feel") {
 			injectPlaygroundStyles();
 			pane.appendChild(buildFeelPlaygroundPanel(undefined, tab.config.expression));
@@ -791,9 +831,8 @@ export function createTabsPlugin(options: TabsPluginOptions = {}): CanvasPlugin 
 		// shows through. pointer-events are set to none in setActiveTab.
 	}
 
-	function applyThemeToTab(tab: TabState): void {
-		tab.dmnViewer?.setTheme(theme);
-		tab.formViewer?.setTheme(theme);
+	function applyThemeToTab(_tab: TabState): void {
+		// dmn-js and form-js-editor handle their own theming
 	}
 
 	function showWarning(tab: TabState, show: boolean): void {
@@ -883,8 +922,10 @@ export function createTabsPlugin(options: TabsPluginOptions = {}): CanvasPlugin 
 			const [tab] = tabs.splice(idx, 1);
 			if (!tab) return;
 
-			tab.dmnViewer?.destroy();
-			tab.formViewer?.destroy();
+			tab.offDmnChange?.();
+			tab.offFormChange?.();
+			tab.dmnEditor?.destroy();
+			tab.formEditor?.destroy();
 			tab.pane.remove();
 
 			if (tab.config.type === "bpmn") {
@@ -911,8 +952,10 @@ export function createTabsPlugin(options: TabsPluginOptions = {}): CanvasPlugin 
 			bpmnProcessNames.clear();
 			isRawMode = false;
 			for (const tab of [...tabs]) {
-				tab.dmnViewer?.destroy();
-				tab.formViewer?.destroy();
+				tab.offDmnChange?.();
+				tab.offFormChange?.();
+				tab.dmnEditor?.destroy();
+				tab.formEditor?.destroy();
 				tab.pane.remove();
 			}
 			tabs.length = 0;
@@ -1211,8 +1254,10 @@ export function createTabsPlugin(options: TabsPluginOptions = {}): CanvasPlugin 
 			bpmnProcessToTabId.clear();
 			bpmnProcessNames.clear();
 			for (const tab of tabs) {
-				tab.dmnViewer?.destroy();
-				tab.formViewer?.destroy();
+				tab.offDmnChange?.();
+				tab.offFormChange?.();
+				tab.dmnEditor?.destroy();
+				tab.formEditor?.destroy();
 			}
 			tabs.length = 0;
 			activeId = null;
