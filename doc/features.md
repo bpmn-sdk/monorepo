@@ -1,13 +1,14 @@
 # Features
 
-## IndexedDB Storage Plugin (2026-02-26, overhauled 2026-02-26) — `@bpmn-sdk/canvas-plugin-storage`
+## IndexedDB Storage Plugin (2026-02-26, overhauled 2026-02-27) — `@bpmn-sdk/canvas-plugin-storage`
 
 - **`@bpmn-sdk/canvas-plugin-storage`** — persists BPMN / DMN / Form files in the browser's IndexedDB in a `workspace → project → files` hierarchy
   - **Native IndexedDB** — zero-dependency wrapper; supports `get/add/update/delete`, `orderBy`, `where().equals()` with `toArray/sortBy/delete`, and `filter`
   - **5 record types**: `WorkspaceRecord`, `ProjectRecord`, `FileRecord` (with `isShared` and `gitPath`), `FileContentRecord`
-  - **Auto-save** — 500 ms debounce triggered by `diagram:change`; forced flush on page hide / `beforeunload`; multi-tab safe
+  - **Auto-save** — 500 ms debounce triggered by `diagram:change`; forced flush on page hide / `beforeunload`; multi-tab safe; bumps project `updatedAt` on each save
   - **Main-menu integration** — workspace/project navigation via drill-down menu (no sidebar); "Open Project", "Save All to Project", "Leave Project" actions in the ⋮ menu
-  - **Project persistence** — last-opened project restored on page refresh via `localStorage`; title updated to `workspace / project`
+  - **Welcome screen on load** — always shows welcome screen on startup; no auto-restore; `getRecentProjects()` provides top-10 recently-saved projects for the welcome dropdown
+  - **`onLeaveProject` callback** — called when "Leave" is clicked; wired to close all tabs and show the welcome screen
   - **Shared files** — any file can be marked `isShared: true` to make it accessible for cross-workspace reference resolution
   - **GitHub-sync ready** — every `FileRecord` carries a `gitPath: string | null` field reserved for future bidirectional GitHub sync
   - **`createStoragePlugin(options)`** returns `CanvasPlugin & { api: StorageApi }`; requires `mainMenu` and `getOpenTabs` options
@@ -39,9 +40,10 @@
   - `buildFeelPlaygroundPanel(onClose?)` exported for embedding in any container; `createFeelPlaygroundPlugin()` retained as a standalone overlay variant
 - **`@bpmn-sdk/canvas-plugin-dmn-viewer` migration** — `feel.ts` now re-exports from `@bpmn-sdk/feel`; DMN cell highlighting uses the full FEEL highlighter
 
-## Welcome Screen Examples (2026-02-26) — `@bpmn-sdk/canvas-plugin-tabs` + `apps/landing`
+## Welcome Screen Examples (2026-02-26, updated 2026-02-27) — `@bpmn-sdk/canvas-plugin-tabs` + `apps/landing`
 
-- **Dynamic sections on welcome screen** — `getWelcomeSections` option accepts a `() => WelcomeSection[]`; rebuilt on each show; used to surface workspace/project/file links from storage
+- **"Open recent" dropdown** — `getRecentProjects` option renders a dropdown button below "Import files…"; shows up to 10 most recently saved projects (Workspace / Project format); disabled when none; rebuilt on each welcome screen show
+- **Dynamic sections on welcome screen** — `getWelcomeSections` option accepts a `() => WelcomeSection[]`; rebuilt on each show
 - **Example entries on welcome screen** — the `examples` option accepts a `WelcomeExample[]`; each entry has a badge (BPMN / DMN / FORM / MULTI), label, optional description, and an `onOpen()` callback
 - **4 built-in examples in the landing app**:
   - *Order Validation* (BPMN) — linear service-task flow
@@ -49,9 +51,11 @@
   - *Support Ticket* (FORM) — subject, category, priority, description, attachment
   - *Loan Application Flow* (MULTI) — BPMN + Credit Risk DMN + Application Form; opens all three tabs and registers resources in the resolver
 
-## Welcome Screen + Grouped Tabs (2026-02-26) — `@bpmn-sdk/canvas-plugin-tabs`
+## Welcome Screen + Grouped Tabs (2026-02-26, updated 2026-02-27) — `@bpmn-sdk/canvas-plugin-tabs`
 
-- **Welcome screen** — shown when no tabs are open; centered card with BPMN icon, title, "New diagram" and "Import files…" buttons; theme-aware (light/dark); `onNewDiagram` / `onImportFiles` option callbacks
+- **Welcome screen** — shown when no tabs are open (and always on initial load); centered card with BPMN icon, title, "New diagram", "Import files…", and optional "Open recent" dropdown button; theme-aware (light/dark); `onNewDiagram` / `onImportFiles` / `onWelcomeShow` option callbacks
+- **Plugin-managed tab XML** — subscribes to `diagram:change` internally; keeps `tab.config.xml` up to date for all open BPMN tabs; eliminates the need for client apps to track per-tab XML manually
+- **Plugin-managed process tracking** — automatically parses BPMN XML on `openTab` and `diagram:change`; exposes `navigateToProcess(id)`, `getAvailableProcesses()`, `getAllTabContent()`, `closeAllTabs()` on `TabsApi`
 - **Grouped tabs** — at most 3 tabs in the bar (one per type: BPMN, DMN, FORM); each group tab shows the active file name and a type badge; chevron opens a dropdown listing all files of that type; per-file close buttons in dropdown; close button on tab itself when group has only one file
 
 ## Multi-file Import + Tab Navigation in Editor (2026-02-26) — `apps/landing` + `canvas-plugins/*`

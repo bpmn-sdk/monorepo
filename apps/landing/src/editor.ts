@@ -4,9 +4,7 @@ import { createConfigPanelPlugin } from "@bpmn-sdk/canvas-plugin-config-panel";
 import { createConfigPanelBpmnPlugin } from "@bpmn-sdk/canvas-plugin-config-panel-bpmn";
 import { createMainMenuPlugin } from "@bpmn-sdk/canvas-plugin-main-menu";
 import { createStoragePlugin } from "@bpmn-sdk/canvas-plugin-storage";
-import type { FileType } from "@bpmn-sdk/canvas-plugin-storage";
 import { InMemoryFileResolver, createTabsPlugin } from "@bpmn-sdk/canvas-plugin-tabs";
-import type { WelcomeSection } from "@bpmn-sdk/canvas-plugin-tabs";
 import { createWatermarkPlugin } from "@bpmn-sdk/canvas-plugin-watermark";
 import { createZoomControlsPlugin } from "@bpmn-sdk/canvas-plugin-zoom-controls";
 import { Bpmn, Dmn, Form } from "@bpmn-sdk/core";
@@ -99,21 +97,8 @@ if (!editorContainer) throw new Error("missing #editor-container");
 // File resolver — shared between the tabs plugin and the config panel callbacks
 const resolver = new InMemoryFileResolver();
 
-// Maps BPMN process IDs to the tab ID that holds that process, for navigation.
-const bpmnProcessToTabId = new Map<string, string>();
-// Maps BPMN process IDs to the process name, for display in the call activity picker.
-const bpmnProcessNames = new Map<string, string>();
-
 // Maps tab ID → storage file ID for tabs opened from the storage plugin.
 const tabIdToStorageFileId = new Map<string, string>();
-
-// Tracks latest content of each open tab for "Save All to Project"
-const openTabConfigs = new Map<string, { name: string; type: FileType; content: string }>();
-
-// Tracks the current BPMN XML per tab (updated on every diagram:change).
-// Used so reactivating a tab restores the latest edited content, not the original.
-const tabCurrentXml = new Map<string, string>();
-let activeBpmnTabId: string | null = null;
 
 let editorRef: BpmnEditor | null = null;
 
@@ -135,34 +120,19 @@ const tabsPlugin = createTabsPlugin({
 	get examples() {
 		return makeExamples(tabsPlugin.api, resolver);
 	},
-	getWelcomeSections(): WelcomeSection[] {
-		const workspaces = storagePlugin.api.getCachedWorkspaces();
-		const items: Array<{ label: string; description: string; onOpen: () => void }> = [];
-		for (const ws of workspaces) {
-			for (const proj of storagePlugin.api.getCachedProjects(ws.id)) {
-				const wsName = ws.name;
-				const projName = proj.name;
-				const projId = proj.id;
-				items.push({
-					label: projName,
-					description: wsName,
-					onOpen: () => {
-						void storagePlugin.api.openProject(projId).then(() => {
-							mainMenuPlugin.api.setTitle(`${wsName} / ${projName}`);
-						});
-					},
+	getRecentProjects() {
+		return storagePlugin.api.getRecentProjects().map(({ project, workspace }) => ({
+			label: project.name,
+			description: workspace.name,
+			onOpen: () => {
+				void storagePlugin.api.openProject(project.id).then(() => {
+					mainMenuPlugin.api.setTitle(`${workspace.name} / ${project.name}`);
 				});
-			}
-		}
-		if (items.length === 0) return [];
-		return [{ label: "Projects", getItems: () => items }];
+			},
+		}));
 	},
 	onNewDiagram() {
-		const tabId = tabsPlugin.api.openTab({ type: "bpmn", xml: SAMPLE_XML, name: "New Diagram" });
-		for (const proc of Bpmn.parse(SAMPLE_XML).processes) {
-			bpmnProcessToTabId.set(proc.id, tabId);
-			bpmnProcessNames.set(proc.id, proc.name ?? proc.id);
-		}
+		tabsPlugin.api.openTab({ type: "bpmn", xml: SAMPLE_XML, name: "New Diagram" });
 	},
 	onImportFiles() {
 		fileInput.click();
@@ -176,26 +146,10 @@ const tabsPlugin = createTabsPlugin({
 		// Restore all HUDs and the main menu when any tab is active
 		setHudVisible(true);
 
+		// The tabs plugin keeps config.xml up to date on every diagram:change,
+		// so we always load the current content when switching tabs.
 		if (config.type === "bpmn" && config.xml) {
-			activeBpmnTabId = id;
-			// Use the latest edited XML if the tab has been modified, otherwise fall back to
-			// the original config.xml (e.g. on first activation after opening from storage).
-			const xml = tabCurrentXml.get(id) ?? config.xml;
-			editorRef?.load(xml);
-			// Snapshot current content for "Save All to Project"
-			openTabConfigs.set(id, { name: config.name ?? "Diagram", type: "bpmn", content: xml });
-		} else if (config.type === "dmn") {
-			openTabConfigs.set(id, {
-				name: config.name ?? "Decision",
-				type: "dmn",
-				content: Dmn.export(config.defs),
-			});
-		} else if (config.type === "form") {
-			openTabConfigs.set(id, {
-				name: config.name ?? "Form",
-				type: "form",
-				content: Form.export(config.form),
-			});
+			editorRef?.load(config.xml);
 		}
 
 		// Update storage current-file pointer — ensures auto-save targets the right file
@@ -248,12 +202,8 @@ async function importFiles(files: FileList | File[]): Promise<void> {
 			const text = await file.text();
 
 			if (ext === ".bpmn" || ext === ".xml") {
-				const bpmnDefs = Bpmn.parse(text);
-				const tabId = tabsPlugin.api.openTab({ type: "bpmn", xml: text, name });
-				for (const proc of bpmnDefs.processes) {
-					bpmnProcessToTabId.set(proc.id, tabId);
-					bpmnProcessNames.set(proc.id, proc.name ?? proc.id);
-				}
+				Bpmn.parse(text); // validate — throws on malformed XML
+				tabsPlugin.api.openTab({ type: "bpmn", xml: text, name });
 			} else if (ext === ".dmn") {
 				const defs = Dmn.parse(text);
 				resolver.registerDmn(defs);
@@ -319,8 +269,10 @@ const mainMenuPlugin = createMainMenuPlugin({
 
 const storagePlugin = createStoragePlugin({
 	mainMenu: mainMenuPlugin,
-	getOpenTabs: () => [...openTabConfigs.entries()].map(([tabId, v]) => ({ tabId, ...v })),
+	getOpenTabs: () => tabsPlugin.api.getAllTabContent(),
 	initialTitle: "BPMN SDK",
+	onLeaveProject: () => tabsPlugin.api.closeAllTabs(),
+	onReady: () => tabsPlugin.api.refreshWelcomeScreen(),
 	onOpenFile(file, content) {
 		if (file.type === "bpmn") {
 			const tabId = tabsPlugin.api.openTab({ type: "bpmn", xml: content, name: file.name });
@@ -328,14 +280,6 @@ const storagePlugin = createStoragePlugin({
 			// onTabActivate fires synchronously inside openTab before the map is set,
 			// so we correct currentFileId explicitly here.
 			storagePlugin.api.setCurrentFileId(file.id);
-			try {
-				for (const proc of Bpmn.parse(content).processes) {
-					bpmnProcessToTabId.set(proc.id, tabId);
-					bpmnProcessNames.set(proc.id, proc.name ?? proc.id);
-				}
-			} catch {
-				// malformed XML — tab still opens
-			}
 		} else if (file.type === "dmn") {
 			try {
 				const defs = Dmn.parse(content);
@@ -385,20 +329,12 @@ const configPanel = createConfigPanelPlugin({
 const configPanelBpmn = createConfigPanelBpmnPlugin(configPanel, {
 	openDecision: (decisionId) => tabsPlugin.api.openDecision(decisionId),
 	openForm: (formId) => tabsPlugin.api.openForm(formId),
-	openProcess: (processId) => {
-		const tabId = bpmnProcessToTabId.get(processId);
-		if (tabId && tabsPlugin.api.getTabIds().includes(tabId)) {
-			tabsPlugin.api.setActiveTab(tabId);
-		}
-	},
-	getAvailableProcesses: () =>
-		[...bpmnProcessToTabId.keys()].map((id) => ({ id, name: bpmnProcessNames.get(id) })),
+	openProcess: (processId) => tabsPlugin.api.navigateToProcess(processId),
+	getAvailableProcesses: () => tabsPlugin.api.getAvailableProcesses(),
 	createProcess: (name, onCreated) => {
 		const processId = `Process_${Math.random().toString(36).slice(2, 9)}`;
 		const xml = makeEmptyBpmnXml(processId, name);
-		const tabId = tabsPlugin.api.openTab({ type: "bpmn", xml, name });
-		bpmnProcessToTabId.set(processId, tabId);
-		bpmnProcessNames.set(processId, name);
+		tabsPlugin.api.openTab({ type: "bpmn", xml, name });
 		onCreated(processId);
 	},
 	openFeelPlayground: (expression) => {
@@ -439,21 +375,6 @@ const editor = new BpmnEditor({
 });
 editorRef = editor;
 
-// Keep tabCurrentXml and openTabConfigs in sync with every edit so that
-// switching back to a BPMN tab always restores the latest content.
-editor.on("diagram:change", (defs) => {
-	if (activeBpmnTabId === null) return;
-	const xml = Bpmn.export(defs);
-	tabCurrentXml.set(activeBpmnTabId, xml);
-	const tab = openTabConfigs.get(activeBpmnTabId);
-	if (tab) openTabConfigs.set(activeBpmnTabId, { ...tab, content: xml });
-});
-
 initEditorHud(editor, {
-	openProcess: (processId) => {
-		const tabId = bpmnProcessToTabId.get(processId);
-		if (tabId && tabsPlugin.api.getTabIds().includes(tabId)) {
-			tabsPlugin.api.setActiveTab(tabId);
-		}
-	},
+	openProcess: (processId) => tabsPlugin.api.navigateToProcess(processId),
 });

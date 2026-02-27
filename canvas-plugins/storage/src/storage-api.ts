@@ -316,7 +316,43 @@ export class StorageApi {
 		} else {
 			await db.fileContents.add({ fileId, content, version: 1 });
 		}
-		await db.files.update(fileId, { updatedAt: now() });
+		const ts = now();
+		await db.files.update(fileId, { updatedAt: ts });
+		// Bump project's updatedAt so it sorts correctly in getRecentProjects
+		if (this._currentProjectId !== null) {
+			await db.projects.update(this._currentProjectId, { updatedAt: ts });
+			this._updateProjectCacheTimestamp(this._currentProjectId, ts);
+		}
+	}
+
+	private _updateProjectCacheTimestamp(projectId: string, ts: number): void {
+		for (const [wsId, projects] of this._projects) {
+			const idx = projects.findIndex((p) => p.id === projectId);
+			if (idx === -1) continue;
+			this._projects.set(
+				wsId,
+				projects.map((p) => (p.id === projectId ? { ...p, updatedAt: ts } : p)),
+			);
+			break;
+		}
+	}
+
+	// ─── Recent projects ─────────────────────────────────────────────────────────
+
+	/**
+	 * Returns up to 10 projects sorted by most recently saved (descending).
+	 * Uses the in-memory cache — call after `initialize()` completes.
+	 */
+	getRecentProjects(): Array<{ project: ProjectRecord; workspace: WorkspaceRecord }> {
+		const result: Array<{ project: ProjectRecord; workspace: WorkspaceRecord }> = [];
+		for (const [wsId, projects] of this._projects) {
+			const ws = this._workspaces.find((w) => w.id === wsId);
+			if (!ws) continue;
+			for (const p of projects) {
+				result.push({ project: p, workspace: ws });
+			}
+		}
+		return result.sort((a, b) => b.project.updatedAt - a.project.updatedAt).slice(0, 10);
 	}
 
 	// ─── Change listeners ─────────────────────────────────────────────────────────

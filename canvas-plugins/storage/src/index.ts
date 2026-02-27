@@ -25,6 +25,10 @@ export interface StoragePluginOptions extends StorageApiOptions {
 	getOpenTabs(): Array<{ tabId: string; name: string; type: FileType; content: string }>;
 	/** Title to restore when leaving a project. Defaults to "". */
 	initialTitle?: string;
+	/** Called when the user clicks "Leave" in the project info bar. */
+	onLeaveProject?: () => void;
+	/** Called after the IndexedDB caches have finished loading. Use this to refresh any UI that depends on storage data (e.g. the recent-projects dropdown). */
+	onReady?: () => void;
 }
 
 /**
@@ -155,6 +159,7 @@ export function createStoragePlugin(
 				onAction: () => {
 					storageApi.setCurrentProjectId(null);
 					options.mainMenu.api.setTitle(options.initialTitle ?? "");
+					options.onLeaveProject?.();
 				},
 			});
 			items.push({ type: "separator" });
@@ -195,20 +200,11 @@ export function createStoragePlugin(
 			// Register dynamic items supplier
 			options.mainMenu.api.setDynamicItems(buildDynamicItems);
 
-			// Initialize: load caches and restore last-opened project
-			void storageApi.initialize().then((files) => {
-				const projectId = storageApi.getCurrentProjectId();
-				if (files && projectId) {
-					const label = getProjectLabel(projectId);
-					if (label !== "Project") {
-						options.mainMenu.api.setTitle(label);
-					}
-					// Files already opened via onOpenFile callbacks inside openProject
-					// But initialize() just returns them — call openFile for each
-					for (const file of files) {
-						void storageApi.openFile(file.id);
-					}
-				}
+			// Load caches so getCachedWorkspaces / getRecentProjects work immediately.
+			// Do NOT auto-restore the last project — always show the welcome screen.
+			void storageApi.initialize().then(() => {
+				storageApi.setCurrentProjectId(null);
+				options.onReady?.();
 			});
 
 			// Rebuild dynamic items next time menu opens when data changes

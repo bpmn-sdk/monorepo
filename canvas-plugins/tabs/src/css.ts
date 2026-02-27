@@ -250,6 +250,16 @@ export const TABS_CSS = `
   border-color: var(--welcome-btn-secondary-border);
 }
 .bpmn-welcome-btn.secondary:hover { opacity: 0.8; }
+.bpmn-welcome-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.bpmn-welcome-btn:disabled:hover { opacity: 0.4; }
+
+.bpmn-welcome-recent-list {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 4px;
+}
 
 .bpmn-welcome-divider {
   width: 100%;

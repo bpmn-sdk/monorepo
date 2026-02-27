@@ -1,5 +1,27 @@
 # Progress
 
+## 2026-02-27 — Leave workspace, recent projects dropdown, plugin-managed tab XML/processes
+
+### `canvas-plugins/tabs`
+- **`closeAllTabs()`** — new `TabsApi` method that closes all tabs without a confirmation dialog and shows the welcome screen
+- **`navigateToProcess(processId)`** — new `TabsApi` method; the plugin now internally tracks which BPMN process is in which tab (populated when `openTab` is called and updated on `diagram:change`)
+- **`getAvailableProcesses()`** — new `TabsApi` method; returns all tracked process IDs with display names
+- **`getAllTabContent()`** — new `TabsApi` method; returns serialized content (XML / DMN / Form JSON) for all non-FEEL tabs; BPMN tabs use the current (post-edit) XML
+- **Auto XML tracking** — subscribes to `diagram:change` in `install()`; updates the active BPMN tab's `config.xml` in place so `onTabActivate` always receives the latest content
+- **"Open recent" dropdown** — new `getRecentProjects` option on `TabsPluginOptions`; when provided, renders a dropdown button below "Import files…" on the welcome screen; disabled when no projects available; rebuilt each time the welcome screen is shown
+- Exported new types: `WelcomeRecentItem`, `TabContentSnapshot`
+
+### `canvas-plugins/storage`
+- **`onLeaveProject` option** — called when the user clicks "Leave" in the project info bar; used by the landing app to close all tabs and show the welcome screen
+- **No auto-restore on load** — `install()` no longer opens last-project files on startup; the welcome screen is always shown initially; `getRecentProjects()` enables explicit re-opening
+- **`StorageApi.getRecentProjects()`** — returns top 10 projects sorted by `updatedAt` (most recently saved first), including workspace info; uses in-memory cache
+- **Project `updatedAt` bumped on auto-save** — `_persistContent` now also updates the project's `updatedAt` timestamp and in-memory cache entry so `getRecentProjects()` stays sorted
+
+### `apps/landing`
+- **"Leave Workspace" → welcome screen** — wired `onLeaveProject: () => tabsPlugin.api.closeAllTabs()`
+- **Simplified `editor.ts`** — removed `tabCurrentXml`, `activeBpmnTabId`, `openTabConfigs`, `bpmnProcessToTabId`, `bpmnProcessNames` maps; removed `diagram:change` subscription; replaced `getOpenTabs` with `tabsPlugin.api.getAllTabContent()`; replaced manual process navigation with `tabsPlugin.api.navigateToProcess()` and `tabsPlugin.api.getAvailableProcesses()`
+- `getWelcomeSections` replaced by `getRecentProjects` (dropdown shows 10 most recently saved projects)
+
 ## 2026-02-27 — Remove Dexie dependency; fix auto-save tab content reset
 
 ### `canvas-plugins/storage`

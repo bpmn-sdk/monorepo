@@ -16,6 +16,8 @@ export type {
 	WelcomeExample,
 	WelcomeSection,
 	WelcomeSectionItem,
+	WelcomeRecentItem,
+	TabContentSnapshot,
 } from "./tabs-plugin.js";
 export { InMemoryFileResolver } from "./file-resolver.js";
 export type { FileResolver, ResolvedFile } from "./file-resolver.js";
