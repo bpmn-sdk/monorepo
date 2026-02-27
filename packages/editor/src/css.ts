@@ -96,7 +96,7 @@ export const EDITOR_CSS = `
   cursor: pointer;
 }
 
-/* Edge hover dot (segment drag / waypoint insertion indicator) */
+/* Edge hover dot (waypoint insertion indicator) */
 .bpmn-edge-hover-dot {
   fill: #0066cc;
   stroke: #fff;
@@ -105,6 +105,16 @@ export const EDITOR_CSS = `
   opacity: 0.85;
 }
 [data-theme="dark"] .bpmn-edge-hover-dot { fill: #4c8ef7; }
+
+/* Edge waypoint angle balls (visible on edge hover) */
+.bpmn-edge-waypoint-ball {
+  fill: #0066cc;
+  stroke: #fff;
+  stroke-width: 1.5;
+  cursor: move;
+}
+.bpmn-edge-waypoint-ball:hover { fill: #0052a3; }
+[data-theme="dark"] .bpmn-edge-waypoint-ball { fill: #4c8ef7; }
 
 /* Edge endpoint drag handles */
 .bpmn-edge-endpoint {

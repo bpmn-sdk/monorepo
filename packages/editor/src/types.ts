@@ -93,7 +93,8 @@ export type HitResult =
 	| { type: "port"; shapeId: string; port: PortDir }
 	| { type: "edge"; id: string }
 	| { type: "edge-endpoint"; edgeId: string; isStart: boolean }
-	| { type: "edge-segment"; id: string; segIdx: number; isHoriz: boolean; projPt: DiagPoint };
+	| { type: "edge-segment"; id: string; segIdx: number; isHoriz: boolean; projPt: DiagPoint }
+	| { type: "edge-waypoint"; id: string; wpIdx: number; pt: DiagPoint };
 
 export interface DiagPoint {
 	x: number;

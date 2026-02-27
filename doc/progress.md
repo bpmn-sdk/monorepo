@@ -1,5 +1,15 @@
 # Progress
 
+## 2026-02-27 — Edge waypoint interaction redesign
+
+### `packages/editor`
+- **Waypoint angle balls** — hovering over any edge now shows blue circles (`bpmn-edge-waypoint-ball`) at every intermediate waypoint (bend point); visible only on hover, hidden when cursor leaves; new SVG layer `_edgeWaypointsG` in `OverlayRenderer`; `setEdgeWaypointBalls(waypoints, edgeId)` method added
+- **Move existing waypoints** — clicking and dragging a waypoint ball moves the bend point; `HitResult` extended with `edge-waypoint { id, wpIdx, pt }` variant; state machine states `pointing-edge-waypoint` and `dragging-edge-waypoint` added; `previewWaypointMove` / `commitWaypointMove` / `cancelWaypointMove` callbacks
+- **Collinear waypoint removal** — after every waypoint insert or move, `removeCollinearWaypoints()` runs and removes any intermediate waypoint that lies exactly on the straight line between its neighbours; prevents accumulation of redundant bend points
+- **Segment drag simplified** — removed direction-based disambiguation; dragging any edge segment always inserts a new waypoint (no more segment-shift mode); `dragging-edge-segment` state, `previewSegmentMove` / `commitSegmentMove` / `cancelSegmentMove` callbacks, and `setCursor` callback all removed
+- **`HitResult` & `Callbacks`** — `edge-waypoint` type added; `previewSegmentMove`, `commitSegmentMove`, `cancelSegmentMove`, `setCursor` removed from `Callbacks`; waypoint move and ball show/hide callbacks added
+- **`modeling.ts` additions** — `moveEdgeWaypoint(defs, edgeId, wpIdx, pt)` and `removeCollinearWaypoints(defs, edgeId)`
+
 ## 2026-02-27 — Edge improvements, raw mode button relocation, obstacle routing
 
 ### `canvas-plugins/tabs`

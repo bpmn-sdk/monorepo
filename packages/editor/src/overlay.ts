@@ -40,6 +40,7 @@ export class OverlayRenderer {
 	private readonly _endpointGhostG: SVGGElement;
 	private readonly _spaceG: SVGGElement;
 	private readonly _edgeHoverDotG: SVGGElement;
+	private readonly _edgeWaypointsG: SVGGElement;
 
 	constructor(overlayGroup: SVGGElement, markerId: string) {
 		this._g = overlayGroup;
@@ -58,6 +59,7 @@ export class OverlayRenderer {
 		this._edgeEndpointsG = svgEl("g");
 		this._spaceG = svgEl("g");
 		this._edgeHoverDotG = svgEl("g");
+		this._edgeWaypointsG = svgEl("g");
 
 		this._g.appendChild(this._spaceG);
 		this._g.appendChild(this._boundaryHostG);
@@ -70,6 +72,7 @@ export class OverlayRenderer {
 		this._g.appendChild(this._distG);
 		this._g.appendChild(this._selectionG);
 		this._g.appendChild(this._portsG);
+		this._g.appendChild(this._edgeWaypointsG);
 		this._g.appendChild(this._edgeEndpointsG);
 		this._g.appendChild(this._edgeHoverDotG);
 	}
@@ -403,6 +406,28 @@ export class OverlayRenderer {
 		const circle = svgEl("circle");
 		attr(circle, { class: "bpmn-edge-hover-dot", cx: pt.x, cy: pt.y, r: 4 });
 		this._edgeHoverDotG.appendChild(circle);
+	}
+
+	// ── Edge waypoint balls ────────────────────────────────────────────
+
+	setEdgeWaypointBalls(waypoints: BpmnWaypoint[] | null, edgeId: string | null): void {
+		this._edgeWaypointsG.innerHTML = "";
+		if (!waypoints || !edgeId || waypoints.length < 3) return;
+		for (let i = 1; i < waypoints.length - 1; i++) {
+			const wp = waypoints[i];
+			if (!wp) continue;
+			const circle = svgEl("circle");
+			attr(circle, {
+				class: "bpmn-edge-waypoint-ball",
+				"data-bpmn-waypoint": "",
+				"data-bpmn-waypoint-idx": i,
+				"data-bpmn-id": edgeId,
+				cx: wp.x,
+				cy: wp.y,
+				r: 5,
+			});
+			this._edgeWaypointsG.appendChild(circle);
+		}
 	}
 
 	// ── Boundary host highlight ────────────────────────────────────────

@@ -43,9 +43,10 @@ import {
 	deleteElements,
 	insertEdgeWaypoint,
 	insertShapeOnEdge,
-	moveEdgeSegment,
+	moveEdgeWaypoint,
 	moveShapes,
 	pasteElements,
+	removeCollinearWaypoints,
 	resizeShape,
 	updateEdgeEndpoint,
 	updateLabel,
@@ -416,19 +417,6 @@ export class BpmnEditor {
 					this._overlay.setEdgeEndpoints(edge?.edge.waypoints ?? null, this._selectedEdgeId);
 				}
 			},
-			previewSegmentMove: (edgeId, segIdx, isHoriz, delta) => {
-				if (!this._defs) return;
-				const preview = moveEdgeSegment(this._defs, edgeId, segIdx, isHoriz, delta);
-				const edge = preview.diagrams[0]?.plane.edges.find((e) => e.bpmnElement === edgeId);
-				this._overlay.setEndpointDragGhost(edge?.waypoints ?? null);
-			},
-			commitSegmentMove: (edgeId, segIdx, isHoriz, delta) => {
-				this._overlay.setEndpointDragGhost(null);
-				this._executeCommand((d) => moveEdgeSegment(d, edgeId, segIdx, isHoriz, delta));
-			},
-			cancelSegmentMove: () => {
-				this._overlay.setEndpointDragGhost(null);
-			},
 			previewWaypointInsert: (edgeId, segIdx, pt) => {
 				if (!this._defs) return;
 				const preview = insertEdgeWaypoint(this._defs, edgeId, segIdx, pt);
@@ -437,19 +425,40 @@ export class BpmnEditor {
 			},
 			commitWaypointInsert: (edgeId, segIdx, pt) => {
 				this._overlay.setEndpointDragGhost(null);
-				this._executeCommand((d) => insertEdgeWaypoint(d, edgeId, segIdx, pt));
+				this._executeCommand((d) =>
+					removeCollinearWaypoints(insertEdgeWaypoint(d, edgeId, segIdx, pt), edgeId),
+				);
 			},
 			cancelWaypointInsert: () => {
 				this._overlay.setEndpointDragGhost(null);
 			},
-			setCursor: (cursor) => {
-				this._svg.style.cursor = cursor ?? "";
+			previewWaypointMove: (edgeId, wpIdx, pt) => {
+				if (!this._defs) return;
+				const preview = moveEdgeWaypoint(this._defs, edgeId, wpIdx, pt);
+				const edge = preview.diagrams[0]?.plane.edges.find((e) => e.bpmnElement === edgeId);
+				this._overlay.setEndpointDragGhost(edge?.waypoints ?? null);
+			},
+			commitWaypointMove: (edgeId, wpIdx, pt) => {
+				this._overlay.setEndpointDragGhost(null);
+				this._executeCommand((d) =>
+					removeCollinearWaypoints(moveEdgeWaypoint(d, edgeId, wpIdx, pt), edgeId),
+				);
+			},
+			cancelWaypointMove: () => {
+				this._overlay.setEndpointDragGhost(null);
 			},
 			showEdgeHoverDot: (pt) => {
 				this._overlay.setEdgeHoverDot(pt);
 			},
 			hideEdgeHoverDot: () => {
 				this._overlay.setEdgeHoverDot(null);
+			},
+			showEdgeWaypointBalls: (edgeId) => {
+				const edge = this._edges.find((e) => e.id === edgeId);
+				if (edge) this._overlay.setEdgeWaypointBalls(edge.edge.waypoints, edgeId);
+			},
+			hideEdgeWaypointBalls: () => {
+				this._overlay.setEdgeWaypointBalls(null, null);
 			},
 			previewSpace: (origin, current, axis) => this._previewSpace(origin, current, axis),
 			commitSpace: (origin, current, axis) => this._commitSpace(origin, current, axis),
@@ -1865,6 +1874,18 @@ export class BpmnEditor {
 			const edgeId = endpointEl.getAttribute("data-bpmn-id");
 			const ep = endpointEl.getAttribute("data-bpmn-endpoint");
 			if (edgeId && ep) return { type: "edge-endpoint", edgeId, isStart: ep === "start" };
+		}
+
+		const waypointEl = el.closest("[data-bpmn-waypoint]");
+		if (waypointEl) {
+			const id = waypointEl.getAttribute("data-bpmn-id");
+			const wpIdxStr = waypointEl.getAttribute("data-bpmn-waypoint-idx");
+			if (id && wpIdxStr !== null) {
+				const wpIdx = Number(wpIdxStr);
+				const rect = this._svg.getBoundingClientRect();
+				const pt = screenToDiagram(clientX, clientY, this._viewport.state, rect);
+				return { type: "edge-waypoint", id, wpIdx, pt };
+			}
 		}
 
 		const edgeHitEl = el.closest("[data-bpmn-edge-hit]");
