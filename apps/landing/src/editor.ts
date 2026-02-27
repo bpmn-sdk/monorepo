@@ -110,6 +110,11 @@ const tabIdToStorageFileId = new Map<string, string>();
 // Tracks latest content of each open tab for "Save All to Project"
 const openTabConfigs = new Map<string, { name: string; type: FileType; content: string }>();
 
+// Tracks the current BPMN XML per tab (updated on every diagram:change).
+// Used so reactivating a tab restores the latest edited content, not the original.
+const tabCurrentXml = new Map<string, string>();
+let activeBpmnTabId: string | null = null;
+
 let editorRef: BpmnEditor | null = null;
 
 // Tabs plugin — onTabActivate loads the BPMN into the editor when a BPMN tab is clicked
@@ -172,9 +177,13 @@ const tabsPlugin = createTabsPlugin({
 		setHudVisible(true);
 
 		if (config.type === "bpmn" && config.xml) {
-			editorRef?.load(config.xml);
+			activeBpmnTabId = id;
+			// Use the latest edited XML if the tab has been modified, otherwise fall back to
+			// the original config.xml (e.g. on first activation after opening from storage).
+			const xml = tabCurrentXml.get(id) ?? config.xml;
+			editorRef?.load(xml);
 			// Snapshot current content for "Save All to Project"
-			openTabConfigs.set(id, { name: config.name ?? "Diagram", type: "bpmn", content: config.xml });
+			openTabConfigs.set(id, { name: config.name ?? "Diagram", type: "bpmn", content: xml });
 		} else if (config.type === "dmn") {
 			openTabConfigs.set(id, {
 				name: config.name ?? "Decision",
@@ -429,6 +438,16 @@ const editor = new BpmnEditor({
 	],
 });
 editorRef = editor;
+
+// Keep tabCurrentXml and openTabConfigs in sync with every edit so that
+// switching back to a BPMN tab always restores the latest content.
+editor.on("diagram:change", (defs) => {
+	if (activeBpmnTabId === null) return;
+	const xml = Bpmn.export(defs);
+	tabCurrentXml.set(activeBpmnTabId, xml);
+	const tab = openTabConfigs.get(activeBpmnTabId);
+	if (tab) openTabConfigs.set(activeBpmnTabId, { ...tab, content: xml });
+});
 
 initEditorHud(editor, {
 	openProcess: (processId) => {

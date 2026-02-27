@@ -1,5 +1,15 @@
 # Progress
 
+## 2026-02-27 — Remove Dexie dependency; fix auto-save tab content reset
+
+### `canvas-plugins/storage`
+- **Removed Dexie**: replaced with a minimal native IndexedDB wrapper (`db.ts`) that matches the same API surface — no external dependency, no change to `storage-api.ts`
+- Native wrapper supports: `get`, `add`, `update`, `delete`, `orderBy().toArray()`, `where().equals().toArray/sortBy/delete()`, `filter().toArray()`; all operations are Promise-based using modern IndexedDB (microtask-safe transactions)
+
+### `apps/landing`
+- **Auto-save fix**: `onTabActivate` was reloading `config.xml` (the original XML from when the tab was created) every time a BPMN tab was reactivated, making the editor appear to lose edits on every tab switch; now a `tabCurrentXml` map tracks the latest XML per tab (updated on every `diagram:change`), and reactivation uses that map so the editor always shows the most recent content
+- `openTabConfigs` (used by "Save All to Project") is also kept in sync via the `diagram:change` listener
+
 ## 2026-02-26 — Bug fixes: auto-save, welcome screen project navigation, call activity process linking
 
 ### `canvas-plugins/config-panel`

@@ -3,7 +3,7 @@
 ## IndexedDB Storage Plugin (2026-02-26, overhauled 2026-02-26) — `@bpmn-sdk/canvas-plugin-storage`
 
 - **`@bpmn-sdk/canvas-plugin-storage`** — persists BPMN / DMN / Form files in the browser's IndexedDB in a `workspace → project → files` hierarchy
-  - **Dexie v4** for IndexedDB access — migrations, compound indexes, type-safe tables
+  - **Native IndexedDB** — zero-dependency wrapper; supports `get/add/update/delete`, `orderBy`, `where().equals()` with `toArray/sortBy/delete`, and `filter`
   - **5 record types**: `WorkspaceRecord`, `ProjectRecord`, `FileRecord` (with `isShared` and `gitPath`), `FileContentRecord`
   - **Auto-save** — 500 ms debounce triggered by `diagram:change`; forced flush on page hide / `beforeunload`; multi-tab safe
   - **Main-menu integration** — workspace/project navigation via drill-down menu (no sidebar); "Open Project", "Save All to Project", "Leave Project" actions in the ⋮ menu
