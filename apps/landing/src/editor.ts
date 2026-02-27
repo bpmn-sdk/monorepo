@@ -116,6 +116,8 @@ const tabIdToStorageFileId = new Map<string, string>();
 const storageFileIdToTabId = new Map<string, string>();
 // Display name cache for storage files (kept in sync with renaming).
 const storageFileToName = new Map<string, string>();
+// File type cache ("bpmn" | "dmn" | "form") for the file switcher description.
+const storageFileToType = new Map<string, string>();
 
 // Ctrl+Tab MRU: tab IDs ordered by most-recently-activated (index 0 = most recent).
 let tabMruOrder: string[] = [];
@@ -346,6 +348,7 @@ const storagePlugin = createStoragePlugin({
 		tabIdToStorageFileId.clear();
 		storageFileIdToTabId.clear();
 		storageFileToName.clear();
+		storageFileToType.clear();
 		tabMruOrder = [];
 	},
 	onReady: () => tabsPlugin.api.refreshWelcomeScreen(),
@@ -374,6 +377,7 @@ const storagePlugin = createStoragePlugin({
 			tabIdToStorageFileId.set(tabId, file.id);
 			storageFileIdToTabId.set(file.id, tabId);
 			storageFileToName.set(file.id, file.name);
+			storageFileToType.set(file.id, file.type);
 			// onTabActivate fires synchronously inside openTab before the map is set,
 			// so we correct currentFileId explicitly here.
 			storagePlugin.api.setCurrentFileId(file.id);
@@ -506,6 +510,202 @@ storagePlugin.api.onChange(() => {
 	}
 
 	rebuildFileCommands();
+});
+
+// ── File switcher (Ctrl+E / Cmd+E) ────────────────────────────────────────────
+
+const FILE_ICON =
+	'<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2h6l4 4v9H4z"/><polyline points="10,2 10,6 14,6"/></svg>';
+
+let fileSwitcherEl: HTMLDivElement | null = null;
+let _fileSwitcherKeyHandler: ((e: KeyboardEvent) => void) | null = null;
+
+function closeFileSwitcher(): void {
+	fileSwitcherEl?.remove();
+	fileSwitcherEl = null;
+	if (_fileSwitcherKeyHandler) {
+		document.removeEventListener("keydown", _fileSwitcherKeyHandler);
+		_fileSwitcherKeyHandler = null;
+	}
+}
+
+function openFileSwitcher(): void {
+	if (fileSwitcherEl) {
+		closeFileSwitcher();
+		return;
+	}
+	if (!storagePlugin.api.getCurrentProjectId()) return;
+
+	const isLight = editorContainer?.dataset.theme !== "dark";
+	let focusIdx = 0;
+
+	const overlay = document.createElement("div");
+	overlay.className = `bpmn-palette-overlay${isLight ? " bpmn-palette--light" : ""}`;
+	overlay.setAttribute("role", "dialog");
+	overlay.setAttribute("aria-modal", "true");
+	overlay.setAttribute("aria-label", "Switch to file");
+
+	const panel = document.createElement("div");
+	panel.className = "bpmn-palette-panel";
+
+	const searchRow = document.createElement("div");
+	searchRow.className = "bpmn-palette-search";
+
+	const iconEl = document.createElement("span");
+	iconEl.className = "bpmn-palette-search-icon";
+	iconEl.innerHTML = FILE_ICON;
+	searchRow.appendChild(iconEl);
+
+	const input = document.createElement("input");
+	input.type = "text";
+	input.className = "bpmn-palette-input";
+	input.placeholder = "Switch to file\u2026";
+	input.setAttribute("autocomplete", "off");
+	input.setAttribute("spellcheck", "false");
+	searchRow.appendChild(input);
+
+	const kbdHint = document.createElement("span");
+	kbdHint.className = "bpmn-palette-kbd";
+	const kbdKey = document.createElement("kbd");
+	kbdKey.textContent = "Esc";
+	kbdHint.appendChild(kbdKey);
+	searchRow.appendChild(kbdHint);
+
+	const list = document.createElement("div");
+	list.className = "bpmn-palette-list";
+	list.setAttribute("role", "listbox");
+
+	panel.appendChild(searchRow);
+	panel.appendChild(list);
+	overlay.appendChild(panel);
+	document.body.appendChild(overlay);
+	fileSwitcherEl = overlay;
+
+	function getEntries(
+		query: string,
+	): Array<{ tabId: string; name: string; type: string; isCurrent: boolean }> {
+		const currentFileId = storagePlugin.api.getCurrentFileId();
+		const allTabIds = tabsPlugin.api.getTabIds();
+		const mru = tabMruOrder.filter((id) => allTabIds.includes(id));
+		for (const id of allTabIds) {
+			if (!mru.includes(id)) mru.push(id);
+		}
+		const q = query.toLowerCase();
+		return mru
+			.map((tabId) => {
+				const fileId = tabIdToStorageFileId.get(tabId) ?? "";
+				return {
+					tabId,
+					name: storageFileToName.get(fileId) ?? fileId,
+					type: storageFileToType.get(fileId) ?? "",
+					isCurrent: fileId === currentFileId,
+				};
+			})
+			.filter((e) => !q || e.name.toLowerCase().includes(q));
+	}
+
+	function renderList(query: string): void {
+		list.innerHTML = "";
+		const entries = getEntries(query);
+		if (entries.length === 0) {
+			const empty = document.createElement("div");
+			empty.className = "bpmn-palette-empty";
+			empty.textContent = "No files found";
+			list.appendChild(empty);
+			return;
+		}
+		if (focusIdx >= entries.length) focusIdx = 0;
+		entries.forEach((entry, i) => {
+			const item = document.createElement("div");
+			item.className = `bpmn-palette-item${i === focusIdx ? " bpmn-palette-focused" : ""}`;
+			item.setAttribute("role", "option");
+			item.setAttribute("aria-selected", String(i === focusIdx));
+
+			const nameEl = document.createElement("span");
+			nameEl.className = "bpmn-palette-item-title";
+			nameEl.textContent = entry.name;
+			if (entry.isCurrent) nameEl.style.fontWeight = "600";
+			item.appendChild(nameEl);
+
+			const descEl = document.createElement("span");
+			descEl.className = "bpmn-palette-item-desc";
+			descEl.textContent = entry.isCurrent
+				? `${entry.type.toUpperCase()} · current`
+				: entry.type.toUpperCase();
+			item.appendChild(descEl);
+
+			item.addEventListener("pointerenter", () => {
+				focusIdx = i;
+				updateFocus();
+			});
+			item.addEventListener("pointerdown", (e) => {
+				e.preventDefault();
+				tabsPlugin.api.setActiveTab(entry.tabId);
+				closeFileSwitcher();
+			});
+			list.appendChild(item);
+		});
+	}
+
+	function updateFocus(): void {
+		const items = list.querySelectorAll<HTMLDivElement>(".bpmn-palette-item");
+		items.forEach((item, i) => {
+			item.classList.toggle("bpmn-palette-focused", i === focusIdx);
+			item.setAttribute("aria-selected", String(i === focusIdx));
+		});
+	}
+
+	// Pre-focus the second entry (most recently previous file)
+	const initial = getEntries("");
+	focusIdx = initial.length > 1 ? 1 : 0;
+	renderList("");
+	input.focus();
+
+	input.addEventListener("input", () => {
+		focusIdx = 0;
+		renderList(input.value);
+	});
+
+	overlay.addEventListener("pointerdown", (e) => {
+		if (e.target === overlay) closeFileSwitcher();
+	});
+
+	_fileSwitcherKeyHandler = (e: KeyboardEvent) => {
+		const entries = getEntries(input.value);
+		const count = entries.length;
+		if (e.key === "ArrowDown") {
+			e.preventDefault();
+			if (count > 0) {
+				focusIdx = (focusIdx + 1) % count;
+				updateFocus();
+			}
+		} else if (e.key === "ArrowUp") {
+			e.preventDefault();
+			if (count > 0) {
+				focusIdx = (focusIdx - 1 + count) % count;
+				updateFocus();
+			}
+		} else if (e.key === "Enter") {
+			e.preventDefault();
+			const entry = entries[focusIdx];
+			if (entry) {
+				tabsPlugin.api.setActiveTab(entry.tabId);
+				closeFileSwitcher();
+			}
+		} else if (e.key === "Escape") {
+			e.preventDefault();
+			closeFileSwitcher();
+		}
+	};
+	document.addEventListener("keydown", _fileSwitcherKeyHandler);
+}
+
+// Ctrl+E / Cmd+E — file switcher (IntelliJ "Recent Files", left-hand accessible)
+document.addEventListener("keydown", (e) => {
+	if ((e.ctrlKey || e.metaKey) && e.key === "e" && !e.shiftKey && !e.altKey) {
+		e.preventDefault();
+		openFileSwitcher();
+	}
 });
 
 // ── Editor ────────────────────────────────────────────────────────────────────

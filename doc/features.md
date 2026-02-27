@@ -24,6 +24,18 @@
 - Theme picker now behind a "Theme" drill item instead of flat in root dropdown
 - **Integrated into tab bar** — panel is flush with the tab bar (right-anchored, 36px tall, matching dark/light background colors); auto-reserves 160px via CSS `:has()` so the tab labels are never hidden behind it
 
+## BPMN Element Config — Event Types (2026-02-27) — `@bpmn-sdk/canvas-plugin-config-panel-bpmn`
+
+- **Timer events** — timerStartEvent, timerCatchEvent, timer boundaryEvent: "Timer type" select (Cycle / Duration / Date) + FEEL expression field for the chosen type; writes `BpmnTimerEventDefinition`
+- **Message events** — messageStartEvent, messageCatchEvent, messageEndEvent, messageThrowEvent, message boundaryEvent, receiveTask: "Message name" + "Correlation key" FEEL fields; writes `zeebe:message` extension element
+- **Signal events** — signal start/catch/throw/end events and signal boundaryEvent: "Signal name" FEEL field; writes `zeebe:signal` extension element
+- **Error events** — errorEndEvent and error boundaryEvent: "Error code" FEEL field; writes `zeebe:error` extension element
+- **Escalation events** — escalation end/throw/catch events and escalation boundaryEvent: "Escalation code" FEEL field; writes `zeebe:escalation` extension element
+- **Conditional events** — conditionalStartEvent, conditionalCatchEvent, conditional boundaryEvent: "Condition expression" FEEL field; writes `BpmnConditionalEventDefinition.condition`
+- **Intermediate events** — all intermediate catch/throw events with any of the above definitions show the matching schema; plain intermediate events show name + documentation
+- **Boundary events** — all boundary event variants (timer/message/signal/error/escalation/conditional) show their respective event-specific schemas; `boundaryEvent` type is now registered
+- **General element coverage** — `subProcess`, `transaction`, `manualTask`, `task` (generic), `complexGateway` added; all show name + documentation
+
 ## BPMN Element Config — Call Activity, Script Task, Sequence Flow (2026-02-26, updated 2026-02-26)
 
 - **Call activity** — configure `zeebe:calledElement processId` and `propagateAllChildVariables` in the config panel; "Select process…" button picks from open BPMN tabs; "New process" button creates a new blank BPMN and auto-links it; optional "Open Process ↗" action button navigates to the matching BPMN tab; navigate icon button in the element toolbar (HUD) above a selected call activity

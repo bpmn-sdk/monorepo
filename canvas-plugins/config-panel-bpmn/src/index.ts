@@ -32,7 +32,13 @@ import type {
 	PanelAdapter,
 	PanelSchema,
 } from "@bpmn-sdk/canvas-plugin-config-panel";
-import type { BpmnDefinitions } from "@bpmn-sdk/core";
+import type {
+	BpmnConditionalEventDefinition,
+	BpmnDefinitions,
+	BpmnEventDefinition,
+	BpmnFlowElement,
+	BpmnTimerEventDefinition,
+} from "@bpmn-sdk/core";
 import { zeebeExtensionsToXmlElements } from "@bpmn-sdk/core";
 import { ELEMENT_TYPE_LABELS } from "@bpmn-sdk/editor";
 import type { CreateShapeType } from "@bpmn-sdk/editor";
@@ -47,8 +53,12 @@ import {
 	getIoInput,
 	getTaskHeader,
 	parseCalledElement,
+	parseZeebeError,
+	parseZeebeEscalation,
 	parseZeebeExtensions,
+	parseZeebeMessage,
 	parseZeebeScript,
+	parseZeebeSignal,
 	updateFlowElement,
 	updateSequenceFlow,
 	xmlLocalName,
@@ -397,14 +407,16 @@ function strVal(v: FieldValue): string {
 // ── All element types that get the general schema ─────────────────────────────
 
 const GENERAL_TYPES: CreateShapeType[] = [
-	"startEvent",
-	"endEvent",
 	"sendTask",
-	"receiveTask",
 	"exclusiveGateway",
 	"parallelGateway",
 	"inclusiveGateway",
 	"eventBasedGateway",
+	"complexGateway",
+	"subProcess",
+	"transaction",
+	"manualTask",
+	"task",
 ];
 
 // ── User task schema (formId + optional Open Form button) ────────────────────
@@ -901,6 +913,524 @@ const SEQUENCE_FLOW_ADAPTER: PanelAdapter = {
 	},
 };
 
+// ── Timer event schema and adapter ────────────────────────────────────────────
+
+const TIMER_SCHEMA: PanelSchema = {
+	compact: [{ key: "name", label: "Name", type: "text", placeholder: "Event name" }],
+	groups: [
+		{
+			id: "general",
+			label: "General",
+			fields: [
+				{ key: "name", label: "Name", type: "text", placeholder: "Event name" },
+				{
+					key: "timerType",
+					label: "Timer type",
+					type: "select",
+					options: [
+						{ value: "timeCycle", label: "Cycle" },
+						{ value: "timeDuration", label: "Duration" },
+						{ value: "timeDate", label: "Date" },
+					],
+				},
+				{
+					key: "timeCycle",
+					label: "Cycle",
+					type: "feel-expression",
+					placeholder: '= "R5/PT10S"',
+					hint: "ISO 8601 repeating interval, e.g. R5/PT10S.",
+					condition: (v) => v.timerType === "timeCycle",
+				},
+				{
+					key: "timeDuration",
+					label: "Duration",
+					type: "feel-expression",
+					placeholder: '= duration("PT5M")',
+					hint: "ISO 8601 duration, e.g. PT15S or P14D.",
+					condition: (v) => v.timerType === "timeDuration",
+				},
+				{
+					key: "timeDate",
+					label: "Date",
+					type: "feel-expression",
+					placeholder: '= date and time("2025-01-01T09:00:00")',
+					hint: "ISO 8601 date-time, e.g. 2025-01-01T09:00:00Z.",
+					condition: (v) => v.timerType === "timeDate",
+				},
+				{
+					key: "documentation",
+					label: "Documentation",
+					type: "textarea",
+					placeholder: "Add notes or documentation…",
+				},
+			],
+		},
+	],
+};
+
+const TIMER_ADAPTER: PanelAdapter = {
+	read(defs, id) {
+		const el = findFlowElement(defs, id);
+		if (!el) return {};
+		if (
+			el.type !== "startEvent" &&
+			el.type !== "intermediateCatchEvent" &&
+			el.type !== "boundaryEvent"
+		)
+			return {};
+		const timerDef = el.eventDefinitions.find(
+			(d): d is BpmnTimerEventDefinition => d.type === "timer",
+		);
+		let timerType = "timeCycle";
+		if (timerDef?.timeDuration !== undefined) timerType = "timeDuration";
+		else if (timerDef?.timeDate !== undefined) timerType = "timeDate";
+		return {
+			name: el.name ?? "",
+			documentation: el.documentation ?? "",
+			timerType,
+			timeCycle: timerDef?.timeCycle ?? "",
+			timeDuration: timerDef?.timeDuration ?? "",
+			timeDate: timerDef?.timeDate ?? "",
+		};
+	},
+	write(defs, id, values) {
+		return updateFlowElement(defs, id, (el) => {
+			if (
+				el.type !== "startEvent" &&
+				el.type !== "intermediateCatchEvent" &&
+				el.type !== "boundaryEvent"
+			)
+				return el;
+			const timerType = strVal(values.timerType) || "timeCycle";
+			const newTimerDef: BpmnTimerEventDefinition = { type: "timer" };
+			if (timerType === "timeCycle") newTimerDef.timeCycle = strVal(values.timeCycle);
+			else if (timerType === "timeDuration") newTimerDef.timeDuration = strVal(values.timeDuration);
+			else newTimerDef.timeDate = strVal(values.timeDate);
+			const hasDef = el.eventDefinitions.some((d) => d.type === "timer");
+			const updatedDefs: BpmnEventDefinition[] = hasDef
+				? el.eventDefinitions.map((d) => (d.type === "timer" ? newTimerDef : d))
+				: [...el.eventDefinitions, newTimerDef];
+			return {
+				...el,
+				name: typeof values.name === "string" ? values.name : el.name,
+				documentation:
+					typeof values.documentation === "string"
+						? values.documentation || undefined
+						: el.documentation,
+				eventDefinitions: updatedDefs,
+			} as BpmnFlowElement;
+		});
+	},
+};
+
+// ── Message event schema and adapter ──────────────────────────────────────────
+
+const MESSAGE_EVENT_SCHEMA: PanelSchema = {
+	compact: [{ key: "name", label: "Name", type: "text", placeholder: "Event name" }],
+	groups: [
+		{
+			id: "general",
+			label: "General",
+			fields: [
+				{ key: "name", label: "Name", type: "text", placeholder: "Event name" },
+				{
+					key: "messageName",
+					label: "Message name",
+					type: "feel-expression",
+					placeholder: '= "order-received"',
+					hint: "Name of the message. FEEL expression.",
+				},
+				{
+					key: "correlationKey",
+					label: "Correlation key",
+					type: "feel-expression",
+					placeholder: "= orderId",
+					hint: "Correlates the incoming message to a specific process instance.",
+				},
+				{
+					key: "documentation",
+					label: "Documentation",
+					type: "textarea",
+					placeholder: "Add notes or documentation…",
+				},
+			],
+		},
+	],
+};
+
+const MESSAGE_ADAPTER: PanelAdapter = {
+	read(defs, id) {
+		const el = findFlowElement(defs, id);
+		if (!el) return {};
+		const msg = parseZeebeMessage(el.extensionElements);
+		return {
+			name: el.name ?? "",
+			documentation: el.documentation ?? "",
+			messageName: msg.name,
+			correlationKey: msg.correlationKey,
+		};
+	},
+	write(defs, id, values) {
+		return updateFlowElement(defs, id, (el) => {
+			const messageName = strVal(values.messageName);
+			const correlationKey = strVal(values.correlationKey);
+			const otherExts = el.extensionElements.filter((x) => xmlLocalName(x.name) !== "message");
+			const attrs: Record<string, string> = { name: messageName };
+			if (correlationKey) attrs.correlationKey = correlationKey;
+			const msgExt = messageName
+				? { name: "zeebe:message", attributes: attrs, children: [] }
+				: null;
+			return {
+				...el,
+				name: typeof values.name === "string" ? values.name : el.name,
+				documentation:
+					typeof values.documentation === "string"
+						? values.documentation || undefined
+						: el.documentation,
+				extensionElements: msgExt ? [...otherExts, msgExt] : otherExts,
+			};
+		});
+	},
+};
+
+// ── Signal event schema and adapter ───────────────────────────────────────────
+
+const SIGNAL_EVENT_SCHEMA: PanelSchema = {
+	compact: [{ key: "name", label: "Name", type: "text", placeholder: "Event name" }],
+	groups: [
+		{
+			id: "general",
+			label: "General",
+			fields: [
+				{ key: "name", label: "Name", type: "text", placeholder: "Event name" },
+				{
+					key: "signalName",
+					label: "Signal name",
+					type: "feel-expression",
+					placeholder: '= "mySignal"',
+					hint: "Name of the signal. FEEL expression.",
+				},
+				{
+					key: "documentation",
+					label: "Documentation",
+					type: "textarea",
+					placeholder: "Add notes or documentation…",
+				},
+			],
+		},
+	],
+};
+
+const SIGNAL_ADAPTER: PanelAdapter = {
+	read(defs, id) {
+		const el = findFlowElement(defs, id);
+		if (!el) return {};
+		const sig = parseZeebeSignal(el.extensionElements);
+		return {
+			name: el.name ?? "",
+			documentation: el.documentation ?? "",
+			signalName: sig.name,
+		};
+	},
+	write(defs, id, values) {
+		return updateFlowElement(defs, id, (el) => {
+			const signalName = strVal(values.signalName);
+			const otherExts = el.extensionElements.filter((x) => xmlLocalName(x.name) !== "signal");
+			const sigExt = signalName
+				? { name: "zeebe:signal", attributes: { name: signalName }, children: [] }
+				: null;
+			return {
+				...el,
+				name: typeof values.name === "string" ? values.name : el.name,
+				documentation:
+					typeof values.documentation === "string"
+						? values.documentation || undefined
+						: el.documentation,
+				extensionElements: sigExt ? [...otherExts, sigExt] : otherExts,
+			};
+		});
+	},
+};
+
+// ── Error event schema and adapter ────────────────────────────────────────────
+
+const ERROR_EVENT_SCHEMA: PanelSchema = {
+	compact: [{ key: "name", label: "Name", type: "text", placeholder: "Event name" }],
+	groups: [
+		{
+			id: "general",
+			label: "General",
+			fields: [
+				{ key: "name", label: "Name", type: "text", placeholder: "Event name" },
+				{
+					key: "errorCode",
+					label: "Error code",
+					type: "feel-expression",
+					placeholder: '= "error-code-value"',
+					hint: "Error code for this event. FEEL expression.",
+				},
+				{
+					key: "documentation",
+					label: "Documentation",
+					type: "textarea",
+					placeholder: "Add notes or documentation…",
+				},
+			],
+		},
+	],
+};
+
+const ERROR_ADAPTER: PanelAdapter = {
+	read(defs, id) {
+		const el = findFlowElement(defs, id);
+		if (!el) return {};
+		const err = parseZeebeError(el.extensionElements);
+		return {
+			name: el.name ?? "",
+			documentation: el.documentation ?? "",
+			errorCode: err.errorCode,
+		};
+	},
+	write(defs, id, values) {
+		return updateFlowElement(defs, id, (el) => {
+			const errorCode = strVal(values.errorCode);
+			const otherExts = el.extensionElements.filter((x) => xmlLocalName(x.name) !== "error");
+			const errExt = errorCode
+				? { name: "zeebe:error", attributes: { errorCode }, children: [] }
+				: null;
+			return {
+				...el,
+				name: typeof values.name === "string" ? values.name : el.name,
+				documentation:
+					typeof values.documentation === "string"
+						? values.documentation || undefined
+						: el.documentation,
+				extensionElements: errExt ? [...otherExts, errExt] : otherExts,
+			};
+		});
+	},
+};
+
+// ── Escalation event schema and adapter ───────────────────────────────────────
+
+const ESCALATION_EVENT_SCHEMA: PanelSchema = {
+	compact: [{ key: "name", label: "Name", type: "text", placeholder: "Event name" }],
+	groups: [
+		{
+			id: "general",
+			label: "General",
+			fields: [
+				{ key: "name", label: "Name", type: "text", placeholder: "Event name" },
+				{
+					key: "escalationCode",
+					label: "Escalation code",
+					type: "feel-expression",
+					placeholder: '= "escalation-code"',
+					hint: "Escalation code for this event. FEEL expression.",
+				},
+				{
+					key: "documentation",
+					label: "Documentation",
+					type: "textarea",
+					placeholder: "Add notes or documentation…",
+				},
+			],
+		},
+	],
+};
+
+const ESCALATION_ADAPTER: PanelAdapter = {
+	read(defs, id) {
+		const el = findFlowElement(defs, id);
+		if (!el) return {};
+		const esc = parseZeebeEscalation(el.extensionElements);
+		return {
+			name: el.name ?? "",
+			documentation: el.documentation ?? "",
+			escalationCode: esc.escalationCode,
+		};
+	},
+	write(defs, id, values) {
+		return updateFlowElement(defs, id, (el) => {
+			const escalationCode = strVal(values.escalationCode);
+			const otherExts = el.extensionElements.filter((x) => xmlLocalName(x.name) !== "escalation");
+			const escExt = escalationCode
+				? { name: "zeebe:escalation", attributes: { escalationCode }, children: [] }
+				: null;
+			return {
+				...el,
+				name: typeof values.name === "string" ? values.name : el.name,
+				documentation:
+					typeof values.documentation === "string"
+						? values.documentation || undefined
+						: el.documentation,
+				extensionElements: escExt ? [...otherExts, escExt] : otherExts,
+			};
+		});
+	},
+};
+
+// ── Conditional event schema and adapter ──────────────────────────────────────
+
+const CONDITIONAL_EVENT_SCHEMA: PanelSchema = {
+	compact: [{ key: "name", label: "Name", type: "text", placeholder: "Event name" }],
+	groups: [
+		{
+			id: "general",
+			label: "General",
+			fields: [
+				{ key: "name", label: "Name", type: "text", placeholder: "Event name" },
+				{
+					key: "conditionExpression",
+					label: "Condition expression",
+					type: "feel-expression",
+					placeholder: "= someVariable = true",
+					hint: "FEEL expression that must evaluate to true for this event to trigger.",
+				},
+				{
+					key: "documentation",
+					label: "Documentation",
+					type: "textarea",
+					placeholder: "Add notes or documentation…",
+				},
+			],
+		},
+	],
+};
+
+const CONDITIONAL_ADAPTER: PanelAdapter = {
+	read(defs, id) {
+		const el = findFlowElement(defs, id);
+		if (!el) return {};
+		if (
+			el.type !== "startEvent" &&
+			el.type !== "intermediateCatchEvent" &&
+			el.type !== "boundaryEvent"
+		)
+			return {};
+		const condDef = el.eventDefinitions.find(
+			(d): d is BpmnConditionalEventDefinition => d.type === "conditional",
+		);
+		return {
+			name: el.name ?? "",
+			documentation: el.documentation ?? "",
+			conditionExpression: condDef?.condition ?? "",
+		};
+	},
+	write(defs, id, values) {
+		return updateFlowElement(defs, id, (el) => {
+			if (
+				el.type !== "startEvent" &&
+				el.type !== "intermediateCatchEvent" &&
+				el.type !== "boundaryEvent"
+			)
+				return el;
+			const conditionExpression = strVal(values.conditionExpression);
+			const newCondDef: BpmnConditionalEventDefinition = {
+				type: "conditional",
+				condition: conditionExpression || undefined,
+			};
+			const hasDef = el.eventDefinitions.some((d) => d.type === "conditional");
+			const updatedDefs: BpmnEventDefinition[] = hasDef
+				? el.eventDefinitions.map((d) => (d.type === "conditional" ? newCondDef : d))
+				: [...el.eventDefinitions, newCondDef];
+			return {
+				...el,
+				name: typeof values.name === "string" ? values.name : el.name,
+				documentation:
+					typeof values.documentation === "string"
+						? values.documentation || undefined
+						: el.documentation,
+				eventDefinitions: updatedDefs,
+			} as BpmnFlowElement;
+		});
+	},
+};
+
+// ── Event dispatcher adapters ─────────────────────────────────────────────────
+
+/** Map an event definition type to the matching schema+adapter pair. */
+function eventDefToRegistration(
+	defType: string,
+): { schema: PanelSchema; adapter: PanelAdapter } | null {
+	switch (defType) {
+		case "timer":
+			return { schema: TIMER_SCHEMA, adapter: TIMER_ADAPTER };
+		case "message":
+			return { schema: MESSAGE_EVENT_SCHEMA, adapter: MESSAGE_ADAPTER };
+		case "signal":
+			return { schema: SIGNAL_EVENT_SCHEMA, adapter: SIGNAL_ADAPTER };
+		case "error":
+			return { schema: ERROR_EVENT_SCHEMA, adapter: ERROR_ADAPTER };
+		case "escalation":
+			return { schema: ESCALATION_EVENT_SCHEMA, adapter: ESCALATION_ADAPTER };
+		case "conditional":
+			return { schema: CONDITIONAL_EVENT_SCHEMA, adapter: CONDITIONAL_ADAPTER };
+		default:
+			return null;
+	}
+}
+
+const START_EVENT_ADAPTER: PanelAdapter = {
+	read: GENERAL_ADAPTER.read,
+	write: GENERAL_ADAPTER.write,
+	resolve(defs, id) {
+		const el = findFlowElement(defs, id);
+		if (!el || el.type !== "startEvent") return null;
+		const defType = el.eventDefinitions[0]?.type;
+		if (!defType) return null;
+		return eventDefToRegistration(defType);
+	},
+};
+
+const END_EVENT_ADAPTER: PanelAdapter = {
+	read: GENERAL_ADAPTER.read,
+	write: GENERAL_ADAPTER.write,
+	resolve(defs, id) {
+		const el = findFlowElement(defs, id);
+		if (!el || el.type !== "endEvent") return null;
+		const defType = el.eventDefinitions[0]?.type;
+		if (!defType) return null;
+		return eventDefToRegistration(defType);
+	},
+};
+
+const CATCH_EVENT_ADAPTER: PanelAdapter = {
+	read: GENERAL_ADAPTER.read,
+	write: GENERAL_ADAPTER.write,
+	resolve(defs, id) {
+		const el = findFlowElement(defs, id);
+		if (!el || el.type !== "intermediateCatchEvent") return null;
+		const defType = el.eventDefinitions[0]?.type;
+		if (!defType) return null;
+		return eventDefToRegistration(defType);
+	},
+};
+
+const THROW_EVENT_ADAPTER: PanelAdapter = {
+	read: GENERAL_ADAPTER.read,
+	write: GENERAL_ADAPTER.write,
+	resolve(defs, id) {
+		const el = findFlowElement(defs, id);
+		if (!el || el.type !== "intermediateThrowEvent") return null;
+		const defType = el.eventDefinitions[0]?.type;
+		if (!defType) return null;
+		return eventDefToRegistration(defType);
+	},
+};
+
+const BOUNDARY_EVENT_ADAPTER: PanelAdapter = {
+	read: GENERAL_ADAPTER.read,
+	write: GENERAL_ADAPTER.write,
+	resolve(defs, id) {
+		const el = findFlowElement(defs, id);
+		if (!el || el.type !== "boundaryEvent") return null;
+		const defType = el.eventDefinitions[0]?.type;
+		if (!defType) return null;
+		return eventDefToRegistration(defType);
+	},
+};
+
 // ── Options for the plugin factory ────────────────────────────────────────────
 
 export interface ConfigPanelBpmnOptions {
@@ -979,6 +1509,14 @@ export function createConfigPanelBpmnPlugin(
 			for (const type of GENERAL_TYPES) {
 				configPanel.registerSchema(type, GENERAL_SCHEMA, GENERAL_ADAPTER);
 			}
+			// Events: dispatcher adapters resolve to event-definition-specific schemas
+			configPanel.registerSchema("startEvent", GENERAL_SCHEMA, START_EVENT_ADAPTER);
+			configPanel.registerSchema("endEvent", GENERAL_SCHEMA, END_EVENT_ADAPTER);
+			configPanel.registerSchema("intermediateCatchEvent", GENERAL_SCHEMA, CATCH_EVENT_ADAPTER);
+			configPanel.registerSchema("intermediateThrowEvent", GENERAL_SCHEMA, THROW_EVENT_ADAPTER);
+			configPanel.registerSchema("boundaryEvent", GENERAL_SCHEMA, BOUNDARY_EVENT_ADAPTER);
+			// Receive task: message name + correlation key
+			configPanel.registerSchema("receiveTask", MESSAGE_EVENT_SCHEMA, MESSAGE_ADAPTER);
 			// User task: formId + optional Open Form button
 			configPanel.registerSchema("userTask", userTaskSchema, USER_TASK_ADAPTER);
 			// Business rule task: decisionId + resultVariable + optional Open Decision button

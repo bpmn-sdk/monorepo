@@ -1,5 +1,23 @@
 # Progress
 
+## 2026-02-27 — Properties panel feature parity
+
+### `canvas-plugins/config-panel-bpmn`
+- **Timer events** — new `TIMER_SCHEMA` + `TIMER_ADAPTER`; shows "Timer type" select (Cycle / Duration / Date) and the matching FEEL expression field; handles `startEvent`, `intermediateCatchEvent`, `boundaryEvent` with timer definitions; reads/writes `BpmnTimerEventDefinition` fields directly
+- **Message events** — new `MESSAGE_EVENT_SCHEMA` + `MESSAGE_ADAPTER`; shows "Message name" and "Correlation key" FEEL fields; reads/writes `zeebe:message` extension element; applies to `messageCatchEvent`, `messageStartEvent`, `messageEndEvent`, `messageThrowEvent`, `boundaryEvent` with message def, and `receiveTask`
+- **Signal events** — new `SIGNAL_EVENT_SCHEMA` + `SIGNAL_ADAPTER`; "Signal name" FEEL field; reads/writes `zeebe:signal` extension; applies to all signal variants and `boundaryEvent`
+- **Error events** — new `ERROR_EVENT_SCHEMA` + `ERROR_ADAPTER`; "Error code" FEEL field; reads/writes `zeebe:error` extension; applies to `errorEndEvent` and error `boundaryEvent`
+- **Escalation events** — new `ESCALATION_EVENT_SCHEMA` + `ESCALATION_ADAPTER`; "Escalation code" FEEL field; reads/writes `zeebe:escalation` extension; applies to escalation throw/catch variants
+- **Conditional events** — new `CONDITIONAL_EVENT_SCHEMA` + `CONDITIONAL_ADAPTER`; "Condition expression" FEEL field; reads/writes `BpmnConditionalEventDefinition.condition`; applies to conditional start, catch, and boundary events
+- **Event dispatcher adapters** — `START_EVENT_ADAPTER`, `END_EVENT_ADAPTER`, `CATCH_EVENT_ADAPTER`, `THROW_EVENT_ADAPTER`, `BOUNDARY_EVENT_ADAPTER` each use `resolve()` to delegate to the matching event-specific schema based on `eventDefinitions[0].type`; plain events (no definition) fall back to `GENERAL_SCHEMA`
+- **New general types** — `subProcess`, `transaction`, `manualTask`, `task`, `complexGateway` added to `GENERAL_TYPES`; `receiveTask` promoted to the `MESSAGE_EVENT_SCHEMA`; `startEvent` and `endEvent` moved to their own dispatcher adapters
+- **Zeebe event extension helpers** — `parseZeebeMessage`, `parseZeebeSignal`, `parseZeebeError`, `parseZeebeEscalation` added to `util.ts`
+
+## 2026-02-27 — File switcher palette (Ctrl+E)
+
+### `apps/landing`
+- **`Ctrl+E` / `Cmd+E` file switcher** — opens a palette (identical visual to the command palette) showing all open project files in MRU order; pre-focuses the second entry (most-recently previous file); supports text filtering, arrow-key navigation, Enter to switch, Esc to close; closed by pressing `Ctrl+E` again; only active when a project is open; reuses command palette CSS classes from `@bpmn-sdk/canvas-plugin-command-palette`; `storageFileToType` cache added to show file type badge in each row; shortcut chosen because it is left-hand accessible, non-conflicting with browser tab management, and mirrors IntelliJ's "Recent Files" shortcut
+
 ## 2026-02-27 — Project mode: no-close tabs, all-files-open, file search, rename, Ctrl+Tab MRU
 
 ### `canvas-plugins/storage`
