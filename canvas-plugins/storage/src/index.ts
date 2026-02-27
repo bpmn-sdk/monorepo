@@ -2,6 +2,7 @@ import type { CanvasApi, CanvasPlugin } from "@bpmn-sdk/canvas";
 import type { MainMenuApi, MenuItem } from "@bpmn-sdk/canvas-plugin-main-menu";
 import { Bpmn } from "@bpmn-sdk/core";
 import type { BpmnDefinitions } from "@bpmn-sdk/core";
+import { exportProjectAsZip } from "./export.js";
 import { StorageApi, type StorageApiOptions } from "./storage-api.js";
 import type { FileType, ProjectRecord, WorkspaceRecord } from "./types.js";
 
@@ -25,6 +26,15 @@ export interface StoragePluginOptions extends StorageApiOptions {
 	getOpenTabs(): Array<{ tabId: string; name: string; type: FileType; content: string }>;
 	/** Title to restore when leaving a project. Defaults to "". */
 	initialTitle?: string;
+	/** Called when the user clicks "Leave" in the project info bar. */
+	onLeaveProject?: () => void;
+	/** Called after the IndexedDB caches have finished loading. Use this to refresh any UI that depends on storage data (e.g. the recent-projects dropdown). */
+	onReady?: () => void;
+	/**
+	 * Called when the user renames the current file via the main menu.
+	 * Update the corresponding tab's display name from this callback.
+	 */
+	onRenameCurrentFile?: (fileId: string, name: string) => void;
 }
 
 /**
@@ -155,7 +165,26 @@ export function createStoragePlugin(
 				onAction: () => {
 					storageApi.setCurrentProjectId(null);
 					options.mainMenu.api.setTitle(options.initialTitle ?? "");
+					options.onLeaveProject?.();
 				},
+			});
+			const currentFileId = storageApi.getCurrentFileId();
+			if (currentFileId && options.onRenameCurrentFile) {
+				const onRename = options.onRenameCurrentFile;
+				items.push({
+					label: "Rename current file\u2026",
+					onClick: () => {
+						const newName = prompt("Rename file:")?.trim();
+						if (!newName) return;
+						void storageApi.renameFile(currentFileId, newName).then(() => {
+							onRename(currentFileId, newName);
+						});
+					},
+				});
+			}
+			items.push({
+				label: "Export Project\u2026",
+				onClick: () => void exportProjectAsZip(storageApi),
 			});
 			items.push({ type: "separator" });
 		}
@@ -195,20 +224,11 @@ export function createStoragePlugin(
 			// Register dynamic items supplier
 			options.mainMenu.api.setDynamicItems(buildDynamicItems);
 
-			// Initialize: load caches and restore last-opened project
-			void storageApi.initialize().then((files) => {
-				const projectId = storageApi.getCurrentProjectId();
-				if (files && projectId) {
-					const label = getProjectLabel(projectId);
-					if (label !== "Project") {
-						options.mainMenu.api.setTitle(label);
-					}
-					// Files already opened via onOpenFile callbacks inside openProject
-					// But initialize() just returns them — call openFile for each
-					for (const file of files) {
-						void storageApi.openFile(file.id);
-					}
-				}
+			// Load caches so getCachedWorkspaces / getRecentProjects work immediately.
+			// Do NOT auto-restore the last project — always show the welcome screen.
+			void storageApi.initialize().then(() => {
+				storageApi.setCurrentProjectId(null);
+				options.onReady?.();
 			});
 
 			// Rebuild dynamic items next time menu opens when data changes

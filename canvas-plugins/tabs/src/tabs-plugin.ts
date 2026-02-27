@@ -1,11 +1,18 @@
 import type { CanvasApi, CanvasPlugin } from "@bpmn-sdk/canvas";
-import { DmnViewer } from "@bpmn-sdk/canvas-plugin-dmn-viewer";
+import { DmnEditor } from "@bpmn-sdk/canvas-plugin-dmn-editor";
 import {
 	buildFeelPlaygroundPanel,
 	injectPlaygroundStyles,
 } from "@bpmn-sdk/canvas-plugin-feel-playground";
-import { FormViewer } from "@bpmn-sdk/canvas-plugin-form-viewer";
-import type { DmnDefinitions, FormDefinition } from "@bpmn-sdk/core";
+import { FormEditor } from "@bpmn-sdk/canvas-plugin-form-editor";
+import {
+	Bpmn,
+	type BpmnDefinitions,
+	Dmn,
+	type DmnDefinitions,
+	Form,
+	type FormDefinition,
+} from "@bpmn-sdk/core";
 import { injectTabsStyles } from "./css.js";
 import type { FileResolver } from "./file-resolver.js";
 
@@ -22,8 +29,25 @@ interface TabState {
 	config: TabConfig;
 	pane: HTMLDivElement;
 	hasWarning: boolean;
-	dmnViewer?: DmnViewer;
-	formViewer?: FormViewer;
+	dmnEditor?: DmnEditor;
+	formEditor?: FormEditor;
+	offDmnChange?: () => void;
+	offFormChange?: () => void;
+}
+
+/** A recent project item shown in the welcome screen dropdown. */
+export interface WelcomeRecentItem {
+	label: string;
+	description?: string;
+	onOpen: () => void;
+}
+
+/** Serialized content snapshot for save/export operations. Not available for FEEL tabs. */
+export interface TabContentSnapshot {
+	tabId: string;
+	name: string;
+	type: "bpmn" | "dmn" | "form";
+	content: string;
 }
 
 /** Options for the tabs plugin. */
@@ -74,6 +98,17 @@ export interface TabsPluginOptions {
 	 * becomes visible, so the content stays up to date.
 	 */
 	getWelcomeSections?: () => WelcomeSection[];
+	/**
+	 * Called when the welcome screen becomes visible to populate the "Open recent"
+	 * dropdown button. Return null or an empty array to disable the button.
+	 */
+	getRecentProjects?: () => WelcomeRecentItem[] | null;
+	/**
+	 * Called whenever a DMN or Form tab's content changes (i.e. the user made an edit).
+	 * Use this to trigger auto-save for the active file. Not called for BPMN tabs
+	 * (use the `diagram:change` canvas event for those).
+	 */
+	onTabChange?: (tabId: string, config: TabConfig) => void;
 }
 
 /** A single example entry shown on the welcome screen. */
@@ -107,6 +142,8 @@ export interface TabsApi {
 	openTab(config: TabConfig): string;
 	/** Close a tab by ID. */
 	closeTab(id: string): void;
+	/** Close all open tabs immediately without a confirmation dialog. Shows the welcome screen. */
+	closeAllTabs(): void;
 	/** Activate a tab by ID. */
 	setActiveTab(id: string): void;
 	/** Get the active tab ID. */
@@ -123,9 +160,47 @@ export interface TabsApi {
 	 * Shows a warning in the tab if the form is not found.
 	 */
 	openForm(formId: string): void;
+	/**
+	 * Navigate to the BPMN tab that contains the given process ID.
+	 * No-op if no open tab contains that process.
+	 */
+	navigateToProcess(processId: string): void;
+	/**
+	 * Get all BPMN processes tracked across open tabs.
+	 * Useful for providing a process picker in the config panel.
+	 */
+	getAvailableProcesses(): Array<{ id: string; name?: string }>;
+	/**
+	 * Get serialized content for all non-FEEL open tabs.
+	 * BPMN tabs return their current XML; DMN/Form tabs are serialized on demand.
+	 */
+	getAllTabContent(): TabContentSnapshot[];
+	/**
+	 * Re-render the welcome screen's dynamic content (recent projects, sections).
+	 * Call this after async data loads to update the welcome screen if it is visible.
+	 */
+	refreshWelcomeScreen(): void;
+	/**
+	 * The raw mode toggle button element. Pass this to `initEditorHud` to place it
+	 * in the bottom-left HUD panel instead of the tab bar.
+	 */
+	rawModeButton: HTMLButtonElement | null;
+	/**
+	 * Enable or disable project mode.
+	 * In project mode, tabs cannot be closed by the user.
+	 */
+	setProjectMode(enabled: boolean): void;
+	/**
+	 * Update the display name of a tab.
+	 * Used when a project file is renamed via the command palette or main menu.
+	 */
+	renameTab(id: string, name: string): void;
 }
 
 let _tabCounter = 0;
+
+const RAW_MODE_ICON =
+	'<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="5,3 1,8 5,13"/><polyline points="11,3 15,8 11,13"/></svg>';
 
 /** The order in which type groups appear in the tab bar. */
 const GROUP_TYPES: Array<TabConfig["type"]> = ["bpmn", "dmn", "form", "feel"];
@@ -159,13 +234,30 @@ export function createTabsPlugin(options: TabsPluginOptions = {}): CanvasPlugin 
 	let welcomeEl: HTMLDivElement | null = null;
 	let dynamicSectionsEl: HTMLDivElement | null = null;
 	let dropdownEl: HTMLDivElement | null = null;
+	let recentBtnEl: HTMLButtonElement | null = null;
+	let recentListEl: HTMLDivElement | null = null;
 	let theme: "dark" | "light" = "dark";
+	let offDiagramChange: (() => void) | undefined;
+	let isRawMode = false;
+	let rawPaneEl: HTMLDivElement | null = null;
+	let rawPreEl: HTMLPreElement | null = null;
+	let rawModeBtn: HTMLButtonElement | null = null;
+
+	let isProjectMode = false;
+
+	/** Tracks which tab ID each BPMN process ID belongs to. */
+	const bpmnProcessToTabId = new Map<string, string>();
+	/** Display name for each tracked BPMN process ID. */
+	const bpmnProcessNames = new Map<string, string>();
 
 	/** Tracks the last-activated tab ID per type group. */
 	const groupActiveId = new Map<TabConfig["type"], string>();
 	/** Which type group's dropdown is currently open, if any. */
 	let openDropdownType: TabConfig["type"] | null = null;
 	let outsideClickHandler: ((e: PointerEvent) => void) | null = null;
+
+	// Cast helper for editor events that extend CanvasEvents at runtime
+	type AnyOn = (event: string, handler: (...args: unknown[]) => void) => () => void;
 
 	// --- Close-confirmation dialog ---
 
@@ -301,11 +393,34 @@ export function createTabsPlugin(options: TabsPluginOptions = {}): CanvasPlugin 
 		const importBtn = document.createElement("button");
 		importBtn.type = "button";
 		importBtn.className = "bpmn-welcome-btn secondary";
-		importBtn.textContent = "Import files…";
+		importBtn.textContent = "Import files\u2026";
 		importBtn.addEventListener("click", () => options.onImportFiles?.());
 
 		actions.appendChild(newBtn);
 		actions.appendChild(importBtn);
+
+		// Recent projects dropdown button — populated each time the welcome screen is shown
+		if (options.getRecentProjects) {
+			const recentBtn = document.createElement("button");
+			recentBtn.type = "button";
+			recentBtn.className = "bpmn-welcome-btn secondary";
+			recentBtn.disabled = true;
+			recentBtnEl = recentBtn;
+
+			const recentList = document.createElement("div");
+			recentList.className = "bpmn-welcome-recent-list";
+			recentList.style.display = "none";
+			recentListEl = recentList;
+
+			recentBtn.addEventListener("click", () => {
+				if (!recentListEl) return;
+				recentListEl.style.display = recentListEl.style.display === "none" ? "" : "none";
+			});
+
+			actions.appendChild(recentBtn);
+			actions.appendChild(recentList);
+		}
+
 		inner.appendChild(actions);
 
 		if (options.examples && options.examples.length > 0) {
@@ -435,9 +550,61 @@ export function createTabsPlugin(options: TabsPluginOptions = {}): CanvasPlugin 
 		}
 	}
 
+	function renderRecentProjects(): void {
+		if (!recentBtnEl || !recentListEl || !options.getRecentProjects) return;
+		const items = options.getRecentProjects();
+		if (!items || items.length === 0) {
+			recentBtnEl.disabled = true;
+			recentBtnEl.textContent = "Open recent\u2026";
+			recentListEl.style.display = "none";
+			return;
+		}
+		recentBtnEl.disabled = false;
+		recentBtnEl.innerHTML =
+			'Open recent\u2026 <svg style="width:8px;height:5px;vertical-align:middle;margin-left:2px" viewBox="0 0 10 6" fill="currentColor"><path d="M0 0l5 6 5-6z"/></svg>';
+		// Collapse the list on re-render
+		recentListEl.style.display = "none";
+		recentListEl.textContent = "";
+		for (const item of items) {
+			const btn = document.createElement("button");
+			btn.type = "button";
+			btn.className = "bpmn-welcome-example";
+			btn.addEventListener("click", () => {
+				if (recentListEl) recentListEl.style.display = "none";
+				item.onOpen();
+			});
+
+			const text = document.createElement("span");
+			text.className = "bpmn-welcome-example-text";
+
+			const labelEl = document.createElement("span");
+			labelEl.className = "bpmn-welcome-example-label";
+			labelEl.textContent = item.label;
+			text.appendChild(labelEl);
+
+			if (item.description) {
+				const descEl = document.createElement("span");
+				descEl.className = "bpmn-welcome-example-desc";
+				descEl.textContent = item.description;
+				text.appendChild(descEl);
+			}
+
+			btn.appendChild(text);
+
+			const arrow = document.createElement("span");
+			arrow.className = "bpmn-welcome-example-arrow";
+			arrow.innerHTML =
+				'<svg viewBox="0 0 8 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="1,1 7,6 1,11"/></svg>';
+			btn.appendChild(arrow);
+
+			recentListEl.appendChild(btn);
+		}
+	}
+
 	function showWelcomeScreen(): void {
 		if (welcomeEl) welcomeEl.style.display = "";
 		renderDynamicSections();
+		renderRecentProjects();
 		// Defer so the callback runs after all synchronous plugin/HUD initialization
 		// completes. On initial install the HUD elements don't exist yet; rAF fires
 		// after the current JS task, by which time initEditorHud() has run.
@@ -470,15 +637,17 @@ export function createTabsPlugin(options: TabsPluginOptions = {}): CanvasPlugin 
 			nameSpan.textContent = tab.config.name ?? tab.id;
 			item.appendChild(nameSpan);
 
-			const closeBtn = document.createElement("span");
-			closeBtn.className = "bpmn-tab-close";
-			closeBtn.textContent = "×";
-			closeBtn.addEventListener("click", (e) => {
-				e.stopPropagation();
-				closeDropdownEl();
-				requestClose(tab);
-			});
-			item.appendChild(closeBtn);
+			if (!isProjectMode) {
+				const closeBtn = document.createElement("span");
+				closeBtn.className = "bpmn-tab-close";
+				closeBtn.textContent = "×";
+				closeBtn.addEventListener("click", (e) => {
+					e.stopPropagation();
+					closeDropdownEl();
+					requestClose(tab);
+				});
+				item.appendChild(closeBtn);
+			}
 
 			item.addEventListener("click", () => {
 				groupActiveId.set(type, tab.id);
@@ -507,6 +676,7 @@ export function createTabsPlugin(options: TabsPluginOptions = {}): CanvasPlugin 
 	// --- Tab bar rendering ---
 
 	function requestClose(tab: TabState): void {
+		if (isProjectMode) return;
 		if (hasContent(tab.config) && canvasApi) {
 			const tabName = tab.config.name ?? `${tab.config.type} tab`;
 			const onDownload = options.onDownloadTab ? () => options.onDownloadTab?.(tab.config) : null;
@@ -537,6 +707,8 @@ export function createTabsPlugin(options: TabsPluginOptions = {}): CanvasPlugin 
 			const isGroupActive = group.some((t) => t.id === activeId);
 			createGroupTabEl(type, group, isGroupActive);
 		}
+
+		updateRawModeBtn();
 	}
 
 	function createGroupTabEl(
@@ -577,8 +749,8 @@ export function createTabsPlugin(options: TabsPluginOptions = {}): CanvasPlugin 
 			chevron.innerHTML =
 				'<svg viewBox="0 0 10 6" fill="currentColor"><path d="M0 0l5 6 5-6z"/></svg>';
 			el.appendChild(chevron);
-		} else {
-			// Close button — only when the group has a single file
+		} else if (!isProjectMode) {
+			// Close button — only when the group has a single file and not in project mode
 			const tab = group[0];
 			if (tab) {
 				const closeBtn = document.createElement("span");
@@ -614,11 +786,43 @@ export function createTabsPlugin(options: TabsPluginOptions = {}): CanvasPlugin 
 		tab.pane = pane;
 
 		if (tab.config.type === "dmn") {
-			tab.dmnViewer = new DmnViewer({ container: pane, theme });
-			tab.dmnViewer.load(tab.config.defs);
+			const editor = new DmnEditor({ container: pane });
+			tab.dmnEditor = editor;
+			const xml = Dmn.export(tab.config.defs);
+			void editor.loadXML(xml);
+			tab.offDmnChange = editor.onChange(() => {
+				void (async () => {
+					const newXml = await editor.getXML();
+					if (tab.config.type === "dmn") {
+						try {
+							tab.config = { type: "dmn", defs: Dmn.parse(newXml), name: tab.config.name };
+						} catch {
+							// keep old defs if parse fails
+						}
+						options.onTabChange?.(tab.id, tab.config);
+					}
+				})();
+			});
 		} else if (tab.config.type === "form") {
-			tab.formViewer = new FormViewer({ container: pane, theme });
-			tab.formViewer.load(tab.config.form);
+			const editor = new FormEditor({ container: pane });
+			tab.formEditor = editor;
+			const schema = JSON.parse(Form.export(tab.config.form)) as Record<string, unknown>;
+			void editor.loadSchema(schema);
+			tab.offFormChange = editor.onChange(() => {
+				if (tab.config.type === "form") {
+					const newSchema = editor.getSchema();
+					try {
+						tab.config = {
+							type: "form",
+							form: Form.parse(JSON.stringify(newSchema)),
+							name: tab.config.name,
+						};
+					} catch {
+						// keep old form if parse fails
+					}
+					options.onTabChange?.(tab.id, tab.config);
+				}
+			});
 		} else if (tab.config.type === "feel") {
 			injectPlaygroundStyles();
 			pane.appendChild(buildFeelPlaygroundPanel(undefined, tab.config.expression));
@@ -627,14 +831,62 @@ export function createTabsPlugin(options: TabsPluginOptions = {}): CanvasPlugin 
 		// shows through. pointer-events are set to none in setActiveTab.
 	}
 
-	function applyThemeToTab(tab: TabState): void {
-		tab.dmnViewer?.setTheme(theme);
-		tab.formViewer?.setTheme(theme);
+	function applyThemeToTab(_tab: TabState): void {
+		// dmn-js and form-js-editor handle their own theming
 	}
 
 	function showWarning(tab: TabState, show: boolean): void {
 		tab.hasWarning = show;
 		renderTabBar();
+	}
+
+	// --- BPMN process tracking ---
+
+	function trackBpmnProcesses(tabId: string, xml: string): void {
+		try {
+			for (const proc of Bpmn.parse(xml).processes) {
+				bpmnProcessToTabId.set(proc.id, tabId);
+				bpmnProcessNames.set(proc.id, proc.name ?? proc.id);
+			}
+		} catch {
+			// Malformed XML — tab still opens, process map unchanged
+		}
+	}
+
+	function untrackBpmnProcesses(tabId: string): void {
+		for (const [procId, tid] of [...bpmnProcessToTabId]) {
+			if (tid === tabId) {
+				bpmnProcessToTabId.delete(procId);
+				bpmnProcessNames.delete(procId);
+			}
+		}
+	}
+
+	// --- Raw mode ---
+
+	function getTabSource(tab: TabState): string {
+		if (tab.config.type === "bpmn") return tab.config.xml;
+		if (tab.config.type === "dmn") return Dmn.export(tab.config.defs);
+		if (tab.config.type === "form") return Form.export(tab.config.form);
+		return "";
+	}
+
+	function updateRawModeBtn(): void {
+		if (!rawModeBtn) return;
+		const activeTab = activeId !== null ? tabs.find((t) => t.id === activeId) : undefined;
+		rawModeBtn.disabled = activeTab === undefined || activeTab.config.type === "feel";
+		rawModeBtn.classList.toggle("active", isRawMode);
+	}
+
+	function updateRawPane(): void {
+		if (!rawPaneEl || !rawPreEl) return;
+		const activeTab = activeId !== null ? tabs.find((t) => t.id === activeId) : undefined;
+		if (!isRawMode || !activeTab || activeTab.config.type === "feel") {
+			rawPaneEl.style.display = "none";
+			return;
+		}
+		rawPreEl.textContent = getTabSource(activeTab);
+		rawPaneEl.style.display = "";
 	}
 
 	// --- Public API ---
@@ -654,6 +906,11 @@ export function createTabsPlugin(options: TabsPluginOptions = {}): CanvasPlugin 
 
 			if (contentArea) mountTabContent(tab);
 
+			// Track BPMN processes for navigation and the config panel picker
+			if (config.type === "bpmn") {
+				trackBpmnProcesses(id, config.xml);
+			}
+
 			renderTabBar();
 			api.setActiveTab(id);
 			return id;
@@ -665,9 +922,15 @@ export function createTabsPlugin(options: TabsPluginOptions = {}): CanvasPlugin 
 			const [tab] = tabs.splice(idx, 1);
 			if (!tab) return;
 
-			tab.dmnViewer?.destroy();
-			tab.formViewer?.destroy();
+			tab.offDmnChange?.();
+			tab.offFormChange?.();
+			tab.dmnEditor?.destroy();
+			tab.formEditor?.destroy();
 			tab.pane.remove();
+
+			if (tab.config.type === "bpmn") {
+				untrackBpmnProcesses(id);
+			}
 
 			if (activeId === id) {
 				const next = tabs[idx] ?? tabs[idx - 1];
@@ -682,6 +945,26 @@ export function createTabsPlugin(options: TabsPluginOptions = {}): CanvasPlugin 
 			}
 
 			renderTabBar();
+		},
+
+		closeAllTabs(): void {
+			bpmnProcessToTabId.clear();
+			bpmnProcessNames.clear();
+			isRawMode = false;
+			for (const tab of [...tabs]) {
+				tab.offDmnChange?.();
+				tab.offFormChange?.();
+				tab.dmnEditor?.destroy();
+				tab.formEditor?.destroy();
+				tab.pane.remove();
+			}
+			tabs.length = 0;
+			activeId = null;
+			groupActiveId.clear();
+			if (contentArea) contentArea.style.pointerEvents = "";
+			if (rawPaneEl) rawPaneEl.style.display = "none";
+			renderTabBar();
+			showWelcomeScreen();
 		},
 
 		setActiveTab(id: string): void {
@@ -699,13 +982,15 @@ export function createTabsPlugin(options: TabsPluginOptions = {}): CanvasPlugin 
 			tab.pane.classList.remove("hidden");
 			groupActiveId.set(tab.config.type, id);
 
-			// BPMN panes are transparent; disable pointer-events so the canvas is interactive
+			// BPMN panes are transparent; disable pointer-events so the canvas is interactive.
+			// In raw mode the raw pane overlays everything so pointer-events must stay on.
 			if (contentArea) {
-				contentArea.style.pointerEvents = tab.config.type === "bpmn" ? "none" : "";
+				contentArea.style.pointerEvents = tab.config.type === "bpmn" && !isRawMode ? "none" : "";
 			}
 
 			renderTabBar();
 			options.onTabActivate?.(id, tab.config);
+			updateRawPane();
 		},
 
 		getActiveTabId(): string | null {
@@ -714,6 +999,71 @@ export function createTabsPlugin(options: TabsPluginOptions = {}): CanvasPlugin 
 
 		getTabIds(): string[] {
 			return tabs.map((t) => t.id);
+		},
+
+		navigateToProcess(processId: string): void {
+			const tabId = bpmnProcessToTabId.get(processId);
+			if (tabId && tabs.some((t) => t.id === tabId)) {
+				api.setActiveTab(tabId);
+			}
+		},
+
+		getAvailableProcesses(): Array<{ id: string; name?: string }> {
+			return [...bpmnProcessToTabId.keys()].map((id) => ({
+				id,
+				name: bpmnProcessNames.get(id),
+			}));
+		},
+
+		getAllTabContent(): TabContentSnapshot[] {
+			const result: TabContentSnapshot[] = [];
+			for (const tab of tabs) {
+				if (tab.config.type === "bpmn") {
+					result.push({
+						tabId: tab.id,
+						name: tab.config.name ?? "Diagram",
+						type: "bpmn",
+						content: tab.config.xml,
+					});
+				} else if (tab.config.type === "dmn") {
+					result.push({
+						tabId: tab.id,
+						name: tab.config.name ?? "Decision",
+						type: "dmn",
+						content: Dmn.export(tab.config.defs),
+					});
+				} else if (tab.config.type === "form") {
+					result.push({
+						tabId: tab.id,
+						name: tab.config.name ?? "Form",
+						type: "form",
+						content: Form.export(tab.config.form),
+					});
+				}
+				// FEEL tabs have no file content — skipped
+			}
+			return result;
+		},
+
+		refreshWelcomeScreen(): void {
+			renderRecentProjects();
+			renderDynamicSections();
+		},
+
+		setProjectMode(enabled: boolean): void {
+			isProjectMode = enabled;
+			renderTabBar();
+		},
+
+		renameTab(id: string, name: string): void {
+			const tab = tabs.find((t) => t.id === id);
+			if (!tab) return;
+			tab.config = { ...tab.config, name };
+			renderTabBar();
+		},
+
+		get rawModeButton(): HTMLButtonElement | null {
+			return rawModeBtn;
 		},
 
 		openDecision(decisionId: string): void {
@@ -809,6 +1159,32 @@ export function createTabsPlugin(options: TabsPluginOptions = {}): CanvasPlugin 
 			contentArea.appendChild(welcomeEl);
 			showWelcomeScreen();
 
+			// Create raw source pane (overlaid on top of content when raw mode is on)
+			rawPaneEl = document.createElement("div");
+			rawPaneEl.className = "bpmn-raw-pane";
+			rawPaneEl.dataset.theme = theme;
+			rawPaneEl.style.display = "none";
+			rawPreEl = document.createElement("pre");
+			rawPreEl.className = "bpmn-raw-content";
+			rawPaneEl.appendChild(rawPreEl);
+			contentArea.appendChild(rawPaneEl);
+
+			// Raw mode toggle button — exposed via api.rawModeButton; caller places it in the HUD
+			rawModeBtn = document.createElement("button");
+			rawModeBtn.type = "button";
+			rawModeBtn.title = "Toggle raw source";
+			rawModeBtn.disabled = true;
+			rawModeBtn.innerHTML = RAW_MODE_ICON;
+			rawModeBtn.addEventListener("click", () => {
+				isRawMode = !isRawMode;
+				const activeTab = activeId !== null ? tabs.find((t) => t.id === activeId) : undefined;
+				if (contentArea && activeTab?.config.type === "bpmn") {
+					contentArea.style.pointerEvents = isRawMode ? "" : "none";
+				}
+				updateRawPane();
+				updateRawModeBtn();
+			});
+
 			// Create body-level dropdown for groups with multiple files
 			dropdownEl = document.createElement("div");
 			dropdownEl.className = "bpmn-tab-dropdown";
@@ -827,6 +1203,23 @@ export function createTabsPlugin(options: TabsPluginOptions = {}): CanvasPlugin 
 			};
 			document.addEventListener("pointerdown", outsideClickHandler);
 
+			// Subscribe to diagram:change to keep BPMN tab XML and process maps up to date
+			const anyOn = cApi.on.bind(cApi) as unknown as AnyOn;
+			offDiagramChange = anyOn("diagram:change", (rawDefs) => {
+				if (!activeId) return;
+				const activeTab = tabs.find((t) => t.id === activeId);
+				if (!activeTab || activeTab.config.type !== "bpmn") return;
+				const defs = rawDefs as BpmnDefinitions;
+				const xml = Bpmn.export(defs);
+				// Update stored XML so onTabActivate always receives the latest content
+				activeTab.config = { ...activeTab.config, xml };
+				// Refresh process map for this tab
+				untrackBpmnProcesses(activeId);
+				trackBpmnProcesses(activeId, xml);
+				// Keep raw pane in sync
+				if (isRawMode) updateRawPane();
+			});
+
 			// Listen for theme changes (canvas toggles data-theme="dark"; absence means light)
 			const observer = new MutationObserver(() => {
 				const t = container.dataset.theme;
@@ -834,12 +1227,15 @@ export function createTabsPlugin(options: TabsPluginOptions = {}): CanvasPlugin 
 				if (tabBar) tabBar.dataset.theme = theme;
 				if (welcomeEl) welcomeEl.dataset.theme = theme;
 				if (dropdownEl) dropdownEl.dataset.theme = theme;
+				if (rawPaneEl) rawPaneEl.dataset.theme = theme;
 				for (const tab of tabs) applyThemeToTab(tab);
 			});
 			observer.observe(container, { attributes: true, attributeFilter: ["data-theme"] });
 		},
 
 		uninstall(): void {
+			offDiagramChange?.();
+			offDiagramChange = undefined;
 			if (outsideClickHandler) {
 				document.removeEventListener("pointerdown", outsideClickHandler);
 				outsideClickHandler = null;
@@ -849,9 +1245,19 @@ export function createTabsPlugin(options: TabsPluginOptions = {}): CanvasPlugin 
 			welcomeEl?.remove();
 			welcomeEl = null;
 			dynamicSectionsEl = null;
+			recentBtnEl = null;
+			recentListEl = null;
+			isRawMode = false;
+			rawPaneEl = null;
+			rawPreEl = null;
+			rawModeBtn = null;
+			bpmnProcessToTabId.clear();
+			bpmnProcessNames.clear();
 			for (const tab of tabs) {
-				tab.dmnViewer?.destroy();
-				tab.formViewer?.destroy();
+				tab.offDmnChange?.();
+				tab.offFormChange?.();
+				tab.dmnEditor?.destroy();
+				tab.formEditor?.destroy();
 			}
 			tabs.length = 0;
 			activeId = null;

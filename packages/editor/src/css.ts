@@ -96,6 +96,26 @@ export const EDITOR_CSS = `
   cursor: pointer;
 }
 
+/* Edge hover dot (waypoint insertion indicator) */
+.bpmn-edge-hover-dot {
+  fill: #0066cc;
+  stroke: #fff;
+  stroke-width: 1.5;
+  pointer-events: none;
+  opacity: 0.85;
+}
+[data-theme="dark"] .bpmn-edge-hover-dot { fill: #4c8ef7; }
+
+/* Edge waypoint angle balls (visible on edge hover) */
+.bpmn-edge-waypoint-ball {
+  fill: #0066cc;
+  stroke: #fff;
+  stroke-width: 1.5;
+  cursor: move;
+}
+.bpmn-edge-waypoint-ball:hover { fill: #0052a3; }
+[data-theme="dark"] .bpmn-edge-waypoint-ball { fill: #4c8ef7; }
+
 /* Edge endpoint drag handles */
 .bpmn-edge-endpoint {
   fill: #0066cc;
@@ -195,11 +215,21 @@ export const HUD_CSS = `
 }
 
 /* ── HUD positions ───────────────────────────────────────────────── */
-#hud-top-center    { top: 10px; left: 50%; transform: translateX(-50%); }
+#hud-top-center    { top: 0; left: 50%; transform: translateX(-50%); height: 36px; }
 #hud-bottom-left   { bottom: 10px; left: 10px; }
 #hud-bottom-center { bottom: 10px; left: 50%; transform: translateX(-50%); }
 #ctx-toolbar { display: none; transform: translateX(-50%); }
 #cfg-toolbar { display: none; transform: translate(-50%, -100%); }
+
+/* ── Top center: strip floating card, merge into tab bar ─────────── */
+#hud-top-center.panel {
+  background: transparent;
+  backdrop-filter: none;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  padding: 0 2px;
+}
 
 /* ── Icon buttons ────────────────────────────────────────────────── */
 .hud-btn {
@@ -318,6 +348,12 @@ export const HUD_CSS = `
   background: rgba(255, 255, 255, 0.92);
   border-color: rgba(0, 0, 0, 0.08);
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+[data-bpmn-hud-theme="light"] #hud-top-center.panel {
+  background: transparent;
+  backdrop-filter: none;
+  border: none;
+  box-shadow: none;
 }
 [data-bpmn-hud-theme="light"] .hud-btn { color: rgba(0,0,0,0.5); }
 [data-bpmn-hud-theme="light"] .hud-btn:hover { background: rgba(0,0,0,0.06); color: rgba(0,0,0,0.9); }

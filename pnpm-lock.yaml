@@ -133,6 +133,12 @@ importers:
         specifier: workspace:*
         version: link:../../packages/editor
 
+  canvas-plugins/dmn-editor:
+    dependencies:
+      '@bpmn-sdk/core':
+        specifier: workspace:*
+        version: link:../../packages/bpmn-sdk
+
   canvas-plugins/dmn-viewer:
     dependencies:
       '@bpmn-sdk/core':
@@ -150,6 +156,12 @@ importers:
       '@bpmn-sdk/feel':
         specifier: workspace:*
         version: link:../../packages/feel
+
+  canvas-plugins/form-editor:
+    dependencies:
+      '@bpmn-sdk/core':
+        specifier: workspace:*
+        version: link:../../packages/bpmn-sdk
 
   canvas-plugins/form-viewer:
     dependencies:
@@ -183,24 +195,21 @@ importers:
       '@bpmn-sdk/core':
         specifier: workspace:*
         version: link:../../packages/bpmn-sdk
-      dexie:
-        specifier: ^4.0.10
-        version: 4.3.0
 
   canvas-plugins/tabs:
     dependencies:
       '@bpmn-sdk/canvas':
         specifier: workspace:*
         version: link:../../packages/canvas
-      '@bpmn-sdk/canvas-plugin-dmn-viewer':
+      '@bpmn-sdk/canvas-plugin-dmn-editor':
         specifier: workspace:*
-        version: link:../dmn-viewer
+        version: link:../dmn-editor
       '@bpmn-sdk/canvas-plugin-feel-playground':
         specifier: workspace:*
         version: link:../feel-playground
-      '@bpmn-sdk/canvas-plugin-form-viewer':
+      '@bpmn-sdk/canvas-plugin-form-editor':
         specifier: workspace:*
-        version: link:../form-viewer
+        version: link:../form-editor
       '@bpmn-sdk/core':
         specifier: workspace:*
         version: link:../../packages/bpmn-sdk
@@ -789,9 +798,6 @@ packages:
   detect-indent@6.1.0:
     resolution: {integrity: sha512-reYkTUJAZb9gUuZ2RvVCNhVHdg62RHnJ7WJl8ftMi4diZ6NWlciOzQN88pUhSELEwflJht4oQDv0F0BMlwaYtA==}
     engines: {node: '>=8'}
-
-  dexie@4.3.0:
-    resolution: {integrity: sha512-5EeoQpJvMKHe6zWt/FSIIuRa3CWlZeIl6zKXt+Lz7BU6RoRRLgX9dZEynRfXrkLcldKYCBiz7xekTEylnie1Ug==}
 
   dir-glob@3.0.1:
     resolution: {integrity: sha512-WkrWp9GR4KXfKGYzOLmTuGVi1UWFfws377n9cc55/tb6DuqyF6pcQ5AbiHEshaDpY9v6oaSr2XCDidGmMwdzIA==}
@@ -1823,8 +1829,6 @@ snapshots:
   deep-eql@5.0.2: {}
 
   detect-indent@6.1.0: {}
-
-  dexie@4.3.0: {}
 
   dir-glob@3.0.1:
     dependencies:

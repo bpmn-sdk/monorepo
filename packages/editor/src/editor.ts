@@ -23,6 +23,7 @@ import { injectEditorStyles } from "./css.js";
 import {
 	closestPort,
 	computeWaypoints,
+	computeWaypointsAvoiding,
 	computeWaypointsWithPorts,
 	diagramToScreen,
 	labelBoundsForPosition,
@@ -40,9 +41,12 @@ import {
 	createEmptyDefinitions,
 	createShape,
 	deleteElements,
+	insertEdgeWaypoint,
 	insertShapeOnEdge,
+	moveEdgeWaypoint,
 	moveShapes,
 	pasteElements,
+	removeCollinearWaypoints,
 	resizeShape,
 	updateEdgeEndpoint,
 	updateLabel,
@@ -412,6 +416,59 @@ export class BpmnEditor {
 					const edge = this._edges.find((e) => e.id === this._selectedEdgeId);
 					this._overlay.setEdgeEndpoints(edge?.edge.waypoints ?? null, this._selectedEdgeId);
 				}
+			},
+			previewWaypointInsert: (edgeId, segIdx, pt) => {
+				if (!this._defs) return;
+				const snap = this._snapWaypoint(pt);
+				const preview = insertEdgeWaypoint(this._defs, edgeId, segIdx, snap.pt);
+				const edge = preview.diagrams[0]?.plane.edges.find((e) => e.bpmnElement === edgeId);
+				this._overlay.setEndpointDragGhost(edge?.waypoints ?? null);
+				this._overlay.setAlignmentGuides(snap.guides);
+			},
+			commitWaypointInsert: (edgeId, segIdx, pt) => {
+				this._overlay.setEndpointDragGhost(null);
+				this._overlay.setAlignmentGuides([]);
+				const snap = this._snapWaypoint(pt);
+				this._executeCommand((d) =>
+					removeCollinearWaypoints(insertEdgeWaypoint(d, edgeId, segIdx, snap.pt), edgeId),
+				);
+			},
+			cancelWaypointInsert: () => {
+				this._overlay.setEndpointDragGhost(null);
+				this._overlay.setAlignmentGuides([]);
+			},
+			previewWaypointMove: (edgeId, wpIdx, pt) => {
+				if (!this._defs) return;
+				const snap = this._snapWaypoint(pt);
+				const preview = moveEdgeWaypoint(this._defs, edgeId, wpIdx, snap.pt);
+				const edge = preview.diagrams[0]?.plane.edges.find((e) => e.bpmnElement === edgeId);
+				this._overlay.setEndpointDragGhost(edge?.waypoints ?? null);
+				this._overlay.setAlignmentGuides(snap.guides);
+			},
+			commitWaypointMove: (edgeId, wpIdx, pt) => {
+				this._overlay.setEndpointDragGhost(null);
+				this._overlay.setAlignmentGuides([]);
+				const snap = this._snapWaypoint(pt);
+				this._executeCommand((d) =>
+					removeCollinearWaypoints(moveEdgeWaypoint(d, edgeId, wpIdx, snap.pt), edgeId),
+				);
+			},
+			cancelWaypointMove: () => {
+				this._overlay.setEndpointDragGhost(null);
+				this._overlay.setAlignmentGuides([]);
+			},
+			showEdgeHoverDot: (pt) => {
+				this._overlay.setEdgeHoverDot(pt);
+			},
+			hideEdgeHoverDot: () => {
+				this._overlay.setEdgeHoverDot(null);
+			},
+			showEdgeWaypointBalls: (edgeId) => {
+				const edge = this._edges.find((e) => e.id === edgeId);
+				if (edge) this._overlay.setEdgeWaypointBalls(edge.edge.waypoints, edgeId);
+			},
+			hideEdgeWaypointBalls: () => {
+				this._overlay.setEdgeWaypointBalls(null, null);
 			},
 			previewSpace: (origin, current, axis) => this._previewSpace(origin, current, axis),
 			commitSpace: (origin, current, axis) => this._commitSpace(origin, current, axis),
@@ -924,7 +981,14 @@ export class BpmnEditor {
 		const srcType = srcShape.flowElement?.type;
 		const tgtType = tgtShape.flowElement?.type;
 		if (srcType && tgtType && !canConnect(srcType, tgtType)) return;
-		const waypoints = computeWaypoints(srcShape.shape.bounds, tgtShape.shape.bounds);
+		const obstacles = this._shapes
+			.filter((s) => s.id !== srcId && s.id !== tgtId)
+			.map((s) => s.shape.bounds);
+		const waypoints = computeWaypointsAvoiding(
+			srcShape.shape.bounds,
+			tgtShape.shape.bounds,
+			obstacles,
+		);
 		this._executeCommand((d) => createConnection(d, srcId, tgtId, waypoints).defs);
 	}
 
@@ -1044,8 +1108,9 @@ export class BpmnEditor {
 		}
 
 		const newBounds = this._smartPlaceBounds(srcBounds, sourceId, w, h);
+		const obstacles = this._shapes.filter((s) => s.id !== sourceId).map((s) => s.shape.bounds);
 		const r1 = createShape(this._defs, type, newBounds);
-		const waypoints = computeWaypoints(srcBounds, newBounds);
+		const waypoints = computeWaypointsAvoiding(srcBounds, newBounds, obstacles);
 		const r2 = createConnection(r1.defs, sourceId, r1.id, waypoints);
 
 		this._selectedIds = [r1.id];
@@ -1821,10 +1886,28 @@ export class BpmnEditor {
 			if (edgeId && ep) return { type: "edge-endpoint", edgeId, isStart: ep === "start" };
 		}
 
+		const waypointEl = el.closest("[data-bpmn-waypoint]");
+		if (waypointEl) {
+			const id = waypointEl.getAttribute("data-bpmn-id");
+			const wpIdxStr = waypointEl.getAttribute("data-bpmn-waypoint-idx");
+			if (id && wpIdxStr !== null) {
+				const wpIdx = Number(wpIdxStr);
+				const rect = this._svg.getBoundingClientRect();
+				const pt = screenToDiagram(clientX, clientY, this._viewport.state, rect);
+				return { type: "edge-waypoint", id, wpIdx, pt };
+			}
+		}
+
 		const edgeHitEl = el.closest("[data-bpmn-edge-hit]");
 		if (edgeHitEl) {
 			const id = edgeHitEl.getAttribute("data-bpmn-edge-hit");
-			if (id) return { type: "edge", id };
+			if (id) {
+				const rect = this._svg.getBoundingClientRect();
+				const diag = screenToDiagram(clientX, clientY, this._viewport.state, rect);
+				const seg = this._nearestSegment(id, diag);
+				if (seg) return { type: "edge-segment", id, ...seg };
+				return { type: "edge", id };
+			}
 		}
 
 		const shapeEl = el.closest("[data-bpmn-id]");
@@ -1834,6 +1917,96 @@ export class BpmnEditor {
 		}
 
 		return { type: "canvas" };
+	}
+
+	/** Returns the nearest segment info for the given edge and diagram point. */
+	private _nearestSegment(
+		edgeId: string,
+		diag: DiagPoint,
+	): { segIdx: number; isHoriz: boolean; projPt: DiagPoint } | null {
+		const edge = this._edges.find((e) => e.id === edgeId);
+		if (!edge) return null;
+		const wps = edge.edge.waypoints;
+		if (wps.length < 2) return null;
+
+		let bestIdx = 0;
+		let bestDist = Number.POSITIVE_INFINITY;
+		let bestProj: DiagPoint = { x: 0, y: 0 };
+		let bestHoriz = true;
+
+		for (let i = 0; i < wps.length - 1; i++) {
+			const a = wps[i];
+			const b = wps[i + 1];
+			if (!a || !b) continue;
+			const dx = b.x - a.x;
+			const dy = b.y - a.y;
+			const lenSq = dx * dx + dy * dy;
+			let proj: DiagPoint;
+			if (lenSq < 0.001) {
+				proj = { x: a.x, y: a.y };
+			} else {
+				const t = Math.max(0, Math.min(1, ((diag.x - a.x) * dx + (diag.y - a.y) * dy) / lenSq));
+				proj = { x: a.x + t * dx, y: a.y + t * dy };
+			}
+			const dist = Math.hypot(diag.x - proj.x, diag.y - proj.y);
+			if (dist < bestDist) {
+				bestDist = dist;
+				bestIdx = i;
+				bestProj = proj;
+				bestHoriz = Math.abs(dy) <= Math.abs(dx);
+			}
+		}
+
+		return { segIdx: bestIdx, isHoriz: bestHoriz, projPt: bestProj };
+	}
+
+	/** Snaps a diagram point to nearby shape/waypoint positions and returns guide lines. */
+	private _snapWaypoint(pt: DiagPoint): {
+		pt: DiagPoint;
+		guides: Array<{ x1: number; y1: number; x2: number; y2: number }>;
+	} {
+		const scale = this._viewport.state.scale;
+		const threshold = 8 / scale;
+		const EXT = 10000;
+
+		const xTargets: number[] = [];
+		const yTargets: number[] = [];
+
+		for (const shape of this._shapes) {
+			const b = shape.shape.bounds;
+			xTargets.push(b.x, b.x + b.width / 2, b.x + b.width);
+			yTargets.push(b.y, b.y + b.height / 2, b.y + b.height);
+		}
+		for (const edge of this._edges) {
+			for (const wp of edge.edge.waypoints) {
+				xTargets.push(wp.x);
+				yTargets.push(wp.y);
+			}
+		}
+
+		let snapX = pt.x;
+		let snapY = pt.y;
+		let minDx = threshold;
+		let minDy = threshold;
+
+		for (const tx of xTargets) {
+			if (Math.abs(pt.x - tx) < minDx) {
+				minDx = Math.abs(pt.x - tx);
+				snapX = tx;
+			}
+		}
+		for (const ty of yTargets) {
+			if (Math.abs(pt.y - ty) < minDy) {
+				minDy = Math.abs(pt.y - ty);
+				snapY = ty;
+			}
+		}
+
+		const guides: Array<{ x1: number; y1: number; x2: number; y2: number }> = [];
+		if (minDx < threshold) guides.push({ x1: snapX, y1: -EXT, x2: snapX, y2: EXT });
+		if (minDy < threshold) guides.push({ x1: -EXT, y1: snapY, x2: EXT, y2: snapY });
+
+		return { pt: { x: snapX, y: snapY }, guides };
 	}
 
 	// ── Theme + controls ──────────────────────────────────────────────

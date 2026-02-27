@@ -250,6 +250,16 @@ export const TABS_CSS = `
   border-color: var(--welcome-btn-secondary-border);
 }
 .bpmn-welcome-btn.secondary:hover { opacity: 0.8; }
+.bpmn-welcome-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.bpmn-welcome-btn:disabled:hover { opacity: 0.4; }
+
+.bpmn-welcome-recent-list {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 4px;
+}
 
 .bpmn-welcome-divider {
   width: 100%;
@@ -545,6 +555,33 @@ export const TABS_CSS = `
   color: var(--cd-primary-fg);
 }
 .bpmn-close-dialog-btn.primary:hover { opacity: 0.88; }
+
+/* ── Raw source pane ─────────────────────────────────────────────────────── */
+
+.bpmn-raw-pane {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  overflow: auto;
+  background: var(--raw-bg, #1e1e2e);
+  pointer-events: auto;
+}
+
+.bpmn-raw-pane[data-theme="light"] { --raw-bg: #f8f9fa; }
+
+.bpmn-raw-content {
+  margin: 0;
+  padding: 16px 20px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--raw-fg, #cdd6f4);
+  white-space: pre;
+  tab-size: 2;
+}
+
+.bpmn-raw-pane[data-theme="light"] .bpmn-raw-content { --raw-fg: #374151; }
+
 `.trim();
 
 const STYLE_ID = "bpmn-sdk-tabs-css";

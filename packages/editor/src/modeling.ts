@@ -1018,6 +1018,143 @@ export function updateEdgeEndpoint(
 	};
 }
 
+// ── Edge segment / waypoint manipulation ──────────────────────────────────────
+
+/**
+ * Moves an orthogonal edge segment perpendicularly by `delta` units.
+ * For horizontal segments delta shifts Y; for vertical segments delta shifts X.
+ * Both waypoints of the segment move together, stretching adjacent segments.
+ */
+export function moveEdgeSegment(
+	defs: BpmnDefinitions,
+	edgeId: string,
+	segIdx: number,
+	isHoriz: boolean,
+	delta: number,
+): BpmnDefinitions {
+	const diagram = defs.diagrams[0];
+	if (!diagram) return defs;
+	const edge = diagram.plane.edges.find((e) => e.bpmnElement === edgeId);
+	if (!edge || segIdx >= edge.waypoints.length - 1) return defs;
+	const newWaypoints = edge.waypoints.map((wp, i) => {
+		if (i === segIdx || i === segIdx + 1) {
+			return isHoriz ? { ...wp, y: wp.y + delta } : { ...wp, x: wp.x + delta };
+		}
+		return wp;
+	});
+	const newEdges = diagram.plane.edges.map((e) =>
+		e.bpmnElement === edgeId ? { ...e, waypoints: newWaypoints } : e,
+	);
+	return {
+		...defs,
+		diagrams: [
+			{ ...diagram, plane: { ...diagram.plane, edges: newEdges } },
+			...defs.diagrams.slice(1),
+		],
+	};
+}
+
+/**
+ * Inserts a new waypoint between waypoints[segIdx] and waypoints[segIdx+1].
+ * Used for free-form bend creation (diagonal movement allowed).
+ */
+export function insertEdgeWaypoint(
+	defs: BpmnDefinitions,
+	edgeId: string,
+	segIdx: number,
+	pt: { x: number; y: number },
+): BpmnDefinitions {
+	const diagram = defs.diagrams[0];
+	if (!diagram) return defs;
+	const edge = diagram.plane.edges.find((e) => e.bpmnElement === edgeId);
+	if (!edge) return defs;
+	const newWaypoints = [
+		...edge.waypoints.slice(0, segIdx + 1),
+		pt,
+		...edge.waypoints.slice(segIdx + 1),
+	];
+	const newEdges = diagram.plane.edges.map((e) =>
+		e.bpmnElement === edgeId ? { ...e, waypoints: newWaypoints } : e,
+	);
+	return {
+		...defs,
+		diagrams: [
+			{ ...diagram, plane: { ...diagram.plane, edges: newEdges } },
+			...defs.diagrams.slice(1),
+		],
+	};
+}
+
+/**
+ * Moves a single intermediate waypoint (by index) to a new position.
+ * Start (0) and end (last) waypoints are not moveable via this function.
+ */
+export function moveEdgeWaypoint(
+	defs: BpmnDefinitions,
+	edgeId: string,
+	wpIdx: number,
+	pt: { x: number; y: number },
+): BpmnDefinitions {
+	const diagram = defs.diagrams[0];
+	if (!diagram) return defs;
+	const edge = diagram.plane.edges.find((e) => e.bpmnElement === edgeId);
+	if (!edge || wpIdx <= 0 || wpIdx >= edge.waypoints.length - 1) return defs;
+	const newWaypoints = edge.waypoints.map((wp, i) => (i === wpIdx ? { ...pt } : wp));
+	const newEdges = diagram.plane.edges.map((e) =>
+		e.bpmnElement === edgeId ? { ...e, waypoints: newWaypoints } : e,
+	);
+	return {
+		...defs,
+		diagrams: [
+			{ ...diagram, plane: { ...diagram.plane, edges: newEdges } },
+			...defs.diagrams.slice(1),
+		],
+	};
+}
+
+/**
+ * Removes intermediate waypoints that lie exactly on the straight line between
+ * their neighbours. Runs iteratively until no more collinear waypoints remain.
+ */
+export function removeCollinearWaypoints(defs: BpmnDefinitions, edgeId: string): BpmnDefinitions {
+	const diagram = defs.diagrams[0];
+	if (!diagram) return defs;
+	const edge = diagram.plane.edges.find((e) => e.bpmnElement === edgeId);
+	if (!edge || edge.waypoints.length < 3) return defs;
+
+	const EPS = 1.0;
+	let waypoints = [...edge.waypoints];
+	let changed = true;
+	while (changed) {
+		changed = false;
+		const filtered: BpmnWaypoint[] = [waypoints[0] as BpmnWaypoint];
+		for (let i = 1; i < waypoints.length - 1; i++) {
+			const a = waypoints[i - 1] as BpmnWaypoint;
+			const b = waypoints[i] as BpmnWaypoint;
+			const c = waypoints[i + 1] as BpmnWaypoint;
+			const cross = Math.abs((c.x - a.x) * (b.y - a.y) - (b.x - a.x) * (c.y - a.y));
+			if (cross < EPS) {
+				changed = true;
+			} else {
+				filtered.push(b);
+			}
+		}
+		filtered.push(waypoints[waypoints.length - 1] as BpmnWaypoint);
+		waypoints = filtered;
+	}
+
+	const newEdges = diagram.plane.edges.map((e) =>
+		e.bpmnElement === edgeId ? { ...e, waypoints } : e,
+	);
+	return {
+		...defs,
+		diagrams: [
+			{ ...diagram, plane: { ...diagram.plane, edges: newEdges } },
+			...defs.diagrams.slice(1),
+		],
+	};
+}
+
 // ── Change element type ───────────────────────────────────────────────────────
 
 /**

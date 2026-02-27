@@ -1,5 +1,5 @@
 {
-	"name": "@bpmn-sdk/canvas-plugin-tabs",
+	"name": "@bpmn-sdk/canvas-plugin-form-editor",
 	"version": "0.0.1",
 	"private": false,
 	"type": "module",
@@ -18,10 +18,6 @@
 		"test": "vitest run"
 	},
 	"dependencies": {
-		"@bpmn-sdk/canvas": "workspace:*",
-		"@bpmn-sdk/canvas-plugin-dmn-editor": "workspace:*",
-		"@bpmn-sdk/canvas-plugin-feel-playground": "workspace:*",
-		"@bpmn-sdk/canvas-plugin-form-editor": "workspace:*",
 		"@bpmn-sdk/core": "workspace:*"
 	}
 }

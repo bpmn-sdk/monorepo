@@ -1,5 +1,186 @@
 # Progress
 
+## 2026-02-27 — Native DMN + Form editors (zero external deps)
+
+Replaced `dmn-js` and `@bpmn-io/form-js-editor` with fully in-repo native implementations.
+
+### `canvas-plugins/dmn-editor`
+- **Rewrote `DmnEditor`** — native editable decision table; no external deps
+  - Parses XML once via `Dmn.parse`; serializes on demand via `Dmn.export`; model stays in memory during editing
+  - Editable name input + hit policy `<select>` per decision
+  - Add / remove input and output columns; add / remove rules (rows)
+  - Each cell is a `<textarea>` bound directly to the model entry; re-render only on structural changes
+  - New **`css.ts`** — `injectDmnEditorStyles()` injects scoped `--dme-*` CSS variables; same dark-default / `.light` override pattern as the viewer
+  - Removed `dmn-js` dependency; added `@bpmn-sdk/core: workspace:*`
+
+### `canvas-plugins/form-editor`
+- **Rewrote `FormEditor`** — native two-panel component editor; no external deps
+  - Parses schema via `Form.parse`; exports via `Form.export`
+  - Left panel: scrollable list of all components (flat + nested groups); click to select; up/down reorder; delete
+  - Right panel: property editor for selected component (label, key, required, options list, etc.)
+  - "Add" button opens a popup dropdown grouped by category (Fields / Display / Advanced / Layout)
+  - Supports all component types: `textfield`, `textarea`, `number`, `select`, `radio`, `checkbox`, `checklist`, `taglist`, `filepicker`, `datetime`, `expression`, `table`, `text`, `html`, `image`, `button`, `separator`, `spacer`, `iframe`, `group`, `dynamiclist`
+  - New **`css.ts`** — `injectFormEditorStyles()` injects scoped `--fe-*` CSS variables
+  - Removed `@bpmn-io/form-js-editor` dependency; added `@bpmn-sdk/core: workspace:*`
+
+### Other changes
+- **Root `package.json`** — removed `dmn-js` and `@bpmn-io/form-js-editor` from `dependencies`
+- **`apps/landing/src/editor.ts`** — removed the 6 CSS import lines for dmn-js / form-js-editor assets
+- **`canvas-plugins/tabs/tests/tabs-plugin.test.ts`** — removed `vi.mock` blocks; native DOM editors run fine in happy-dom
+
+## 2026-02-27 — DMN and Form editing
+
+### New packages
+- **`canvas-plugins/dmn-editor`** → `@bpmn-sdk/canvas-plugin-dmn-editor` — thin wrapper around `dmn-js` DmnModeler; exports `DmnEditor` class with `loadXML(xml)`, `getXML()`, `onChange(handler)`, and `destroy()` API; no TypeScript types shipped by dmn-js so uses `@ts-expect-error` import suppression
+- **`canvas-plugins/form-editor`** → `@bpmn-sdk/canvas-plugin-form-editor` — wraps `@bpmn-io/form-js-editor` FormEditor; exports `FormEditor` class with `loadSchema(schema)`, `getSchema()`, `onChange(handler)`, and `destroy()` API
+
+### `canvas-plugins/tabs`
+- **DMN tabs now editable** — replaces the read-only `DmnViewer` with `DmnEditor` (dmn-js DmnModeler); the editor is initialized with the XML exported from the tab's `DmnDefinitions`; on every `commandStack.changed` event the XML is re-exported, parsed back to `DmnDefinitions`, and stored in the tab config
+- **Form tabs now editable** — replaces the read-only `FormViewer` with `FormEditor` (`@bpmn-io/form-js-editor`); the editor is initialized with the JSON exported from the tab's `FormDefinition`; on every `changed` event the schema is exported, parsed, and stored in the tab config
+- **`onTabChange` callback** — new optional `TabsPluginOptions.onTabChange(tabId, config)` called whenever a DMN or Form tab's content changes; used by the landing app to trigger auto-save
+- **Dependency swap** — `@bpmn-sdk/canvas-plugin-dmn-viewer` and `@bpmn-sdk/canvas-plugin-form-viewer` removed from deps; `@bpmn-sdk/canvas-plugin-dmn-editor` and `@bpmn-sdk/canvas-plugin-form-editor` added
+- **Tests updated** — DMN fixture updated to correct `DmnDefinitions` structure (with proper `decisionTable` + namespace); editor packages mocked in tests so dmn-js/inferno rendering is skipped in happy-dom
+
+### `apps/landing`
+- **CSS assets** — dmn-js and form-js-editor CSS files imported as Vite side-effects at the top of `editor.ts`; `vite-env.d.ts` added with `/// <reference types="vite/client" />` so TypeScript accepts CSS imports
+- **Auto-save for DMN/Form** — `onTabChange` callback wired to `storagePlugin.api.scheduleSave()` so edits in the DMN or Form editor are auto-saved with the same 500 ms debounce as BPMN
+
+### Root
+- `dmn-js ^17.7.0` and `@bpmn-io/form-js-editor ^1.19.0` added to root `package.json` devDependencies
+
+## 2026-02-27 — File switcher: Alt-Tab-style cycle mode
+
+### `apps/landing`
+- **Ctrl+E (hold) cycle behavior** — pressing Ctrl+E opens the file switcher pre-focused on the second MRU entry; each additional E press (while Ctrl is still held) cycles to the next file in the list; releasing Ctrl commits the selection and switches to that file
+- **Search mode via Tab / ArrowRight** — pressing Tab or ArrowRight while in cycle mode focuses the search input and detaches the Ctrl-release commit; the switcher now stays open until Enter (commit), Esc (cancel), or a click; ArrowDown/Up navigate the list from either mode
+- **kbd hint updated** — hint row now shows `E cycle  Tab search  Esc close`
+- **scrollIntoView** — `updateFocus()` scrolls the highlighted item into view when the list overflows
+
+## 2026-02-27 — Properties panel feature parity
+
+### `canvas-plugins/config-panel-bpmn`
+- **Timer events** — new `TIMER_SCHEMA` + `TIMER_ADAPTER`; shows "Timer type" select (Cycle / Duration / Date) and the matching FEEL expression field; handles `startEvent`, `intermediateCatchEvent`, `boundaryEvent` with timer definitions; reads/writes `BpmnTimerEventDefinition` fields directly
+- **Message events** — new `MESSAGE_EVENT_SCHEMA` + `MESSAGE_ADAPTER`; shows "Message name" and "Correlation key" FEEL fields; reads/writes `zeebe:message` extension element; applies to `messageCatchEvent`, `messageStartEvent`, `messageEndEvent`, `messageThrowEvent`, `boundaryEvent` with message def, and `receiveTask`
+- **Signal events** — new `SIGNAL_EVENT_SCHEMA` + `SIGNAL_ADAPTER`; "Signal name" FEEL field; reads/writes `zeebe:signal` extension; applies to all signal variants and `boundaryEvent`
+- **Error events** — new `ERROR_EVENT_SCHEMA` + `ERROR_ADAPTER`; "Error code" FEEL field; reads/writes `zeebe:error` extension; applies to `errorEndEvent` and error `boundaryEvent`
+- **Escalation events** — new `ESCALATION_EVENT_SCHEMA` + `ESCALATION_ADAPTER`; "Escalation code" FEEL field; reads/writes `zeebe:escalation` extension; applies to escalation throw/catch variants
+- **Conditional events** — new `CONDITIONAL_EVENT_SCHEMA` + `CONDITIONAL_ADAPTER`; "Condition expression" FEEL field; reads/writes `BpmnConditionalEventDefinition.condition`; applies to conditional start, catch, and boundary events
+- **Event dispatcher adapters** — `START_EVENT_ADAPTER`, `END_EVENT_ADAPTER`, `CATCH_EVENT_ADAPTER`, `THROW_EVENT_ADAPTER`, `BOUNDARY_EVENT_ADAPTER` each use `resolve()` to delegate to the matching event-specific schema based on `eventDefinitions[0].type`; plain events (no definition) fall back to `GENERAL_SCHEMA`
+- **New general types** — `subProcess`, `transaction`, `manualTask`, `task`, `complexGateway` added to `GENERAL_TYPES`; `receiveTask` promoted to the `MESSAGE_EVENT_SCHEMA`; `startEvent` and `endEvent` moved to their own dispatcher adapters
+- **Zeebe event extension helpers** — `parseZeebeMessage`, `parseZeebeSignal`, `parseZeebeError`, `parseZeebeEscalation` added to `util.ts`
+
+## 2026-02-27 — File switcher palette (Ctrl+E)
+
+### `apps/landing`
+- **`Ctrl+E` / `Cmd+E` file switcher** — opens a palette (identical visual to the command palette) showing all open project files in MRU order; pre-focuses the second entry (most-recently previous file); supports text filtering, arrow-key navigation, Enter to switch, Esc to close; closed by pressing `Ctrl+E` again; only active when a project is open; reuses command palette CSS classes from `@bpmn-sdk/canvas-plugin-command-palette`; `storageFileToType` cache added to show file type badge in each row; shortcut chosen because it is left-hand accessible, non-conflicting with browser tab management, and mirrors IntelliJ's "Recent Files" shortcut
+
+## 2026-02-27 — Project mode: no-close tabs, all-files-open, file search, rename, Ctrl+Tab MRU
+
+### `canvas-plugins/storage`
+- **`ProjectMruRecord` type** — new `{ projectId, fileIds[] }` record type in `types.ts`; IndexedDB DB_VERSION bumped to 12; `projectMru` object store added in `db.ts`
+- **`StorageApi.getMru` / `pushMruFile`** — `getMru(projectId)` returns stored MRU file-ID list; `pushMruFile(projectId, fileId)` prepends to the list (deduplicated, max 50 entries)
+- **`StoragePluginOptions.onRenameCurrentFile`** — new optional callback called after a file is renamed via the main menu; allows the caller to update the tab display name
+- **Rename in main menu** — when a project is open and a file is active, "Rename current file…" appears in the storage plugin's dynamic menu items
+
+### `canvas-plugins/tabs`
+- **`TabsApi.setProjectMode(enabled)`** — enables or disables project mode; re-renders the tab bar
+- **`TabsApi.renameTab(id, name)`** — updates a tab's display name and re-renders the tab bar
+- **No-close in project mode** — `requestClose` is a no-op in project mode; close buttons are hidden in both the tab bar and the group dropdown
+
+### `apps/landing`
+- **All files always open** — `openProject` already calls `onOpenFile` for each file; `storageFileIdToTabId` and `storageFileToName` maps track the correspondence
+- **Project mode toggle** — `storagePlugin.api.onChange()` calls `tabsPlugin.api.setProjectMode(!!projectId)` whenever the current project changes
+- **File-search commands** — `rebuildFileCommands()` registers one command-palette command per open project file (search by name → switch to that tab); deregistered when leaving a project
+- **Rename current file** — command palette includes "Rename current file…" when in project mode; updates name in the display, maps, and IndexedDB; also accessible via main menu
+- **MRU persistence** — `tabMruOrder` maintained in memory; order loaded from IndexedDB on project open and persisted on every tab switch via `pushMruFile`; Ctrl+Tab handler not implemented (browser reserves the shortcut and cannot be overridden); file switching available via Ctrl+K command palette
+
+## 2026-02-27 — Edge waypoint hover dot fix + snap guides
+
+### `packages/editor`
+- **Fix: `_nearestSegment` for diagonal edges** — replaced the orthogonal-only projection (`x = a.x` / `y = a.y`) with a proper perpendicular dot-product projection onto the segment line (`t = clamp((P-A)·(B-A)/|B-A|², 0, 1)`, `proj = A + t*(B-A)`); the hover dot now appears at the geometrically correct nearest point on any segment orientation; `isHoriz` is now determined by `|dy| ≤ |dx|` (predominant direction) rather than requiring near-zero delta
+- **Waypoint snap (magnet lines)** — new `_snapWaypoint(pt)` helper snaps a diagram point to shape bounds key positions (left/center-x/right + top/center-y/bottom) and all edge waypoints within an 8px/scale threshold; returns snapped point and alignment guide lines; applied to both `previewWaypointInsert` / `commitWaypointInsert` and `previewWaypointMove` / `commitWaypointMove`; alignment guides cleared on commit and cancel
+
+## 2026-02-27 — Edge waypoint interaction redesign
+
+### `packages/editor`
+- **Waypoint angle balls** — hovering over any edge now shows blue circles (`bpmn-edge-waypoint-ball`) at every intermediate waypoint (bend point); visible only on hover, hidden when cursor leaves; new SVG layer `_edgeWaypointsG` in `OverlayRenderer`; `setEdgeWaypointBalls(waypoints, edgeId)` method added
+- **Move existing waypoints** — clicking and dragging a waypoint ball moves the bend point; `HitResult` extended with `edge-waypoint { id, wpIdx, pt }` variant; state machine states `pointing-edge-waypoint` and `dragging-edge-waypoint` added; `previewWaypointMove` / `commitWaypointMove` / `cancelWaypointMove` callbacks
+- **Collinear waypoint removal** — after every waypoint insert or move, `removeCollinearWaypoints()` runs and removes any intermediate waypoint that lies exactly on the straight line between its neighbours; prevents accumulation of redundant bend points
+- **Segment drag simplified** — removed direction-based disambiguation; dragging any edge segment always inserts a new waypoint (no more segment-shift mode); `dragging-edge-segment` state, `previewSegmentMove` / `commitSegmentMove` / `cancelSegmentMove` callbacks, and `setCursor` callback all removed
+- **`HitResult` & `Callbacks`** — `edge-waypoint` type added; `previewSegmentMove`, `commitSegmentMove`, `cancelSegmentMove`, `setCursor` removed from `Callbacks`; waypoint move and ball show/hide callbacks added
+- **`modeling.ts` additions** — `moveEdgeWaypoint(defs, edgeId, wpIdx, pt)` and `removeCollinearWaypoints(defs, edgeId)`
+
+## 2026-02-27 — Edge improvements, raw mode button relocation, obstacle routing
+
+### `canvas-plugins/tabs`
+- **Raw mode button relocated** — raw source toggle button removed from the tab bar; exposed via `TabsApi.rawModeButton`; tab bar CSS for `.bpmn-raw-mode-btn` removed
+
+### `packages/editor`
+- **Raw mode button in HUD** — `HudOptions` accepts `rawModeButton?: HTMLButtonElement | null`; when provided the button is styled as a `hud-btn` and appended (with a separator) to the bottom-left HUD panel
+- **Obstacle-avoiding edge routing** — new `computeWaypointsAvoiding(src, tgt, obstacles)` in `geometry.ts`; tries all 16 port combinations and returns the first route that does not intersect any obstacle shape (2 px margin); used in `_doConnect()` and `addConnectedElement()` so new edges automatically route around existing elements
+- **Edge segment drag** — hovering over an edge segment shows a blue dot at the projected cursor position and changes the cursor to `ns-resize` (horizontal segment) or `ew-resize` (vertical); dragging perpendicularly (steeper than 45°) moves the entire segment while maintaining orthogonality of the adjacent segments; state machine states: `pointing-edge-segment`, `dragging-edge-segment`
+- **Edge waypoint insertion** — dragging an edge at a shallower angle (more parallel than perpendicular) inserts a new free-form waypoint at the drag position; diagonal movements allowed; state machine state: `dragging-edge-waypoint-new`
+- **`HitResult` extended** — new `edge-segment` variant `{ type, id, segIdx, isHoriz, projPt }` returned by `_hitTest()` when hovering an edge; `_nearestSegment()` helper computes the nearest segment and its projection
+- **`modeling.ts` additions** — `moveEdgeSegment(defs, edgeId, segIdx, isHoriz, delta)` and `insertEdgeWaypoint(defs, edgeId, segIdx, pt)`
+- **Overlay** — new `_edgeHoverDotG` SVG layer and `setEdgeHoverDot(pt|null)` method; blue dot styled with `.bpmn-edge-hover-dot`
+
+### `apps/landing`
+- Passes `rawModeButton: tabsPlugin.api.rawModeButton` to `initEditorHud()`
+
+## 2026-02-27 — Unified tab bar (HUD + main menu integration)
+
+### `canvas-plugins/main-menu`
+- **Flush tab bar layout** — `.bpmn-main-menu-panel` restyled from a floating card (`top: 12px; right: 12px; border-radius: 8px; box-shadow`) to a flush right-side segment of the tab bar (`top: 0; right: 0; height: 36px; border-radius: 0; box-shadow: none; border-left: 1px solid`); background matches the tabs dark/light theme (`#181825` / `#f0f4f8`) via `[data-theme="dark"]` selector
+- **Auto padding-right** — CSS `:has()` rule adds `padding-right: 160px` to `.bpmn-tabs` whenever `.bpmn-main-menu-panel` is visible, preventing the raw-mode button from scrolling under the menu
+
+### `packages/editor`
+- **HUD top-center flush** — `#hud-top-center` moved to `top: 0; height: 36px`; `#hud-top-center.panel` overrides strip the floating card (transparent background, no blur, no border-radius, no shadow) for both dark and light themes; center action buttons (undo/redo/delete/etc.) now sit visually inside the tab bar row
+
+## 2026-02-27 — Export project ZIP, new file shortcuts, raw source toggle
+
+### `canvas-plugins/storage`
+- **Export project as ZIP** — new "Export Project…" action in the main menu when a project is open; builds a ZIP (STORE method, no external deps) from all project files and triggers a browser download named `<project>.zip`; pure TypeScript ZIP implementation in `src/export.ts` with CRC-32 and full central directory
+- **`StorageApi.getProjectName(id)`** — looks up a project name from the in-memory cache; used by the ZIP exporter
+
+### `canvas-plugins/tabs`
+- **Raw/rendered toggle** — `</>` icon button at the right end of the tab bar; toggles a raw source overlay (`<pre>`) showing the current tab's BPMN XML, DMN XML, or Form JSON; disabled for FEEL tabs; stays in sync with `diagram:change` events; per-session state persists while tabs are open, resets on `closeAllTabs()`
+
+### `apps/landing`
+- **"New…" drill menu** — top-right menu now has a "New…" drill-down with three entries: "New BPMN diagram" (empty with a start event), "New DMN table" (minimal decision table), "New Form" (empty form)
+- New helper `makeEmptyDmnXml()` for blank DMN table XML
+
+## 2026-02-27 — Leave workspace, recent projects dropdown, plugin-managed tab XML/processes
+
+### `canvas-plugins/tabs`
+- **`closeAllTabs()`** — new `TabsApi` method that closes all tabs without a confirmation dialog and shows the welcome screen
+- **`navigateToProcess(processId)`** — new `TabsApi` method; the plugin now internally tracks which BPMN process is in which tab (populated when `openTab` is called and updated on `diagram:change`)
+- **`getAvailableProcesses()`** — new `TabsApi` method; returns all tracked process IDs with display names
+- **`getAllTabContent()`** — new `TabsApi` method; returns serialized content (XML / DMN / Form JSON) for all non-FEEL tabs; BPMN tabs use the current (post-edit) XML
+- **Auto XML tracking** — subscribes to `diagram:change` in `install()`; updates the active BPMN tab's `config.xml` in place so `onTabActivate` always receives the latest content
+- **"Open recent" dropdown** — new `getRecentProjects` option on `TabsPluginOptions`; when provided, renders a dropdown button below "Import files…" on the welcome screen; disabled when no projects available; rebuilt each time the welcome screen is shown
+- Exported new types: `WelcomeRecentItem`, `TabContentSnapshot`
+
+### `canvas-plugins/storage`
+- **`onLeaveProject` option** — called when the user clicks "Leave" in the project info bar; used by the landing app to close all tabs and show the welcome screen
+- **No auto-restore on load** — `install()` no longer opens last-project files on startup; the welcome screen is always shown initially; `getRecentProjects()` enables explicit re-opening
+- **`StorageApi.getRecentProjects()`** — returns top 10 projects sorted by `updatedAt` (most recently saved first), including workspace info; uses in-memory cache
+- **Project `updatedAt` bumped on auto-save** — `_persistContent` now also updates the project's `updatedAt` timestamp and in-memory cache entry so `getRecentProjects()` stays sorted
+
+### `apps/landing`
+- **"Leave Workspace" → welcome screen** — wired `onLeaveProject: () => tabsPlugin.api.closeAllTabs()`
+- **Simplified `editor.ts`** — removed `tabCurrentXml`, `activeBpmnTabId`, `openTabConfigs`, `bpmnProcessToTabId`, `bpmnProcessNames` maps; removed `diagram:change` subscription; replaced `getOpenTabs` with `tabsPlugin.api.getAllTabContent()`; replaced manual process navigation with `tabsPlugin.api.navigateToProcess()` and `tabsPlugin.api.getAvailableProcesses()`
+- `getWelcomeSections` replaced by `getRecentProjects` (dropdown shows 10 most recently saved projects)
+
+## 2026-02-27 — Remove Dexie dependency; fix auto-save tab content reset
+
+### `canvas-plugins/storage`
+- **Removed Dexie**: replaced with a minimal native IndexedDB wrapper (`db.ts`) that matches the same API surface — no external dependency, no change to `storage-api.ts`
+- Native wrapper supports: `get`, `add`, `update`, `delete`, `orderBy().toArray()`, `where().equals().toArray/sortBy/delete()`, `filter().toArray()`; all operations are Promise-based using modern IndexedDB (microtask-safe transactions)
+
+### `apps/landing`
+- **Auto-save fix**: `onTabActivate` was reloading `config.xml` (the original XML from when the tab was created) every time a BPMN tab was reactivated, making the editor appear to lose edits on every tab switch; now a `tabCurrentXml` map tracks the latest XML per tab (updated on every `diagram:change`), and reactivation uses that map so the editor always shows the most recent content
+- `openTabConfigs` (used by "Save All to Project") is also kept in sync via the `diagram:change` listener
+
 ## 2026-02-26 — Bug fixes: auto-save, welcome screen project navigation, call activity process linking
 
 ### `canvas-plugins/config-panel`

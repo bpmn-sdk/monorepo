@@ -80,6 +80,14 @@ export class StorageApi {
 		return this._projects.get(wsId) ?? [];
 	}
 
+	getProjectName(id: string): string | null {
+		for (const projects of this._projects.values()) {
+			const p = projects.find((pr) => pr.id === id);
+			if (p) return p.name;
+		}
+		return null;
+	}
+
 	/** Open a project: sets it as current and returns its files. */
 	async openProject(id: string): Promise<FileRecord[]> {
 		this.setCurrentProjectId(id);
@@ -316,7 +324,63 @@ export class StorageApi {
 		} else {
 			await db.fileContents.add({ fileId, content, version: 1 });
 		}
-		await db.files.update(fileId, { updatedAt: now() });
+		const ts = now();
+		await db.files.update(fileId, { updatedAt: ts });
+		// Bump project's updatedAt so it sorts correctly in getRecentProjects
+		if (this._currentProjectId !== null) {
+			await db.projects.update(this._currentProjectId, { updatedAt: ts });
+			this._updateProjectCacheTimestamp(this._currentProjectId, ts);
+		}
+	}
+
+	private _updateProjectCacheTimestamp(projectId: string, ts: number): void {
+		for (const [wsId, projects] of this._projects) {
+			const idx = projects.findIndex((p) => p.id === projectId);
+			if (idx === -1) continue;
+			this._projects.set(
+				wsId,
+				projects.map((p) => (p.id === projectId ? { ...p, updatedAt: ts } : p)),
+			);
+			break;
+		}
+	}
+
+	// ─── MRU (most-recently-used files per project) ───────────────────────────────
+
+	/** Returns the MRU file-ID list for a project (most recent first). */
+	async getMru(projectId: string): Promise<string[]> {
+		const record = await db.projectMru.get(projectId);
+		return record?.fileIds ?? [];
+	}
+
+	/** Pushes a file ID to the front of the project's MRU list (deduplicates, max 50). */
+	async pushMruFile(projectId: string, fileId: string): Promise<void> {
+		const existing = await db.projectMru.get(projectId);
+		const current = existing?.fileIds ?? [];
+		const updated = [fileId, ...current.filter((id) => id !== fileId)].slice(0, 50);
+		if (existing) {
+			await db.projectMru.update(projectId, { fileIds: updated });
+		} else {
+			await db.projectMru.add({ projectId, fileIds: updated });
+		}
+	}
+
+	// ─── Recent projects ─────────────────────────────────────────────────────────
+
+	/**
+	 * Returns up to 10 projects sorted by most recently saved (descending).
+	 * Uses the in-memory cache — call after `initialize()` completes.
+	 */
+	getRecentProjects(): Array<{ project: ProjectRecord; workspace: WorkspaceRecord }> {
+		const result: Array<{ project: ProjectRecord; workspace: WorkspaceRecord }> = [];
+		for (const [wsId, projects] of this._projects) {
+			const ws = this._workspaces.find((w) => w.id === wsId);
+			if (!ws) continue;
+			for (const p of projects) {
+				result.push({ project: p, workspace: ws });
+			}
+		}
+		return result.sort((a, b) => b.project.updatedAt - a.project.updatedAt).slice(0, 10);
 	}
 
 	// ─── Change listeners ─────────────────────────────────────────────────────────

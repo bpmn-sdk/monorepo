@@ -72,6 +72,11 @@ export interface HudOptions {
 	 * call activity. Receives the `processId` from `zeebe:calledElement`.
 	 */
 	openProcess?: (processId: string) => void;
+	/**
+	 * Optional raw mode toggle button (from `tabsPlugin.api.rawModeButton`).
+	 * When provided, it is styled as a HUD button and placed in the bottom-left panel.
+	 */
+	rawModeButton?: HTMLButtonElement | null;
 }
 
 export function initEditorHud(editor: BpmnEditor, options: HudOptions = {}): void {
@@ -131,6 +136,13 @@ export function initEditorHud(editor: BpmnEditor, options: HudOptions = {}): voi
 	hudBottomLeft.id = "hud-bottom-left";
 	hudBottomLeft.className = "hud panel";
 	hudBottomLeft.append(btnZoomCurrent, zoomExpanded);
+
+	if (options.rawModeButton) {
+		const btn = options.rawModeButton;
+		btn.className = "hud-btn";
+		const sep = hudSep();
+		hudBottomLeft.append(sep, btn);
+	}
 
 	// Tool selector — bottom center
 	const btnSelect = hudBtn("btn-select", "Select (V)");

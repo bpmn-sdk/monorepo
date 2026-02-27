@@ -4,9 +4,7 @@ import { createConfigPanelPlugin } from "@bpmn-sdk/canvas-plugin-config-panel";
 import { createConfigPanelBpmnPlugin } from "@bpmn-sdk/canvas-plugin-config-panel-bpmn";
 import { createMainMenuPlugin } from "@bpmn-sdk/canvas-plugin-main-menu";
 import { createStoragePlugin } from "@bpmn-sdk/canvas-plugin-storage";
-import type { FileType } from "@bpmn-sdk/canvas-plugin-storage";
 import { InMemoryFileResolver, createTabsPlugin } from "@bpmn-sdk/canvas-plugin-tabs";
-import type { WelcomeSection } from "@bpmn-sdk/canvas-plugin-tabs";
 import { createWatermarkPlugin } from "@bpmn-sdk/canvas-plugin-watermark";
 import { createZoomControlsPlugin } from "@bpmn-sdk/canvas-plugin-zoom-controls";
 import { Bpmn, Dmn, Form } from "@bpmn-sdk/core";
@@ -91,6 +89,19 @@ function makeEmptyBpmnXml(processId: string, processName: string): string {
 </bpmn:definitions>`;
 }
 
+function makeEmptyDmnXml(): string {
+	const id = Math.random().toString(36).slice(2, 9);
+	return `<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/"
+  id="Definitions_${id}" name="New Decision" namespace="http://bpmn.io/schema/dmn">
+  <decision id="Decision_${id}" name="Decision 1">
+    <decisionTable id="decisionTable_${id}" hitPolicy="UNIQUE">
+      <output id="output_${id}" label="Result" name="result" typeRef="string"/>
+    </decisionTable>
+  </decision>
+</definitions>`;
+}
+
 // ── Setup ──────────────────────────────────────────────────────────────────────
 
 const editorContainer = document.getElementById("editor-container");
@@ -99,16 +110,21 @@ if (!editorContainer) throw new Error("missing #editor-container");
 // File resolver — shared between the tabs plugin and the config panel callbacks
 const resolver = new InMemoryFileResolver();
 
-// Maps BPMN process IDs to the tab ID that holds that process, for navigation.
-const bpmnProcessToTabId = new Map<string, string>();
-// Maps BPMN process IDs to the process name, for display in the call activity picker.
-const bpmnProcessNames = new Map<string, string>();
-
 // Maps tab ID → storage file ID for tabs opened from the storage plugin.
 const tabIdToStorageFileId = new Map<string, string>();
+// Reverse map: storage file ID → tab ID.
+const storageFileIdToTabId = new Map<string, string>();
+// Display name cache for storage files (kept in sync with renaming).
+const storageFileToName = new Map<string, string>();
+// File type cache ("bpmn" | "dmn" | "form") for the file switcher description.
+const storageFileToType = new Map<string, string>();
 
-// Tracks latest content of each open tab for "Save All to Project"
-const openTabConfigs = new Map<string, { name: string; type: FileType; content: string }>();
+// Ctrl+Tab MRU: tab IDs ordered by most-recently-activated (index 0 = most recent).
+let tabMruOrder: string[] = [];
+// Deregister function for the current set of file-search palette commands.
+let removeFileCommands: (() => void) | undefined;
+// Last known project ID — used to detect project changes in onChange.
+let lastProjectId: string | null = null;
 
 let editorRef: BpmnEditor | null = null;
 
@@ -130,34 +146,19 @@ const tabsPlugin = createTabsPlugin({
 	get examples() {
 		return makeExamples(tabsPlugin.api, resolver);
 	},
-	getWelcomeSections(): WelcomeSection[] {
-		const workspaces = storagePlugin.api.getCachedWorkspaces();
-		const items: Array<{ label: string; description: string; onOpen: () => void }> = [];
-		for (const ws of workspaces) {
-			for (const proj of storagePlugin.api.getCachedProjects(ws.id)) {
-				const wsName = ws.name;
-				const projName = proj.name;
-				const projId = proj.id;
-				items.push({
-					label: projName,
-					description: wsName,
-					onOpen: () => {
-						void storagePlugin.api.openProject(projId).then(() => {
-							mainMenuPlugin.api.setTitle(`${wsName} / ${projName}`);
-						});
-					},
+	getRecentProjects() {
+		return storagePlugin.api.getRecentProjects().map(({ project, workspace }) => ({
+			label: project.name,
+			description: workspace.name,
+			onOpen: () => {
+				void storagePlugin.api.openProject(project.id).then(() => {
+					mainMenuPlugin.api.setTitle(`${workspace.name} / ${project.name}`);
 				});
-			}
-		}
-		if (items.length === 0) return [];
-		return [{ label: "Projects", getItems: () => items }];
+			},
+		}));
 	},
 	onNewDiagram() {
-		const tabId = tabsPlugin.api.openTab({ type: "bpmn", xml: SAMPLE_XML, name: "New Diagram" });
-		for (const proc of Bpmn.parse(SAMPLE_XML).processes) {
-			bpmnProcessToTabId.set(proc.id, tabId);
-			bpmnProcessNames.set(proc.id, proc.name ?? proc.id);
-		}
+		tabsPlugin.api.openTab({ type: "bpmn", xml: SAMPLE_XML, name: "New Diagram" });
 	},
 	onImportFiles() {
 		fileInput.click();
@@ -171,26 +172,24 @@ const tabsPlugin = createTabsPlugin({
 		// Restore all HUDs and the main menu when any tab is active
 		setHudVisible(true);
 
+		// The tabs plugin keeps config.xml up to date on every diagram:change,
+		// so we always load the current content when switching tabs.
 		if (config.type === "bpmn" && config.xml) {
 			editorRef?.load(config.xml);
-			// Snapshot current content for "Save All to Project"
-			openTabConfigs.set(id, { name: config.name ?? "Diagram", type: "bpmn", content: config.xml });
-		} else if (config.type === "dmn") {
-			openTabConfigs.set(id, {
-				name: config.name ?? "Decision",
-				type: "dmn",
-				content: Dmn.export(config.defs),
-			});
-		} else if (config.type === "form") {
-			openTabConfigs.set(id, {
-				name: config.name ?? "Form",
-				type: "form",
-				content: Form.export(config.form),
-			});
 		}
 
 		// Update storage current-file pointer — ensures auto-save targets the right file
 		storagePlugin.api.setCurrentFileId(tabIdToStorageFileId.get(id) ?? null);
+
+		// Update MRU order (project mode only)
+		if (storagePlugin.api.getCurrentProjectId()) {
+			tabMruOrder = [id, ...tabMruOrder.filter((tid) => tid !== id)];
+			const fileId = tabIdToStorageFileId.get(id);
+			const projectId = storagePlugin.api.getCurrentProjectId();
+			if (fileId && projectId) {
+				void storagePlugin.api.pushMruFile(projectId, fileId);
+			}
+		}
 
 		// Hide BPMN-only toolbars on non-BPMN views
 		for (const hudId of BPMN_ONLY_HUD) {
@@ -226,6 +225,17 @@ const tabsPlugin = createTabsPlugin({
 		a.click();
 		URL.revokeObjectURL(url);
 	},
+	onTabChange(tabId, _config) {
+		// Auto-save DMN/Form content when edited
+		const fileId = tabIdToStorageFileId.get(tabId);
+		if (!fileId) return;
+		// getAllTabContent() pulls the latest content from the editor via the parsed defs/form
+		const snapshots = tabsPlugin.api.getAllTabContent();
+		const snapshot = snapshots.find((s) => s.tabId === tabId);
+		if (snapshot) {
+			storagePlugin.api.scheduleSave(fileId, snapshot.content);
+		}
+	},
 });
 
 // ── File import logic ──────────────────────────────────────────────────────────
@@ -239,12 +249,8 @@ async function importFiles(files: FileList | File[]): Promise<void> {
 			const text = await file.text();
 
 			if (ext === ".bpmn" || ext === ".xml") {
-				const bpmnDefs = Bpmn.parse(text);
-				const tabId = tabsPlugin.api.openTab({ type: "bpmn", xml: text, name });
-				for (const proc of bpmnDefs.processes) {
-					bpmnProcessToTabId.set(proc.id, tabId);
-					bpmnProcessNames.set(proc.id, proc.name ?? proc.id);
-				}
+				Bpmn.parse(text); // validate — throws on malformed XML
+				tabsPlugin.api.openTab({ type: "bpmn", xml: text, name });
 			} else if (ext === ".dmn") {
 				const defs = Dmn.parse(text);
 				resolver.registerDmn(defs);
@@ -295,7 +301,43 @@ const mainMenuPlugin = createMainMenuPlugin({
 	title: "BPMN SDK",
 	menuItems: [
 		{
-			label: "Import files…",
+			type: "drill",
+			label: "New\u2026",
+			items: [
+				{
+					label: "New BPMN diagram",
+					onClick: () => {
+						const processId = `Process_${Math.random().toString(36).slice(2, 9)}`;
+						tabsPlugin.api.openTab({
+							type: "bpmn",
+							xml: makeEmptyBpmnXml(processId, "New Process"),
+							name: "New Diagram",
+						});
+					},
+				},
+				{
+					label: "New DMN table",
+					onClick: () => {
+						const defs = Dmn.parse(makeEmptyDmnXml());
+						resolver.registerDmn(defs);
+						tabsPlugin.api.openTab({ type: "dmn", defs, name: "New Decision" });
+					},
+				},
+				{
+					label: "New Form",
+					onClick: () => {
+						const id = `Form_${Math.random().toString(36).slice(2, 9)}`;
+						tabsPlugin.api.openTab({
+							type: "form",
+							form: { id, type: "default", components: [] },
+							name: "New Form",
+						});
+					},
+				},
+			],
+		},
+		{
+			label: "Import files\u2026",
 			icon: IMPORT_ICON,
 			onClick: () => fileInput.click(),
 		},
@@ -310,30 +352,26 @@ const mainMenuPlugin = createMainMenuPlugin({
 
 const storagePlugin = createStoragePlugin({
 	mainMenu: mainMenuPlugin,
-	getOpenTabs: () => [...openTabConfigs.entries()].map(([tabId, v]) => ({ tabId, ...v })),
+	getOpenTabs: () => tabsPlugin.api.getAllTabContent(),
 	initialTitle: "BPMN SDK",
+	onLeaveProject: () => {
+		tabsPlugin.api.closeAllTabs();
+		tabIdToStorageFileId.clear();
+		storageFileIdToTabId.clear();
+		storageFileToName.clear();
+		storageFileToType.clear();
+		tabMruOrder = [];
+	},
+	onReady: () => tabsPlugin.api.refreshWelcomeScreen(),
 	onOpenFile(file, content) {
+		let tabId: string | null = null;
 		if (file.type === "bpmn") {
-			const tabId = tabsPlugin.api.openTab({ type: "bpmn", xml: content, name: file.name });
-			tabIdToStorageFileId.set(tabId, file.id);
-			// onTabActivate fires synchronously inside openTab before the map is set,
-			// so we correct currentFileId explicitly here.
-			storagePlugin.api.setCurrentFileId(file.id);
-			try {
-				for (const proc of Bpmn.parse(content).processes) {
-					bpmnProcessToTabId.set(proc.id, tabId);
-					bpmnProcessNames.set(proc.id, proc.name ?? proc.id);
-				}
-			} catch {
-				// malformed XML — tab still opens
-			}
+			tabId = tabsPlugin.api.openTab({ type: "bpmn", xml: content, name: file.name });
 		} else if (file.type === "dmn") {
 			try {
 				const defs = Dmn.parse(content);
 				resolver.registerDmn(defs);
-				const tabId = tabsPlugin.api.openTab({ type: "dmn", defs, name: file.name });
-				tabIdToStorageFileId.set(tabId, file.id);
-				storagePlugin.api.setCurrentFileId(file.id);
+				tabId = tabsPlugin.api.openTab({ type: "dmn", defs, name: file.name });
 			} catch {
 				console.error("[storage] Failed to parse DMN:", file.name);
 			}
@@ -341,13 +379,26 @@ const storagePlugin = createStoragePlugin({
 			try {
 				const form = Form.parse(content);
 				resolver.registerForm(form);
-				const tabId = tabsPlugin.api.openTab({ type: "form", form, name: file.name });
-				tabIdToStorageFileId.set(tabId, file.id);
-				storagePlugin.api.setCurrentFileId(file.id);
+				tabId = tabsPlugin.api.openTab({ type: "form", form, name: file.name });
 			} catch {
 				console.error("[storage] Failed to parse form:", file.name);
 			}
 		}
+		if (tabId !== null) {
+			tabIdToStorageFileId.set(tabId, file.id);
+			storageFileIdToTabId.set(file.id, tabId);
+			storageFileToName.set(file.id, file.name);
+			storageFileToType.set(file.id, file.type);
+			// onTabActivate fires synchronously inside openTab before the map is set,
+			// so we correct currentFileId explicitly here.
+			storagePlugin.api.setCurrentFileId(file.id);
+		}
+	},
+	onRenameCurrentFile(fileId, name) {
+		storageFileToName.set(fileId, name);
+		const tabId = storageFileIdToTabId.get(fileId);
+		if (tabId) tabsPlugin.api.renameTab(tabId, name);
+		rebuildFileCommands();
 	},
 });
 
@@ -376,20 +427,12 @@ const configPanel = createConfigPanelPlugin({
 const configPanelBpmn = createConfigPanelBpmnPlugin(configPanel, {
 	openDecision: (decisionId) => tabsPlugin.api.openDecision(decisionId),
 	openForm: (formId) => tabsPlugin.api.openForm(formId),
-	openProcess: (processId) => {
-		const tabId = bpmnProcessToTabId.get(processId);
-		if (tabId && tabsPlugin.api.getTabIds().includes(tabId)) {
-			tabsPlugin.api.setActiveTab(tabId);
-		}
-	},
-	getAvailableProcesses: () =>
-		[...bpmnProcessToTabId.keys()].map((id) => ({ id, name: bpmnProcessNames.get(id) })),
+	openProcess: (processId) => tabsPlugin.api.navigateToProcess(processId),
+	getAvailableProcesses: () => tabsPlugin.api.getAvailableProcesses(),
 	createProcess: (name, onCreated) => {
 		const processId = `Process_${Math.random().toString(36).slice(2, 9)}`;
 		const xml = makeEmptyBpmnXml(processId, name);
-		const tabId = tabsPlugin.api.openTab({ type: "bpmn", xml, name });
-		bpmnProcessToTabId.set(processId, tabId);
-		bpmnProcessNames.set(processId, name);
+		tabsPlugin.api.openTab({ type: "bpmn", xml, name });
 		onCreated(processId);
 	},
 	openFeelPlayground: (expression) => {
@@ -404,6 +447,323 @@ palette.addCommands([
 		action: () => tabsPlugin.api.openTab({ type: "feel", name: "FEEL Playground" }),
 	},
 ]);
+
+// ── Project mode: file-search commands + Ctrl+Tab MRU ─────────────────────────
+
+/** Rebuilds file-search commands in the palette for the current project. */
+function rebuildFileCommands(): void {
+	removeFileCommands?.();
+	removeFileCommands = undefined;
+	const projectId = storagePlugin.api.getCurrentProjectId();
+	if (!projectId) return;
+
+	const cmds: Array<{ id: string; title: string; description?: string; action: () => void }> = [];
+
+	// One "switch to file" command per open project file
+	for (const [tabId, fileId] of tabIdToStorageFileId) {
+		const name = storageFileToName.get(fileId) ?? fileId;
+		const tid = tabId;
+		cmds.push({
+			id: `open-file-${fileId}`,
+			title: name,
+			description: "Switch to file",
+			action: () => tabsPlugin.api.setActiveTab(tid),
+		});
+	}
+
+	// "Rename current file" command
+	const currentFileId = storagePlugin.api.getCurrentFileId();
+	if (currentFileId && storageFileIdToTabId.has(currentFileId)) {
+		const fid = currentFileId;
+		const currentName = storageFileToName.get(fid) ?? "";
+		cmds.push({
+			id: "rename-current-file",
+			title: "Rename current file\u2026",
+			action: () => {
+				const newName = prompt("Rename file:", currentName)?.trim();
+				if (!newName || newName === currentName) return;
+				storageFileToName.set(fid, newName);
+				const tabId = storageFileIdToTabId.get(fid);
+				if (tabId) tabsPlugin.api.renameTab(tabId, newName);
+				void storagePlugin.api.renameFile(fid, newName);
+				// onChange will call rebuildFileCommands after the rename completes
+			},
+		});
+	}
+
+	removeFileCommands = palette.addCommands(cmds);
+}
+
+// React to storage changes: toggle project mode and rebuild file commands
+storagePlugin.api.onChange(() => {
+	const projectId = storagePlugin.api.getCurrentProjectId();
+	const projectChanged = projectId !== lastProjectId;
+	lastProjectId = projectId;
+
+	tabsPlugin.api.setProjectMode(!!projectId);
+
+	if (projectChanged && projectId) {
+		// Load stored MRU and apply it as the initial Ctrl+Tab order
+		void storagePlugin.api.getMru(projectId).then((fileIds) => {
+			const allTabIds = tabsPlugin.api.getTabIds();
+			const ordered: string[] = [];
+			for (const fileId of fileIds) {
+				const tabId = storageFileIdToTabId.get(fileId);
+				if (tabId && allTabIds.includes(tabId)) ordered.push(tabId);
+			}
+			for (const tabId of allTabIds) {
+				if (!ordered.includes(tabId)) ordered.push(tabId);
+			}
+			tabMruOrder = ordered;
+		});
+	} else if (!projectId) {
+		tabMruOrder = [];
+	}
+
+	rebuildFileCommands();
+});
+
+// ── File switcher (Ctrl+E / Cmd+E) ────────────────────────────────────────────
+
+const FILE_ICON =
+	'<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2h6l4 4v9H4z"/><polyline points="10,2 10,6 14,6"/></svg>';
+
+let fileSwitcherEl: HTMLDivElement | null = null;
+let _fileSwitcherKeyHandler: ((e: KeyboardEvent) => void) | null = null;
+let _fileSwitcherCtrlRelease: ((e: KeyboardEvent) => void) | null = null;
+let _fileSwitcherCycle: (() => void) | null = null;
+
+function closeFileSwitcher(): void {
+	fileSwitcherEl?.remove();
+	fileSwitcherEl = null;
+	if (_fileSwitcherKeyHandler) {
+		document.removeEventListener("keydown", _fileSwitcherKeyHandler);
+		_fileSwitcherKeyHandler = null;
+	}
+	if (_fileSwitcherCtrlRelease) {
+		document.removeEventListener("keyup", _fileSwitcherCtrlRelease);
+		_fileSwitcherCtrlRelease = null;
+	}
+	_fileSwitcherCycle = null;
+}
+
+function openFileSwitcher(): void {
+	if (!storagePlugin.api.getCurrentProjectId()) return;
+
+	const isLight = editorContainer?.dataset.theme !== "dark";
+	let focusIdx = 0;
+	let isSearchMode = false;
+
+	const overlay = document.createElement("div");
+	overlay.className = `bpmn-palette-overlay${isLight ? " bpmn-palette--light" : ""}`;
+	overlay.setAttribute("role", "dialog");
+	overlay.setAttribute("aria-modal", "true");
+	overlay.setAttribute("aria-label", "Switch to file");
+
+	const panel = document.createElement("div");
+	panel.className = "bpmn-palette-panel";
+
+	const searchRow = document.createElement("div");
+	searchRow.className = "bpmn-palette-search";
+
+	const iconEl = document.createElement("span");
+	iconEl.className = "bpmn-palette-search-icon";
+	iconEl.innerHTML = FILE_ICON;
+	searchRow.appendChild(iconEl);
+
+	const input = document.createElement("input");
+	input.type = "text";
+	input.className = "bpmn-palette-input";
+	input.placeholder = "Switch to file\u2026";
+	input.setAttribute("autocomplete", "off");
+	input.setAttribute("spellcheck", "false");
+	searchRow.appendChild(input);
+
+	const kbdHint = document.createElement("span");
+	kbdHint.className = "bpmn-palette-kbd";
+	kbdHint.innerHTML = "<kbd>E</kbd> cycle &nbsp;<kbd>Tab</kbd> search &nbsp;<kbd>Esc</kbd> close";
+	searchRow.appendChild(kbdHint);
+
+	const list = document.createElement("div");
+	list.className = "bpmn-palette-list";
+	list.setAttribute("role", "listbox");
+
+	panel.appendChild(searchRow);
+	panel.appendChild(list);
+	overlay.appendChild(panel);
+	document.body.appendChild(overlay);
+	fileSwitcherEl = overlay;
+
+	function getEntries(
+		query: string,
+	): Array<{ tabId: string; name: string; type: string; isCurrent: boolean }> {
+		const currentFileId = storagePlugin.api.getCurrentFileId();
+		const allTabIds = tabsPlugin.api.getTabIds();
+		const mru = tabMruOrder.filter((id) => allTabIds.includes(id));
+		for (const id of allTabIds) {
+			if (!mru.includes(id)) mru.push(id);
+		}
+		const q = query.toLowerCase();
+		return mru
+			.map((tabId) => {
+				const fileId = tabIdToStorageFileId.get(tabId) ?? "";
+				return {
+					tabId,
+					name: storageFileToName.get(fileId) ?? fileId,
+					type: storageFileToType.get(fileId) ?? "",
+					isCurrent: fileId === currentFileId,
+				};
+			})
+			.filter((e) => !q || e.name.toLowerCase().includes(q));
+	}
+
+	function renderList(query: string): void {
+		list.innerHTML = "";
+		const entries = getEntries(query);
+		if (entries.length === 0) {
+			const empty = document.createElement("div");
+			empty.className = "bpmn-palette-empty";
+			empty.textContent = "No files found";
+			list.appendChild(empty);
+			return;
+		}
+		if (focusIdx >= entries.length) focusIdx = 0;
+		entries.forEach((entry, i) => {
+			const item = document.createElement("div");
+			item.className = `bpmn-palette-item${i === focusIdx ? " bpmn-palette-focused" : ""}`;
+			item.setAttribute("role", "option");
+			item.setAttribute("aria-selected", String(i === focusIdx));
+
+			const nameEl = document.createElement("span");
+			nameEl.className = "bpmn-palette-item-title";
+			nameEl.textContent = entry.name;
+			if (entry.isCurrent) nameEl.style.fontWeight = "600";
+			item.appendChild(nameEl);
+
+			const descEl = document.createElement("span");
+			descEl.className = "bpmn-palette-item-desc";
+			descEl.textContent = entry.isCurrent
+				? `${entry.type.toUpperCase()} · current`
+				: entry.type.toUpperCase();
+			item.appendChild(descEl);
+
+			item.addEventListener("pointerenter", () => {
+				focusIdx = i;
+				updateFocus();
+			});
+			item.addEventListener("pointerdown", (e) => {
+				e.preventDefault();
+				tabsPlugin.api.setActiveTab(entry.tabId);
+				closeFileSwitcher();
+			});
+			list.appendChild(item);
+		});
+	}
+
+	function updateFocus(): void {
+		const items = list.querySelectorAll<HTMLDivElement>(".bpmn-palette-item");
+		items.forEach((item, i) => {
+			item.classList.toggle("bpmn-palette-focused", i === focusIdx);
+			item.setAttribute("aria-selected", String(i === focusIdx));
+		});
+		list.querySelector<HTMLDivElement>(".bpmn-palette-focused")?.scrollIntoView({
+			block: "nearest",
+		});
+	}
+
+	function enterSearchMode(): void {
+		if (isSearchMode) return;
+		isSearchMode = true;
+		// Detach Ctrl-release commit — switcher now stays open until Enter/Esc/click
+		if (_fileSwitcherCtrlRelease) {
+			document.removeEventListener("keyup", _fileSwitcherCtrlRelease);
+			_fileSwitcherCtrlRelease = null;
+		}
+		input.focus();
+	}
+
+	// Pre-focus the second entry (most recently previous file); no input focus in cycle mode
+	const initial = getEntries("");
+	focusIdx = initial.length > 1 ? 1 : 0;
+	renderList("");
+
+	input.addEventListener("input", () => {
+		focusIdx = 0;
+		renderList(input.value);
+	});
+
+	overlay.addEventListener("pointerdown", (e) => {
+		if (e.target === overlay) closeFileSwitcher();
+	});
+
+	// Ctrl/Meta release → commit the highlighted file (cycle mode only)
+	_fileSwitcherCtrlRelease = (e: KeyboardEvent) => {
+		if (e.key === "Control" || e.key === "Meta") {
+			const entries = getEntries(input.value);
+			const entry = entries[focusIdx];
+			if (entry) tabsPlugin.api.setActiveTab(entry.tabId);
+			closeFileSwitcher();
+		}
+	};
+	document.addEventListener("keyup", _fileSwitcherCtrlRelease);
+
+	// Exposed to the global Ctrl+E handler for cycling
+	_fileSwitcherCycle = () => {
+		if (isSearchMode) return;
+		const entries = getEntries("");
+		if (entries.length > 0) {
+			focusIdx = (focusIdx + 1) % entries.length;
+			updateFocus();
+		}
+	};
+
+	_fileSwitcherKeyHandler = (e: KeyboardEvent) => {
+		const entries = getEntries(input.value);
+		const count = entries.length;
+		if (e.key === "ArrowDown") {
+			e.preventDefault();
+			if (count > 0) {
+				focusIdx = (focusIdx + 1) % count;
+				updateFocus();
+			}
+		} else if (e.key === "ArrowUp") {
+			e.preventDefault();
+			if (count > 0) {
+				focusIdx = (focusIdx - 1 + count) % count;
+				updateFocus();
+			}
+		} else if (e.key === "Tab") {
+			e.preventDefault();
+			enterSearchMode();
+		} else if (e.key === "ArrowRight" && document.activeElement !== input) {
+			e.preventDefault();
+			enterSearchMode();
+		} else if (e.key === "Enter") {
+			e.preventDefault();
+			const entry = entries[focusIdx];
+			if (entry) {
+				tabsPlugin.api.setActiveTab(entry.tabId);
+				closeFileSwitcher();
+			}
+		} else if (e.key === "Escape") {
+			e.preventDefault();
+			closeFileSwitcher();
+		}
+	};
+	document.addEventListener("keydown", _fileSwitcherKeyHandler);
+}
+
+// Ctrl+E / Cmd+E — open switcher or cycle to next file while Ctrl is held
+document.addEventListener("keydown", (e) => {
+	if ((e.ctrlKey || e.metaKey) && e.key === "e" && !e.shiftKey && !e.altKey) {
+		e.preventDefault();
+		if (fileSwitcherEl && _fileSwitcherCycle) {
+			_fileSwitcherCycle();
+		} else {
+			openFileSwitcher();
+		}
+	}
+});
 
 // ── Editor ────────────────────────────────────────────────────────────────────
 
@@ -431,10 +791,6 @@ const editor = new BpmnEditor({
 editorRef = editor;
 
 initEditorHud(editor, {
-	openProcess: (processId) => {
-		const tabId = bpmnProcessToTabId.get(processId);
-		if (tabId && tabsPlugin.api.getTabIds().includes(tabId)) {
-			tabsPlugin.api.setActiveTab(tabId);
-		}
-	},
+	openProcess: (processId) => tabsPlugin.api.navigateToProcess(processId),
+	rawModeButton: tabsPlugin.api.rawModeButton,
 });

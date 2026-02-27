@@ -179,3 +179,31 @@ export function getAdHocAttr(
 	const el = extensionElements.find((x) => xmlLocalName(x.name) === "adHoc");
 	return el?.attributes[property];
 }
+
+// ── Zeebe event extension helpers ─────────────────────────────────────────────
+
+export function parseZeebeMessage(extensionElements: XmlElement[]): {
+	name: string;
+	correlationKey: string;
+} {
+	const el = extensionElements.find((x) => xmlLocalName(x.name) === "message");
+	return {
+		name: el?.attributes.name ?? "",
+		correlationKey: el?.attributes.correlationKey ?? "",
+	};
+}
+
+export function parseZeebeSignal(extensionElements: XmlElement[]): { name: string } {
+	const el = extensionElements.find((x) => xmlLocalName(x.name) === "signal");
+	return { name: el?.attributes.name ?? "" };
+}
+
+export function parseZeebeError(extensionElements: XmlElement[]): { errorCode: string } {
+	const el = extensionElements.find((x) => xmlLocalName(x.name) === "error");
+	return { errorCode: el?.attributes.errorCode ?? "" };
+}
+
+export function parseZeebeEscalation(extensionElements: XmlElement[]): { escalationCode: string } {
+	const el = extensionElements.find((x) => xmlLocalName(x.name) === "escalation");
+	return { escalationCode: el?.attributes.escalationCode ?? "" };
+}

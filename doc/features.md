@@ -1,23 +1,64 @@
 # Features
 
-## IndexedDB Storage Plugin (2026-02-26, overhauled 2026-02-26) — `@bpmn-sdk/canvas-plugin-storage`
+## DMN Editor + Form Editor (2026-02-27) — `@bpmn-sdk/canvas-plugin-dmn-editor` + `@bpmn-sdk/canvas-plugin-form-editor`
+
+- **`@bpmn-sdk/canvas-plugin-dmn-editor`** — native editable decision table; zero external dependencies
+  - **`DmnEditor`** class with `loadXML(xml)`, `getXML()`, `onChange(handler)`, `destroy()` API
+  - Parses XML via `Dmn.parse`; serializes on demand via `Dmn.export`; model kept in memory
+  - Editable decision name + hit policy dropdown per decision
+  - Add / remove input columns, output columns, and rules (rows)
+  - Each cell is a `<textarea>` bound directly to the model; structural changes trigger full re-render from model
+  - CSS injected via `injectDmnEditorStyles()` — `--dme-*` CSS variables; dark default / `.light` override pattern
+
+- **`@bpmn-sdk/canvas-plugin-form-editor`** — native two-panel form component editor; zero external dependencies
+  - **`FormEditor`** class with `loadSchema(schema)`, `getSchema()`, `onChange(handler)`, `destroy()` API
+  - Parses schema via `Form.parse`; exports via `Form.export`
+  - Left panel: component list with type badge, label, up/down reorder, delete; nested containers shown indented
+  - Right panel: property editor for selected component (label, key, required, options list, etc.)
+  - "Add" dropdown grouped by Fields / Display / Advanced / Layout; all standard form component types supported
+  - CSS injected via `injectFormEditorStyles()` — `--fe-*` CSS variables; dark default / `.light` override pattern
+
+- **Tabs plugin wired for editing** — `@bpmn-sdk/canvas-plugin-tabs` mounts `DmnEditor` / `FormEditor`; `tab.config` kept in sync on every change
+  - **`onTabChange(tabId, config)`** callback — fires whenever a DMN or Form tab's content changes; used for auto-save
+  - Cleanup on tab close / `destroy()`
+
+- **Auto-save wired in landing app** — `onTabChange` triggers `storagePlugin.api.scheduleSave()` for DMN and Form tabs
+
+## IndexedDB Storage Plugin (2026-02-26, overhauled 2026-02-27) — `@bpmn-sdk/canvas-plugin-storage`
 
 - **`@bpmn-sdk/canvas-plugin-storage`** — persists BPMN / DMN / Form files in the browser's IndexedDB in a `workspace → project → files` hierarchy
-  - **Dexie v4** for IndexedDB access — migrations, compound indexes, type-safe tables
-  - **5 record types**: `WorkspaceRecord`, `ProjectRecord`, `FileRecord` (with `isShared` and `gitPath`), `FileContentRecord`
-  - **Auto-save** — 500 ms debounce triggered by `diagram:change`; forced flush on page hide / `beforeunload`; multi-tab safe
+  - **Native IndexedDB** — zero-dependency wrapper; supports `get/add/update/delete`, `orderBy`, `where().equals()` with `toArray/sortBy/delete`, and `filter`
+  - **6 record types**: `WorkspaceRecord`, `ProjectRecord`, `FileRecord` (with `isShared` and `gitPath`), `FileContentRecord`, `ProjectMruRecord` (per-project Ctrl+Tab history)
+  - **Auto-save** — 500 ms debounce triggered by `diagram:change`; forced flush on page hide / `beforeunload`; multi-tab safe; bumps project `updatedAt` on each save
   - **Main-menu integration** — workspace/project navigation via drill-down menu (no sidebar); "Open Project", "Save All to Project", "Leave Project" actions in the ⋮ menu
-  - **Project persistence** — last-opened project restored on page refresh via `localStorage`; title updated to `workspace / project`
+  - **Welcome screen on load** — always shows welcome screen on startup; no auto-restore; `getRecentProjects()` provides top-10 recently-saved projects for the welcome dropdown
+  - **`onLeaveProject` callback** — called when "Leave" is clicked; wired to close all tabs and show the welcome screen
+  - **Export project as ZIP** — "Export Project…" in the main menu downloads a `.zip` of all project files; built-in CRC-32 + ZIP STORE implementation, no external dependencies
   - **Shared files** — any file can be marked `isShared: true` to make it accessible for cross-workspace reference resolution
   - **GitHub-sync ready** — every `FileRecord` carries a `gitPath: string | null` field reserved for future bidirectional GitHub sync
   - **`createStoragePlugin(options)`** returns `CanvasPlugin & { api: StorageApi }`; requires `mainMenu` and `getOpenTabs` options
+  - **Project mode** — when a project is open: tabs cannot be closed by the user; all project files are always open; "Rename current file…" appears in the main menu; `onRenameCurrentFile` callback updates the tab display name
+  - **MRU per project** — `getMru(projectId)` / `pushMruFile(projectId, fileId)` persist the most-recently-used file order in IndexedDB; used for Ctrl+Tab switching
 
-## Main Menu Plugin (enhanced 2026-02-26) — `@bpmn-sdk/canvas-plugin-main-menu`
+## Main Menu Plugin (enhanced 2026-02-26, restyled 2026-02-27) — `@bpmn-sdk/canvas-plugin-main-menu`
 
 - **`MainMenuApi`** — programmatic API: `setTitle(text)` updates title span; `setDynamicItems(fn)` injects items on every open
 - **`MenuDrill`** — drill-down menu items with back-navigation stack; clicking drills into sub-menu; "← Back" button returns to parent
 - **`MenuInfo`** — passive info row with optional action button (e.g. "Leave" for active project indicator)
 - Theme picker now behind a "Theme" drill item instead of flat in root dropdown
+- **Integrated into tab bar** — panel is flush with the tab bar (right-anchored, 36px tall, matching dark/light background colors); auto-reserves 160px via CSS `:has()` so the tab labels are never hidden behind it
+
+## BPMN Element Config — Event Types (2026-02-27) — `@bpmn-sdk/canvas-plugin-config-panel-bpmn`
+
+- **Timer events** — timerStartEvent, timerCatchEvent, timer boundaryEvent: "Timer type" select (Cycle / Duration / Date) + FEEL expression field for the chosen type; writes `BpmnTimerEventDefinition`
+- **Message events** — messageStartEvent, messageCatchEvent, messageEndEvent, messageThrowEvent, message boundaryEvent, receiveTask: "Message name" + "Correlation key" FEEL fields; writes `zeebe:message` extension element
+- **Signal events** — signal start/catch/throw/end events and signal boundaryEvent: "Signal name" FEEL field; writes `zeebe:signal` extension element
+- **Error events** — errorEndEvent and error boundaryEvent: "Error code" FEEL field; writes `zeebe:error` extension element
+- **Escalation events** — escalation end/throw/catch events and escalation boundaryEvent: "Escalation code" FEEL field; writes `zeebe:escalation` extension element
+- **Conditional events** — conditionalStartEvent, conditionalCatchEvent, conditional boundaryEvent: "Condition expression" FEEL field; writes `BpmnConditionalEventDefinition.condition`
+- **Intermediate events** — all intermediate catch/throw events with any of the above definitions show the matching schema; plain intermediate events show name + documentation
+- **Boundary events** — all boundary event variants (timer/message/signal/error/escalation/conditional) show their respective event-specific schemas; `boundaryEvent` type is now registered
+- **General element coverage** — `subProcess`, `transaction`, `manualTask`, `task` (generic), `complexGateway` added; all show name + documentation
 
 ## BPMN Element Config — Call Activity, Script Task, Sequence Flow (2026-02-26, updated 2026-02-26)
 
@@ -39,9 +80,10 @@
   - `buildFeelPlaygroundPanel(onClose?)` exported for embedding in any container; `createFeelPlaygroundPlugin()` retained as a standalone overlay variant
 - **`@bpmn-sdk/canvas-plugin-dmn-viewer` migration** — `feel.ts` now re-exports from `@bpmn-sdk/feel`; DMN cell highlighting uses the full FEEL highlighter
 
-## Welcome Screen Examples (2026-02-26) — `@bpmn-sdk/canvas-plugin-tabs` + `apps/landing`
+## Welcome Screen Examples (2026-02-26, updated 2026-02-27) — `@bpmn-sdk/canvas-plugin-tabs` + `apps/landing`
 
-- **Dynamic sections on welcome screen** — `getWelcomeSections` option accepts a `() => WelcomeSection[]`; rebuilt on each show; used to surface workspace/project/file links from storage
+- **"Open recent" dropdown** — `getRecentProjects` option renders a dropdown button below "Import files…"; shows up to 10 most recently saved projects (Workspace / Project format); disabled when none; rebuilt on each welcome screen show
+- **Dynamic sections on welcome screen** — `getWelcomeSections` option accepts a `() => WelcomeSection[]`; rebuilt on each show
 - **Example entries on welcome screen** — the `examples` option accepts a `WelcomeExample[]`; each entry has a badge (BPMN / DMN / FORM / MULTI), label, optional description, and an `onOpen()` callback
 - **4 built-in examples in the landing app**:
   - *Order Validation* (BPMN) — linear service-task flow
@@ -49,9 +91,12 @@
   - *Support Ticket* (FORM) — subject, category, priority, description, attachment
   - *Loan Application Flow* (MULTI) — BPMN + Credit Risk DMN + Application Form; opens all three tabs and registers resources in the resolver
 
-## Welcome Screen + Grouped Tabs (2026-02-26) — `@bpmn-sdk/canvas-plugin-tabs`
+## Welcome Screen + Grouped Tabs (2026-02-26, updated 2026-02-27) — `@bpmn-sdk/canvas-plugin-tabs`
 
-- **Welcome screen** — shown when no tabs are open; centered card with BPMN icon, title, "New diagram" and "Import files…" buttons; theme-aware (light/dark); `onNewDiagram` / `onImportFiles` option callbacks
+- **Welcome screen** — shown when no tabs are open (and always on initial load); centered card with BPMN icon, title, "New diagram", "Import files…", and optional "Open recent" dropdown button; theme-aware (light/dark); `onNewDiagram` / `onImportFiles` / `onWelcomeShow` option callbacks
+- **Plugin-managed tab XML** — subscribes to `diagram:change` internally; keeps `tab.config.xml` up to date for all open BPMN tabs; eliminates the need for client apps to track per-tab XML manually
+- **Plugin-managed process tracking** — automatically parses BPMN XML on `openTab` and `diagram:change`; exposes `navigateToProcess(id)`, `getAvailableProcesses()`, `getAllTabContent()`, `closeAllTabs()` on `TabsApi`
+- **Raw source toggle** — `</>` icon button in the bottom-left HUD panel; overlays a monospace `<pre>` with BPMN XML / DMN XML / Form JSON; stays in sync with live edits; disabled for FEEL tabs; button exposed via `TabsApi.rawModeButton` and placed in the HUD by `initEditorHud()`
 - **Grouped tabs** — at most 3 tabs in the bar (one per type: BPMN, DMN, FORM); each group tab shows the active file name and a type badge; chevron opens a dropdown listing all files of that type; per-file close buttons in dropdown; close button on tab itself when group has only one file
 
 ## Multi-file Import + Tab Navigation in Editor (2026-02-26) — `apps/landing` + `canvas-plugins/*`
@@ -166,6 +211,9 @@
 - **Group toolbar** — bottom toolbar shows one button per BPMN group (Events, Activities, Gateways); click to use last-selected type; long-press (500ms) opens a horizontal picker with all types in the group; standard BPMN notation icons throughout
 - **`changeElementType(id, newType)`** — changes a flow element's type while preserving id, name, and connections
 - **Orthogonal edges** — all sequence flows rendered as H/V-only Z-shaped paths; routes recomputed on shape move; endpoint repositioning via drag
+- **Obstacle-avoiding edge routing** — new edges automatically route around existing shapes by trying all 16 port combinations and picking the first non-intersecting route
+- **Edge segment drag** — hover over an edge segment to reveal a blue dot (projected cursor position) and a resize cursor (`ns-resize` for horizontal, `ew-resize` for vertical); drag perpendicularly to move the entire segment while keeping adjacent segments orthogonal
+- **Edge waypoint insertion** — drag an edge at a shallower (more parallel) angle to insert a free-form bend point; diagonal edges allowed for waypoint insertion only
 - **Edge endpoint repositioning** — click edge to select; drag start/end balls to reposition on source/target port (top/right/bottom/left); route recomputed via port-aware orthogonal routing
 - **External label positions** — events and gateways show labels outside the shape; 8 positions via `setLabelPosition(id, pos)`; contextual toolbar compass icon to choose
 - **Magnet snap** — shapes snap to aligned edges/centers of neighbors during drag; blue dashed guide lines shown
