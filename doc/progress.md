@@ -1,5 +1,25 @@
 # Progress
 
+## 2026-02-27 — Project mode: no-close tabs, all-files-open, file search, rename, Ctrl+Tab MRU
+
+### `canvas-plugins/storage`
+- **`ProjectMruRecord` type** — new `{ projectId, fileIds[] }` record type in `types.ts`; IndexedDB DB_VERSION bumped to 12; `projectMru` object store added in `db.ts`
+- **`StorageApi.getMru` / `pushMruFile`** — `getMru(projectId)` returns stored MRU file-ID list; `pushMruFile(projectId, fileId)` prepends to the list (deduplicated, max 50 entries)
+- **`StoragePluginOptions.onRenameCurrentFile`** — new optional callback called after a file is renamed via the main menu; allows the caller to update the tab display name
+- **Rename in main menu** — when a project is open and a file is active, "Rename current file…" appears in the storage plugin's dynamic menu items
+
+### `canvas-plugins/tabs`
+- **`TabsApi.setProjectMode(enabled)`** — enables or disables project mode; re-renders the tab bar
+- **`TabsApi.renameTab(id, name)`** — updates a tab's display name and re-renders the tab bar
+- **No-close in project mode** — `requestClose` is a no-op in project mode; close buttons are hidden in both the tab bar and the group dropdown
+
+### `apps/landing`
+- **All files always open** — `openProject` already calls `onOpenFile` for each file; `storageFileIdToTabId` and `storageFileToName` maps track the correspondence
+- **Project mode toggle** — `storagePlugin.api.onChange()` calls `tabsPlugin.api.setProjectMode(!!projectId)` whenever the current project changes
+- **File-search commands** — `rebuildFileCommands()` registers one command-palette command per open project file (search by name → switch to that tab); deregistered when leaving a project
+- **Rename current file** — command palette includes "Rename current file…" when in project mode; updates name in the display, maps, and IndexedDB; also accessible via main menu
+- **MRU persistence** — `tabMruOrder` maintained in memory; order loaded from IndexedDB on project open and persisted on every tab switch via `pushMruFile`; Ctrl+Tab handler not implemented (browser reserves the shortcut and cannot be overridden); file switching available via Ctrl+K command palette
+
 ## 2026-02-27 — Edge waypoint hover dot fix + snap guides
 
 ### `packages/editor`

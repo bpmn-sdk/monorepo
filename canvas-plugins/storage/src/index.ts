@@ -30,6 +30,11 @@ export interface StoragePluginOptions extends StorageApiOptions {
 	onLeaveProject?: () => void;
 	/** Called after the IndexedDB caches have finished loading. Use this to refresh any UI that depends on storage data (e.g. the recent-projects dropdown). */
 	onReady?: () => void;
+	/**
+	 * Called when the user renames the current file via the main menu.
+	 * Update the corresponding tab's display name from this callback.
+	 */
+	onRenameCurrentFile?: (fileId: string, name: string) => void;
 }
 
 /**
@@ -163,6 +168,20 @@ export function createStoragePlugin(
 					options.onLeaveProject?.();
 				},
 			});
+			const currentFileId = storageApi.getCurrentFileId();
+			if (currentFileId && options.onRenameCurrentFile) {
+				const onRename = options.onRenameCurrentFile;
+				items.push({
+					label: "Rename current file\u2026",
+					onClick: () => {
+						const newName = prompt("Rename file:")?.trim();
+						if (!newName) return;
+						void storageApi.renameFile(currentFileId, newName).then(() => {
+							onRename(currentFileId, newName);
+						});
+					},
+				});
+			}
 			items.push({
 				label: "Export Project\u2026",
 				onClick: () => void exportProjectAsZip(storageApi),

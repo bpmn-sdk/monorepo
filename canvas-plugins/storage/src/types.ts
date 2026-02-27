@@ -38,3 +38,11 @@ export interface FileContentRecord {
 	/** Monotonically increasing; incremented on every save. */
 	version: number;
 }
+
+/** Per-project most-recently-used file order for Ctrl+Tab switching. */
+export interface ProjectMruRecord {
+	/** Primary key — matches ProjectRecord.id. */
+	projectId: string;
+	/** File IDs ordered most-recently-used first (index 0 = most recent). */
+	fileIds: string[];
+}

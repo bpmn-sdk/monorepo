@@ -345,6 +345,26 @@ export class StorageApi {
 		}
 	}
 
+	// ─── MRU (most-recently-used files per project) ───────────────────────────────
+
+	/** Returns the MRU file-ID list for a project (most recent first). */
+	async getMru(projectId: string): Promise<string[]> {
+		const record = await db.projectMru.get(projectId);
+		return record?.fileIds ?? [];
+	}
+
+	/** Pushes a file ID to the front of the project's MRU list (deduplicates, max 50). */
+	async pushMruFile(projectId: string, fileId: string): Promise<void> {
+		const existing = await db.projectMru.get(projectId);
+		const current = existing?.fileIds ?? [];
+		const updated = [fileId, ...current.filter((id) => id !== fileId)].slice(0, 50);
+		if (existing) {
+			await db.projectMru.update(projectId, { fileIds: updated });
+		} else {
+			await db.projectMru.add({ projectId, fileIds: updated });
+		}
+	}
+
 	// ─── Recent projects ─────────────────────────────────────────────────────────
 
 	/**

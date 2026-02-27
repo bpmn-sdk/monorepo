@@ -4,7 +4,7 @@
 
 - **`@bpmn-sdk/canvas-plugin-storage`** — persists BPMN / DMN / Form files in the browser's IndexedDB in a `workspace → project → files` hierarchy
   - **Native IndexedDB** — zero-dependency wrapper; supports `get/add/update/delete`, `orderBy`, `where().equals()` with `toArray/sortBy/delete`, and `filter`
-  - **5 record types**: `WorkspaceRecord`, `ProjectRecord`, `FileRecord` (with `isShared` and `gitPath`), `FileContentRecord`
+  - **6 record types**: `WorkspaceRecord`, `ProjectRecord`, `FileRecord` (with `isShared` and `gitPath`), `FileContentRecord`, `ProjectMruRecord` (per-project Ctrl+Tab history)
   - **Auto-save** — 500 ms debounce triggered by `diagram:change`; forced flush on page hide / `beforeunload`; multi-tab safe; bumps project `updatedAt` on each save
   - **Main-menu integration** — workspace/project navigation via drill-down menu (no sidebar); "Open Project", "Save All to Project", "Leave Project" actions in the ⋮ menu
   - **Welcome screen on load** — always shows welcome screen on startup; no auto-restore; `getRecentProjects()` provides top-10 recently-saved projects for the welcome dropdown
@@ -13,6 +13,8 @@
   - **Shared files** — any file can be marked `isShared: true` to make it accessible for cross-workspace reference resolution
   - **GitHub-sync ready** — every `FileRecord` carries a `gitPath: string | null` field reserved for future bidirectional GitHub sync
   - **`createStoragePlugin(options)`** returns `CanvasPlugin & { api: StorageApi }`; requires `mainMenu` and `getOpenTabs` options
+  - **Project mode** — when a project is open: tabs cannot be closed by the user; all project files are always open; "Rename current file…" appears in the main menu; `onRenameCurrentFile` callback updates the tab display name
+  - **MRU per project** — `getMru(projectId)` / `pushMruFile(projectId, fileId)` persist the most-recently-used file order in IndexedDB; used for Ctrl+Tab switching
 
 ## Main Menu Plugin (enhanced 2026-02-26, restyled 2026-02-27) — `@bpmn-sdk/canvas-plugin-main-menu`
 

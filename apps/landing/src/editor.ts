@@ -112,6 +112,17 @@ const resolver = new InMemoryFileResolver();
 
 // Maps tab ID → storage file ID for tabs opened from the storage plugin.
 const tabIdToStorageFileId = new Map<string, string>();
+// Reverse map: storage file ID → tab ID.
+const storageFileIdToTabId = new Map<string, string>();
+// Display name cache for storage files (kept in sync with renaming).
+const storageFileToName = new Map<string, string>();
+
+// Ctrl+Tab MRU: tab IDs ordered by most-recently-activated (index 0 = most recent).
+let tabMruOrder: string[] = [];
+// Deregister function for the current set of file-search palette commands.
+let removeFileCommands: (() => void) | undefined;
+// Last known project ID — used to detect project changes in onChange.
+let lastProjectId: string | null = null;
 
 let editorRef: BpmnEditor | null = null;
 
@@ -167,6 +178,16 @@ const tabsPlugin = createTabsPlugin({
 
 		// Update storage current-file pointer — ensures auto-save targets the right file
 		storagePlugin.api.setCurrentFileId(tabIdToStorageFileId.get(id) ?? null);
+
+		// Update MRU order (project mode only)
+		if (storagePlugin.api.getCurrentProjectId()) {
+			tabMruOrder = [id, ...tabMruOrder.filter((tid) => tid !== id)];
+			const fileId = tabIdToStorageFileId.get(id);
+			const projectId = storagePlugin.api.getCurrentProjectId();
+			if (fileId && projectId) {
+				void storagePlugin.api.pushMruFile(projectId, fileId);
+			}
+		}
 
 		// Hide BPMN-only toolbars on non-BPMN views
 		for (const hudId of BPMN_ONLY_HUD) {
@@ -320,22 +341,23 @@ const storagePlugin = createStoragePlugin({
 	mainMenu: mainMenuPlugin,
 	getOpenTabs: () => tabsPlugin.api.getAllTabContent(),
 	initialTitle: "BPMN SDK",
-	onLeaveProject: () => tabsPlugin.api.closeAllTabs(),
+	onLeaveProject: () => {
+		tabsPlugin.api.closeAllTabs();
+		tabIdToStorageFileId.clear();
+		storageFileIdToTabId.clear();
+		storageFileToName.clear();
+		tabMruOrder = [];
+	},
 	onReady: () => tabsPlugin.api.refreshWelcomeScreen(),
 	onOpenFile(file, content) {
+		let tabId: string | null = null;
 		if (file.type === "bpmn") {
-			const tabId = tabsPlugin.api.openTab({ type: "bpmn", xml: content, name: file.name });
-			tabIdToStorageFileId.set(tabId, file.id);
-			// onTabActivate fires synchronously inside openTab before the map is set,
-			// so we correct currentFileId explicitly here.
-			storagePlugin.api.setCurrentFileId(file.id);
+			tabId = tabsPlugin.api.openTab({ type: "bpmn", xml: content, name: file.name });
 		} else if (file.type === "dmn") {
 			try {
 				const defs = Dmn.parse(content);
 				resolver.registerDmn(defs);
-				const tabId = tabsPlugin.api.openTab({ type: "dmn", defs, name: file.name });
-				tabIdToStorageFileId.set(tabId, file.id);
-				storagePlugin.api.setCurrentFileId(file.id);
+				tabId = tabsPlugin.api.openTab({ type: "dmn", defs, name: file.name });
 			} catch {
 				console.error("[storage] Failed to parse DMN:", file.name);
 			}
@@ -343,13 +365,25 @@ const storagePlugin = createStoragePlugin({
 			try {
 				const form = Form.parse(content);
 				resolver.registerForm(form);
-				const tabId = tabsPlugin.api.openTab({ type: "form", form, name: file.name });
-				tabIdToStorageFileId.set(tabId, file.id);
-				storagePlugin.api.setCurrentFileId(file.id);
+				tabId = tabsPlugin.api.openTab({ type: "form", form, name: file.name });
 			} catch {
 				console.error("[storage] Failed to parse form:", file.name);
 			}
 		}
+		if (tabId !== null) {
+			tabIdToStorageFileId.set(tabId, file.id);
+			storageFileIdToTabId.set(file.id, tabId);
+			storageFileToName.set(file.id, file.name);
+			// onTabActivate fires synchronously inside openTab before the map is set,
+			// so we correct currentFileId explicitly here.
+			storagePlugin.api.setCurrentFileId(file.id);
+		}
+	},
+	onRenameCurrentFile(fileId, name) {
+		storageFileToName.set(fileId, name);
+		const tabId = storageFileIdToTabId.get(fileId);
+		if (tabId) tabsPlugin.api.renameTab(tabId, name);
+		rebuildFileCommands();
 	},
 });
 
@@ -398,6 +432,81 @@ palette.addCommands([
 		action: () => tabsPlugin.api.openTab({ type: "feel", name: "FEEL Playground" }),
 	},
 ]);
+
+// ── Project mode: file-search commands + Ctrl+Tab MRU ─────────────────────────
+
+/** Rebuilds file-search commands in the palette for the current project. */
+function rebuildFileCommands(): void {
+	removeFileCommands?.();
+	removeFileCommands = undefined;
+	const projectId = storagePlugin.api.getCurrentProjectId();
+	if (!projectId) return;
+
+	const cmds: Array<{ id: string; title: string; description?: string; action: () => void }> = [];
+
+	// One "switch to file" command per open project file
+	for (const [tabId, fileId] of tabIdToStorageFileId) {
+		const name = storageFileToName.get(fileId) ?? fileId;
+		const tid = tabId;
+		cmds.push({
+			id: `open-file-${fileId}`,
+			title: name,
+			description: "Switch to file",
+			action: () => tabsPlugin.api.setActiveTab(tid),
+		});
+	}
+
+	// "Rename current file" command
+	const currentFileId = storagePlugin.api.getCurrentFileId();
+	if (currentFileId && storageFileIdToTabId.has(currentFileId)) {
+		const fid = currentFileId;
+		const currentName = storageFileToName.get(fid) ?? "";
+		cmds.push({
+			id: "rename-current-file",
+			title: "Rename current file\u2026",
+			action: () => {
+				const newName = prompt("Rename file:", currentName)?.trim();
+				if (!newName || newName === currentName) return;
+				storageFileToName.set(fid, newName);
+				const tabId = storageFileIdToTabId.get(fid);
+				if (tabId) tabsPlugin.api.renameTab(tabId, newName);
+				void storagePlugin.api.renameFile(fid, newName);
+				// onChange will call rebuildFileCommands after the rename completes
+			},
+		});
+	}
+
+	removeFileCommands = palette.addCommands(cmds);
+}
+
+// React to storage changes: toggle project mode and rebuild file commands
+storagePlugin.api.onChange(() => {
+	const projectId = storagePlugin.api.getCurrentProjectId();
+	const projectChanged = projectId !== lastProjectId;
+	lastProjectId = projectId;
+
+	tabsPlugin.api.setProjectMode(!!projectId);
+
+	if (projectChanged && projectId) {
+		// Load stored MRU and apply it as the initial Ctrl+Tab order
+		void storagePlugin.api.getMru(projectId).then((fileIds) => {
+			const allTabIds = tabsPlugin.api.getTabIds();
+			const ordered: string[] = [];
+			for (const fileId of fileIds) {
+				const tabId = storageFileIdToTabId.get(fileId);
+				if (tabId && allTabIds.includes(tabId)) ordered.push(tabId);
+			}
+			for (const tabId of allTabIds) {
+				if (!ordered.includes(tabId)) ordered.push(tabId);
+			}
+			tabMruOrder = ordered;
+		});
+	} else if (!projectId) {
+		tabMruOrder = [];
+	}
+
+	rebuildFileCommands();
+});
 
 // ── Editor ────────────────────────────────────────────────────────────────────
 

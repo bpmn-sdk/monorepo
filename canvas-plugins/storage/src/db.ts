@@ -1,9 +1,15 @@
-import type { FileContentRecord, FileRecord, ProjectRecord, WorkspaceRecord } from "./types.js";
+import type {
+	FileContentRecord,
+	FileRecord,
+	ProjectMruRecord,
+	ProjectRecord,
+	WorkspaceRecord,
+} from "./types.js";
 
 const DB_NAME = "bpmn-sdk-storage";
 // Dexie 4.x internally stored version 10 for user-space version 1.
-// Use 11 so existing databases are upgraded cleanly rather than rejected.
-const DB_VERSION = 11;
+// Use 12 to add the projectMru object store.
+const DB_VERSION = 12;
 
 let _db: IDBDatabase | null = null;
 
@@ -28,6 +34,9 @@ function openDb(): Promise<IDBDatabase> {
 			}
 			if (!d.objectStoreNames.contains("fileContents")) {
 				d.createObjectStore("fileContents", { keyPath: "fileId" });
+			}
+			if (!d.objectStoreNames.contains("projectMru")) {
+				d.createObjectStore("projectMru", { keyPath: "projectId" });
 			}
 		};
 		r.onsuccess = () => {
@@ -128,4 +137,5 @@ export const db = {
 	projects: makeTable<ProjectRecord>("projects"),
 	files: makeTable<FileRecord>("files"),
 	fileContents: makeTable<FileContentRecord>("fileContents"),
+	projectMru: makeTable<ProjectMruRecord>("projectMru"),
 };

@@ -177,6 +177,16 @@ export interface TabsApi {
 	 * in the bottom-left HUD panel instead of the tab bar.
 	 */
 	rawModeButton: HTMLButtonElement | null;
+	/**
+	 * Enable or disable project mode.
+	 * In project mode, tabs cannot be closed by the user.
+	 */
+	setProjectMode(enabled: boolean): void;
+	/**
+	 * Update the display name of a tab.
+	 * Used when a project file is renamed via the command palette or main menu.
+	 */
+	renameTab(id: string, name: string): void;
 }
 
 let _tabCounter = 0;
@@ -224,6 +234,8 @@ export function createTabsPlugin(options: TabsPluginOptions = {}): CanvasPlugin 
 	let rawPaneEl: HTMLDivElement | null = null;
 	let rawPreEl: HTMLPreElement | null = null;
 	let rawModeBtn: HTMLButtonElement | null = null;
+
+	let isProjectMode = false;
 
 	/** Tracks which tab ID each BPMN process ID belongs to. */
 	const bpmnProcessToTabId = new Map<string, string>();
@@ -617,15 +629,17 @@ export function createTabsPlugin(options: TabsPluginOptions = {}): CanvasPlugin 
 			nameSpan.textContent = tab.config.name ?? tab.id;
 			item.appendChild(nameSpan);
 
-			const closeBtn = document.createElement("span");
-			closeBtn.className = "bpmn-tab-close";
-			closeBtn.textContent = "×";
-			closeBtn.addEventListener("click", (e) => {
-				e.stopPropagation();
-				closeDropdownEl();
-				requestClose(tab);
-			});
-			item.appendChild(closeBtn);
+			if (!isProjectMode) {
+				const closeBtn = document.createElement("span");
+				closeBtn.className = "bpmn-tab-close";
+				closeBtn.textContent = "×";
+				closeBtn.addEventListener("click", (e) => {
+					e.stopPropagation();
+					closeDropdownEl();
+					requestClose(tab);
+				});
+				item.appendChild(closeBtn);
+			}
 
 			item.addEventListener("click", () => {
 				groupActiveId.set(type, tab.id);
@@ -654,6 +668,7 @@ export function createTabsPlugin(options: TabsPluginOptions = {}): CanvasPlugin 
 	// --- Tab bar rendering ---
 
 	function requestClose(tab: TabState): void {
+		if (isProjectMode) return;
 		if (hasContent(tab.config) && canvasApi) {
 			const tabName = tab.config.name ?? `${tab.config.type} tab`;
 			const onDownload = options.onDownloadTab ? () => options.onDownloadTab?.(tab.config) : null;
@@ -726,8 +741,8 @@ export function createTabsPlugin(options: TabsPluginOptions = {}): CanvasPlugin 
 			chevron.innerHTML =
 				'<svg viewBox="0 0 10 6" fill="currentColor"><path d="M0 0l5 6 5-6z"/></svg>';
 			el.appendChild(chevron);
-		} else {
-			// Close button — only when the group has a single file
+		} else if (!isProjectMode) {
+			// Close button — only when the group has a single file and not in project mode
 			const tab = group[0];
 			if (tab) {
 				const closeBtn = document.createElement("span");
@@ -990,6 +1005,18 @@ export function createTabsPlugin(options: TabsPluginOptions = {}): CanvasPlugin 
 		refreshWelcomeScreen(): void {
 			renderRecentProjects();
 			renderDynamicSections();
+		},
+
+		setProjectMode(enabled: boolean): void {
+			isProjectMode = enabled;
+			renderTabBar();
+		},
+
+		renameTab(id: string, name: string): void {
+			const tab = tabs.find((t) => t.id === id);
+			if (!tab) return;
+			tab.config = { ...tab.config, name };
+			renderTabBar();
 		},
 
 		get rawModeButton(): HTMLButtonElement | null {
