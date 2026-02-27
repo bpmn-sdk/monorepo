@@ -14,12 +14,13 @@
   - **GitHub-sync ready** — every `FileRecord` carries a `gitPath: string | null` field reserved for future bidirectional GitHub sync
   - **`createStoragePlugin(options)`** returns `CanvasPlugin & { api: StorageApi }`; requires `mainMenu` and `getOpenTabs` options
 
-## Main Menu Plugin (enhanced 2026-02-26) — `@bpmn-sdk/canvas-plugin-main-menu`
+## Main Menu Plugin (enhanced 2026-02-26, restyled 2026-02-27) — `@bpmn-sdk/canvas-plugin-main-menu`
 
 - **`MainMenuApi`** — programmatic API: `setTitle(text)` updates title span; `setDynamicItems(fn)` injects items on every open
 - **`MenuDrill`** — drill-down menu items with back-navigation stack; clicking drills into sub-menu; "← Back" button returns to parent
 - **`MenuInfo`** — passive info row with optional action button (e.g. "Leave" for active project indicator)
 - Theme picker now behind a "Theme" drill item instead of flat in root dropdown
+- **Integrated into tab bar** — panel is flush with the tab bar (right-anchored, 36px tall, matching dark/light background colors); auto-reserves 160px via CSS `:has()` so the raw-mode button is never hidden
 
 ## BPMN Element Config — Call Activity, Script Task, Sequence Flow (2026-02-26, updated 2026-02-26)
 

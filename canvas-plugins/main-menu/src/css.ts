@@ -3,17 +3,26 @@ export const MAIN_MENU_STYLE_ID = "bpmn-main-menu-styles-v2";
 export const MAIN_MENU_CSS = `
 .bpmn-main-menu-panel {
   position: absolute;
-  top: 12px;
-  right: 12px;
+  top: 0;
+  right: 0;
+  height: 36px;
   display: flex;
   align-items: center;
   gap: 3px;
-  padding: 3px;
-  background: var(--bpmn-overlay-bg, rgba(248, 249, 250, 0.92));
-  border: 1px solid var(--bpmn-overlay-border, rgba(0, 0, 0, 0.12));
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  padding: 0 6px;
+  background: #f0f4f8;
+  border: none;
+  border-left: 1px solid #d0d0d0;
+  border-radius: 0;
+  box-shadow: none;
   z-index: 110;
+}
+[data-theme="dark"] .bpmn-main-menu-panel {
+  background: #181825;
+  border-left-color: #313244;
+}
+.bpmn-canvas-host:has(.bpmn-main-menu-panel:not([style*="none"])) .bpmn-tabs {
+  padding-right: 160px;
 }
 .bpmn-main-menu-title {
   padding: 0 6px;

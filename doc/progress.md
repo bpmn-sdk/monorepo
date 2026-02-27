@@ -1,5 +1,14 @@
 # Progress
 
+## 2026-02-27 — Unified tab bar (HUD + main menu integration)
+
+### `canvas-plugins/main-menu`
+- **Flush tab bar layout** — `.bpmn-main-menu-panel` restyled from a floating card (`top: 12px; right: 12px; border-radius: 8px; box-shadow`) to a flush right-side segment of the tab bar (`top: 0; right: 0; height: 36px; border-radius: 0; box-shadow: none; border-left: 1px solid`); background matches the tabs dark/light theme (`#181825` / `#f0f4f8`) via `[data-theme="dark"]` selector
+- **Auto padding-right** — CSS `:has()` rule adds `padding-right: 160px` to `.bpmn-tabs` whenever `.bpmn-main-menu-panel` is visible, preventing the raw-mode button from scrolling under the menu
+
+### `packages/editor`
+- **HUD top-center flush** — `#hud-top-center` moved to `top: 0; height: 36px`; `#hud-top-center.panel` overrides strip the floating card (transparent background, no blur, no border-radius, no shadow) for both dark and light themes; center action buttons (undo/redo/delete/etc.) now sit visually inside the tab bar row
+
 ## 2026-02-27 — Export project ZIP, new file shortcuts, raw source toggle
 
 ### `canvas-plugins/storage`
