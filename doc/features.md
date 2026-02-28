@@ -1,5 +1,15 @@
 # Features
 
+## Form Editor drag-and-drop redesign (2026-02-28) — `@bpmn-sdk/canvas-plugin-form-editor`
+
+- Three-panel layout: Palette (260px fixed) | Canvas (flex, scrollable) | Properties (300px fixed)
+- **Palette**: 5 groups (Input, Selection, Presentation, Containers, Action); icon grid; live search; click or drag to add
+- **Canvas**: card-based visual form preview; drop zones between cards; empty state; nested containers with inner drop zones
+- **Drag-and-drop**: native HTML5 DnD; palette→canvas (copy), card→card (move); drop-zone highlight; self-move prevention
+- **Component previews**: per-type non-interactive previews (faux input, textarea, select, checkbox, radio, button, badge, separator, spacer, image)
+- **Properties panel**: colored icon header; label/key/required/text/expression/options inputs; label updates preview live without refocusing
+- **CSS**: light theme by default; dark via `.dark` class; `--fe-*` CSS variables
+
 ## DMN Editor feature parity (2026-02-28) — `@bpmn-sdk/canvas-plugin-dmn-editor`
 
 - Single-row column headers with "When"/"And" (inputs) and "Then"/"And" (outputs) clause labels

@@ -1,5 +1,23 @@
 # Progress
 
+## 2026-02-28 — Form Editor drag-and-drop redesign (form-js parity)
+
+Rewrote `FormEditor` (`canvas-plugins/form-editor`) with a three-panel drag-and-drop layout matching form-js.
+
+### `canvas-plugins/form-editor` — Complete rewrite
+
+- **Three-panel layout** — Palette (260px) | Canvas (flex) | Properties (300px)
+- **Palette** — 5 color-coded groups (Input/blue, Selection/green, Presentation/amber, Containers/purple, Action/red); icon grid ~72×72px per item; live search filter; click to append, drag to place
+- **Canvas** — Visual card-based preview of form structure; drop zones between cards (8px→24px→36px on drag/hover); empty state with drag target; container cards (group/dynamiclist) render nested drop zones
+- **Drag-and-drop** — HTML5 native DnD; palette→canvas (copy), canvas→canvas (move); drop zone highlight on hover; card opacity on drag; self-referential drop prevention for containers
+- **Component previews** — Non-interactive per-type previews: faux input/textarea/select/checkbox/radio/button/badge/separator/spacer/image
+- **Properties panel** — Colored icon header; property inputs for label, key, required, text, html, source, url, expression, and options list; label change updates canvas preview without re-rendering props (preserves focus)
+- **CSS redesign** — Light default, `.dark` class override; `--fe-*` CSS variables throughout
+
+### Files changed
+- **`canvas-plugins/form-editor/src/form-editor.ts`** — complete rewrite
+- **`canvas-plugins/form-editor/src/css.ts`** — complete redesign
+
 ## 2026-02-28 — DMN Editor feature parity with dmn-js
 
 Redesigned `DmnEditor` to match the dmn-js visual language and feature set.
