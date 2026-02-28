@@ -1,5 +1,17 @@
 # Features
 
+## DMN Editor feature parity (2026-02-28) — `@bpmn-sdk/canvas-plugin-dmn-editor`
+
+- Single-row column headers with "When"/"And" (inputs) and "Then"/"And" (outputs) clause labels
+- Hit policy in table corner — abbreviated (U/F/A/P/C/C+/C</C>/C#/R/O); select overlay to change
+- Collect aggregation: C, C+ (SUM), C< (MIN), C> (MAX), C# (COUNT)
+- TypeRef dropdown per column — editable; round-trips through XML
+- Annotations column bound to `rule.description`
+- Context menu — right-click row number: add above/below/remove; right-click column header: add left/right/remove
+- Double border separating input from output sections
+- Light theme as default; dark theme via `.dark` class
+- `DmnAggregation` type added to `@bpmn-sdk/core`; parsed and serialized in `aggregation` XML attribute
+
 ## DMN Editor + Form Editor (2026-02-27) — `@bpmn-sdk/canvas-plugin-dmn-editor` + `@bpmn-sdk/canvas-plugin-form-editor`
 
 - **`@bpmn-sdk/canvas-plugin-dmn-editor`** — native editable decision table; zero external dependencies

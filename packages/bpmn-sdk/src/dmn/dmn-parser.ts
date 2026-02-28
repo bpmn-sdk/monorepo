@@ -1,6 +1,7 @@
 import type { XmlElement } from "../types/xml-element.js";
 import { parseXml } from "../xml/xml-parser.js";
 import type {
+	DmnAggregation,
 	DmnDecision,
 	DmnDecisionTable,
 	DmnDefinitions,
@@ -124,6 +125,7 @@ function parseDecisionTable(el: XmlElement): DmnDecisionTable {
 	return {
 		id: requiredAttr(el, "id"),
 		hitPolicy: parseHitPolicy(attr(el, "hitPolicy")),
+		aggregation: attr(el, "aggregation") as DmnAggregation | undefined,
 		inputs: findChildren(el, "input").map(parseInput),
 		outputs: findChildren(el, "output").map(parseOutput),
 		rules: findChildren(el, "rule").map(parseRule),

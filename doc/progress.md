@@ -1,5 +1,27 @@
 # Progress
 
+## 2026-02-28 — DMN Editor feature parity with dmn-js
+
+Redesigned `DmnEditor` to match the dmn-js visual language and feature set.
+
+### `packages/bpmn-sdk` — Aggregation support
+- **`dmn-model.ts`** — added `DmnAggregation` type (`"SUM" | "MIN" | "MAX" | "COUNT"`) and `aggregation?` field on `DmnDecisionTable`
+- **`dmn-parser.ts`** — parses `aggregation` attribute from `<decisionTable>`
+- **`dmn-serializer.ts`** — serializes `aggregation` attribute when present
+- **`index.ts`** — exports `DmnAggregation` type
+
+### `canvas-plugins/dmn-editor` — Major redesign
+- **Single-row column headers** replacing the previous two-row (type + col) layout
+- **Hit policy cell** — top-left table corner shows abbreviated policy (U/F/A/P/C/C+/C</C>/C#/R/O); transparent `<select>` overlay for changing it; supports all 11 combinations of hit policy + aggregation
+- **Clause labels** — "When"/"And" on input columns, "Then"/"And" on output columns
+- **TypeRef dropdowns** — `<select>` in each column header footer; editable per-column; updates `inputExpression.typeRef` or `output.typeRef` on change
+- **Annotations column** — rightmost column with "Annotation" clause label; bound to `rule.description`; fully round-trips through XML
+- **Context menu** — right-click on row-number cell: add rule above/below, remove rule; right-click on column header: add input/output left/right, remove column
+- **Collect aggregation** — COLLECT hit policy now has 5 variants: C, C+ (SUM), C< (MIN), C> (MAX), C# (COUNT)
+- **Light theme as default** — clean white background with blue hit-policy accent and section tints
+- **Double border** — 3px double border separates last input column from first output column
+- **CSS redesign** — Arial font, 14px base, new `--dme-*` variables for clause text, hit policy cell, section colors, annotation column, context menu
+
 ## 2026-02-27 — Native DMN + Form editors (zero external deps)
 
 Replaced `dmn-js` and `@bpmn-io/form-js-editor` with fully in-repo native implementations.

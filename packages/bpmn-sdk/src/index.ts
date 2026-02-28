@@ -157,6 +157,7 @@ export type {
 	DmnDiagram,
 	DmnDiagramShape,
 	DmnTypeRef,
+	DmnAggregation,
 	HitPolicy,
 } from "./dmn/dmn-model.js";
 export type { XmlElement } from "./types/xml-element.js";

@@ -10,6 +10,9 @@ export type HitPolicy =
 	| "OUTPUT ORDER"
 	| "PRIORITY";
 
+/** DMN collect aggregation for COLLECT hit policy. */
+export type DmnAggregation = "SUM" | "MIN" | "MAX" | "COUNT";
+
 /** DMN type reference for inputs/outputs. */
 export type DmnTypeRef = "string" | "boolean" | "number" | "date";
 
@@ -56,6 +59,7 @@ export interface DmnRule {
 export interface DmnDecisionTable {
 	id: string;
 	hitPolicy?: HitPolicy;
+	aggregation?: DmnAggregation;
 	inputs: DmnInput[];
 	outputs: DmnOutput[];
 	rules: DmnRule[];

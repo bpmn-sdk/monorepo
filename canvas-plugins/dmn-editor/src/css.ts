@@ -1,58 +1,66 @@
 export const DMN_EDITOR_CSS = `
 .dmn-editor {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  font-size: 13px;
+  font-family: Arial, sans-serif;
+  font-size: 14px;
   overflow: auto;
   height: 100%;
   box-sizing: border-box;
-  background: var(--dme-bg, #1e1e2e);
-  color: var(--dme-fg, #cdd6f4);
+  background: var(--dme-bg, #fff);
+  color: var(--dme-fg, #1c1c1c);
 }
 
 .dmn-editor-body {
-  max-width: 1100px;
+  max-width: 1200px;
   margin: 0 auto;
   padding: 24px;
 }
 
+/* ── Light theme (default) ── */
+.dmn-editor,
 .dmn-editor.light {
-  --dme-bg: #ffffff;
+  --dme-bg: #fff;
   --dme-fg: #1c1c1c;
-  --dme-border: #d0d0d0;
-  --dme-header-bg: #f0f4f8;
-  --dme-input-bg: #e8f0fe;
-  --dme-output-bg: #e8f5e9;
+  --dme-border: #ddd;
+  --dme-hp-bg: #e8f0fe;
+  --dme-hp-fg: #1a56db;
+  --dme-input-section: #f0f4ff;
+  --dme-output-section: #f0fff4;
+  --dme-annotation-bg: #fafaf5;
   --dme-row-hover: #f5f5f5;
   --dme-row-even: #fafafa;
-  --dme-badge-bg: #e2e8f0;
-  --dme-badge-fg: #334155;
+  --dme-clause-fg: #888;
   --dme-btn-bg: #e2e8f0;
   --dme-btn-fg: #334155;
   --dme-btn-hover: #cbd5e1;
   --dme-input-cell-bg: transparent;
   --dme-input-cell-fg: #1c1c1c;
   --dme-accent: #3b82f6;
+  --dme-divider: 3px double #aaa;
 }
 
+/* ── Dark theme ── */
 .dmn-editor.dark {
   --dme-bg: #1e1e2e;
   --dme-fg: #cdd6f4;
   --dme-border: #313244;
-  --dme-header-bg: #181825;
-  --dme-input-bg: #1e1e3a;
-  --dme-output-bg: #1a2e1a;
+  --dme-hp-bg: #1e1e3a;
+  --dme-hp-fg: #89b4fa;
+  --dme-input-section: #1e1e3a;
+  --dme-output-section: #1a2e1a;
+  --dme-annotation-bg: #252530;
   --dme-row-hover: #2a2a3e;
   --dme-row-even: #252535;
-  --dme-badge-bg: #313244;
-  --dme-badge-fg: #bac2de;
+  --dme-clause-fg: #6c6f85;
   --dme-btn-bg: #313244;
   --dme-btn-fg: #bac2de;
   --dme-btn-hover: #45475a;
   --dme-input-cell-bg: transparent;
   --dme-input-cell-fg: #cdd6f4;
   --dme-accent: #89b4fa;
+  --dme-divider: 3px double #444;
 }
 
+/* ── Decision section ── */
 .dme-decision {
   margin-bottom: 32px;
 }
@@ -61,7 +69,7 @@ export const DMN_EDITOR_CSS = `
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 12px;
+  margin-bottom: 10px;
 }
 
 .dme-name-input {
@@ -81,25 +89,10 @@ export const DMN_EDITOR_CSS = `
   border-bottom-color: var(--dme-accent);
 }
 
-.dme-hp-select {
-  appearance: none;
-  background: var(--dme-badge-bg);
-  color: var(--dme-badge-fg);
-  border: 1px solid var(--dme-border);
-  border-radius: 4px;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  padding: 2px 24px 2px 8px;
-  cursor: pointer;
-  outline: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23888'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 6px center;
-}
-
+/* ── Table ── */
 .dme-table {
   border-collapse: collapse;
+  table-layout: fixed;
   width: 100%;
   min-width: 400px;
 }
@@ -111,42 +104,116 @@ export const DMN_EDITOR_CSS = `
   vertical-align: top;
 }
 
-.dme-table thead th {
-  background: var(--dme-header-bg);
-  font-weight: 600;
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  padding: 6px 6px 4px;
+/* ── Hit policy cell ── */
+.dme-th-hp {
+  position: relative;
+  width: 48px;
+  min-width: 48px;
+  background: var(--dme-hp-bg) !important;
+  text-align: center;
+  vertical-align: middle !important;
+  padding: 0 !important;
 }
 
+.dme-hp-abbr {
+  display: block;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--dme-hp-fg);
+  pointer-events: none;
+  user-select: none;
+  line-height: 1;
+}
+
+.dme-th-hp .dme-hp-select {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+  margin: 0;
+  padding: 0;
+  border: none;
+  font-size: 14px;
+}
+
+/* ── Column headers ── */
 .dme-th-input {
-  background: var(--dme-input-bg) !important;
+  background: var(--dme-input-section) !important;
+  min-width: 160px;
+  padding: 6px 8px 4px !important;
 }
 
 .dme-th-output {
-  background: var(--dme-output-bg) !important;
+  background: var(--dme-output-section) !important;
+  min-width: 160px;
+  padding: 6px 8px 4px !important;
 }
 
-.dme-th-inner {
-  display: flex;
-  align-items: center;
-  gap: 4px;
+.dme-th-annotation {
+  background: var(--dme-annotation-bg) !important;
+  min-width: 140px;
+  padding: 6px 8px 4px !important;
+  vertical-align: middle !important;
 }
 
-.dme-col-label,
-.dme-col-expr {
-  flex: 1;
+.dme-th-add {
+  width: 36px;
+  min-width: 36px;
+  text-align: center;
+  vertical-align: middle !important;
+  padding: 4px !important;
+  background: var(--dme-bg) !important;
+}
+
+/* Double border separating last input from first output */
+.dme-th-input.dme-last-input {
+  border-right: var(--dme-divider) !important;
+}
+
+.dme-table td.dme-last-input {
+  border-right: var(--dme-divider) !important;
+}
+
+/* ── Clause label (When / And / Then / Annotation) ── */
+.dme-clause {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--dme-clause-fg);
+  margin-bottom: 4px;
+  user-select: none;
+}
+
+/* ── Column label / expression inputs ── */
+.dme-col-label {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
   background: transparent;
   border: none;
   border-bottom: 1px solid var(--dme-border);
   color: var(--dme-fg);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
-  padding: 2px 4px;
+  padding: 2px 2px;
   outline: none;
-  min-width: 40px;
+  margin-bottom: 2px;
+}
+
+.dme-col-expr {
+  display: block;
   width: 100%;
+  box-sizing: border-box;
+  background: transparent;
+  border: none;
+  border-bottom: 1px dashed var(--dme-border);
+  color: var(--dme-clause-fg);
+  font-size: 11px;
+  padding: 2px 2px;
+  outline: none;
+  margin-bottom: 4px;
 }
 
 .dme-col-label:focus,
@@ -154,6 +221,28 @@ export const DMN_EDITOR_CSS = `
   border-bottom-color: var(--dme-accent);
 }
 
+/* ── Column footer: typeRef + delete ── */
+.dme-col-footer {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 2px;
+}
+
+.dme-typeref {
+  flex: 1;
+  min-width: 0;
+  font-size: 11px;
+  background: var(--dme-bg);
+  color: var(--dme-fg);
+  border: 1px solid var(--dme-border);
+  border-radius: 3px;
+  padding: 1px 3px;
+  outline: none;
+  cursor: pointer;
+}
+
+/* ── Body rows ── */
 .dme-table tr:nth-child(even) td {
   background: var(--dme-row-even);
 }
@@ -163,14 +252,22 @@ export const DMN_EDITOR_CSS = `
 }
 
 .dme-row-num {
-  color: var(--dme-badge-fg);
+  color: var(--dme-clause-fg);
   font-size: 11px;
-  min-width: 24px;
+  width: 48px;
+  min-width: 48px;
   text-align: center;
   user-select: none;
   padding: 6px 4px;
+  cursor: context-menu;
+  background: var(--dme-hp-bg) !important;
 }
 
+.dme-cell-annotation {
+  background: var(--dme-annotation-bg) !important;
+}
+
+/* ── Entry textarea ── */
 .dme-entry {
   display: block;
   width: 100%;
@@ -192,6 +289,7 @@ export const DMN_EDITOR_CSS = `
   outline-offset: -1px;
 }
 
+/* ── Buttons ── */
 .dme-btn {
   display: inline-flex;
   align-items: center;
@@ -224,17 +322,38 @@ export const DMN_EDITOR_CSS = `
   padding: 4px 10px;
 }
 
-.dme-th-actions {
-  width: 28px;
-  text-align: center !important;
-  padding: 4px !important;
+.dme-th-add .dme-btn-icon {
+  display: block;
+  margin: 2px auto;
 }
 
-.dme-td-actions {
-  width: 28px;
-  text-align: center;
-  vertical-align: middle;
-  padding: 4px;
+/* ── Context menu ── */
+.dme-ctx-menu {
+  position: fixed;
+  z-index: 9999;
+  background: var(--dme-bg);
+  border: 1px solid var(--dme-border);
+  border-radius: 4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  min-width: 160px;
+  padding: 3px 0;
+  font-size: 13px;
+  color: var(--dme-fg);
+}
+
+.dme-ctx-item {
+  padding: 6px 14px;
+  cursor: pointer;
+}
+
+.dme-ctx-item:hover {
+  background: var(--dme-row-hover);
+}
+
+.dme-ctx-sep {
+  border: none;
+  border-top: 1px solid var(--dme-border);
+  margin: 3px 0;
 }
 `.trim();
 
