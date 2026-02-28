@@ -14,6 +14,7 @@ import { injectDmnEditorStyles } from "./css.js";
 
 export interface DmnEditorOptions {
 	container: HTMLElement;
+	theme?: "dark" | "light";
 }
 
 const HIT_POLICIES: HitPolicy[] = [
@@ -42,7 +43,7 @@ export class DmnEditor {
 		injectDmnEditorStyles();
 
 		this._root = document.createElement("div");
-		this._root.className = "dmn-editor dark";
+		this._root.className = `dmn-editor ${options.theme ?? "dark"}`;
 		this._body = document.createElement("div");
 		this._body.className = "dmn-editor-body";
 		this._root.appendChild(this._body);
@@ -65,6 +66,10 @@ export class DmnEditor {
 			const idx = this._handlers.indexOf(handler);
 			if (idx !== -1) this._handlers.splice(idx, 1);
 		};
+	}
+
+	setTheme(theme: "dark" | "light"): void {
+		this._root.className = `dmn-editor ${theme}`;
 	}
 
 	destroy(): void {

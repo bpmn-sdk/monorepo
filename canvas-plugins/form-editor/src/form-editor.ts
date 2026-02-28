@@ -9,6 +9,7 @@ import { injectFormEditorStyles } from "./css.js";
 
 export interface FormEditorOptions {
 	container: HTMLElement;
+	theme?: "dark" | "light";
 }
 
 function uid(): string {
@@ -169,7 +170,7 @@ export class FormEditor {
 		injectFormEditorStyles();
 
 		this._root = document.createElement("div");
-		this._root.className = "form-editor dark";
+		this._root.className = `form-editor ${options.theme ?? "dark"}`;
 
 		this._listPanel = document.createElement("div");
 		this._listPanel.className = "fe-list-panel";
@@ -228,6 +229,10 @@ export class FormEditor {
 			const idx = this._handlers.indexOf(handler);
 			if (idx !== -1) this._handlers.splice(idx, 1);
 		};
+	}
+
+	setTheme(theme: "dark" | "light"): void {
+		this._root.className = `form-editor ${theme}`;
 	}
 
 	destroy(): void {
