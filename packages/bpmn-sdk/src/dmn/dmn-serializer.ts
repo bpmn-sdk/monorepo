@@ -90,6 +90,7 @@ function serializeDecisionTable(table: DmnDecisionTable): XmlElement {
 	if (table.hitPolicy && table.hitPolicy !== "UNIQUE") {
 		attrs.hitPolicy = table.hitPolicy;
 	}
+	if (table.aggregation) attrs.aggregation = table.aggregation;
 
 	const children: XmlElement[] = [
 		...table.inputs.map(serializeInput),

@@ -1,5 +1,45 @@
 # Progress
 
+## 2026-02-28 — Form Editor drag-and-drop redesign (form-js parity)
+
+Rewrote `FormEditor` (`canvas-plugins/form-editor`) with a three-panel drag-and-drop layout matching form-js.
+
+### `canvas-plugins/form-editor` — Complete rewrite
+
+- **Three-panel layout** — Palette (260px) | Canvas (flex) | Properties (300px)
+- **Palette** — 5 color-coded groups (Input/blue, Selection/green, Presentation/amber, Containers/purple, Action/red); icon grid ~72×72px per item; live search filter; click to append, drag to place
+- **Canvas** — Visual card-based preview of form structure; drop zones between cards (8px→24px→36px on drag/hover); empty state with drag target; container cards (group/dynamiclist) render nested drop zones
+- **Drag-and-drop** — HTML5 native DnD; palette→canvas (copy), canvas→canvas (move); drop zone highlight on hover; card opacity on drag; self-referential drop prevention for containers
+- **Component previews** — Non-interactive per-type previews: faux input/textarea/select/checkbox/radio/button/badge/separator/spacer/image
+- **Properties panel** — Colored icon header; property inputs for label, key, required, text, html, source, url, expression, and options list; label change updates canvas preview without re-rendering props (preserves focus)
+- **CSS redesign** — Light default, `.dark` class override; `--fe-*` CSS variables throughout
+
+### Files changed
+- **`canvas-plugins/form-editor/src/form-editor.ts`** — complete rewrite
+- **`canvas-plugins/form-editor/src/css.ts`** — complete redesign
+
+## 2026-02-28 — DMN Editor feature parity with dmn-js
+
+Redesigned `DmnEditor` to match the dmn-js visual language and feature set.
+
+### `packages/bpmn-sdk` — Aggregation support
+- **`dmn-model.ts`** — added `DmnAggregation` type (`"SUM" | "MIN" | "MAX" | "COUNT"`) and `aggregation?` field on `DmnDecisionTable`
+- **`dmn-parser.ts`** — parses `aggregation` attribute from `<decisionTable>`
+- **`dmn-serializer.ts`** — serializes `aggregation` attribute when present
+- **`index.ts`** — exports `DmnAggregation` type
+
+### `canvas-plugins/dmn-editor` — Major redesign
+- **Single-row column headers** replacing the previous two-row (type + col) layout
+- **Hit policy cell** — top-left table corner shows abbreviated policy (U/F/A/P/C/C+/C</C>/C#/R/O); transparent `<select>` overlay for changing it; supports all 11 combinations of hit policy + aggregation
+- **Clause labels** — "When"/"And" on input columns, "Then"/"And" on output columns
+- **TypeRef dropdowns** — `<select>` in each column header footer; editable per-column; updates `inputExpression.typeRef` or `output.typeRef` on change
+- **Annotations column** — rightmost column with "Annotation" clause label; bound to `rule.description`; fully round-trips through XML
+- **Context menu** — right-click on row-number cell: add rule above/below, remove rule; right-click on column header: add input/output left/right, remove column
+- **Collect aggregation** — COLLECT hit policy now has 5 variants: C, C+ (SUM), C< (MIN), C> (MAX), C# (COUNT)
+- **Light theme as default** — clean white background with blue hit-policy accent and section tints
+- **Double border** — 3px double border separates last input column from first output column
+- **CSS redesign** — Arial font, 14px base, new `--dme-*` variables for clause text, hit policy cell, section colors, annotation column, context menu
+
 ## 2026-02-27 — Native DMN + Form editors (zero external deps)
 
 Replaced `dmn-js` and `@bpmn-io/form-js-editor` with fully in-repo native implementations.

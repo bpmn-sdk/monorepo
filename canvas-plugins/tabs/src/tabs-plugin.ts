@@ -786,7 +786,7 @@ export function createTabsPlugin(options: TabsPluginOptions = {}): CanvasPlugin 
 		tab.pane = pane;
 
 		if (tab.config.type === "dmn") {
-			const editor = new DmnEditor({ container: pane });
+			const editor = new DmnEditor({ container: pane, theme });
 			tab.dmnEditor = editor;
 			const xml = Dmn.export(tab.config.defs);
 			void editor.loadXML(xml);
@@ -804,7 +804,7 @@ export function createTabsPlugin(options: TabsPluginOptions = {}): CanvasPlugin 
 				})();
 			});
 		} else if (tab.config.type === "form") {
-			const editor = new FormEditor({ container: pane });
+			const editor = new FormEditor({ container: pane, theme });
 			tab.formEditor = editor;
 			const schema = JSON.parse(Form.export(tab.config.form)) as Record<string, unknown>;
 			void editor.loadSchema(schema);
@@ -831,8 +831,9 @@ export function createTabsPlugin(options: TabsPluginOptions = {}): CanvasPlugin 
 		// shows through. pointer-events are set to none in setActiveTab.
 	}
 
-	function applyThemeToTab(_tab: TabState): void {
-		// dmn-js and form-js-editor handle their own theming
+	function applyThemeToTab(tab: TabState): void {
+		tab.dmnEditor?.setTheme(theme);
+		tab.formEditor?.setTheme(theme);
 	}
 
 	function showWarning(tab: TabState, show: boolean): void {
