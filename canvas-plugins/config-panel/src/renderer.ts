@@ -18,6 +18,13 @@ export class ConfigPanelRenderer {
 
 	private _panelEl: HTMLElement | null = null;
 	private _collapsed = false;
+	/** Persists the user-dragged width across panel close/reopen. */
+	private _panelWidth = 320;
+	/** Refs for the tab-scroll widgets; reset when panel is torn down. */
+	private _tabsScrollEl: HTMLElement | null = null;
+	private _tabsPrevBtn: HTMLButtonElement | null = null;
+	private _tabsNextBtn: HTMLButtonElement | null = null;
+
 	private _selectedId: string | null = null;
 	private _selectedType: string | null = null;
 	private _elementName = "";
@@ -160,6 +167,9 @@ export class ConfigPanelRenderer {
 	private _hidePanel(): void {
 		this._panelEl?.remove();
 		this._panelEl = null;
+		this._tabsScrollEl = null;
+		this._tabsPrevBtn = null;
+		this._tabsNextBtn = null;
 	}
 
 	/** Update all input values in-place without re-rendering (preserves focus). */
@@ -241,6 +251,8 @@ export class ConfigPanelRenderer {
 				}
 			}
 		}
+
+		requestAnimationFrame(() => this._updateTabScrollBtns());
 	}
 
 	private _activateTab(panel: HTMLElement, groupId: string): void {
@@ -255,6 +267,22 @@ export class ConfigPanelRenderer {
 		const groupEl = panel.querySelector<HTMLElement>(`[data-group-id="${groupId}"]`);
 		tabBtn?.classList.add("active");
 		if (groupEl) groupEl.style.display = "";
+		requestAnimationFrame(() => this._updateTabScrollBtns());
+	}
+
+	/** Show/hide tab scroll arrow buttons based on current scroll position and overflow. */
+	private _updateTabScrollBtns(): void {
+		const tabs = this._tabsScrollEl;
+		const prev = this._tabsPrevBtn;
+		const next = this._tabsNextBtn;
+		if (!tabs || !prev || !next) return;
+
+		const hasOverflow = tabs.scrollWidth > tabs.clientWidth + 1;
+		const atStart = tabs.scrollLeft <= 0;
+		const atEnd = tabs.scrollLeft + tabs.clientWidth >= tabs.scrollWidth - 1;
+
+		prev.style.display = hasOverflow && !atStart ? "flex" : "none";
+		next.style.display = hasOverflow && !atEnd ? "flex" : "none";
 	}
 
 	// ── Inspector panel ───────────────────────────────────────────────────────
@@ -264,7 +292,33 @@ export class ConfigPanelRenderer {
 
 		const panel = document.createElement("div");
 		panel.className = "bpmn-cfg-full";
-		if (this._collapsed) panel.classList.add("bpmn-cfg-full--collapsed");
+		if (this._collapsed) {
+			panel.classList.add("bpmn-cfg-full--collapsed");
+		} else {
+			panel.style.width = `${this._panelWidth}px`;
+		}
+
+		// Resize handle — dragging the left edge changes panel width
+		const resizeHandle = document.createElement("div");
+		resizeHandle.className = "bpmn-cfg-resize-handle";
+		resizeHandle.addEventListener("mousedown", (e) => {
+			if (this._collapsed) return;
+			e.preventDefault();
+			const startX = e.clientX;
+			const startWidth = this._panelWidth;
+			const onMove = (ev: MouseEvent) => {
+				const dx = startX - ev.clientX;
+				this._panelWidth = Math.max(240, Math.min(600, startWidth + dx));
+				panel.style.width = `${this._panelWidth}px`;
+			};
+			const onUp = () => {
+				document.removeEventListener("mousemove", onMove);
+				document.removeEventListener("mouseup", onUp);
+			};
+			document.addEventListener("mousemove", onMove);
+			document.addEventListener("mouseup", onUp);
+		});
+		panel.appendChild(resizeHandle);
 
 		// Header
 		const header = document.createElement("div");
@@ -291,6 +345,11 @@ export class ConfigPanelRenderer {
 		collapseBtn.addEventListener("click", () => {
 			this._collapsed = !this._collapsed;
 			panel.classList.toggle("bpmn-cfg-full--collapsed", this._collapsed);
+			if (this._collapsed) {
+				panel.style.width = "";
+			} else {
+				panel.style.width = `${this._panelWidth}px`;
+			}
 			collapseBtn.textContent = this._collapsed ? "›" : "‹";
 			collapseBtn.setAttribute("title", this._collapsed ? "Expand" : "Collapse");
 		});
@@ -305,9 +364,40 @@ export class ConfigPanelRenderer {
 		header.appendChild(collapseBtn);
 		header.appendChild(closeBtn);
 
-		// Tabs bar
+		// Tabs area: [prev arrow] [scrollable tabs] [next arrow]
+		const tabsArea = document.createElement("div");
+		tabsArea.className = "bpmn-cfg-tabs-area";
+
+		const prevBtn = document.createElement("button");
+		prevBtn.className = "bpmn-cfg-tabs-scroll-btn bpmn-cfg-tabs-scroll-btn--prev";
+		prevBtn.setAttribute("aria-label", "Scroll tabs left");
+		prevBtn.textContent = "‹";
+		prevBtn.style.display = "none";
+
 		const tabs = document.createElement("div");
 		tabs.className = "bpmn-cfg-tabs";
+
+		const nextBtn = document.createElement("button");
+		nextBtn.className = "bpmn-cfg-tabs-scroll-btn bpmn-cfg-tabs-scroll-btn--next";
+		nextBtn.setAttribute("aria-label", "Scroll tabs right");
+		nextBtn.textContent = "›";
+		nextBtn.style.display = "none";
+
+		prevBtn.addEventListener("click", () => {
+			tabs.scrollBy({ left: -100, behavior: "smooth" });
+		});
+		nextBtn.addEventListener("click", () => {
+			tabs.scrollBy({ left: 100, behavior: "smooth" });
+		});
+		tabs.addEventListener("scroll", () => this._updateTabScrollBtns());
+
+		tabsArea.appendChild(prevBtn);
+		tabsArea.appendChild(tabs);
+		tabsArea.appendChild(nextBtn);
+
+		this._tabsScrollEl = tabs;
+		this._tabsPrevBtn = prevBtn;
+		this._tabsNextBtn = nextBtn;
 
 		// Scrollable body
 		const body = document.createElement("div");
@@ -359,10 +449,13 @@ export class ConfigPanelRenderer {
 		}
 
 		panel.appendChild(header);
-		panel.appendChild(tabs);
+		panel.appendChild(tabsArea);
 		panel.appendChild(body);
 		document.body.appendChild(panel);
 		this._panelEl = panel;
+
+		// Defer scroll button check until the panel has been laid out
+		requestAnimationFrame(() => this._updateTabScrollBtns());
 	}
 
 	// ── Field rendering ───────────────────────────────────────────────────────

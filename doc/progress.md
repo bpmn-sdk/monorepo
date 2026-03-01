@@ -1,5 +1,13 @@
 # Progress
 
+## 2026-03-01 — Config Panel: resizable width, vertical offset, tab scroll arrows
+
+### `canvas-plugins/config-panel` — UX refinements
+
+- **Resizable width** — A 5px drag handle on the left edge of the inspector panel lets users resize it between 240px and 600px. The chosen width persists across node selections (stored as `_panelWidth`). Dragging is blocked when the panel is collapsed. Inline `style.width` is cleared when collapsing and restored on expand.
+- **Vertical offset** — `top: 36px` (matches the `canvas-plugin-tabs` bar height) so the inspector panel no longer overlaps the tab bar.
+- **Tab scroll arrows** — The tabs bar is now wrapped in a `.bpmn-cfg-tabs-area` flex container. When tab buttons overflow the available width, ‹ and › arrow buttons appear on the left/right edges to scroll by 100px. Buttons are shown/hidden dynamically via `_updateTabScrollBtns()`, called after render, on scroll, on tab switch, and on group-visibility changes.
+
 ## 2026-03-01 — Config Panel: Persistent Inspector Panel (Pattern 1)
 
 Replaced the two-click compact+overlay UX with a single persistent fixed-width right-side inspector panel.

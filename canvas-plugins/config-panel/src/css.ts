@@ -2,10 +2,14 @@ export const CONFIG_PANEL_STYLE_ID = "bpmn-config-panel-styles-v1";
 
 export const CONFIG_PANEL_CSS = `
 /* ── Inspector panel ─────────────────────────────────────────────────────── */
+/*
+ * top: 36px matches the height of the .bpmn-tabs bar from canvas-plugin-tabs,
+ * so the inspector panel does not overlap the tab bar.
+ */
 .bpmn-cfg-full {
   position: fixed;
   right: 0;
-  top: 0;
+  top: 36px;
   bottom: 0;
   width: 320px;
   background: rgba(18, 18, 26, 0.98);
@@ -17,7 +21,6 @@ export const CONFIG_PANEL_CSS = `
   font-family: system-ui, -apple-system, sans-serif;
   font-size: 13px;
   color: rgba(255,255,255,0.85);
-  overflow: hidden;
   z-index: 9999;
   transition: width 0.2s ease;
 }
@@ -26,7 +29,7 @@ export const CONFIG_PANEL_CSS = `
 }
 .bpmn-cfg-full--collapsed .bpmn-cfg-full-info,
 .bpmn-cfg-full--collapsed .bpmn-cfg-full-close,
-.bpmn-cfg-full--collapsed .bpmn-cfg-tabs,
+.bpmn-cfg-full--collapsed .bpmn-cfg-tabs-area,
 .bpmn-cfg-full--collapsed .bpmn-cfg-full-body {
   display: none;
 }
@@ -34,6 +37,21 @@ export const CONFIG_PANEL_CSS = `
   justify-content: center;
   padding: 14px 0;
 }
+
+/* Resize handle — a thin grab zone along the left edge */
+.bpmn-cfg-resize-handle {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 5px;
+  cursor: ew-resize;
+  z-index: 1;
+}
+.bpmn-cfg-resize-handle:hover {
+  background: rgba(76,142,247,0.35);
+}
+
 .bpmn-cfg-full-header {
   display: flex;
   align-items: center;
@@ -99,19 +117,23 @@ export const CONFIG_PANEL_CSS = `
 }
 .bpmn-cfg-full-close:hover { background: rgba(255,255,255,0.08); color: #fff; }
 
-/* ── Tabs ─────────────────────────────────────────────────────────────────── */
+/* ── Tabs area (wrapper + scroll buttons) ────────────────────────────────── */
+.bpmn-cfg-tabs-area {
+  display: flex;
+  align-items: stretch;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  flex-shrink: 0;
+  overflow: hidden;
+}
 .bpmn-cfg-tabs {
+  flex: 1;
+  min-width: 0;
   display: flex;
   align-items: flex-end;
-  gap: 0;
-  padding: 0 14px;
-  border-bottom: 1px solid rgba(255,255,255,0.08);
   overflow-x: auto;
-  flex-shrink: 0;
   scrollbar-width: none;
 }
 .bpmn-cfg-tabs::-webkit-scrollbar { display: none; }
-
 .bpmn-cfg-tab-btn {
   padding: 10px 14px;
   background: none;
@@ -124,9 +146,31 @@ export const CONFIG_PANEL_CSS = `
   white-space: nowrap;
   transition: color 0.1s, border-color 0.1s;
   margin-bottom: -1px;
+  flex-shrink: 0;
 }
 .bpmn-cfg-tab-btn:hover { color: rgba(255,255,255,0.75); }
 .bpmn-cfg-tab-btn.active { color: #4c8ef7; border-bottom-color: #4c8ef7; }
+
+/* Arrow buttons for overflowing tabs */
+.bpmn-cfg-tabs-scroll-btn {
+  flex-shrink: 0;
+  width: 26px;
+  background: none;
+  border: none;
+  border-radius: 0;
+  color: rgba(255,255,255,0.5);
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  padding: 0;
+  /* display toggled via JS */
+  align-items: center;
+  justify-content: center;
+  transition: background 0.1s, color 0.1s;
+}
+.bpmn-cfg-tabs-scroll-btn:hover { color: #fff; background: rgba(255,255,255,0.08); }
+.bpmn-cfg-tabs-scroll-btn--prev { border-right: 1px solid rgba(255,255,255,0.06); }
+.bpmn-cfg-tabs-scroll-btn--next { border-left: 1px solid rgba(255,255,255,0.06); }
 
 .bpmn-cfg-full-body {
   flex: 1;
@@ -338,9 +382,13 @@ export const CONFIG_PANEL_CSS = `
 [data-bpmn-hud-theme="light"] .bpmn-cfg-full-close { color: rgba(0,0,0,0.4); }
 [data-bpmn-hud-theme="light"] .bpmn-cfg-full-close:hover { background: rgba(0,0,0,0.06); color: rgba(0,0,0,0.9); }
 
-[data-bpmn-hud-theme="light"] .bpmn-cfg-tabs { border-bottom-color: rgba(0,0,0,0.07); }
+[data-bpmn-hud-theme="light"] .bpmn-cfg-tabs-area { border-bottom-color: rgba(0,0,0,0.07); }
 [data-bpmn-hud-theme="light"] .bpmn-cfg-tab-btn { color: rgba(0,0,0,0.4); }
 [data-bpmn-hud-theme="light"] .bpmn-cfg-tab-btn:hover { color: rgba(0,0,0,0.7); }
+[data-bpmn-hud-theme="light"] .bpmn-cfg-tabs-scroll-btn { color: rgba(0,0,0,0.4); }
+[data-bpmn-hud-theme="light"] .bpmn-cfg-tabs-scroll-btn:hover { color: rgba(0,0,0,0.9); background: rgba(0,0,0,0.06); }
+[data-bpmn-hud-theme="light"] .bpmn-cfg-tabs-scroll-btn--prev { border-right-color: rgba(0,0,0,0.06); }
+[data-bpmn-hud-theme="light"] .bpmn-cfg-tabs-scroll-btn--next { border-left-color: rgba(0,0,0,0.06); }
 [data-bpmn-hud-theme="light"] .bpmn-cfg-full-body { scrollbar-color: rgba(0,0,0,0.15) transparent; }
 
 [data-bpmn-hud-theme="light"] .bpmn-cfg-group-label {
@@ -377,6 +425,9 @@ export const CONFIG_PANEL_CSS = `
 [data-bpmn-hud-theme="light"] .bpmn-cfg-action-btn:hover {
   background: rgba(0,0,0,0.08);
   border-color: rgba(0,0,0,0.2);
+}
+[data-bpmn-hud-theme="light"] .bpmn-cfg-resize-handle:hover {
+  background: rgba(26,86,219,0.2);
 }
 `;
 
