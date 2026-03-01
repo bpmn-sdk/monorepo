@@ -5,6 +5,7 @@ import type { FieldSchema, FieldValue, GroupSchema, PanelAdapter, PanelSchema } 
 // Attribute set on the field wrapper div when the field has a condition, used
 // by _refreshConditionals to toggle visibility without a full re-render.
 const FIELD_WRAPPER_ATTR = "data-field-wrapper";
+const STORAGE_KEY_WIDTH = "bpmn-cfg-panel-width";
 
 interface Registration {
 	schema: PanelSchema;
@@ -18,13 +19,18 @@ export class ConfigPanelRenderer {
 
 	private _panelEl: HTMLElement | null = null;
 	private _collapsed = false;
-	/** Persists the user-dragged width across panel close/reopen. */
+	/** User-set panel width; persisted to localStorage. */
 	private _panelWidth = 320;
-	/** Refs for the tab-scroll widgets; reset when panel is torn down. */
+	/** Sub-element refs for layout toggling; reset on panel teardown. */
+	private _tabsAreaEl: HTMLElement | null = null;
 	private _tabsScrollEl: HTMLElement | null = null;
 	private _tabsPrevBtn: HTMLButtonElement | null = null;
 	private _tabsNextBtn: HTMLButtonElement | null = null;
+	private _bodyEl: HTMLElement | null = null;
+	private _searchResultsEl: HTMLElement | null = null;
+	private _searchClearBtn: HTMLButtonElement | null = null;
 
+	private _searchQuery = "";
 	private _selectedId: string | null = null;
 	private _selectedType: string | null = null;
 	private _elementName = "";
@@ -41,6 +47,16 @@ export class ConfigPanelRenderer {
 		this._schemas = schemas;
 		this._getDefinitions = getDefinitions;
 		this._applyChange = applyChange;
+
+		// Restore persisted panel width
+		try {
+			const saved = Number(localStorage.getItem(STORAGE_KEY_WIDTH));
+			if (Number.isFinite(saved) && saved >= 240 && saved <= 600) {
+				this._panelWidth = saved;
+			}
+		} catch {
+			// localStorage unavailable (e.g. sandboxed iframe) — use default
+		}
 	}
 
 	onSelect(ids: string[], shapes: RenderedShape[], edges: RenderedEdge[] = []): void {
@@ -162,14 +178,19 @@ export class ConfigPanelRenderer {
 		this._activeTabId = null;
 		this._values = {};
 		this._effectiveReg = null;
+		this._searchQuery = "";
 	}
 
 	private _hidePanel(): void {
 		this._panelEl?.remove();
 		this._panelEl = null;
+		this._tabsAreaEl = null;
 		this._tabsScrollEl = null;
 		this._tabsPrevBtn = null;
 		this._tabsNextBtn = null;
+		this._bodyEl = null;
+		this._searchResultsEl = null;
+		this._searchClearBtn = null;
 	}
 
 	/** Update all input values in-place without re-rendering (preserves focus). */
@@ -252,6 +273,7 @@ export class ConfigPanelRenderer {
 			}
 		}
 
+		this._syncTabsAreaVisibility(groups);
 		requestAnimationFrame(() => this._updateTabScrollBtns());
 	}
 
@@ -285,10 +307,90 @@ export class ConfigPanelRenderer {
 		next.style.display = hasOverflow && !atEnd ? "flex" : "none";
 	}
 
+	/**
+	 * Hide the tabs area when there are 0 or 1 visible groups — a single tab
+	 * provides no navigation value and adds visual noise.
+	 */
+	private _syncTabsAreaVisibility(groups: GroupSchema[]): void {
+		const tabsArea = this._tabsAreaEl;
+		if (!tabsArea) return;
+		const visibleCount = groups.filter(
+			(g) => g.fields.length > 0 && (!g.condition || g.condition(this._values)),
+		).length;
+		tabsArea.style.display = visibleCount <= 1 ? "none" : "";
+	}
+
+	// ── Search ────────────────────────────────────────────────────────────────
+
+	private _setSearch(query: string): void {
+		this._searchQuery = query;
+		const searchResults = this._searchResultsEl;
+		const tabsArea = this._tabsAreaEl;
+		const body = this._bodyEl;
+		const clearBtn = this._searchClearBtn;
+		if (!searchResults || !body) return;
+
+		const isSearching = query.trim().length > 0;
+
+		// Toggle clear button visibility
+		if (clearBtn) clearBtn.style.display = isSearching ? "flex" : "none";
+
+		if (!isSearching) {
+			searchResults.style.display = "none";
+			searchResults.innerHTML = "";
+			if (tabsArea) {
+				const schema = this._effectiveReg?.schema;
+				if (schema) this._syncTabsAreaVisibility(schema.groups);
+			}
+			body.style.display = "";
+			return;
+		}
+
+		body.style.display = "none";
+		if (tabsArea) tabsArea.style.display = "none";
+		searchResults.style.display = "";
+		this._buildSearchResults(query);
+	}
+
+	private _buildSearchResults(query: string): void {
+		const searchResults = this._searchResultsEl;
+		const schema = this._effectiveReg?.schema;
+		if (!searchResults || !schema) return;
+
+		searchResults.innerHTML = "";
+		const q = query.trim().toLowerCase();
+		let totalMatches = 0;
+
+		for (const group of schema.groups) {
+			const matchingFields = group.fields.filter((f) => f.label.toLowerCase().includes(q));
+			if (matchingFields.length === 0) continue;
+
+			totalMatches += matchingFields.length;
+
+			const groupHeader = document.createElement("div");
+			groupHeader.className = "bpmn-cfg-search-group-label";
+			groupHeader.textContent = group.label;
+			searchResults.appendChild(groupHeader);
+
+			for (const field of matchingFields) {
+				searchResults.appendChild(this._renderField(field));
+			}
+		}
+
+		if (totalMatches === 0) {
+			const empty = document.createElement("div");
+			empty.className = "bpmn-cfg-search-empty";
+			empty.textContent = "No matching properties";
+			searchResults.appendChild(empty);
+		}
+	}
+
 	// ── Inspector panel ───────────────────────────────────────────────────────
 
 	private _showPanel(reg: Registration): void {
 		this._hidePanel();
+		// Reset search when re-rendering (e.g., template changed)
+		this._searchQuery = "";
 
 		const panel = document.createElement("div");
 		panel.className = "bpmn-cfg-full";
@@ -310,6 +412,11 @@ export class ConfigPanelRenderer {
 				const dx = startX - ev.clientX;
 				this._panelWidth = Math.max(240, Math.min(600, startWidth + dx));
 				panel.style.width = `${this._panelWidth}px`;
+				try {
+					localStorage.setItem(STORAGE_KEY_WIDTH, String(this._panelWidth));
+				} catch {
+					// ignore
+				}
 			};
 			const onUp = () => {
 				document.removeEventListener("mousemove", onMove);
@@ -337,6 +444,19 @@ export class ConfigPanelRenderer {
 
 		info.appendChild(typeLabel);
 		info.appendChild(nameLabel);
+		header.appendChild(info);
+
+		// Docs link — shown when the schema provides a documentation URL
+		if (reg.schema.docsUrl) {
+			const docsLink = document.createElement("a");
+			docsLink.className = "bpmn-cfg-docs-link";
+			docsLink.href = reg.schema.docsUrl;
+			docsLink.target = "_blank";
+			docsLink.rel = "noopener noreferrer";
+			docsLink.setAttribute("title", "Documentation");
+			docsLink.textContent = "?";
+			header.appendChild(docsLink);
+		}
 
 		const collapseBtn = document.createElement("button");
 		collapseBtn.className = "bpmn-cfg-collapse-btn";
@@ -360,9 +480,45 @@ export class ConfigPanelRenderer {
 		closeBtn.textContent = "×";
 		closeBtn.addEventListener("click", () => this._close());
 
-		header.appendChild(info);
 		header.appendChild(collapseBtn);
 		header.appendChild(closeBtn);
+
+		// Search bar
+		const searchBar = document.createElement("div");
+		searchBar.className = "bpmn-cfg-search-bar";
+
+		const searchInput = document.createElement("input");
+		searchInput.type = "text";
+		searchInput.className = "bpmn-cfg-search-input";
+		searchInput.placeholder = "Search properties…";
+		searchInput.value = this._searchQuery;
+		searchInput.setAttribute("spellcheck", "false");
+		searchInput.setAttribute("autocomplete", "off");
+
+		const clearBtn = document.createElement("button");
+		clearBtn.className = "bpmn-cfg-search-clear";
+		clearBtn.setAttribute("title", "Clear search");
+		clearBtn.textContent = "×";
+		clearBtn.style.display = this._searchQuery.trim().length > 0 ? "flex" : "none";
+
+		searchInput.addEventListener("input", () => this._setSearch(searchInput.value));
+		searchInput.addEventListener("keydown", (e) => {
+			if (e.key === "Escape") {
+				searchInput.value = "";
+				this._setSearch("");
+				searchInput.blur();
+			}
+		});
+		clearBtn.addEventListener("click", () => {
+			searchInput.value = "";
+			this._setSearch("");
+			searchInput.focus();
+		});
+
+		searchBar.appendChild(searchInput);
+		searchBar.appendChild(clearBtn);
+
+		this._searchClearBtn = clearBtn;
 
 		// Tabs area: [prev arrow] [scrollable tabs] [next arrow]
 		const tabsArea = document.createElement("div");
@@ -395,6 +551,7 @@ export class ConfigPanelRenderer {
 		tabsArea.appendChild(tabs);
 		tabsArea.appendChild(nextBtn);
 
+		this._tabsAreaEl = tabsArea;
 		this._tabsScrollEl = tabs;
 		this._tabsPrevBtn = prevBtn;
 		this._tabsNextBtn = nextBtn;
@@ -402,6 +559,13 @@ export class ConfigPanelRenderer {
 		// Scrollable body
 		const body = document.createElement("div");
 		body.className = "bpmn-cfg-full-body";
+		this._bodyEl = body;
+
+		// Search results pane (initially hidden)
+		const searchResults = document.createElement("div");
+		searchResults.className = "bpmn-cfg-search-results";
+		searchResults.style.display = "none";
+		this._searchResultsEl = searchResults;
 
 		// Ensure the active tab is valid for the current values
 		const hasActive = reg.schema.groups.some(
@@ -449,13 +613,22 @@ export class ConfigPanelRenderer {
 		}
 
 		panel.appendChild(header);
+		panel.appendChild(searchBar);
 		panel.appendChild(tabsArea);
 		panel.appendChild(body);
+		panel.appendChild(searchResults);
 		document.body.appendChild(panel);
 		this._panelEl = panel;
 
-		// Defer scroll button check until the panel has been laid out
-		requestAnimationFrame(() => this._updateTabScrollBtns());
+		// Defer layout-dependent checks until the panel is in the DOM
+		requestAnimationFrame(() => {
+			this._syncTabsAreaVisibility(reg.schema.groups);
+			this._updateTabScrollBtns();
+			// Restore active search if panel was re-rendered while search was active
+			if (this._searchQuery.trim().length > 0) {
+				this._setSearch(this._searchQuery);
+			}
+		});
 	}
 
 	// ── Field rendering ───────────────────────────────────────────────────────
@@ -483,6 +656,7 @@ export class ConfigPanelRenderer {
 			const labelRow = document.createElement("div");
 			labelRow.className = "bpmn-cfg-field-label";
 			labelRow.textContent = field.label;
+			if (field.tooltip) labelRow.title = field.tooltip;
 
 			if (field.required) {
 				const star = document.createElement("span");
@@ -612,6 +786,7 @@ export class ConfigPanelRenderer {
 		const labelText = document.createElement("span");
 		labelText.className = "bpmn-cfg-toggle-label";
 		labelText.textContent = field.label;
+		if (field.tooltip) labelText.title = field.tooltip;
 
 		input.addEventListener("change", () => this._applyField(field.key, input.checked));
 
@@ -625,6 +800,7 @@ export class ConfigPanelRenderer {
 		btn.type = "button";
 		btn.className = "bpmn-cfg-action-btn";
 		btn.textContent = field.label;
+		if (field.tooltip) btn.title = field.tooltip;
 		btn.addEventListener("click", () =>
 			field.onClick?.(this._values, (k, v) => this._applyField(k, v)),
 		);

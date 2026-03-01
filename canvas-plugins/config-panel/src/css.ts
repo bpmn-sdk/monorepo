@@ -29,8 +29,11 @@ export const CONFIG_PANEL_CSS = `
 }
 .bpmn-cfg-full--collapsed .bpmn-cfg-full-info,
 .bpmn-cfg-full--collapsed .bpmn-cfg-full-close,
+.bpmn-cfg-full--collapsed .bpmn-cfg-docs-link,
+.bpmn-cfg-full--collapsed .bpmn-cfg-search-bar,
 .bpmn-cfg-full--collapsed .bpmn-cfg-tabs-area,
-.bpmn-cfg-full--collapsed .bpmn-cfg-full-body {
+.bpmn-cfg-full--collapsed .bpmn-cfg-full-body,
+.bpmn-cfg-full--collapsed .bpmn-cfg-search-results {
   display: none;
 }
 .bpmn-cfg-full--collapsed .bpmn-cfg-full-header {
@@ -52,11 +55,12 @@ export const CONFIG_PANEL_CSS = `
   background: rgba(76,142,247,0.35);
 }
 
+/* ── Header ──────────────────────────────────────────────────────────────── */
 .bpmn-cfg-full-header {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 14px 18px 12px;
+  gap: 8px;
+  padding: 12px 14px 10px;
   border-bottom: 1px solid rgba(255,255,255,0.08);
   flex-shrink: 0;
 }
@@ -73,16 +77,37 @@ export const CONFIG_PANEL_CSS = `
   margin-bottom: 2px;
 }
 .bpmn-cfg-full-name {
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 600;
   color: #fff;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* Docs link — ? button shown when the schema has a documentationRef */
+.bpmn-cfg-docs-link {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 1px solid rgba(255,255,255,0.2);
+  color: rgba(255,255,255,0.45);
+  font-size: 11px;
+  font-weight: 700;
+  text-decoration: none;
+  flex-shrink: 0;
+  transition: border-color 0.1s, color 0.1s, background 0.1s;
+}
+.bpmn-cfg-docs-link:hover {
+  color: #4c8ef7;
+  border-color: #4c8ef7;
+  background: rgba(76,142,247,0.12);
+}
 .bpmn-cfg-collapse-btn {
-  width: 30px;
-  height: 30px;
+  width: 28px;
+  height: 28px;
   background: none;
   border: none;
   color: rgba(255,255,255,0.4);
@@ -99,8 +124,8 @@ export const CONFIG_PANEL_CSS = `
 }
 .bpmn-cfg-collapse-btn:hover { background: rgba(255,255,255,0.08); color: #fff; }
 .bpmn-cfg-full-close {
-  width: 30px;
-  height: 30px;
+  width: 28px;
+  height: 28px;
   background: none;
   border: none;
   color: rgba(255,255,255,0.4);
@@ -116,6 +141,78 @@ export const CONFIG_PANEL_CSS = `
   transition: background 0.1s, color 0.1s;
 }
 .bpmn-cfg-full-close:hover { background: rgba(255,255,255,0.08); color: #fff; }
+
+/* ── Search bar ──────────────────────────────────────────────────────────── */
+.bpmn-cfg-search-bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 12px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  flex-shrink: 0;
+}
+.bpmn-cfg-search-input {
+  flex: 1;
+  height: 28px;
+  padding: 0 8px;
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 5px;
+  color: rgba(255,255,255,0.85);
+  font-size: 12px;
+  font-family: system-ui, -apple-system, sans-serif;
+  outline: none;
+  transition: border-color 0.15s, background 0.15s;
+  box-sizing: border-box;
+}
+.bpmn-cfg-search-input::placeholder { color: rgba(255,255,255,0.28); }
+.bpmn-cfg-search-input:focus {
+  border-color: #4c8ef7;
+  background: rgba(255,255,255,0.1);
+}
+.bpmn-cfg-search-clear {
+  width: 22px;
+  height: 22px;
+  background: none;
+  border: none;
+  color: rgba(255,255,255,0.35);
+  cursor: pointer;
+  padding: 0;
+  /* display toggled via JS */
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  font-size: 14px;
+  flex-shrink: 0;
+  transition: color 0.1s, background 0.1s;
+}
+.bpmn-cfg-search-clear:hover { color: #fff; background: rgba(255,255,255,0.08); }
+
+/* ── Search results ──────────────────────────────────────────────────────── */
+.bpmn-cfg-search-results {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 22px 32px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.15) transparent;
+}
+.bpmn-cfg-search-group-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(255,255,255,0.3);
+  margin: 16px 0 10px;
+  padding-bottom: 5px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.bpmn-cfg-search-group-label:first-child { margin-top: 10px; }
+.bpmn-cfg-search-empty {
+  font-size: 12px;
+  color: rgba(255,255,255,0.3);
+  text-align: center;
+  padding: 28px 0;
+}
 
 /* ── Tabs area (wrapper + scroll buttons) ────────────────────────────────── */
 .bpmn-cfg-tabs-area {
@@ -172,6 +269,7 @@ export const CONFIG_PANEL_CSS = `
 .bpmn-cfg-tabs-scroll-btn--prev { border-right: 1px solid rgba(255,255,255,0.06); }
 .bpmn-cfg-tabs-scroll-btn--next { border-left: 1px solid rgba(255,255,255,0.06); }
 
+/* ── Scrollable body ─────────────────────────────────────────────────────── */
 .bpmn-cfg-full-body {
   flex: 1;
   overflow-y: auto;
@@ -202,7 +300,9 @@ export const CONFIG_PANEL_CSS = `
   font-weight: 500;
   color: rgba(255,255,255,0.55);
   margin-bottom: 5px;
+  cursor: default;
 }
+.bpmn-cfg-field-label[title] { cursor: help; }
 .bpmn-cfg-field-docs {
   font-size: 10px;
   color: #4c8ef7;
@@ -313,6 +413,7 @@ export const CONFIG_PANEL_CSS = `
   color: rgba(255,255,255,0.7);
   cursor: pointer;
 }
+.bpmn-cfg-toggle-label[title] { cursor: help; }
 .bpmn-cfg-toggle {
   position: relative;
   display: inline-flex;
@@ -377,10 +478,25 @@ export const CONFIG_PANEL_CSS = `
 [data-bpmn-hud-theme="light"] .bpmn-cfg-full-header { border-bottom-color: rgba(0,0,0,0.07); }
 [data-bpmn-hud-theme="light"] .bpmn-cfg-full-type { color: rgba(0,0,0,0.35); }
 [data-bpmn-hud-theme="light"] .bpmn-cfg-full-name { color: rgba(0,0,0,0.9); }
+[data-bpmn-hud-theme="light"] .bpmn-cfg-docs-link { color: rgba(0,0,0,0.4); border-color: rgba(0,0,0,0.2); }
+[data-bpmn-hud-theme="light"] .bpmn-cfg-docs-link:hover { color: #1a56db; border-color: #1a56db; background: rgba(26,86,219,0.08); }
 [data-bpmn-hud-theme="light"] .bpmn-cfg-collapse-btn { color: rgba(0,0,0,0.4); }
 [data-bpmn-hud-theme="light"] .bpmn-cfg-collapse-btn:hover { background: rgba(0,0,0,0.06); color: rgba(0,0,0,0.9); }
 [data-bpmn-hud-theme="light"] .bpmn-cfg-full-close { color: rgba(0,0,0,0.4); }
 [data-bpmn-hud-theme="light"] .bpmn-cfg-full-close:hover { background: rgba(0,0,0,0.06); color: rgba(0,0,0,0.9); }
+
+[data-bpmn-hud-theme="light"] .bpmn-cfg-search-bar { border-bottom-color: rgba(0,0,0,0.06); }
+[data-bpmn-hud-theme="light"] .bpmn-cfg-search-input {
+  background: rgba(0,0,0,0.04);
+  border-color: rgba(0,0,0,0.12);
+  color: rgba(0,0,0,0.85);
+}
+[data-bpmn-hud-theme="light"] .bpmn-cfg-search-input::placeholder { color: rgba(0,0,0,0.3); }
+[data-bpmn-hud-theme="light"] .bpmn-cfg-search-clear { color: rgba(0,0,0,0.35); }
+[data-bpmn-hud-theme="light"] .bpmn-cfg-search-clear:hover { color: rgba(0,0,0,0.9); background: rgba(0,0,0,0.06); }
+[data-bpmn-hud-theme="light"] .bpmn-cfg-search-results { scrollbar-color: rgba(0,0,0,0.15) transparent; }
+[data-bpmn-hud-theme="light"] .bpmn-cfg-search-group-label { color: rgba(0,0,0,0.35); border-bottom-color: rgba(0,0,0,0.06); }
+[data-bpmn-hud-theme="light"] .bpmn-cfg-search-empty { color: rgba(0,0,0,0.35); }
 
 [data-bpmn-hud-theme="light"] .bpmn-cfg-tabs-area { border-bottom-color: rgba(0,0,0,0.07); }
 [data-bpmn-hud-theme="light"] .bpmn-cfg-tab-btn { color: rgba(0,0,0,0.4); }

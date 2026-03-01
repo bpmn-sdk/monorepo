@@ -86,6 +86,7 @@ function propToFieldSchema(prop: TemplateProperty): FieldSchema {
 		type: "text",
 		placeholder: prop.placeholder,
 		hint: prop.description,
+		tooltip: prop.tooltip,
 		condition,
 		...(prop.constraints?.notEmpty === true ? { required: true } : {}),
 	};
@@ -228,6 +229,7 @@ export function buildRegistrationFromTemplate(template: ElementTemplate): Templa
 	const schema: PanelSchema = {
 		compact: [nameField],
 		groups: schemaGroups,
+		...(template.documentationRef ? { docsUrl: template.documentationRef } : {}),
 	};
 
 	// Build adapter

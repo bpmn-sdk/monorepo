@@ -20,6 +20,8 @@ export interface FieldSchema {
 	options?: SelectOption[];
 	/** Short hint displayed below the field. */
 	hint?: string;
+	/** Tooltip text shown on hover over the field label. */
+	tooltip?: string;
 	/** Link to external documentation. */
 	docsUrl?: string;
 	/** Mask the input (password-style) for secret values. */
@@ -55,6 +57,8 @@ export interface GroupSchema {
 
 /** Describes the full config panel for an element type. */
 export interface PanelSchema {
+	/** Optional link to documentation for this element type. Shown as a ? button in the panel header. */
+	docsUrl?: string;
 	/** Fields shown in the compact (right-rail) panel. */
 	compact: FieldSchema[];
 	/** All field groups shown in the full overlay editor. */

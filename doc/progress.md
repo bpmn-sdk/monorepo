@@ -1,5 +1,36 @@
 # Progress
 
+## 2026-03-01 — Config Panel UX: search, docs link, tooltip, tab hiding, localStorage width
+
+### Investigation findings
+- **Tabs**: appropriate for connector templates (2–9 groups, 10–50 fields each) but visual noise for built-in schemas with a single group. Fixed by auto-hiding the tab bar when ≤ 1 visible group.
+- **Finding properties**: without search, users must click through tabs to locate a specific property. Fixed with full-text search.
+- **Help/support**: 102/115 connector templates have `documentationRef` but it was never surfaced in the UI. Template `tooltip` per-field was also unmapped. Both now wired.
+- **Examples**: `placeholder` and `hint` already serve as examples for most fields; a dedicated `example` field type is a future enhancement.
+
+### Changes
+
+**`canvas-plugins/config-panel/src/types.ts`**
+- Added `docsUrl?: string` to `PanelSchema` (panel-level docs URL)
+- Added `tooltip?: string` to `FieldSchema` (hover tooltip on field label)
+
+**`canvas-plugins/config-panel/src/renderer.ts`**
+- **localStorage width** — panel width restored from `localStorage` on construction; saved on every resize drag
+- **Search** — search bar (below header) filters all fields across all groups by label. Results show group name as section header. Tabs+body hidden while search is active; restored on clear. Escape key clears search.
+- **Docs link** — `?` button in header shown when `reg.schema.docsUrl` is set; opens documentation in new tab
+- **Tooltip** — `field.tooltip` rendered as `title` attribute on field label, toggle label, and action button
+- **Single-group tab bar auto-hide** — `_syncTabsAreaVisibility()` hides the `.bpmn-cfg-tabs-area` when ≤ 1 group is visible; called on initial render and after every group visibility change
+
+**`canvas-plugins/config-panel/src/css.ts`**
+- Added search bar, search results, and search-group-label styles
+- Added `.bpmn-cfg-docs-link` styles (circular `?` badge)
+- Added `cursor: help` on `.bpmn-cfg-field-label[title]` and `.bpmn-cfg-toggle-label[title]`
+- Added collapsed-state hiding for new elements (`search-bar`, `docs-link`, `search-results`)
+
+**`canvas-plugins/config-panel-bpmn/src/template-engine.ts`**
+- `prop.tooltip` → `FieldSchema.tooltip`
+- `template.documentationRef` → `schema.docsUrl`
+
 ## 2026-03-01 — Config Panel: resizable width, vertical offset, tab scroll arrows
 
 ### `canvas-plugins/config-panel` — UX refinements
