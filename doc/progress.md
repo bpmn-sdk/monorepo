@@ -1,5 +1,18 @@
 # Progress
 
+## 2026-03-01 — Config panel: improved validation UX
+
+### Tab error dots
+Each config panel tab now shows a small red dot (CSS `::after`) when that group contains at least one required field with an empty value. Dots update in real time as the user types. Only visible fields are counted (conditionally-hidden required fields are excluded).
+
+### Enhanced field invalid styling
+Invalid required fields now show a solid red left-border accent (`border-left: 2px solid #f87171`) on the field wrapper in addition to the vivid red input border, making the exact property that needs fixing immediately obvious.
+
+### Canvas badge tooltip
+The canvas "!" badge now includes an SVG `<title>` listing the specific missing field names (e.g. "Required: API Endpoint, Authentication"). Hovering the badge shows a native browser tooltip identifying exactly which fields need attention.
+
+**Files:** `canvas-plugins/config-panel/src/renderer.ts`, `canvas-plugins/config-panel/src/css.ts`
+
 ## 2026-03-01 — Config panel: connector name in header + validation badges
 
 ### Feature: connector/template name in inspector header

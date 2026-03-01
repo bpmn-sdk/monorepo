@@ -248,20 +248,36 @@ export class ConfigPanelRenderer {
 		this._refreshGroupVisibility(schema.groups);
 	}
 
-	/** Update red-border invalid state for required fields that are empty. */
+	/**
+	 * Returns true when a group has at least one required field that is empty
+	 * and currently visible (condition is satisfied or absent).
+	 */
+	private _groupHasErrors(group: GroupSchema): boolean {
+		return group.fields.some(
+			(f) =>
+				f.required &&
+				(this._values[f.key] === "" || this._values[f.key] === undefined) &&
+				(!f.condition || f.condition(this._values)),
+		);
+	}
+
+	/** Update invalid state for required fields and tab error dots. */
 	private _refreshValidation(schema: PanelSchema): void {
 		const container = this._panelEl;
 		if (!container) return;
-		const allFields = schema.groups.flatMap((g) => g.fields);
-		for (const field of allFields) {
-			if (!field.required) continue;
-			const wrapper = container.querySelector<HTMLElement>(
-				`[${FIELD_WRAPPER_ATTR}="${field.key}"]`,
-			);
-			if (!wrapper) continue;
-			const val = this._values[field.key];
-			const isEmpty = val === "" || val === undefined;
-			wrapper.classList.toggle("bpmn-cfg-field--invalid", isEmpty);
+		for (const group of schema.groups) {
+			for (const field of group.fields) {
+				if (!field.required) continue;
+				const wrapper = container.querySelector<HTMLElement>(
+					`[${FIELD_WRAPPER_ATTR}="${field.key}"]`,
+				);
+				if (!wrapper) continue;
+				const val = this._values[field.key];
+				wrapper.classList.toggle("bpmn-cfg-field--invalid", val === "" || val === undefined);
+			}
+			// Update tab error dot
+			const tabBtn = container.querySelector<HTMLElement>(`[data-tab-id="${group.id}"]`);
+			if (tabBtn) tabBtn.classList.toggle("has-error", this._groupHasErrors(group));
 		}
 	}
 
@@ -373,12 +389,17 @@ export class ConfigPanelRenderer {
 			// Resolve template if stamped on the element
 			const reg = baseReg.adapter.resolve?.(defs, shape.id) ?? baseReg;
 
-			// Check whether any required field is empty
+			// Collect missing required field labels for the tooltip
 			const values = reg.adapter.read(defs, shape.id);
-			const hasError = reg.schema.groups.some((g) =>
-				g.fields.some((f) => f.required && (values[f.key] === "" || values[f.key] === undefined)),
-			);
-			if (!hasError) continue;
+			const missingLabels: string[] = [];
+			for (const g of reg.schema.groups) {
+				for (const f of g.fields) {
+					if (f.required && (values[f.key] === "" || values[f.key] === undefined)) {
+						missingLabels.push(f.label);
+					}
+				}
+			}
+			if (missingLabels.length === 0) continue;
 
 			// Badge positioned at the top-right corner of the shape
 			const { x, y, width } = shape.shape.bounds;
@@ -386,6 +407,11 @@ export class ConfigPanelRenderer {
 			const badge = document.createElementNS(SVG_NS, "g");
 			badge.setAttribute("class", "bpmn-cfg-badge");
 			badge.setAttribute("transform", `translate(${x + width}, ${y})`);
+
+			// Tooltip: lists the specific missing fields on hover
+			const title = document.createElementNS(SVG_NS, "title");
+			title.textContent = `Required: ${missingLabels.join(", ")}`;
+			badge.appendChild(title);
 
 			const circle = document.createElementNS(SVG_NS, "circle");
 			circle.setAttribute("r", "7");
@@ -691,6 +717,7 @@ export class ConfigPanelRenderer {
 			tabBtn.setAttribute("data-tab-id", group.id);
 			if (!isVisible) tabBtn.style.display = "none";
 			if (isActive) tabBtn.classList.add("active");
+			if (this._groupHasErrors(group)) tabBtn.classList.add("has-error");
 			tabs.appendChild(tabBtn);
 
 			// Group content (visible only when this tab is active)

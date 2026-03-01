@@ -256,6 +256,18 @@ export const CONFIG_PANEL_CSS = `
 }
 .bpmn-cfg-tab-btn:hover { color: rgba(255,255,255,0.75); }
 .bpmn-cfg-tab-btn.active { color: #4c8ef7; border-bottom-color: #4c8ef7; }
+/* Red dot shown after tab label when the group has required-empty fields */
+.bpmn-cfg-tab-btn.has-error::after {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #f87171;
+  margin-left: 5px;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
 
 /* Arrow buttons for overflowing tabs */
 .bpmn-cfg-tabs-scroll-btn {
@@ -325,10 +337,14 @@ export const CONFIG_PANEL_CSS = `
   font-weight: 700;
   margin-left: 2px;
 }
+.bpmn-cfg-field--invalid {
+  border-left: 2px solid #f87171;
+  padding-left: 8px;
+}
 .bpmn-cfg-field--invalid .bpmn-cfg-input,
 .bpmn-cfg-field--invalid .bpmn-cfg-select,
 .bpmn-cfg-field--invalid .bpmn-cfg-textarea {
-  border-color: rgba(248, 113, 113, 0.6);
+  border-color: #f87171;
 }
 
 .bpmn-cfg-input,
