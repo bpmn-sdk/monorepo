@@ -1,103 +1,13 @@
 export const CONFIG_PANEL_STYLE_ID = "bpmn-config-panel-styles-v1";
 
 export const CONFIG_PANEL_CSS = `
-/* ── Compact panel ───────────────────────────────────────────────────────── */
-.bpmn-cfg-compact {
-  position: fixed;
-  right: 12px;
-  top: 12px;
-  width: 280px;
-  background: rgba(20, 20, 28, 0.95);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(255,255,255,0.1);
-  border-radius: 10px;
-  box-shadow: 0 4px 24px rgba(0,0,0,0.5);
-  z-index: 9999;
-  font-family: system-ui, -apple-system, sans-serif;
-  font-size: 12px;
-  color: rgba(255,255,255,0.85);
-  overflow: hidden;
-}
-.bpmn-cfg-compact-header {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 10px 12px 8px;
-  border-bottom: 1px solid rgba(255,255,255,0.07);
-}
-.bpmn-cfg-compact-title {
-  flex: 1;
-  font-size: 11px;
-  font-weight: 600;
-  color: rgba(255,255,255,0.45);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.bpmn-cfg-compact-body {
-  padding: 10px 12px 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 9px;
-}
-.bpmn-cfg-compact-close {
-  width: 20px;
-  height: 20px;
-  background: none;
-  border: none;
-  color: rgba(255,255,255,0.35);
-  cursor: pointer;
-  padding: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 4px;
-  font-size: 15px;
-  line-height: 1;
-  flex-shrink: 0;
-}
-.bpmn-cfg-compact-close:hover { color: #fff; background: rgba(255,255,255,0.08); }
-
-.bpmn-cfg-configure-btn {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 3px;
-  padding: 0;
-  background: none;
-  border: none;
-  color: #4c8ef7;
-  cursor: pointer;
-  font-size: 12px;
-  font-weight: 500;
-  transition: color 0.1s;
-  margin-top: 2px;
-}
-.bpmn-cfg-configure-btn:hover { color: #7aaeff; }
-
-/* ── Full overlay ─────────────────────────────────────────────────────────── */
-.bpmn-cfg-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 9999;
-  pointer-events: none;
-}
-.bpmn-cfg-backdrop {
-  position: absolute;
-  inset: 0;
-  background: rgba(0,0,0,0.35);
-  pointer-events: all;
-  cursor: pointer;
-}
+/* ── Inspector panel ─────────────────────────────────────────────────────── */
 .bpmn-cfg-full {
-  position: absolute;
+  position: fixed;
   right: 0;
   top: 0;
   bottom: 0;
-  width: 65%;
-  min-width: 420px;
+  width: 320px;
   background: rgba(18, 18, 26, 0.98);
   backdrop-filter: blur(16px);
   border-left: 1px solid rgba(255,255,255,0.1);
@@ -108,7 +18,21 @@ export const CONFIG_PANEL_CSS = `
   font-size: 13px;
   color: rgba(255,255,255,0.85);
   overflow: hidden;
-  pointer-events: all;
+  z-index: 9999;
+  transition: width 0.2s ease;
+}
+.bpmn-cfg-full--collapsed {
+  width: 40px;
+}
+.bpmn-cfg-full--collapsed .bpmn-cfg-full-info,
+.bpmn-cfg-full--collapsed .bpmn-cfg-full-close,
+.bpmn-cfg-full--collapsed .bpmn-cfg-tabs,
+.bpmn-cfg-full--collapsed .bpmn-cfg-full-body {
+  display: none;
+}
+.bpmn-cfg-full--collapsed .bpmn-cfg-full-header {
+  justify-content: center;
+  padding: 14px 0;
 }
 .bpmn-cfg-full-header {
   display: flex;
@@ -138,6 +62,24 @@ export const CONFIG_PANEL_CSS = `
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.bpmn-cfg-collapse-btn {
+  width: 30px;
+  height: 30px;
+  background: none;
+  border: none;
+  color: rgba(255,255,255,0.4);
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  font-size: 18px;
+  line-height: 1;
+  flex-shrink: 0;
+  transition: background 0.1s, color 0.1s;
+}
+.bpmn-cfg-collapse-btn:hover { background: rgba(255,255,255,0.08); color: #fff; }
 .bpmn-cfg-full-close {
   width: 30px;
   height: 30px;
@@ -382,18 +324,6 @@ export const CONFIG_PANEL_CSS = `
 }
 
 /* ── Light theme overrides ────────────────────────────────────────────────── */
-[data-bpmn-hud-theme="light"] .bpmn-cfg-compact {
-  background: rgba(255, 255, 255, 0.96);
-  border-color: rgba(0,0,0,0.08);
-  box-shadow: 0 4px 24px rgba(0,0,0,0.12);
-  color: rgba(0,0,0,0.85);
-}
-[data-bpmn-hud-theme="light"] .bpmn-cfg-compact-header { border-bottom-color: rgba(0,0,0,0.07); }
-[data-bpmn-hud-theme="light"] .bpmn-cfg-compact-title { color: rgba(0,0,0,0.4); }
-[data-bpmn-hud-theme="light"] .bpmn-cfg-compact-close { color: rgba(0,0,0,0.35); }
-[data-bpmn-hud-theme="light"] .bpmn-cfg-compact-close:hover { color: rgba(0,0,0,0.9); background: rgba(0,0,0,0.06); }
-
-[data-bpmn-hud-theme="light"] .bpmn-cfg-backdrop { background: rgba(0,0,0,0.2); }
 [data-bpmn-hud-theme="light"] .bpmn-cfg-full {
   background: rgba(248, 248, 252, 0.99);
   border-left-color: rgba(0,0,0,0.08);
@@ -403,6 +333,8 @@ export const CONFIG_PANEL_CSS = `
 [data-bpmn-hud-theme="light"] .bpmn-cfg-full-header { border-bottom-color: rgba(0,0,0,0.07); }
 [data-bpmn-hud-theme="light"] .bpmn-cfg-full-type { color: rgba(0,0,0,0.35); }
 [data-bpmn-hud-theme="light"] .bpmn-cfg-full-name { color: rgba(0,0,0,0.9); }
+[data-bpmn-hud-theme="light"] .bpmn-cfg-collapse-btn { color: rgba(0,0,0,0.4); }
+[data-bpmn-hud-theme="light"] .bpmn-cfg-collapse-btn:hover { background: rgba(0,0,0,0.06); color: rgba(0,0,0,0.9); }
 [data-bpmn-hud-theme="light"] .bpmn-cfg-full-close { color: rgba(0,0,0,0.4); }
 [data-bpmn-hud-theme="light"] .bpmn-cfg-full-close:hover { background: rgba(0,0,0,0.06); color: rgba(0,0,0,0.9); }
 

@@ -64,13 +64,7 @@ export function createConfigPanelPlugin(options: ConfigPanelOptions): ConfigPane
 
 		install(api) {
 			injectConfigPanelStyles();
-			_renderer = new ConfigPanelRenderer(
-				_schemas,
-				getDefinitions,
-				applyChange,
-				() => api.getViewport(),
-				(state) => api.setViewport(state),
-			);
+			_renderer = new ConfigPanelRenderer(_schemas, getDefinitions, applyChange);
 
 			// BpmnEditor routes EditorEvents through api.on at runtime.
 			// TypeScript only knows CanvasEvents here, so we cast for editor events.

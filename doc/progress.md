@@ -1,5 +1,16 @@
 # Progress
 
+## 2026-03-01 — Config Panel: Persistent Inspector Panel (Pattern 1)
+
+Replaced the two-click compact+overlay UX with a single persistent fixed-width right-side inspector panel.
+
+### `canvas-plugins/config-panel` — Changes
+
+- **`renderer.ts`** — Removed compact panel, overlay, backdrop, `_centerSelected`, and `_fullOpen` state. Added `_panelEl` and `_collapsed` state. Single `_showPanel()` method replaces `_showCompact()`+`_showFull()`. Panel now opens immediately on first node click and persists across selections. Collapse toggle button (‹/›) in header preserves preference across node switches. Constructor no longer takes `getViewport`/`setViewport` params.
+- **`css.ts`** — Removed all compact/configure-btn/overlay/backdrop styles and their light-theme overrides. Updated `.bpmn-cfg-full` to `position: fixed; right: 0; width: 320px; transition: width 0.2s ease`. Added `.bpmn-cfg-full--collapsed` (collapses to 40px strip), `.bpmn-cfg-collapse-btn`, and collapsed-header centering rule.
+- **`index.ts`** — Removed `getViewport`/`setViewport` arguments from `ConfigPanelRenderer` constructor call.
+- **`tests/index.test.ts`** — Updated test name and selector from `.bpmn-cfg-compact` to `.bpmn-cfg-full`.
+
 ## 2026-02-28 — Form Editor drag-and-drop redesign (form-js parity)
 
 Rewrote `FormEditor` (`canvas-plugins/form-editor`) with a three-panel drag-and-drop layout matching form-js.

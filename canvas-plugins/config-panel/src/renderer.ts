@@ -1,4 +1,4 @@
-import type { RenderedEdge, RenderedShape, ViewportState } from "@bpmn-sdk/canvas";
+import type { RenderedEdge, RenderedShape } from "@bpmn-sdk/canvas";
 import type { BpmnDefinitions } from "@bpmn-sdk/core";
 import type { FieldSchema, FieldValue, GroupSchema, PanelAdapter, PanelSchema } from "./types.js";
 
@@ -11,22 +11,16 @@ interface Registration {
 	adapter: PanelAdapter;
 }
 
-type Bounds = { x: number; y: number; width: number; height: number };
-
 export class ConfigPanelRenderer {
 	private readonly _schemas: Map<string, Registration>;
 	private readonly _getDefinitions: () => BpmnDefinitions | null;
 	private readonly _applyChange: (fn: (d: BpmnDefinitions) => BpmnDefinitions) => void;
-	private readonly _getViewport: () => ViewportState;
-	private readonly _setViewport: (state: ViewportState) => void;
 
-	private _compactEl: HTMLElement | null = null;
-	private _overlayEl: HTMLElement | null = null;
+	private _panelEl: HTMLElement | null = null;
+	private _collapsed = false;
 	private _selectedId: string | null = null;
 	private _selectedType: string | null = null;
-	private _selectedBounds: Bounds | null = null;
 	private _elementName = "";
-	private _fullOpen = false;
 	private _activeTabId: string | null = null;
 	private _values: Record<string, FieldValue> = {};
 	/** The effective registration after optional `resolve?` override. */
@@ -36,14 +30,10 @@ export class ConfigPanelRenderer {
 		schemas: Map<string, Registration>,
 		getDefinitions: () => BpmnDefinitions | null,
 		applyChange: (fn: (d: BpmnDefinitions) => BpmnDefinitions) => void,
-		getViewport: () => ViewportState,
-		setViewport: (state: ViewportState) => void,
 	) {
 		this._schemas = schemas;
 		this._getDefinitions = getDefinitions;
 		this._applyChange = applyChange;
-		this._getViewport = getViewport;
-		this._setViewport = setViewport;
 	}
 
 	onSelect(ids: string[], shapes: RenderedShape[], edges: RenderedEdge[] = []): void {
@@ -69,7 +59,6 @@ export class ConfigPanelRenderer {
 
 			this._selectedId = id;
 			this._selectedType = elementType;
-			this._selectedBounds = shape?.shape?.bounds ?? null;
 			this._elementName = shape?.flowElement?.name ?? "";
 
 			// Resolve optional template override
@@ -78,12 +67,7 @@ export class ConfigPanelRenderer {
 			this._effectiveReg = resolved ?? reg;
 
 			this._refreshValues(this._effectiveReg);
-
-			if (this._fullOpen) {
-				this._showFull(this._effectiveReg);
-			} else {
-				this._showCompact(this._effectiveReg);
-			}
+			this._showPanel(this._effectiveReg);
 		} else {
 			// Edge selection — check if it's a sequence flow
 			const isEdge = edges.some((e) => e.id === id);
@@ -105,18 +89,12 @@ export class ConfigPanelRenderer {
 
 			this._selectedId = id;
 			this._selectedType = "sequenceFlow";
-			this._selectedBounds = null;
 			const sf = defs?.processes.flatMap((p) => p.sequenceFlows).find((f) => f.id === id);
 			this._elementName = sf?.name ?? "";
 			this._effectiveReg = reg;
 
 			this._refreshValues(reg);
-
-			if (this._fullOpen) {
-				this._showFull(reg);
-			} else {
-				this._showCompact(reg);
-			}
+			this._showPanel(reg);
 		}
 	}
 
@@ -134,8 +112,7 @@ export class ConfigPanelRenderer {
 		// If the effective registration changed (e.g. template applied), re-render
 		if (newEffective !== this._effectiveReg) {
 			this._effectiveReg = newEffective;
-			if (this._fullOpen) this._showFull(newEffective);
-			else this._showCompact(newEffective);
+			this._showPanel(newEffective);
 			return;
 		}
 
@@ -170,41 +147,24 @@ export class ConfigPanelRenderer {
 		this._applyChange((defs) => effective.adapter.write(defs, id, snapshot));
 	}
 
-	private _centerSelected(targetScreenX: number, targetScreenY: number): void {
-		const bounds = this._selectedBounds;
-		if (!bounds) return;
-		const cx = bounds.x + bounds.width / 2;
-		const cy = bounds.y + bounds.height / 2;
-		const { scale } = this._getViewport();
-		this._setViewport({ tx: targetScreenX - cx * scale, ty: targetScreenY - cy * scale, scale });
-	}
-
 	private _close(): void {
-		this._hideCompact();
-		this._hideOverlay();
+		this._hidePanel();
 		this._selectedId = null;
 		this._selectedType = null;
-		this._selectedBounds = null;
 		this._elementName = "";
-		this._fullOpen = false;
 		this._activeTabId = null;
 		this._values = {};
 		this._effectiveReg = null;
 	}
 
-	private _hideCompact(): void {
-		this._compactEl?.remove();
-		this._compactEl = null;
-	}
-
-	private _hideOverlay(): void {
-		this._overlayEl?.remove();
-		this._overlayEl = null;
+	private _hidePanel(): void {
+		this._panelEl?.remove();
+		this._panelEl = null;
 	}
 
 	/** Update all input values in-place without re-rendering (preserves focus). */
 	private _refreshInputs(): void {
-		const container = this._fullOpen ? this._overlayEl : this._compactEl;
+		const container = this._panelEl;
 		if (!container) return;
 		for (const [key, value] of Object.entries(this._values)) {
 			const els = container.querySelectorAll<
@@ -226,11 +186,11 @@ export class ConfigPanelRenderer {
 	 * Called synchronously after any value change so the UI updates immediately.
 	 */
 	private _refreshConditionals(schema: PanelSchema): void {
-		const container = this._fullOpen ? this._overlayEl : this._compactEl;
+		const container = this._panelEl;
 		if (!container) return;
 
 		// Field-level conditions
-		const allFields = [...schema.compact, ...schema.groups.flatMap((g) => g.fields)];
+		const allFields = schema.groups.flatMap((g) => g.fields);
 		for (const field of allFields) {
 			if (!field.condition) continue;
 			const wrapper = container.querySelector<HTMLElement>(
@@ -239,15 +199,14 @@ export class ConfigPanelRenderer {
 			if (wrapper) wrapper.style.display = field.condition(this._values) ? "" : "none";
 		}
 
-		// Group/tab conditions only apply in the full overlay
-		if (this._fullOpen) this._refreshGroupVisibility(schema.groups);
+		this._refreshGroupVisibility(schema.groups);
 	}
 
 	/** Update red-border invalid state for required fields that are empty. */
 	private _refreshValidation(schema: PanelSchema): void {
-		const container = this._fullOpen ? this._overlayEl : this._compactEl;
+		const container = this._panelEl;
 		if (!container) return;
-		const allFields = [...schema.compact, ...schema.groups.flatMap((g) => g.fields)];
+		const allFields = schema.groups.flatMap((g) => g.fields);
 		for (const field of allFields) {
 			if (!field.required) continue;
 			const wrapper = container.querySelector<HTMLElement>(
@@ -262,13 +221,13 @@ export class ConfigPanelRenderer {
 
 	/** Show/hide tabs and groups based on their conditions. */
 	private _refreshGroupVisibility(groups: GroupSchema[]): void {
-		const overlay = this._overlayEl;
-		if (!overlay) return;
+		const panel = this._panelEl;
+		if (!panel) return;
 
 		let activeIsVisible = false;
 		for (const group of groups) {
 			const isVisible = !group.condition || group.condition(this._values);
-			const tabBtn = overlay.querySelector<HTMLElement>(`[data-tab-id="${group.id}"]`);
+			const tabBtn = panel.querySelector<HTMLElement>(`[data-tab-id="${group.id}"]`);
 			if (tabBtn) tabBtn.style.display = isVisible ? "" : "none";
 			if (group.id === this._activeTabId && isVisible) activeIsVisible = true;
 		}
@@ -277,105 +236,35 @@ export class ConfigPanelRenderer {
 		if (!activeIsVisible) {
 			for (const group of groups) {
 				if (!group.condition || group.condition(this._values)) {
-					this._activateTab(overlay, group.id);
+					this._activateTab(panel, group.id);
 					break;
 				}
 			}
 		}
 	}
 
-	private _activateTab(overlay: HTMLElement, groupId: string): void {
+	private _activateTab(panel: HTMLElement, groupId: string): void {
 		this._activeTabId = groupId;
-		for (const btn of overlay.querySelectorAll<HTMLElement>(".bpmn-cfg-tab-btn")) {
+		for (const btn of panel.querySelectorAll<HTMLElement>(".bpmn-cfg-tab-btn")) {
 			btn.classList.remove("active");
 		}
-		for (const grp of overlay.querySelectorAll<HTMLElement>(".bpmn-cfg-group")) {
+		for (const grp of panel.querySelectorAll<HTMLElement>(".bpmn-cfg-group")) {
 			grp.style.display = "none";
 		}
-		const tabBtn = overlay.querySelector<HTMLElement>(`[data-tab-id="${groupId}"]`);
-		const groupEl = overlay.querySelector<HTMLElement>(`[data-group-id="${groupId}"]`);
+		const tabBtn = panel.querySelector<HTMLElement>(`[data-tab-id="${groupId}"]`);
+		const groupEl = panel.querySelector<HTMLElement>(`[data-group-id="${groupId}"]`);
 		tabBtn?.classList.add("active");
 		if (groupEl) groupEl.style.display = "";
 	}
 
-	// ── Compact panel ─────────────────────────────────────────────────────────
+	// ── Inspector panel ───────────────────────────────────────────────────────
 
-	private _showCompact(reg: Registration): void {
-		this._hideCompact();
-
-		const el = document.createElement("div");
-		el.className = "bpmn-cfg-compact";
-
-		// Header
-		const header = document.createElement("div");
-		header.className = "bpmn-cfg-compact-header";
-
-		const title = document.createElement("span");
-		title.className = "bpmn-cfg-compact-title";
-		title.textContent = this._elementName || (this._selectedType ?? "");
-		title.title = title.textContent;
-
-		const closeBtn = document.createElement("button");
-		closeBtn.className = "bpmn-cfg-compact-close";
-		closeBtn.setAttribute("title", "Close");
-		closeBtn.textContent = "×";
-		closeBtn.addEventListener("click", () => this._close());
-
-		header.appendChild(title);
-		header.appendChild(closeBtn);
-
-		// Body: compact fields
-		const body = document.createElement("div");
-		body.className = "bpmn-cfg-compact-body";
-
-		for (const field of reg.schema.compact) {
-			body.appendChild(this._renderField(field));
-		}
-
-		// Configure button (if full groups exist)
-		if (reg.schema.groups.length > 0) {
-			const cfgBtn = document.createElement("button");
-			cfgBtn.className = "bpmn-cfg-configure-btn";
-			cfgBtn.textContent = "Configure →";
-			cfgBtn.addEventListener("click", () => {
-				this._fullOpen = true;
-				this._hideCompact();
-				this._showFull(reg);
-			});
-			body.appendChild(cfgBtn);
-		}
-
-		el.appendChild(header);
-		el.appendChild(body);
-		document.body.appendChild(el);
-		this._compactEl = el;
-	}
-
-	// ── Full overlay ──────────────────────────────────────────────────────────
-
-	private _showFull(reg: Registration): void {
-		this._hideOverlay();
-
-		// Center the selected element in the left 35% darkened area
-		this._centerSelected(window.innerWidth * 0.175, window.innerHeight / 2);
-
-		const overlay = document.createElement("div");
-		overlay.className = "bpmn-cfg-overlay";
-
-		const closeAndRestore = () => {
-			this._fullOpen = false;
-			this._hideOverlay();
-			this._centerSelected(window.innerWidth / 2, window.innerHeight / 2);
-			this._showCompact(reg);
-		};
-
-		const backdrop = document.createElement("div");
-		backdrop.className = "bpmn-cfg-backdrop";
-		backdrop.title = "Close panel";
-		backdrop.addEventListener("click", closeAndRestore);
+	private _showPanel(reg: Registration): void {
+		this._hidePanel();
 
 		const panel = document.createElement("div");
 		panel.className = "bpmn-cfg-full";
+		if (this._collapsed) panel.classList.add("bpmn-cfg-full--collapsed");
 
 		// Header
 		const header = document.createElement("div");
@@ -395,13 +284,25 @@ export class ConfigPanelRenderer {
 		info.appendChild(typeLabel);
 		info.appendChild(nameLabel);
 
+		const collapseBtn = document.createElement("button");
+		collapseBtn.className = "bpmn-cfg-collapse-btn";
+		collapseBtn.setAttribute("title", this._collapsed ? "Expand" : "Collapse");
+		collapseBtn.textContent = this._collapsed ? "›" : "‹";
+		collapseBtn.addEventListener("click", () => {
+			this._collapsed = !this._collapsed;
+			panel.classList.toggle("bpmn-cfg-full--collapsed", this._collapsed);
+			collapseBtn.textContent = this._collapsed ? "›" : "‹";
+			collapseBtn.setAttribute("title", this._collapsed ? "Expand" : "Collapse");
+		});
+
 		const closeBtn = document.createElement("button");
 		closeBtn.className = "bpmn-cfg-full-close";
 		closeBtn.setAttribute("title", "Close");
 		closeBtn.textContent = "×";
-		closeBtn.addEventListener("click", closeAndRestore);
+		closeBtn.addEventListener("click", () => this._close());
 
 		header.appendChild(info);
+		header.appendChild(collapseBtn);
 		header.appendChild(closeBtn);
 
 		// Tabs bar
@@ -453,18 +354,15 @@ export class ConfigPanelRenderer {
 			body.appendChild(groupEl);
 
 			tabBtn.addEventListener("click", () => {
-				this._activateTab(overlay, group.id);
+				this._activateTab(panel, group.id);
 			});
 		}
 
 		panel.appendChild(header);
 		panel.appendChild(tabs);
 		panel.appendChild(body);
-
-		overlay.appendChild(backdrop);
-		overlay.appendChild(panel);
-		document.body.appendChild(overlay);
-		this._overlayEl = overlay;
+		document.body.appendChild(panel);
+		this._panelEl = panel;
 	}
 
 	// ── Field rendering ───────────────────────────────────────────────────────
