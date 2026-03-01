@@ -250,6 +250,7 @@ export function buildRegistrationFromTemplate(template: ElementTemplate): Templa
 		compact: [nameField],
 		groups: schemaGroups,
 		...(template.documentationRef ? { docsUrl: template.documentationRef } : {}),
+		templateName: template.name,
 	};
 
 	// Build adapter

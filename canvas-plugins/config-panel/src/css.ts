@@ -76,6 +76,15 @@ export const CONFIG_PANEL_CSS = `
   color: rgba(255,255,255,0.35);
   margin-bottom: 2px;
 }
+.bpmn-cfg-full-template {
+  font-size: 11px;
+  font-weight: 600;
+  color: #4c8ef7;
+  margin-bottom: 1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .bpmn-cfg-full-name {
   font-size: 14px;
   font-weight: 600;
@@ -477,6 +486,7 @@ export const CONFIG_PANEL_CSS = `
 }
 [data-bpmn-hud-theme="light"] .bpmn-cfg-full-header { border-bottom-color: rgba(0,0,0,0.07); }
 [data-bpmn-hud-theme="light"] .bpmn-cfg-full-type { color: rgba(0,0,0,0.35); }
+[data-bpmn-hud-theme="light"] .bpmn-cfg-full-template { color: #1a56db; }
 [data-bpmn-hud-theme="light"] .bpmn-cfg-full-name { color: rgba(0,0,0,0.9); }
 [data-bpmn-hud-theme="light"] .bpmn-cfg-docs-link { color: rgba(0,0,0,0.4); border-color: rgba(0,0,0,0.2); }
 [data-bpmn-hud-theme="light"] .bpmn-cfg-docs-link:hover { color: #1a56db; border-color: #1a56db; background: rgba(26,86,219,0.08); }

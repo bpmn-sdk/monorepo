@@ -1,5 +1,17 @@
 # Progress
 
+## 2026-03-01 — Config panel: connector name in header + validation badges
+
+### Feature: connector/template name in inspector header
+When a connector template is active on a service task, the panel header now shows the template name (e.g. "REST Connector") between the element type line and the element name. Implemented via a new optional `templateName?` field on `PanelSchema`, set to `template.name` in `buildRegistrationFromTemplate`, and rendered as `.bpmn-cfg-full-template` in the panel header.
+
+**Files:** `canvas-plugins/config-panel/src/types.ts`, `canvas-plugins/config-panel/src/renderer.ts`, `canvas-plugins/config-panel/src/css.ts`, `canvas-plugins/config-panel-bpmn/src/template-engine.ts`
+
+### Feature: validation badges on canvas elements
+Canvas shapes with at least one required config field that is empty now show a small red badge (circle with "!") at the top-right corner of the shape in the SVG diagram. Badges live in a dedicated `<g class="bpmn-cfg-badge-layer">` appended to `api.viewportEl` so they follow pan and zoom automatically. Updated on every `diagram:change` event. Badge rendering is opt-in — only active when `getSvgViewport` and `getShapes` callbacks are provided to the renderer (which `index.ts` now does).
+
+**Files:** `canvas-plugins/config-panel/src/renderer.ts`, `canvas-plugins/config-panel/src/index.ts`
+
 ## 2026-03-01 — Config panel bug fixes: connector switching + HTML hints
 
 ### Bug: couldn't change connector once a template was applied

@@ -2,6 +2,8 @@ import type { RenderedEdge, RenderedShape } from "@bpmn-sdk/canvas";
 import type { BpmnDefinitions } from "@bpmn-sdk/core";
 import type { FieldSchema, FieldValue, GroupSchema, PanelAdapter, PanelSchema } from "./types.js";
 
+const SVG_NS = "http://www.w3.org/2000/svg";
+
 // Attribute set on the field wrapper div when the field has a condition, used
 // by _refreshConditionals to toggle visibility without a full re-render.
 const FIELD_WRAPPER_ATTR = "data-field-wrapper";
@@ -16,8 +18,12 @@ export class ConfigPanelRenderer {
 	private readonly _schemas: Map<string, Registration>;
 	private readonly _getDefinitions: () => BpmnDefinitions | null;
 	private readonly _applyChange: (fn: (d: BpmnDefinitions) => BpmnDefinitions) => void;
+	private readonly _getSvgViewport: (() => SVGGElement | null) | null;
+	private readonly _getShapes: (() => RenderedShape[]) | null;
 
 	private _panelEl: HTMLElement | null = null;
+	/** SVG group appended to the canvas viewport; holds all validation badges. */
+	private _badgeContainerEl: SVGGElement | null = null;
 	private _collapsed = false;
 	/** User-set panel width; persisted to localStorage. */
 	private _panelWidth = 320;
@@ -43,10 +49,14 @@ export class ConfigPanelRenderer {
 		schemas: Map<string, Registration>,
 		getDefinitions: () => BpmnDefinitions | null,
 		applyChange: (fn: (d: BpmnDefinitions) => BpmnDefinitions) => void,
+		getSvgViewport?: () => SVGGElement | null,
+		getShapes?: () => RenderedShape[],
 	) {
 		this._schemas = schemas;
 		this._getDefinitions = getDefinitions;
 		this._applyChange = applyChange;
+		this._getSvgViewport = getSvgViewport ?? null;
+		this._getShapes = getShapes ?? null;
 
 		// Restore persisted panel width
 		try {
@@ -122,6 +132,9 @@ export class ConfigPanelRenderer {
 	}
 
 	onDiagramChange(defs: BpmnDefinitions): void {
+		// Update validation badges for all canvas shapes regardless of selection
+		this._updateBadges(defs);
+
 		if (!this._selectedId || !this._selectedType) return;
 		const reg = this._schemas.get(this._selectedType);
 		if (!reg) return;
@@ -145,6 +158,8 @@ export class ConfigPanelRenderer {
 	}
 
 	destroy(): void {
+		this._badgeContainerEl?.remove();
+		this._badgeContainerEl = null;
 		this._close();
 	}
 
@@ -320,6 +335,80 @@ export class ConfigPanelRenderer {
 		tabsArea.style.display = visibleCount <= 1 ? "none" : "";
 	}
 
+	// ── Validation badges ─────────────────────────────────────────────────────
+
+	/**
+	 * Renders (or removes) a small red "!" badge on each canvas shape that has
+	 * at least one required config field with a missing or empty value.
+	 * Badges live in a `<g>` appended to the SVG viewport group so they
+	 * automatically follow pan and zoom.
+	 */
+	private _updateBadges(defs: BpmnDefinitions): void {
+		if (!this._getSvgViewport || !this._getShapes) return;
+
+		const viewport = this._getSvgViewport();
+		if (!viewport) return;
+
+		// Create badge layer on first use
+		if (!this._badgeContainerEl) {
+			const g = document.createElementNS(SVG_NS, "g");
+			g.setAttribute("class", "bpmn-cfg-badge-layer");
+			viewport.appendChild(g);
+			this._badgeContainerEl = g;
+		}
+
+		// Clear previous badges
+		const container = this._badgeContainerEl;
+		while (container.lastChild) {
+			container.removeChild(container.lastChild);
+		}
+
+		for (const shape of this._getShapes()) {
+			const type = shape.flowElement?.type;
+			if (!type) continue;
+
+			const baseReg = this._schemas.get(type);
+			if (!baseReg) continue;
+
+			// Resolve template if stamped on the element
+			const reg = baseReg.adapter.resolve?.(defs, shape.id) ?? baseReg;
+
+			// Check whether any required field is empty
+			const values = reg.adapter.read(defs, shape.id);
+			const hasError = reg.schema.groups.some((g) =>
+				g.fields.some((f) => f.required && (values[f.key] === "" || values[f.key] === undefined)),
+			);
+			if (!hasError) continue;
+
+			// Badge positioned at the top-right corner of the shape
+			const { x, y, width } = shape.shape.bounds;
+
+			const badge = document.createElementNS(SVG_NS, "g");
+			badge.setAttribute("class", "bpmn-cfg-badge");
+			badge.setAttribute("transform", `translate(${x + width}, ${y})`);
+
+			const circle = document.createElementNS(SVG_NS, "circle");
+			circle.setAttribute("r", "7");
+			circle.setAttribute("fill", "#f87171");
+			circle.setAttribute("stroke", "#fff");
+			circle.setAttribute("stroke-width", "1.5");
+
+			const text = document.createElementNS(SVG_NS, "text");
+			text.setAttribute("text-anchor", "middle");
+			text.setAttribute("dominant-baseline", "central");
+			text.setAttribute("fill", "#fff");
+			text.setAttribute("font-size", "9");
+			text.setAttribute("font-weight", "bold");
+			text.setAttribute("font-family", "system-ui, sans-serif");
+			text.setAttribute("pointer-events", "none");
+			text.textContent = "!";
+
+			badge.appendChild(circle);
+			badge.appendChild(text);
+			container.appendChild(badge);
+		}
+	}
+
 	// ── Search ────────────────────────────────────────────────────────────────
 
 	private _setSearch(query: string): void {
@@ -438,11 +527,19 @@ export class ConfigPanelRenderer {
 		typeLabel.className = "bpmn-cfg-full-type";
 		typeLabel.textContent = this._selectedType ?? "";
 
+		info.appendChild(typeLabel);
+
+		if (reg.schema.templateName) {
+			const templateLabel = document.createElement("div");
+			templateLabel.className = "bpmn-cfg-full-template";
+			templateLabel.textContent = reg.schema.templateName;
+			info.appendChild(templateLabel);
+		}
+
 		const nameLabel = document.createElement("div");
 		nameLabel.className = "bpmn-cfg-full-name";
 		nameLabel.textContent = this._elementName || "(unnamed)";
 
-		info.appendChild(typeLabel);
 		info.appendChild(nameLabel);
 		header.appendChild(info);
 
