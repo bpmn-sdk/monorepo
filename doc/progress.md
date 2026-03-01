@@ -1,5 +1,159 @@
 # Progress
 
+## 2026-03-01 — DMN DRD (Decision Requirements Diagram) support
+
+### Feature: full DRG element model in `@bpmn-sdk/core`
+Expanded `DmnDefinitions` with all standard DMN DRG element types:
+- `DmnInputData`, `DmnKnowledgeSource`, `DmnBusinessKnowledgeModel`, `DmnTextAnnotation`, `DmnAssociation`
+- `DmnInformationRequirement`, `DmnKnowledgeRequirement`, `DmnAuthorityRequirement`
+- `DmnWaypoint`, `DmnDiagramEdge`
+- `DmnDecision.decisionTable` made optional; requirement arrays added to `DmnDecision`, `DmnKnowledgeSource`, `DmnBusinessKnowledgeModel`
+- `DmnDiagram.edges` added for DMNDI edge roundtrip
+
+### Feature: full parser/serializer roundtrip for all DRG elements
+- Parser: `parseDmn` now reads `inputData`, `knowledgeSource`, `businessKnowledgeModel`, `textAnnotation`, `association` elements and all requirement child elements; `DMNEdge` waypoints parsed
+- Serializer: `serializeDmn` writes all new element types, requirement children, and DMNDI edges
+- Builder: `DmnBuilder.build()` initialises all new arrays; `edges: []` added to diagram
+
+### Feature: interactive SVG DRD canvas (`@bpmn-sdk/canvas-plugin-dmn-editor`)
+New `DrdCanvas` class (~920 lines) in `drd-canvas.ts`:
+- **5 node shapes**: Decision (rectangle), InputData (stadium/rounded ends), KnowledgeSource (wavy-bottom rect), BusinessKnowledgeModel (clipped-corner rect), TextAnnotation (open bracket)
+- **4 edge types**: InformationRequirement (solid filled arrow), KnowledgeRequirement (dashed open-V), AuthorityRequirement (dashed + open circle at source), Association (dotted)
+- **Pan/zoom**: mouse-wheel zoom, pointer-drag panning
+- **Node drag**: move nodes; position written back to DMNDI diagram shapes
+- **Connect mode**: toolbar button activates two-click connect; connection type inferred from source/target node types
+- **Delete**: keyboard Delete/Backspace removes selected node or edge; requirements/associations cleaned from model
+- **Inline label edit**: double-click node shows `<foreignObject><input>` for in-place renaming
+- **Auto-layout**: nodes without existing diagram positions placed in a grid automatically
+- **Toolbar**: "Add Decision", "Add Input Data", "Add Knowledge Source", "Add BKM", "Add Annotation", "Connect", zoom controls
+- **Double-click decision** → switches to decision table view
+
+### Feature: DRD as primary view in DMN Editor
+`dmn-editor.ts` refactored with a `"drd" | "table"` view state:
+- DRD canvas is shown first when loading a DMN file
+- Double-clicking a Decision node navigates to its decision table with a "← DRD" back bar
+- Decision table auto-creates an empty `decisionTable` if the decision has none yet
+- `destroy()` cleans up the DRD canvas properly
+
+**Files:** `packages/bpmn-sdk/src/dmn/dmn-model.ts`, `dmn-parser.ts`, `dmn-serializer.ts`, `dmn-builder.ts`, `packages/bpmn-sdk/src/index.ts`, `canvas-plugins/dmn-editor/src/drd-canvas.ts`, `canvas-plugins/dmn-editor/src/dmn-editor.ts`, `canvas-plugins/dmn-editor/src/css.ts`, `canvas-plugins/tabs/src/tabs-plugin.ts`, `canvas-plugins/tabs/tests/tabs-plugin.test.ts`, `apps/landing/src/examples.ts`
+
+## 2026-03-01 — Config panel: FEEL syntax validation + unified error detection
+
+### Fix: invalid FEEL expressions now flagged as errors
+Added module-level `hasFEELSyntaxError(val)` that catches structural errors in any value starting with `"="`:
+- Empty body (`=` or `= `)
+- Trailing binary operator (`="asdasfd"-` → trailing `-`)
+- Unclosed string literal (`="hello`)
+- Unbalanced brackets (`=someFunc(x`)
+- Unmatched closing bracket
+
+Validation applies to **any field** whose value starts with `=`, not just `feel-expression` typed fields — matching Camunda Zeebe semantics where `=` always signals a FEEL expression.
+
+### Refactor: unified `_fieldHasError(field, val)` across all validation paths
+Replaced the scattered `_isEffectivelyEmpty` checks with a single `_fieldHasError` that covers both required-empty AND invalid-FEEL. All four validation sites (field border, tab dot, guide bar, canvas badge) now use the same predicate. Guide bar text updated from "required fields" to "fields to fix" since it now covers both categories.
+
+**Files:** `canvas-plugins/config-panel/src/renderer.ts`
+
+## 2026-03-01 — Config panel: badge accuracy, field guide, FEEL validation
+
+### Fix: canvas badge no longer shows errors for condition-hidden fields
+`_updateBadges` now skips required fields whose condition function returns false (i.e. fields the user cannot see). This was the primary cause of the "still shows error after filling everything" frustration — hidden-but-required fields were being counted.
+
+### Fix: FEEL expression "=" treated as empty
+Added `_isEffectivelyEmpty(field, val)` which treats a `feel-expression` value of just `"="` (with optional whitespace) as effectively empty. Used in all validation paths: field border, tab dot, guide bar, and canvas badge.
+
+### Feature: field guide assistant ("Start / Next" navigator)
+A guide bar is now omnipresent between the search box and the tabs when any required field is missing. It shows the count ("3 required fields") and a **Start →** button. Clicking navigates to the first missing field (switches tab, scrolls into view, focuses the input). The button becomes **Next →** for subsequent clicks, cycling through remaining missing fields in group order. The bar disappears automatically when all required fields are filled.
+
+**Files:** `canvas-plugins/config-panel/src/renderer.ts`, `canvas-plugins/config-panel/src/css.ts`
+
+## 2026-03-01 — Config panel: improved validation UX
+
+### Tab error dots
+Each config panel tab now shows a small red dot (CSS `::after`) when that group contains at least one required field with an empty value. Dots update in real time as the user types. Only visible fields are counted (conditionally-hidden required fields are excluded).
+
+### Enhanced field invalid styling
+Invalid required fields now show a solid red left-border accent (`border-left: 2px solid #f87171`) on the field wrapper in addition to the vivid red input border, making the exact property that needs fixing immediately obvious.
+
+### Canvas badge tooltip
+The canvas "!" badge now includes an SVG `<title>` listing the specific missing field names (e.g. "Required: API Endpoint, Authentication"). Hovering the badge shows a native browser tooltip identifying exactly which fields need attention.
+
+**Files:** `canvas-plugins/config-panel/src/renderer.ts`, `canvas-plugins/config-panel/src/css.ts`
+
+## 2026-03-01 — Config panel: connector name in header + validation badges
+
+### Feature: connector/template name in inspector header
+When a connector template is active on a service task, the panel header now shows the template name (e.g. "REST Connector") between the element type line and the element name. Implemented via a new optional `templateName?` field on `PanelSchema`, set to `template.name` in `buildRegistrationFromTemplate`, and rendered as `.bpmn-cfg-full-template` in the panel header.
+
+**Files:** `canvas-plugins/config-panel/src/types.ts`, `canvas-plugins/config-panel/src/renderer.ts`, `canvas-plugins/config-panel/src/css.ts`, `canvas-plugins/config-panel-bpmn/src/template-engine.ts`
+
+### Feature: validation badges on canvas elements
+Canvas shapes with at least one required config field that is empty now show a small red badge (circle with "!") at the top-right corner of the shape in the SVG diagram. Badges live in a dedicated `<g class="bpmn-cfg-badge-layer">` appended to `api.viewportEl` so they follow pan and zoom automatically. Updated on every `diagram:change` event. Badge rendering is opt-in — only active when `getSvgViewport` and `getShapes` callbacks are provided to the renderer (which `index.ts` now does).
+
+**Files:** `canvas-plugins/config-panel/src/renderer.ts`, `canvas-plugins/config-panel/src/index.ts`
+
+## 2026-03-01 — Config panel bug fixes: connector switching + HTML hints
+
+### Bug: couldn't change connector once a template was applied
+Once a connector template was stamped on a service task, `resolve()` replaced the generic schema (which has the connector dropdown) with the template schema, which had no way to get back. Fixed by adding a **"Change connector"** action button as the first field in every template's General group. Clicking it writes a sentinel value `__change_connector: "remove"` which the template adapter's `write()` intercepts — it strips `zeebe:modelerTemplate`, `zeebe:modelerTemplateVersion`, and `zeebe:modelerTemplateIcon` from `unknownAttributes`, causing `resolve()` to return null on the next render and the generic connector selector to reappear.
+
+**Files:** `canvas-plugins/config-panel-bpmn/src/template-engine.ts`
+
+### Bug: hint text showed raw HTML tags
+Template property `description` fields contain HTML (e.g. `<a href="...">documentation</a>` links). These were rendered with `textContent`, so users saw literal `<a href=...>` text. Fixed by switching to `innerHTML`.
+
+**Files:** `canvas-plugins/config-panel/src/renderer.ts`
+
+## 2026-03-01 — Config Panel UX: search, docs link, tooltip, tab hiding, localStorage width
+
+### Investigation findings
+- **Tabs**: appropriate for connector templates (2–9 groups, 10–50 fields each) but visual noise for built-in schemas with a single group. Fixed by auto-hiding the tab bar when ≤ 1 visible group.
+- **Finding properties**: without search, users must click through tabs to locate a specific property. Fixed with full-text search.
+- **Help/support**: 102/115 connector templates have `documentationRef` but it was never surfaced in the UI. Template `tooltip` per-field was also unmapped. Both now wired.
+- **Examples**: `placeholder` and `hint` already serve as examples for most fields; a dedicated `example` field type is a future enhancement.
+
+### Changes
+
+**`canvas-plugins/config-panel/src/types.ts`**
+- Added `docsUrl?: string` to `PanelSchema` (panel-level docs URL)
+- Added `tooltip?: string` to `FieldSchema` (hover tooltip on field label)
+
+**`canvas-plugins/config-panel/src/renderer.ts`**
+- **localStorage width** — panel width restored from `localStorage` on construction; saved on every resize drag
+- **Search** — search bar (below header) filters all fields across all groups by label. Results show group name as section header. Tabs+body hidden while search is active; restored on clear. Escape key clears search.
+- **Docs link** — `?` button in header shown when `reg.schema.docsUrl` is set; opens documentation in new tab
+- **Tooltip** — `field.tooltip` rendered as `title` attribute on field label, toggle label, and action button
+- **Single-group tab bar auto-hide** — `_syncTabsAreaVisibility()` hides the `.bpmn-cfg-tabs-area` when ≤ 1 group is visible; called on initial render and after every group visibility change
+
+**`canvas-plugins/config-panel/src/css.ts`**
+- Added search bar, search results, and search-group-label styles
+- Added `.bpmn-cfg-docs-link` styles (circular `?` badge)
+- Added `cursor: help` on `.bpmn-cfg-field-label[title]` and `.bpmn-cfg-toggle-label[title]`
+- Added collapsed-state hiding for new elements (`search-bar`, `docs-link`, `search-results`)
+
+**`canvas-plugins/config-panel-bpmn/src/template-engine.ts`**
+- `prop.tooltip` → `FieldSchema.tooltip`
+- `template.documentationRef` → `schema.docsUrl`
+
+## 2026-03-01 — Config Panel: resizable width, vertical offset, tab scroll arrows
+
+### `canvas-plugins/config-panel` — UX refinements
+
+- **Resizable width** — A 5px drag handle on the left edge of the inspector panel lets users resize it between 240px and 600px. The chosen width persists across node selections (stored as `_panelWidth`). Dragging is blocked when the panel is collapsed. Inline `style.width` is cleared when collapsing and restored on expand.
+- **Vertical offset** — `top: 36px` (matches the `canvas-plugin-tabs` bar height) so the inspector panel no longer overlaps the tab bar.
+- **Tab scroll arrows** — The tabs bar is now wrapped in a `.bpmn-cfg-tabs-area` flex container. When tab buttons overflow the available width, ‹ and › arrow buttons appear on the left/right edges to scroll by 100px. Buttons are shown/hidden dynamically via `_updateTabScrollBtns()`, called after render, on scroll, on tab switch, and on group-visibility changes.
+
+## 2026-03-01 — Config Panel: Persistent Inspector Panel (Pattern 1)
+
+Replaced the two-click compact+overlay UX with a single persistent fixed-width right-side inspector panel.
+
+### `canvas-plugins/config-panel` — Changes
+
+- **`renderer.ts`** — Removed compact panel, overlay, backdrop, `_centerSelected`, and `_fullOpen` state. Added `_panelEl` and `_collapsed` state. Single `_showPanel()` method replaces `_showCompact()`+`_showFull()`. Panel now opens immediately on first node click and persists across selections. Collapse toggle button (‹/›) in header preserves preference across node switches. Constructor no longer takes `getViewport`/`setViewport` params.
+- **`css.ts`** — Removed all compact/configure-btn/overlay/backdrop styles and their light-theme overrides. Updated `.bpmn-cfg-full` to `position: fixed; right: 0; width: 320px; transition: width 0.2s ease`. Added `.bpmn-cfg-full--collapsed` (collapses to 40px strip), `.bpmn-cfg-collapse-btn`, and collapsed-header centering rule.
+- **`index.ts`** — Removed `getViewport`/`setViewport` arguments from `ConfigPanelRenderer` constructor call.
+- **`tests/index.test.ts`** — Updated test name and selector from `.bpmn-cfg-compact` to `.bpmn-cfg-full`.
+
 ## 2026-02-28 — Form Editor drag-and-drop redesign (form-js parity)
 
 Rewrote `FormEditor` (`canvas-plugins/form-editor`) with a three-panel drag-and-drop layout matching form-js.

@@ -156,9 +156,19 @@ export type {
 	DmnOutputEntry,
 	DmnDiagram,
 	DmnDiagramShape,
+	DmnDiagramEdge,
+	DmnWaypoint,
 	DmnTypeRef,
 	DmnAggregation,
 	HitPolicy,
+	DmnInformationRequirement,
+	DmnKnowledgeRequirement,
+	DmnAuthorityRequirement,
+	DmnInputData,
+	DmnKnowledgeSource,
+	DmnBusinessKnowledgeModel,
+	DmnTextAnnotation,
+	DmnAssociation,
 } from "./dmn/dmn-model.js";
 export type { XmlElement } from "./types/xml-element.js";
 export { generateId, resetIdCounter } from "./types/id-generator.js";

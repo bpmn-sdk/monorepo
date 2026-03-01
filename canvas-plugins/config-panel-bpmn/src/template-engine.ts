@@ -86,6 +86,7 @@ function propToFieldSchema(prop: TemplateProperty): FieldSchema {
 		type: "text",
 		placeholder: prop.placeholder,
 		hint: prop.description,
+		tooltip: prop.tooltip,
 		condition,
 		...(prop.constraints?.notEmpty === true ? { required: true } : {}),
 	};
@@ -211,7 +212,27 @@ export function buildRegistrationFromTemplate(template: ElementTemplate): Templa
 		type: "text",
 		placeholder: "Task name",
 	};
-	const generalFields: FieldSchema[] = [nameField, ...ungrouped.map((p) => propToFieldSchema(p))];
+
+	/**
+	 * Action button that strips the zeebe:modelerTemplate stamp so the renderer
+	 * falls back to the generic connector selector on the next diagram:change.
+	 * The sentinel value "__change_connector" is intercepted by write() below.
+	 */
+	const changeConnectorField: FieldSchema = {
+		key: "__change_connector",
+		label: "Change connector",
+		type: "action",
+		hint: "Switch to a different connector or custom task type.",
+		onClick: (_values, setValue) => {
+			setValue("__change_connector", "remove");
+		},
+	};
+
+	const generalFields: FieldSchema[] = [
+		nameField,
+		changeConnectorField,
+		...ungrouped.map((p) => propToFieldSchema(p)),
+	];
 
 	const schemaGroups = [{ id: "general", label: "General", fields: generalFields }];
 
@@ -228,6 +249,8 @@ export function buildRegistrationFromTemplate(template: ElementTemplate): Templa
 	const schema: PanelSchema = {
 		compact: [nameField],
 		groups: schemaGroups,
+		...(template.documentationRef ? { docsUrl: template.documentationRef } : {}),
+		templateName: template.name,
 	};
 
 	// Build adapter
@@ -248,6 +271,20 @@ export function buildRegistrationFromTemplate(template: ElementTemplate): Templa
 		},
 
 		write(defs: BpmnDefinitions, id: string, values: Record<string, FieldValue>): BpmnDefinitions {
+			// "Change connector" button — strip the template stamp so the renderer
+			// falls back to the generic connector selector on the next render.
+			if (values.__change_connector === "remove") {
+				return updateFlowElement(defs, id, (el) => {
+					const {
+						"zeebe:modelerTemplate": _tm,
+						"zeebe:modelerTemplateVersion": _tmv,
+						"zeebe:modelerTemplateIcon": _tmi,
+						...rest
+					} = el.unknownAttributes;
+					return { ...el, unknownAttributes: rest };
+				});
+			}
+
 			return updateFlowElement(defs, id, (el) => {
 				const name = typeof values.name === "string" ? values.name || undefined : el.name;
 

@@ -2,17 +2,21 @@ export const DMN_EDITOR_CSS = `
 .dmn-editor {
   font-family: Arial, sans-serif;
   font-size: 14px;
-  overflow: auto;
+  overflow: hidden;
   height: 100%;
   box-sizing: border-box;
   background: var(--dme-bg, #fff);
   color: var(--dme-fg, #1c1c1c);
+  display: flex;
+  flex-direction: column;
 }
 
 .dmn-editor-body {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 24px;
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+  display: flex;
+  flex-direction: column;
 }
 
 /* ── Light theme (default) ── */
@@ -58,6 +62,209 @@ export const DMN_EDITOR_CSS = `
   --dme-input-cell-fg: #cdd6f4;
   --dme-accent: #89b4fa;
   --dme-divider: 3px double #444;
+}
+
+/* ── Table view wrapper ── */
+.dme-back-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--dme-border);
+  background: var(--dme-bg);
+  flex-shrink: 0;
+}
+
+.dme-back-btn {
+  padding: 4px 12px;
+  font-size: 13px;
+}
+
+.dme-back-title {
+  font-weight: 600;
+  font-size: 15px;
+  color: var(--dme-fg);
+}
+
+.dme-table-wrap {
+  overflow: auto;
+  flex: 1;
+  padding: 24px;
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* ── DRD Canvas ── */
+.drd-root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+.drd-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--dme-border);
+  background: var(--dme-bg);
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+.drd-toolbar-btn {
+  background: var(--dme-btn-bg);
+  color: var(--dme-btn-fg);
+  border: 1px solid transparent;
+  border-radius: 4px;
+  font-size: 12px;
+  padding: 4px 10px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.drd-toolbar-btn:hover {
+  background: var(--dme-btn-hover);
+}
+
+.drd-toolbar-btn--active {
+  background: var(--dme-accent) !important;
+  color: #fff !important;
+  border-color: var(--dme-accent) !important;
+}
+
+.drd-toolbar-sep {
+  flex: 1;
+}
+
+.drd-svg {
+  flex: 1;
+  width: 100%;
+  cursor: default;
+  background: var(--drd-canvas-bg, #f8f8fa);
+}
+
+/* ── DRD Node shapes ── */
+.drd-node {
+  cursor: pointer;
+}
+
+.drd-shape {
+  stroke: var(--drd-node-stroke, #374151);
+  stroke-width: 1.5;
+  fill: var(--drd-node-fill, #ffffff);
+}
+
+.drd-node--decision .drd-shape {
+  fill: var(--drd-decision-fill, #eff6ff);
+  stroke: var(--drd-decision-stroke, #3b82f6);
+}
+
+.drd-node--inputData .drd-shape {
+  fill: var(--drd-input-fill, #f0fdf4);
+  stroke: var(--drd-input-stroke, #16a34a);
+}
+
+.drd-node--knowledgeSource .drd-shape {
+  fill: var(--drd-ks-fill, #fff7ed);
+  stroke: var(--drd-ks-stroke, #ea580c);
+}
+
+.drd-node--businessKnowledgeModel .drd-shape {
+  fill: var(--drd-bkm-fill, #faf5ff);
+  stroke: var(--drd-bkm-stroke, #9333ea);
+}
+
+.drd-node--textAnnotation .drd-shape {
+  stroke: var(--drd-ann-stroke, #6b7280);
+}
+
+.drd-node--selected .drd-shape {
+  stroke-width: 2.5;
+  filter: drop-shadow(0 0 4px rgba(59,130,246,0.5));
+}
+
+/* Connect source highlight */
+.drd-node--connect-src .drd-shape {
+  stroke: #f97316 !important;
+  stroke-width: 2.5;
+}
+
+/* Connect mode hover highlight */
+.drd-connect-hi {
+  fill: none;
+  stroke: #3b82f6;
+  stroke-width: 2;
+  stroke-dasharray: 4,3;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.1s;
+}
+
+.drd-node:hover .drd-connect-hi {
+  opacity: 1;
+}
+
+/* ── DRD Node labels ── */
+.drd-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--dme-fg, #1c1c1c);
+  padding: 4px 6px;
+  box-sizing: border-box;
+  overflow: hidden;
+  pointer-events: none;
+  user-select: none;
+  word-break: break-word;
+}
+
+/* ── DRD Edges ── */
+.drd-edge-line {
+  stroke: var(--drd-edge, #374151);
+}
+
+.drd-edge--association .drd-edge-line {
+  stroke: var(--drd-assoc, #9ca3af);
+}
+
+.drd-edge--selected .drd-edge-line {
+  stroke: #3b82f6;
+  stroke-width: 2.5;
+}
+
+/* ── Marker colors ── */
+.drd-marker-fill {
+  fill: var(--drd-edge, #374151);
+}
+
+.drd-marker-stroke {
+  stroke: var(--drd-edge, #374151);
+}
+
+.drd-marker-assoc {
+  stroke: var(--drd-assoc, #9ca3af);
+}
+
+/* ── Inline label editing ── */
+.drd-inline-edit {
+  box-sizing: border-box;
+  border: 2px solid var(--dme-accent);
+  border-radius: 2px;
+  background: var(--dme-bg);
+  color: var(--dme-fg);
+  font-size: 12px;
+  font-weight: 500;
+  text-align: center;
+  padding: 4px;
+  outline: none;
 }
 
 /* ── Decision section ── */

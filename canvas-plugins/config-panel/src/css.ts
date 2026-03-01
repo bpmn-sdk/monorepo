@@ -1,103 +1,17 @@
 export const CONFIG_PANEL_STYLE_ID = "bpmn-config-panel-styles-v1";
 
 export const CONFIG_PANEL_CSS = `
-/* ── Compact panel ───────────────────────────────────────────────────────── */
-.bpmn-cfg-compact {
-  position: fixed;
-  right: 12px;
-  top: 12px;
-  width: 280px;
-  background: rgba(20, 20, 28, 0.95);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(255,255,255,0.1);
-  border-radius: 10px;
-  box-shadow: 0 4px 24px rgba(0,0,0,0.5);
-  z-index: 9999;
-  font-family: system-ui, -apple-system, sans-serif;
-  font-size: 12px;
-  color: rgba(255,255,255,0.85);
-  overflow: hidden;
-}
-.bpmn-cfg-compact-header {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 10px 12px 8px;
-  border-bottom: 1px solid rgba(255,255,255,0.07);
-}
-.bpmn-cfg-compact-title {
-  flex: 1;
-  font-size: 11px;
-  font-weight: 600;
-  color: rgba(255,255,255,0.45);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.bpmn-cfg-compact-body {
-  padding: 10px 12px 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 9px;
-}
-.bpmn-cfg-compact-close {
-  width: 20px;
-  height: 20px;
-  background: none;
-  border: none;
-  color: rgba(255,255,255,0.35);
-  cursor: pointer;
-  padding: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 4px;
-  font-size: 15px;
-  line-height: 1;
-  flex-shrink: 0;
-}
-.bpmn-cfg-compact-close:hover { color: #fff; background: rgba(255,255,255,0.08); }
-
-.bpmn-cfg-configure-btn {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 3px;
-  padding: 0;
-  background: none;
-  border: none;
-  color: #4c8ef7;
-  cursor: pointer;
-  font-size: 12px;
-  font-weight: 500;
-  transition: color 0.1s;
-  margin-top: 2px;
-}
-.bpmn-cfg-configure-btn:hover { color: #7aaeff; }
-
-/* ── Full overlay ─────────────────────────────────────────────────────────── */
-.bpmn-cfg-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 9999;
-  pointer-events: none;
-}
-.bpmn-cfg-backdrop {
-  position: absolute;
-  inset: 0;
-  background: rgba(0,0,0,0.35);
-  pointer-events: all;
-  cursor: pointer;
-}
+/* ── Inspector panel ─────────────────────────────────────────────────────── */
+/*
+ * top: 36px matches the height of the .bpmn-tabs bar from canvas-plugin-tabs,
+ * so the inspector panel does not overlap the tab bar.
+ */
 .bpmn-cfg-full {
-  position: absolute;
+  position: fixed;
   right: 0;
-  top: 0;
+  top: 36px;
   bottom: 0;
-  width: 65%;
-  min-width: 420px;
+  width: 320px;
   background: rgba(18, 18, 26, 0.98);
   backdrop-filter: blur(16px);
   border-left: 1px solid rgba(255,255,255,0.1);
@@ -107,14 +21,47 @@ export const CONFIG_PANEL_CSS = `
   font-family: system-ui, -apple-system, sans-serif;
   font-size: 13px;
   color: rgba(255,255,255,0.85);
-  overflow: hidden;
-  pointer-events: all;
+  z-index: 9999;
+  transition: width 0.2s ease;
 }
+.bpmn-cfg-full--collapsed {
+  width: 40px;
+}
+.bpmn-cfg-full--collapsed .bpmn-cfg-full-info,
+.bpmn-cfg-full--collapsed .bpmn-cfg-full-close,
+.bpmn-cfg-full--collapsed .bpmn-cfg-docs-link,
+.bpmn-cfg-full--collapsed .bpmn-cfg-search-bar,
+.bpmn-cfg-full--collapsed .bpmn-cfg-guide-bar,
+.bpmn-cfg-full--collapsed .bpmn-cfg-tabs-area,
+.bpmn-cfg-full--collapsed .bpmn-cfg-full-body,
+.bpmn-cfg-full--collapsed .bpmn-cfg-search-results {
+  display: none;
+}
+.bpmn-cfg-full--collapsed .bpmn-cfg-full-header {
+  justify-content: center;
+  padding: 14px 0;
+}
+
+/* Resize handle — a thin grab zone along the left edge */
+.bpmn-cfg-resize-handle {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 5px;
+  cursor: ew-resize;
+  z-index: 1;
+}
+.bpmn-cfg-resize-handle:hover {
+  background: rgba(76,142,247,0.35);
+}
+
+/* ── Header ──────────────────────────────────────────────────────────────── */
 .bpmn-cfg-full-header {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 14px 18px 12px;
+  gap: 8px;
+  padding: 12px 14px 10px;
   border-bottom: 1px solid rgba(255,255,255,0.08);
   flex-shrink: 0;
 }
@@ -130,17 +77,65 @@ export const CONFIG_PANEL_CSS = `
   color: rgba(255,255,255,0.35);
   margin-bottom: 2px;
 }
+.bpmn-cfg-full-template {
+  font-size: 11px;
+  font-weight: 600;
+  color: #4c8ef7;
+  margin-bottom: 1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .bpmn-cfg-full-name {
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 600;
   color: #fff;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* Docs link — ? button shown when the schema has a documentationRef */
+.bpmn-cfg-docs-link {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 1px solid rgba(255,255,255,0.2);
+  color: rgba(255,255,255,0.45);
+  font-size: 11px;
+  font-weight: 700;
+  text-decoration: none;
+  flex-shrink: 0;
+  transition: border-color 0.1s, color 0.1s, background 0.1s;
+}
+.bpmn-cfg-docs-link:hover {
+  color: #4c8ef7;
+  border-color: #4c8ef7;
+  background: rgba(76,142,247,0.12);
+}
+.bpmn-cfg-collapse-btn {
+  width: 28px;
+  height: 28px;
+  background: none;
+  border: none;
+  color: rgba(255,255,255,0.4);
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  font-size: 18px;
+  line-height: 1;
+  flex-shrink: 0;
+  transition: background 0.1s, color 0.1s;
+}
+.bpmn-cfg-collapse-btn:hover { background: rgba(255,255,255,0.08); color: #fff; }
 .bpmn-cfg-full-close {
-  width: 30px;
-  height: 30px;
+  width: 28px;
+  height: 28px;
   background: none;
   border: none;
   color: rgba(255,255,255,0.4);
@@ -157,19 +152,152 @@ export const CONFIG_PANEL_CSS = `
 }
 .bpmn-cfg-full-close:hover { background: rgba(255,255,255,0.08); color: #fff; }
 
-/* ── Tabs ─────────────────────────────────────────────────────────────────── */
+/* ── Search bar ──────────────────────────────────────────────────────────── */
+.bpmn-cfg-search-bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 12px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  flex-shrink: 0;
+}
+.bpmn-cfg-search-input {
+  flex: 1;
+  height: 28px;
+  padding: 0 8px;
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 5px;
+  color: rgba(255,255,255,0.85);
+  font-size: 12px;
+  font-family: system-ui, -apple-system, sans-serif;
+  outline: none;
+  transition: border-color 0.15s, background 0.15s;
+  box-sizing: border-box;
+}
+.bpmn-cfg-search-input::placeholder { color: rgba(255,255,255,0.28); }
+.bpmn-cfg-search-input:focus {
+  border-color: #4c8ef7;
+  background: rgba(255,255,255,0.1);
+}
+.bpmn-cfg-search-clear {
+  width: 22px;
+  height: 22px;
+  background: none;
+  border: none;
+  color: rgba(255,255,255,0.35);
+  cursor: pointer;
+  padding: 0;
+  /* display toggled via JS */
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  font-size: 14px;
+  flex-shrink: 0;
+  transition: color 0.1s, background 0.1s;
+}
+.bpmn-cfg-search-clear:hover { color: #fff; background: rgba(255,255,255,0.08); }
+
+/* ── Guide bar (field assistant) ─────────────────────────────────────────── */
+.bpmn-cfg-guide-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 14px;
+  background: rgba(248, 113, 113, 0.09);
+  border-bottom: 1px solid rgba(248, 113, 113, 0.18);
+  flex-shrink: 0;
+}
+.bpmn-cfg-guide-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.bpmn-cfg-guide-icon {
+  width: 16px;
+  height: 16px;
+  background: #f87171;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 800;
+  color: #fff;
+  flex-shrink: 0;
+  line-height: 1;
+}
+.bpmn-cfg-guide-text {
+  font-size: 11px;
+  font-weight: 500;
+  color: rgba(248, 113, 113, 0.9);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.bpmn-cfg-guide-btn {
+  flex-shrink: 0;
+  padding: 3px 10px;
+  border-radius: 4px;
+  border: 1px solid rgba(248, 113, 113, 0.4);
+  background: rgba(248, 113, 113, 0.12);
+  color: #f87171;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.1s, border-color 0.1s;
+  white-space: nowrap;
+}
+.bpmn-cfg-guide-btn:hover {
+  background: rgba(248, 113, 113, 0.22);
+  border-color: rgba(248, 113, 113, 0.6);
+}
+
+/* ── Search results ──────────────────────────────────────────────────────── */
+.bpmn-cfg-search-results {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 22px 32px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.15) transparent;
+}
+.bpmn-cfg-search-group-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(255,255,255,0.3);
+  margin: 16px 0 10px;
+  padding-bottom: 5px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.bpmn-cfg-search-group-label:first-child { margin-top: 10px; }
+.bpmn-cfg-search-empty {
+  font-size: 12px;
+  color: rgba(255,255,255,0.3);
+  text-align: center;
+  padding: 28px 0;
+}
+
+/* ── Tabs area (wrapper + scroll buttons) ────────────────────────────────── */
+.bpmn-cfg-tabs-area {
+  display: flex;
+  align-items: stretch;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  flex-shrink: 0;
+  overflow: hidden;
+}
 .bpmn-cfg-tabs {
+  flex: 1;
+  min-width: 0;
   display: flex;
   align-items: flex-end;
-  gap: 0;
-  padding: 0 14px;
-  border-bottom: 1px solid rgba(255,255,255,0.08);
   overflow-x: auto;
-  flex-shrink: 0;
   scrollbar-width: none;
 }
 .bpmn-cfg-tabs::-webkit-scrollbar { display: none; }
-
 .bpmn-cfg-tab-btn {
   padding: 10px 14px;
   background: none;
@@ -182,10 +310,45 @@ export const CONFIG_PANEL_CSS = `
   white-space: nowrap;
   transition: color 0.1s, border-color 0.1s;
   margin-bottom: -1px;
+  flex-shrink: 0;
 }
 .bpmn-cfg-tab-btn:hover { color: rgba(255,255,255,0.75); }
 .bpmn-cfg-tab-btn.active { color: #4c8ef7; border-bottom-color: #4c8ef7; }
+/* Red dot shown after tab label when the group has required-empty fields */
+.bpmn-cfg-tab-btn.has-error::after {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #f87171;
+  margin-left: 5px;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
 
+/* Arrow buttons for overflowing tabs */
+.bpmn-cfg-tabs-scroll-btn {
+  flex-shrink: 0;
+  width: 26px;
+  background: none;
+  border: none;
+  border-radius: 0;
+  color: rgba(255,255,255,0.5);
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  padding: 0;
+  /* display toggled via JS */
+  align-items: center;
+  justify-content: center;
+  transition: background 0.1s, color 0.1s;
+}
+.bpmn-cfg-tabs-scroll-btn:hover { color: #fff; background: rgba(255,255,255,0.08); }
+.bpmn-cfg-tabs-scroll-btn--prev { border-right: 1px solid rgba(255,255,255,0.06); }
+.bpmn-cfg-tabs-scroll-btn--next { border-left: 1px solid rgba(255,255,255,0.06); }
+
+/* ── Scrollable body ─────────────────────────────────────────────────────── */
 .bpmn-cfg-full-body {
   flex: 1;
   overflow-y: auto;
@@ -216,7 +379,9 @@ export const CONFIG_PANEL_CSS = `
   font-weight: 500;
   color: rgba(255,255,255,0.55);
   margin-bottom: 5px;
+  cursor: default;
 }
+.bpmn-cfg-field-label[title] { cursor: help; }
 .bpmn-cfg-field-docs {
   font-size: 10px;
   color: #4c8ef7;
@@ -230,10 +395,14 @@ export const CONFIG_PANEL_CSS = `
   font-weight: 700;
   margin-left: 2px;
 }
+.bpmn-cfg-field--invalid {
+  border-left: 2px solid #f87171;
+  padding-left: 8px;
+}
 .bpmn-cfg-field--invalid .bpmn-cfg-input,
 .bpmn-cfg-field--invalid .bpmn-cfg-select,
 .bpmn-cfg-field--invalid .bpmn-cfg-textarea {
-  border-color: rgba(248, 113, 113, 0.6);
+  border-color: #f87171;
 }
 
 .bpmn-cfg-input,
@@ -327,6 +496,7 @@ export const CONFIG_PANEL_CSS = `
   color: rgba(255,255,255,0.7);
   cursor: pointer;
 }
+.bpmn-cfg-toggle-label[title] { cursor: help; }
 .bpmn-cfg-toggle {
   position: relative;
   display: inline-flex;
@@ -382,18 +552,6 @@ export const CONFIG_PANEL_CSS = `
 }
 
 /* ── Light theme overrides ────────────────────────────────────────────────── */
-[data-bpmn-hud-theme="light"] .bpmn-cfg-compact {
-  background: rgba(255, 255, 255, 0.96);
-  border-color: rgba(0,0,0,0.08);
-  box-shadow: 0 4px 24px rgba(0,0,0,0.12);
-  color: rgba(0,0,0,0.85);
-}
-[data-bpmn-hud-theme="light"] .bpmn-cfg-compact-header { border-bottom-color: rgba(0,0,0,0.07); }
-[data-bpmn-hud-theme="light"] .bpmn-cfg-compact-title { color: rgba(0,0,0,0.4); }
-[data-bpmn-hud-theme="light"] .bpmn-cfg-compact-close { color: rgba(0,0,0,0.35); }
-[data-bpmn-hud-theme="light"] .bpmn-cfg-compact-close:hover { color: rgba(0,0,0,0.9); background: rgba(0,0,0,0.06); }
-
-[data-bpmn-hud-theme="light"] .bpmn-cfg-backdrop { background: rgba(0,0,0,0.2); }
 [data-bpmn-hud-theme="light"] .bpmn-cfg-full {
   background: rgba(248, 248, 252, 0.99);
   border-left-color: rgba(0,0,0,0.08);
@@ -402,13 +560,35 @@ export const CONFIG_PANEL_CSS = `
 }
 [data-bpmn-hud-theme="light"] .bpmn-cfg-full-header { border-bottom-color: rgba(0,0,0,0.07); }
 [data-bpmn-hud-theme="light"] .bpmn-cfg-full-type { color: rgba(0,0,0,0.35); }
+[data-bpmn-hud-theme="light"] .bpmn-cfg-full-template { color: #1a56db; }
 [data-bpmn-hud-theme="light"] .bpmn-cfg-full-name { color: rgba(0,0,0,0.9); }
+[data-bpmn-hud-theme="light"] .bpmn-cfg-docs-link { color: rgba(0,0,0,0.4); border-color: rgba(0,0,0,0.2); }
+[data-bpmn-hud-theme="light"] .bpmn-cfg-docs-link:hover { color: #1a56db; border-color: #1a56db; background: rgba(26,86,219,0.08); }
+[data-bpmn-hud-theme="light"] .bpmn-cfg-collapse-btn { color: rgba(0,0,0,0.4); }
+[data-bpmn-hud-theme="light"] .bpmn-cfg-collapse-btn:hover { background: rgba(0,0,0,0.06); color: rgba(0,0,0,0.9); }
 [data-bpmn-hud-theme="light"] .bpmn-cfg-full-close { color: rgba(0,0,0,0.4); }
 [data-bpmn-hud-theme="light"] .bpmn-cfg-full-close:hover { background: rgba(0,0,0,0.06); color: rgba(0,0,0,0.9); }
 
-[data-bpmn-hud-theme="light"] .bpmn-cfg-tabs { border-bottom-color: rgba(0,0,0,0.07); }
+[data-bpmn-hud-theme="light"] .bpmn-cfg-search-bar { border-bottom-color: rgba(0,0,0,0.06); }
+[data-bpmn-hud-theme="light"] .bpmn-cfg-search-input {
+  background: rgba(0,0,0,0.04);
+  border-color: rgba(0,0,0,0.12);
+  color: rgba(0,0,0,0.85);
+}
+[data-bpmn-hud-theme="light"] .bpmn-cfg-search-input::placeholder { color: rgba(0,0,0,0.3); }
+[data-bpmn-hud-theme="light"] .bpmn-cfg-search-clear { color: rgba(0,0,0,0.35); }
+[data-bpmn-hud-theme="light"] .bpmn-cfg-search-clear:hover { color: rgba(0,0,0,0.9); background: rgba(0,0,0,0.06); }
+[data-bpmn-hud-theme="light"] .bpmn-cfg-search-results { scrollbar-color: rgba(0,0,0,0.15) transparent; }
+[data-bpmn-hud-theme="light"] .bpmn-cfg-search-group-label { color: rgba(0,0,0,0.35); border-bottom-color: rgba(0,0,0,0.06); }
+[data-bpmn-hud-theme="light"] .bpmn-cfg-search-empty { color: rgba(0,0,0,0.35); }
+
+[data-bpmn-hud-theme="light"] .bpmn-cfg-tabs-area { border-bottom-color: rgba(0,0,0,0.07); }
 [data-bpmn-hud-theme="light"] .bpmn-cfg-tab-btn { color: rgba(0,0,0,0.4); }
 [data-bpmn-hud-theme="light"] .bpmn-cfg-tab-btn:hover { color: rgba(0,0,0,0.7); }
+[data-bpmn-hud-theme="light"] .bpmn-cfg-tabs-scroll-btn { color: rgba(0,0,0,0.4); }
+[data-bpmn-hud-theme="light"] .bpmn-cfg-tabs-scroll-btn:hover { color: rgba(0,0,0,0.9); background: rgba(0,0,0,0.06); }
+[data-bpmn-hud-theme="light"] .bpmn-cfg-tabs-scroll-btn--prev { border-right-color: rgba(0,0,0,0.06); }
+[data-bpmn-hud-theme="light"] .bpmn-cfg-tabs-scroll-btn--next { border-left-color: rgba(0,0,0,0.06); }
 [data-bpmn-hud-theme="light"] .bpmn-cfg-full-body { scrollbar-color: rgba(0,0,0,0.15) transparent; }
 
 [data-bpmn-hud-theme="light"] .bpmn-cfg-group-label {
@@ -445,6 +625,23 @@ export const CONFIG_PANEL_CSS = `
 [data-bpmn-hud-theme="light"] .bpmn-cfg-action-btn:hover {
   background: rgba(0,0,0,0.08);
   border-color: rgba(0,0,0,0.2);
+}
+[data-bpmn-hud-theme="light"] .bpmn-cfg-resize-handle:hover {
+  background: rgba(26,86,219,0.2);
+}
+[data-bpmn-hud-theme="light"] .bpmn-cfg-guide-bar {
+  background: rgba(248, 113, 113, 0.06);
+  border-bottom-color: rgba(248, 113, 113, 0.15);
+}
+[data-bpmn-hud-theme="light"] .bpmn-cfg-guide-text { color: #dc2626; }
+[data-bpmn-hud-theme="light"] .bpmn-cfg-guide-btn {
+  color: #dc2626;
+  border-color: rgba(220, 38, 38, 0.3);
+  background: rgba(220, 38, 38, 0.07);
+}
+[data-bpmn-hud-theme="light"] .bpmn-cfg-guide-btn:hover {
+  background: rgba(220, 38, 38, 0.14);
+  border-color: rgba(220, 38, 38, 0.5);
 }
 `;
 

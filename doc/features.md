@@ -1,5 +1,16 @@
 # Features
 
+## DMN DRD Canvas (2026-03-01) — `@bpmn-sdk/canvas-plugin-dmn-editor` + `@bpmn-sdk/core`
+
+- **Full DRG element model** — `DmnInputData`, `DmnKnowledgeSource`, `DmnBusinessKnowledgeModel`, `DmnTextAnnotation`, `DmnAssociation`, all three requirement types (`DmnInformationRequirement`, `DmnKnowledgeRequirement`, `DmnAuthorityRequirement`), waypoints, and diagram edges
+- **Parser/serializer roundtrip** — all DRG elements, requirement child elements, and DMNDI edges (with `di:waypoint`) are parsed and serialized; `decisionTable` is now optional on decisions
+- **Interactive SVG DRD canvas** — pan/zoom, drag-to-move nodes, connect mode, inline label editing, keyboard delete, auto-layout for nodes without diagram positions
+- **5 node shapes**: Decision (rect), InputData (stadium), KnowledgeSource (wavy-bottom rect), BKM (clipped-corner rect), TextAnnotation (open bracket)
+- **4 edge types**: InformationRequirement (solid filled arrow), KnowledgeRequirement (dashed open-V arrow), AuthorityRequirement (dashed + open circle), Association (dotted)
+- **Toolbar**: add node buttons for each type, Connect tool, zoom controls
+- **DRD as primary view** — opening a DMN file shows the DRD canvas; double-click a Decision → decision table; "← DRD" back button returns to DRD
+- **Zero external dependencies** — pure TypeScript/DOM SVG rendering
+
 ## Form Editor drag-and-drop redesign (2026-02-28) — `@bpmn-sdk/canvas-plugin-form-editor`
 
 - Three-panel layout: Palette (260px fixed) | Canvas (flex, scrollable) | Properties (300px fixed)

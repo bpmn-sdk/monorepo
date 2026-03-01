@@ -75,7 +75,7 @@ describe("createConfigPanelPlugin", () => {
 		expect(() => plugin.registerSchema("startEvent", schema, adapter)).not.toThrow();
 	});
 
-	it("shows compact panel when element with registered schema is selected", () => {
+	it("shows inspector panel when element with registered schema is selected", () => {
 		let selectHandler: ((ids: string[]) => void) | null = null;
 		const api: CanvasApi = {
 			...makeApi(),
@@ -133,7 +133,7 @@ describe("createConfigPanelPlugin", () => {
 		// Trigger selection
 		selectHandler?.(["el1"]);
 
-		const panel = document.querySelector(".bpmn-cfg-compact");
+		const panel = document.querySelector(".bpmn-cfg-full");
 		expect(panel).not.toBeNull();
 	});
 });

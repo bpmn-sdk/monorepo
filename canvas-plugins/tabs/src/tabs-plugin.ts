@@ -1089,6 +1089,11 @@ export function createTabsPlugin(options: TabsPluginOptions = {}): CanvasPlugin 
 						namespaces: {},
 						modelerAttributes: {},
 						decisions: [],
+						inputData: [],
+						knowledgeSources: [],
+						businessKnowledgeModels: [],
+						textAnnotations: [],
+						associations: [],
 					},
 					name: decisionId,
 				});
