@@ -1,5 +1,35 @@
 # Progress
 
+## 2026-03-01 — Config panel: FEEL syntax validation + unified error detection
+
+### Fix: invalid FEEL expressions now flagged as errors
+Added module-level `hasFEELSyntaxError(val)` that catches structural errors in any value starting with `"="`:
+- Empty body (`=` or `= `)
+- Trailing binary operator (`="asdasfd"-` → trailing `-`)
+- Unclosed string literal (`="hello`)
+- Unbalanced brackets (`=someFunc(x`)
+- Unmatched closing bracket
+
+Validation applies to **any field** whose value starts with `=`, not just `feel-expression` typed fields — matching Camunda Zeebe semantics where `=` always signals a FEEL expression.
+
+### Refactor: unified `_fieldHasError(field, val)` across all validation paths
+Replaced the scattered `_isEffectivelyEmpty` checks with a single `_fieldHasError` that covers both required-empty AND invalid-FEEL. All four validation sites (field border, tab dot, guide bar, canvas badge) now use the same predicate. Guide bar text updated from "required fields" to "fields to fix" since it now covers both categories.
+
+**Files:** `canvas-plugins/config-panel/src/renderer.ts`
+
+## 2026-03-01 — Config panel: badge accuracy, field guide, FEEL validation
+
+### Fix: canvas badge no longer shows errors for condition-hidden fields
+`_updateBadges` now skips required fields whose condition function returns false (i.e. fields the user cannot see). This was the primary cause of the "still shows error after filling everything" frustration — hidden-but-required fields were being counted.
+
+### Fix: FEEL expression "=" treated as empty
+Added `_isEffectivelyEmpty(field, val)` which treats a `feel-expression` value of just `"="` (with optional whitespace) as effectively empty. Used in all validation paths: field border, tab dot, guide bar, and canvas badge.
+
+### Feature: field guide assistant ("Start / Next" navigator)
+A guide bar is now omnipresent between the search box and the tabs when any required field is missing. It shows the count ("3 required fields") and a **Start →** button. Clicking navigates to the first missing field (switches tab, scrolls into view, focuses the input). The button becomes **Next →** for subsequent clicks, cycling through remaining missing fields in group order. The bar disappears automatically when all required fields are filled.
+
+**Files:** `canvas-plugins/config-panel/src/renderer.ts`, `canvas-plugins/config-panel/src/css.ts`
+
 ## 2026-03-01 — Config panel: improved validation UX
 
 ### Tab error dots

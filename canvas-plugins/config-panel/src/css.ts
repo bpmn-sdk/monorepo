@@ -31,6 +31,7 @@ export const CONFIG_PANEL_CSS = `
 .bpmn-cfg-full--collapsed .bpmn-cfg-full-close,
 .bpmn-cfg-full--collapsed .bpmn-cfg-docs-link,
 .bpmn-cfg-full--collapsed .bpmn-cfg-search-bar,
+.bpmn-cfg-full--collapsed .bpmn-cfg-guide-bar,
 .bpmn-cfg-full--collapsed .bpmn-cfg-tabs-area,
 .bpmn-cfg-full--collapsed .bpmn-cfg-full-body,
 .bpmn-cfg-full--collapsed .bpmn-cfg-search-results {
@@ -196,6 +197,63 @@ export const CONFIG_PANEL_CSS = `
   transition: color 0.1s, background 0.1s;
 }
 .bpmn-cfg-search-clear:hover { color: #fff; background: rgba(255,255,255,0.08); }
+
+/* ── Guide bar (field assistant) ─────────────────────────────────────────── */
+.bpmn-cfg-guide-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 14px;
+  background: rgba(248, 113, 113, 0.09);
+  border-bottom: 1px solid rgba(248, 113, 113, 0.18);
+  flex-shrink: 0;
+}
+.bpmn-cfg-guide-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.bpmn-cfg-guide-icon {
+  width: 16px;
+  height: 16px;
+  background: #f87171;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 800;
+  color: #fff;
+  flex-shrink: 0;
+  line-height: 1;
+}
+.bpmn-cfg-guide-text {
+  font-size: 11px;
+  font-weight: 500;
+  color: rgba(248, 113, 113, 0.9);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.bpmn-cfg-guide-btn {
+  flex-shrink: 0;
+  padding: 3px 10px;
+  border-radius: 4px;
+  border: 1px solid rgba(248, 113, 113, 0.4);
+  background: rgba(248, 113, 113, 0.12);
+  color: #f87171;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.1s, border-color 0.1s;
+  white-space: nowrap;
+}
+.bpmn-cfg-guide-btn:hover {
+  background: rgba(248, 113, 113, 0.22);
+  border-color: rgba(248, 113, 113, 0.6);
+}
 
 /* ── Search results ──────────────────────────────────────────────────────── */
 .bpmn-cfg-search-results {
@@ -570,6 +628,20 @@ export const CONFIG_PANEL_CSS = `
 }
 [data-bpmn-hud-theme="light"] .bpmn-cfg-resize-handle:hover {
   background: rgba(26,86,219,0.2);
+}
+[data-bpmn-hud-theme="light"] .bpmn-cfg-guide-bar {
+  background: rgba(248, 113, 113, 0.06);
+  border-bottom-color: rgba(248, 113, 113, 0.15);
+}
+[data-bpmn-hud-theme="light"] .bpmn-cfg-guide-text { color: #dc2626; }
+[data-bpmn-hud-theme="light"] .bpmn-cfg-guide-btn {
+  color: #dc2626;
+  border-color: rgba(220, 38, 38, 0.3);
+  background: rgba(220, 38, 38, 0.07);
+}
+[data-bpmn-hud-theme="light"] .bpmn-cfg-guide-btn:hover {
+  background: rgba(220, 38, 38, 0.14);
+  border-color: rgba(220, 38, 38, 0.5);
 }
 `;
 

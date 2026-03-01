@@ -9,6 +9,37 @@ const SVG_NS = "http://www.w3.org/2000/svg";
 const FIELD_WRAPPER_ATTR = "data-field-wrapper";
 const STORAGE_KEY_WIDTH = "bpmn-cfg-panel-width";
 
+/**
+ * Returns true when a FEEL expression value (starting with "=") has obvious
+ * structural errors: empty body, trailing binary operator, or unbalanced
+ * string/bracket delimiters.
+ */
+function hasFEELSyntaxError(val: string): boolean {
+	const body = val.startsWith("=") ? val.slice(1).trim() : val.trim();
+	if (body === "") return true;
+
+	// Trailing characters that indicate an incomplete binary expression
+	if (/[+\-*/^,([{]$/.test(body)) return true;
+
+	// Scan for unbalanced strings and structural delimiters
+	let depth = 0;
+	let inString = false;
+	for (let i = 0; i < body.length; i++) {
+		const ch = body[i];
+		if (inString) {
+			if (ch === '"') inString = false;
+		} else {
+			if (ch === '"') inString = true;
+			else if (ch === "(" || ch === "[" || ch === "{") depth++;
+			else if (ch === ")" || ch === "]" || ch === "}") {
+				depth--;
+				if (depth < 0) return true;
+			}
+		}
+	}
+	return inString || depth !== 0;
+}
+
 interface Registration {
 	schema: PanelSchema;
 	adapter: PanelAdapter;
@@ -37,6 +68,13 @@ export class ConfigPanelRenderer {
 	private _searchClearBtn: HTMLButtonElement | null = null;
 
 	private _searchQuery = "";
+	/** Guide bar sub-element refs; reset on panel teardown. */
+	private _guideBarEl: HTMLElement | null = null;
+	private _guideTextEl: HTMLElement | null = null;
+	private _guideBtnEl: HTMLButtonElement | null = null;
+	/** Key of the field the guide is currently pointing at. */
+	private _guideCurrentKey: string | null = null;
+	private _guideStarted = false;
 	private _selectedId: string | null = null;
 	private _selectedType: string | null = null;
 	private _elementName = "";
@@ -194,6 +232,8 @@ export class ConfigPanelRenderer {
 		this._values = {};
 		this._effectiveReg = null;
 		this._searchQuery = "";
+		this._guideCurrentKey = null;
+		this._guideStarted = false;
 	}
 
 	private _hidePanel(): void {
@@ -206,6 +246,9 @@ export class ConfigPanelRenderer {
 		this._bodyEl = null;
 		this._searchResultsEl = null;
 		this._searchClearBtn = null;
+		this._guideBarEl = null;
+		this._guideTextEl = null;
+		this._guideBtnEl = null;
 	}
 
 	/** Update all input values in-place without re-rendering (preserves focus). */
@@ -249,36 +292,63 @@ export class ConfigPanelRenderer {
 	}
 
 	/**
-	 * Returns true when a group has at least one required field that is empty
-	 * and currently visible (condition is satisfied or absent).
+	 * Returns true when a field value is considered empty for validation purposes.
+	 * For `feel-expression` fields, a value of just "=" (no expression body) is
+	 * treated the same as empty.
+	 */
+	private _isEffectivelyEmpty(field: FieldSchema, val: FieldValue): boolean {
+		if (val === "" || val === undefined) return true;
+		if (field.type === "feel-expression" && typeof val === "string") {
+			return val.trim() === "=";
+		}
+		return false;
+	}
+
+	/**
+	 * Returns true when a field value has any error:
+	 * - required field with an effectively-empty value, OR
+	 * - value is a FEEL expression (starts with "=") with structural syntax errors.
+	 */
+	private _fieldHasError(field: FieldSchema, val: FieldValue): boolean {
+		if (field.required && this._isEffectivelyEmpty(field, val)) return true;
+		if (typeof val === "string" && val.startsWith("=") && hasFEELSyntaxError(val)) return true;
+		return false;
+	}
+
+	/**
+	 * Returns true when a group has at least one required, currently-visible field
+	 * that is effectively empty.
 	 */
 	private _groupHasErrors(group: GroupSchema): boolean {
 		return group.fields.some(
 			(f) =>
-				f.required &&
-				(this._values[f.key] === "" || this._values[f.key] === undefined) &&
-				(!f.condition || f.condition(this._values)),
+				f.type !== "action" &&
+				(!f.condition || f.condition(this._values)) &&
+				this._fieldHasError(f, this._values[f.key]),
 		);
 	}
 
-	/** Update invalid state for required fields and tab error dots. */
+	/** Update invalid state for all fields, tab error dots, and guide bar. */
 	private _refreshValidation(schema: PanelSchema): void {
 		const container = this._panelEl;
 		if (!container) return;
 		for (const group of schema.groups) {
 			for (const field of group.fields) {
-				if (!field.required) continue;
+				if (field.type === "action") continue;
 				const wrapper = container.querySelector<HTMLElement>(
 					`[${FIELD_WRAPPER_ATTR}="${field.key}"]`,
 				);
 				if (!wrapper) continue;
-				const val = this._values[field.key];
-				wrapper.classList.toggle("bpmn-cfg-field--invalid", val === "" || val === undefined);
+				wrapper.classList.toggle(
+					"bpmn-cfg-field--invalid",
+					this._fieldHasError(field, this._values[field.key]),
+				);
 			}
 			// Update tab error dot
 			const tabBtn = container.querySelector<HTMLElement>(`[data-tab-id="${group.id}"]`);
 			if (tabBtn) tabBtn.classList.toggle("has-error", this._groupHasErrors(group));
 		}
+		this._refreshGuide();
 	}
 
 	/** Show/hide tabs and groups based on their conditions. */
@@ -389,14 +459,14 @@ export class ConfigPanelRenderer {
 			// Resolve template if stamped on the element
 			const reg = baseReg.adapter.resolve?.(defs, shape.id) ?? baseReg;
 
-			// Collect missing required field labels for the tooltip
+			// Collect labels for all visible fields with errors (missing or invalid FEEL)
 			const values = reg.adapter.read(defs, shape.id);
 			const missingLabels: string[] = [];
 			for (const g of reg.schema.groups) {
 				for (const f of g.fields) {
-					if (f.required && (values[f.key] === "" || values[f.key] === undefined)) {
-						missingLabels.push(f.label);
-					}
+					if (f.type === "action") continue;
+					if (f.condition && !f.condition(values)) continue;
+					if (this._fieldHasError(f, values[f.key])) missingLabels.push(f.label);
 				}
 			}
 			if (missingLabels.length === 0) continue;
@@ -433,6 +503,67 @@ export class ConfigPanelRenderer {
 			badge.appendChild(text);
 			container.appendChild(badge);
 		}
+	}
+
+	// ── Setup assistant / field guide ───────────────────────────────────────
+
+	/** Returns all visible fields that have any error (missing required or invalid FEEL). */
+	private _getMissingFields(): Array<{ group: GroupSchema; field: FieldSchema }> {
+		const result: Array<{ group: GroupSchema; field: FieldSchema }> = [];
+		const schema = this._effectiveReg?.schema;
+		if (!schema) return result;
+		for (const group of schema.groups) {
+			for (const field of group.fields) {
+				if (field.type === "action") continue;
+				if (field.condition && !field.condition(this._values)) continue;
+				if (this._fieldHasError(field, this._values[field.key])) {
+					result.push({ group, field });
+				}
+			}
+		}
+		return result;
+	}
+
+	/** Switches to the group's tab, scrolls the field into view, and focuses its input. */
+	private _navigateToField(group: GroupSchema, field: FieldSchema): void {
+		const panel = this._panelEl;
+		if (!panel) return;
+		// Exit search mode so the field is visible
+		if (this._searchQuery.trim().length > 0) {
+			const searchInput = panel.querySelector<HTMLInputElement>(".bpmn-cfg-search-input");
+			if (searchInput) {
+				searchInput.value = "";
+				this._setSearch("");
+			}
+		}
+		this._activateTab(panel, group.id);
+		this._guideCurrentKey = field.key;
+		requestAnimationFrame(() => {
+			const wrapper = panel.querySelector<HTMLElement>(`[${FIELD_WRAPPER_ATTR}="${field.key}"]`);
+			if (!wrapper) return;
+			wrapper.scrollIntoView({ behavior: "smooth", block: "nearest" });
+			const input = wrapper.querySelector<HTMLElement>("input, select, textarea");
+			input?.focus();
+		});
+	}
+
+	/** Refreshes guide bar text and visibility; hides when no required fields are missing. */
+	private _refreshGuide(): void {
+		const bar = this._guideBarEl;
+		const textEl = this._guideTextEl;
+		const btn = this._guideBtnEl;
+		if (!bar || !textEl || !btn) return;
+		const missing = this._getMissingFields();
+		if (missing.length === 0) {
+			bar.style.display = "none";
+			this._guideCurrentKey = null;
+			this._guideStarted = false;
+			return;
+		}
+		bar.style.display = "";
+		textEl.textContent =
+			missing.length === 1 ? "1 field to fix" : `${missing.length} fields to fix`;
+		btn.textContent = this._guideStarted ? "Next \u203a" : "Start \u203a";
 	}
 
 	// ── Search ────────────────────────────────────────────────────────────────
@@ -643,6 +774,48 @@ export class ConfigPanelRenderer {
 
 		this._searchClearBtn = clearBtn;
 
+		// Guide bar — omnipresent (between search and tabs), hidden when no errors
+		const guideBar = document.createElement("div");
+		guideBar.className = "bpmn-cfg-guide-bar";
+
+		const guideInfo = document.createElement("div");
+		guideInfo.className = "bpmn-cfg-guide-info";
+
+		const guideIcon = document.createElement("span");
+		guideIcon.className = "bpmn-cfg-guide-icon";
+		guideIcon.textContent = "!";
+		guideIcon.setAttribute("aria-hidden", "true");
+
+		const guideText = document.createElement("span");
+		guideText.className = "bpmn-cfg-guide-text";
+
+		guideInfo.appendChild(guideIcon);
+		guideInfo.appendChild(guideText);
+
+		const guideBtn = document.createElement("button");
+		guideBtn.className = "bpmn-cfg-guide-btn";
+		guideBtn.textContent = "Start ›";
+		guideBtn.addEventListener("click", () => {
+			const missing = this._getMissingFields();
+			if (missing.length === 0) return;
+			let nextIdx = 0;
+			if (this._guideStarted && this._guideCurrentKey !== null) {
+				const curIdx = missing.findIndex((m) => m.field.key === this._guideCurrentKey);
+				nextIdx = curIdx === -1 ? 0 : (curIdx + 1) % missing.length;
+			}
+			this._guideStarted = true;
+			const target = missing[nextIdx];
+			if (target) this._navigateToField(target.group, target.field);
+			this._refreshGuide();
+		});
+
+		guideBar.appendChild(guideInfo);
+		guideBar.appendChild(guideBtn);
+
+		this._guideBarEl = guideBar;
+		this._guideTextEl = guideText;
+		this._guideBtnEl = guideBtn;
+
 		// Tabs area: [prev arrow] [scrollable tabs] [next arrow]
 		const tabsArea = document.createElement("div");
 		tabsArea.className = "bpmn-cfg-tabs-area";
@@ -738,6 +911,7 @@ export class ConfigPanelRenderer {
 
 		panel.appendChild(header);
 		panel.appendChild(searchBar);
+		panel.appendChild(guideBar);
 		panel.appendChild(tabsArea);
 		panel.appendChild(body);
 		panel.appendChild(searchResults);
@@ -748,6 +922,7 @@ export class ConfigPanelRenderer {
 		requestAnimationFrame(() => {
 			this._syncTabsAreaVisibility(reg.schema.groups);
 			this._updateTabScrollBtns();
+			this._refreshGuide();
 			// Restore active search if panel was re-rendered while search was active
 			if (this._searchQuery.trim().length > 0) {
 				this._setSearch(this._searchQuery);
@@ -767,8 +942,8 @@ export class ConfigPanelRenderer {
 
 		const value = this._values[field.key];
 
-		// Initial required-empty state
-		if (field.required && (value === "" || value === undefined)) {
+		// Initial error state (required-empty OR invalid FEEL expression)
+		if (this._fieldHasError(field, value)) {
 			wrapper.classList.add("bpmn-cfg-field--invalid");
 		}
 
