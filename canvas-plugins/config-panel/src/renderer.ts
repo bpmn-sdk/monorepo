@@ -691,7 +691,8 @@ export class ConfigPanelRenderer {
 		if (field.hint) {
 			const hint = document.createElement("div");
 			hint.className = "bpmn-cfg-field-hint";
-			hint.textContent = field.hint;
+			// hint may contain safe HTML from template descriptions (e.g. <a> links)
+			hint.innerHTML = field.hint;
 			wrapper.appendChild(hint);
 		}
 

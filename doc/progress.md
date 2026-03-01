@@ -1,5 +1,17 @@
 # Progress
 
+## 2026-03-01 — Config panel bug fixes: connector switching + HTML hints
+
+### Bug: couldn't change connector once a template was applied
+Once a connector template was stamped on a service task, `resolve()` replaced the generic schema (which has the connector dropdown) with the template schema, which had no way to get back. Fixed by adding a **"Change connector"** action button as the first field in every template's General group. Clicking it writes a sentinel value `__change_connector: "remove"` which the template adapter's `write()` intercepts — it strips `zeebe:modelerTemplate`, `zeebe:modelerTemplateVersion`, and `zeebe:modelerTemplateIcon` from `unknownAttributes`, causing `resolve()` to return null on the next render and the generic connector selector to reappear.
+
+**Files:** `canvas-plugins/config-panel-bpmn/src/template-engine.ts`
+
+### Bug: hint text showed raw HTML tags
+Template property `description` fields contain HTML (e.g. `<a href="...">documentation</a>` links). These were rendered with `textContent`, so users saw literal `<a href=...>` text. Fixed by switching to `innerHTML`.
+
+**Files:** `canvas-plugins/config-panel/src/renderer.ts`
+
 ## 2026-03-01 — Config Panel UX: search, docs link, tooltip, tab hiding, localStorage width
 
 ### Investigation findings
