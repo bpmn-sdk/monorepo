@@ -65,12 +65,87 @@ export interface DmnDecisionTable {
 	rules: DmnRule[];
 }
 
+// ── Requirements ─────────────────────────────────────────────────────────────
+
+/** Information requirement — connects a decision or input data to a decision. */
+export interface DmnInformationRequirement {
+	id: string;
+	/** Ref to required decision id (mutually exclusive with requiredInput). */
+	requiredDecision?: string;
+	/** Ref to required input data id (mutually exclusive with requiredDecision). */
+	requiredInput?: string;
+}
+
+/** Knowledge requirement — connects a BKM to a decision or BKM. */
+export interface DmnKnowledgeRequirement {
+	id: string;
+	/** Ref to the required BKM id. */
+	requiredKnowledge: string;
+}
+
+/** Authority requirement — connects a knowledge source or decision to a DRG element. */
+export interface DmnAuthorityRequirement {
+	id: string;
+	requiredDecision?: string;
+	requiredInput?: string;
+	/** Ref to knowledge source id. */
+	requiredAuthority?: string;
+}
+
+// ── DRG Elements ──────────────────────────────────────────────────────────────
+
 /** A top-level decision element. */
 export interface DmnDecision {
 	id: string;
 	name?: string;
-	decisionTable: DmnDecisionTable;
+	/** Decision table (optional — a decision may contain a literal expression instead). */
+	decisionTable?: DmnDecisionTable;
+	informationRequirements: DmnInformationRequirement[];
+	knowledgeRequirements: DmnKnowledgeRequirement[];
+	authorityRequirements: DmnAuthorityRequirement[];
 	extensionElements?: XmlElement[];
+}
+
+/** Input data element — an external data source feeding into decisions. */
+export interface DmnInputData {
+	id: string;
+	name?: string;
+}
+
+/** Knowledge source element — an authority for decisions or BKMs. */
+export interface DmnKnowledgeSource {
+	id: string;
+	name?: string;
+	authorityRequirements: DmnAuthorityRequirement[];
+}
+
+/** Business knowledge model element — a reusable function or decision table. */
+export interface DmnBusinessKnowledgeModel {
+	id: string;
+	name?: string;
+	knowledgeRequirements: DmnKnowledgeRequirement[];
+	authorityRequirements: DmnAuthorityRequirement[];
+}
+
+/** Text annotation element — a free-form textual comment. */
+export interface DmnTextAnnotation {
+	id: string;
+	text?: string;
+}
+
+/** Association between any two DRG elements (often with text annotations). */
+export interface DmnAssociation {
+	id: string;
+	sourceRef: string;
+	targetRef: string;
+}
+
+// ── Diagram ───────────────────────────────────────────────────────────────────
+
+/** A waypoint in a diagram edge path. */
+export interface DmnWaypoint {
+	x: number;
+	y: number;
 }
 
 /** DMN diagram shape for visual representation. */
@@ -84,9 +159,16 @@ export interface DmnDiagramShape {
 	};
 }
 
+/** DMN diagram edge for visual representation. */
+export interface DmnDiagramEdge {
+	dmnElementRef: string;
+	waypoints: DmnWaypoint[];
+}
+
 /** DMN diagram information. */
 export interface DmnDiagram {
 	shapes: DmnDiagramShape[];
+	edges: DmnDiagramEdge[];
 }
 
 /** Root DMN definitions element. */
@@ -101,6 +183,11 @@ export interface DmnDefinitions {
 	/** Modeler extension attributes (e.g. executionPlatform). */
 	modelerAttributes: Record<string, string>;
 	decisions: DmnDecision[];
+	inputData: DmnInputData[];
+	knowledgeSources: DmnKnowledgeSource[];
+	businessKnowledgeModels: DmnBusinessKnowledgeModel[];
+	textAnnotations: DmnTextAnnotation[];
+	associations: DmnAssociation[];
 	diagram?: DmnDiagram;
 	extensionElements?: XmlElement[];
 }

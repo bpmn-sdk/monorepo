@@ -1,5 +1,42 @@
 # Progress
 
+## 2026-03-01 — DMN DRD (Decision Requirements Diagram) support
+
+### Feature: full DRG element model in `@bpmn-sdk/core`
+Expanded `DmnDefinitions` with all standard DMN DRG element types:
+- `DmnInputData`, `DmnKnowledgeSource`, `DmnBusinessKnowledgeModel`, `DmnTextAnnotation`, `DmnAssociation`
+- `DmnInformationRequirement`, `DmnKnowledgeRequirement`, `DmnAuthorityRequirement`
+- `DmnWaypoint`, `DmnDiagramEdge`
+- `DmnDecision.decisionTable` made optional; requirement arrays added to `DmnDecision`, `DmnKnowledgeSource`, `DmnBusinessKnowledgeModel`
+- `DmnDiagram.edges` added for DMNDI edge roundtrip
+
+### Feature: full parser/serializer roundtrip for all DRG elements
+- Parser: `parseDmn` now reads `inputData`, `knowledgeSource`, `businessKnowledgeModel`, `textAnnotation`, `association` elements and all requirement child elements; `DMNEdge` waypoints parsed
+- Serializer: `serializeDmn` writes all new element types, requirement children, and DMNDI edges
+- Builder: `DmnBuilder.build()` initialises all new arrays; `edges: []` added to diagram
+
+### Feature: interactive SVG DRD canvas (`@bpmn-sdk/canvas-plugin-dmn-editor`)
+New `DrdCanvas` class (~920 lines) in `drd-canvas.ts`:
+- **5 node shapes**: Decision (rectangle), InputData (stadium/rounded ends), KnowledgeSource (wavy-bottom rect), BusinessKnowledgeModel (clipped-corner rect), TextAnnotation (open bracket)
+- **4 edge types**: InformationRequirement (solid filled arrow), KnowledgeRequirement (dashed open-V), AuthorityRequirement (dashed + open circle at source), Association (dotted)
+- **Pan/zoom**: mouse-wheel zoom, pointer-drag panning
+- **Node drag**: move nodes; position written back to DMNDI diagram shapes
+- **Connect mode**: toolbar button activates two-click connect; connection type inferred from source/target node types
+- **Delete**: keyboard Delete/Backspace removes selected node or edge; requirements/associations cleaned from model
+- **Inline label edit**: double-click node shows `<foreignObject><input>` for in-place renaming
+- **Auto-layout**: nodes without existing diagram positions placed in a grid automatically
+- **Toolbar**: "Add Decision", "Add Input Data", "Add Knowledge Source", "Add BKM", "Add Annotation", "Connect", zoom controls
+- **Double-click decision** → switches to decision table view
+
+### Feature: DRD as primary view in DMN Editor
+`dmn-editor.ts` refactored with a `"drd" | "table"` view state:
+- DRD canvas is shown first when loading a DMN file
+- Double-clicking a Decision node navigates to its decision table with a "← DRD" back bar
+- Decision table auto-creates an empty `decisionTable` if the decision has none yet
+- `destroy()` cleans up the DRD canvas properly
+
+**Files:** `packages/bpmn-sdk/src/dmn/dmn-model.ts`, `dmn-parser.ts`, `dmn-serializer.ts`, `dmn-builder.ts`, `packages/bpmn-sdk/src/index.ts`, `canvas-plugins/dmn-editor/src/drd-canvas.ts`, `canvas-plugins/dmn-editor/src/dmn-editor.ts`, `canvas-plugins/dmn-editor/src/css.ts`, `canvas-plugins/tabs/src/tabs-plugin.ts`, `canvas-plugins/tabs/tests/tabs-plugin.test.ts`, `apps/landing/src/examples.ts`
+
 ## 2026-03-01 — Config panel: FEEL syntax validation + unified error detection
 
 ### Fix: invalid FEEL expressions now flagged as errors

@@ -157,6 +157,9 @@ export class DecisionTableBuilder {
 			id: this.decisionId,
 			name: this.decisionName,
 			decisionTable,
+			informationRequirements: [],
+			knowledgeRequirements: [],
+			authorityRequirements: [],
 		};
 
 		const diagram: DmnDiagram = {
@@ -166,6 +169,7 @@ export class DecisionTableBuilder {
 					bounds: { x: 160, y: 100, width: 180, height: 80 },
 				},
 			],
+			edges: [],
 		};
 
 		return {
@@ -185,6 +189,11 @@ export class DecisionTableBuilder {
 				executionPlatformVersion: "8.5.0",
 			},
 			decisions: [decision],
+			inputData: [],
+			knowledgeSources: [],
+			businessKnowledgeModels: [],
+			textAnnotations: [],
+			associations: [],
 			diagram,
 		};
 	}

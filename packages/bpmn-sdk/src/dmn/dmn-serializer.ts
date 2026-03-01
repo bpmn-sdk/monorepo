@@ -1,16 +1,23 @@
 import type { XmlElement } from "../types/xml-element.js";
 import { serializeXml } from "../xml/xml-parser.js";
 import type {
+	DmnAssociation,
+	DmnAuthorityRequirement,
+	DmnBusinessKnowledgeModel,
 	DmnDecision,
 	DmnDecisionTable,
 	DmnDefinitions,
 	DmnDiagram,
 	DmnInput,
+	DmnInputData,
+	DmnKnowledgeRequirement,
+	DmnKnowledgeSource,
 	DmnOutput,
 	DmnRule,
+	DmnTextAnnotation,
 } from "./dmn-model.js";
 
-function textElement(parentName: string, text: string): XmlElement {
+function textElement(text: string): XmlElement {
 	return { name: "text", attributes: {}, children: [], text };
 }
 
@@ -22,7 +29,7 @@ function serializeInput(input: DmnInput): XmlElement {
 
 	const exprChildren: XmlElement[] = [];
 	if (input.inputExpression.text) {
-		exprChildren.push(textElement("text", input.inputExpression.text));
+		exprChildren.push(textElement(input.inputExpression.text));
 	}
 
 	const inputAttrs: Record<string, string> = { id: input.id };
@@ -66,7 +73,7 @@ function serializeRule(rule: DmnRule): XmlElement {
 		children.push({
 			name: "inputEntry",
 			attributes: { id: entry.id },
-			children: [textElement("text", entry.text)],
+			children: [textElement(entry.text)],
 		});
 	}
 
@@ -74,7 +81,7 @@ function serializeRule(rule: DmnRule): XmlElement {
 		children.push({
 			name: "outputEntry",
 			attributes: { id: entry.id },
-			children: [textElement("text", entry.text)],
+			children: [textElement(entry.text)],
 		});
 	}
 
@@ -101,6 +108,63 @@ function serializeDecisionTable(table: DmnDecisionTable): XmlElement {
 	return { name: "decisionTable", attributes: attrs, children };
 }
 
+function serializeInformationRequirements(decision: DmnDecision): XmlElement[] {
+	return decision.informationRequirements.map((req) => {
+		const child: XmlElement = req.requiredDecision
+			? { name: "requiredDecision", attributes: { href: `#${req.requiredDecision}` }, children: [] }
+			: { name: "requiredInput", attributes: { href: `#${req.requiredInput}` }, children: [] };
+		return {
+			name: "informationRequirement",
+			attributes: { id: req.id },
+			children: [child],
+		};
+	});
+}
+
+function serializeKnowledgeRequirements(reqs: DmnKnowledgeRequirement[]): XmlElement[] {
+	return reqs.map((req) => ({
+		name: "knowledgeRequirement",
+		attributes: { id: req.id },
+		children: [
+			{
+				name: "requiredKnowledge",
+				attributes: { href: `#${req.requiredKnowledge}` },
+				children: [],
+			},
+		],
+	}));
+}
+
+function serializeAuthorityRequirements(reqs: DmnAuthorityRequirement[]): XmlElement[] {
+	return reqs.map((req) => {
+		let child: XmlElement;
+		if (req.requiredDecision) {
+			child = {
+				name: "requiredDecision",
+				attributes: { href: `#${req.requiredDecision}` },
+				children: [],
+			};
+		} else if (req.requiredInput) {
+			child = {
+				name: "requiredInput",
+				attributes: { href: `#${req.requiredInput}` },
+				children: [],
+			};
+		} else {
+			child = {
+				name: "requiredAuthority",
+				attributes: { href: `#${req.requiredAuthority ?? ""}` },
+				children: [],
+			};
+		}
+		return {
+			name: "authorityRequirement",
+			attributes: { id: req.id },
+			children: [child],
+		};
+	});
+}
+
 function serializeDecision(decision: DmnDecision): XmlElement {
 	const children: XmlElement[] = [];
 
@@ -112,12 +176,67 @@ function serializeDecision(decision: DmnDecision): XmlElement {
 		});
 	}
 
-	children.push(serializeDecisionTable(decision.decisionTable));
+	children.push(...serializeInformationRequirements(decision));
+	children.push(...serializeKnowledgeRequirements(decision.knowledgeRequirements));
+	children.push(...serializeAuthorityRequirements(decision.authorityRequirements));
+
+	if (decision.decisionTable) {
+		children.push(serializeDecisionTable(decision.decisionTable));
+	}
 
 	const attrs: Record<string, string> = { id: decision.id };
 	if (decision.name) attrs.name = decision.name;
 
 	return { name: "decision", attributes: attrs, children };
+}
+
+function serializeInputData(inputData: DmnInputData): XmlElement {
+	const attrs: Record<string, string> = { id: inputData.id };
+	if (inputData.name) attrs.name = inputData.name;
+	return { name: "inputData", attributes: attrs, children: [] };
+}
+
+function serializeKnowledgeSource(ks: DmnKnowledgeSource): XmlElement {
+	const attrs: Record<string, string> = { id: ks.id };
+	if (ks.name) attrs.name = ks.name;
+	return {
+		name: "knowledgeSource",
+		attributes: attrs,
+		children: serializeAuthorityRequirements(ks.authorityRequirements),
+	};
+}
+
+function serializeBusinessKnowledgeModel(bkm: DmnBusinessKnowledgeModel): XmlElement {
+	const attrs: Record<string, string> = { id: bkm.id };
+	if (bkm.name) attrs.name = bkm.name;
+	return {
+		name: "businessKnowledgeModel",
+		attributes: attrs,
+		children: [
+			...serializeKnowledgeRequirements(bkm.knowledgeRequirements),
+			...serializeAuthorityRequirements(bkm.authorityRequirements),
+		],
+	};
+}
+
+function serializeTextAnnotation(ann: DmnTextAnnotation): XmlElement {
+	const children: XmlElement[] = [];
+	if (ann.text) {
+		children.push(textElement(ann.text));
+	}
+	return { name: "textAnnotation", attributes: { id: ann.id }, children };
+}
+
+function serializeAssociation(assoc: DmnAssociation): XmlElement {
+	return {
+		name: "association",
+		attributes: {
+			id: assoc.id,
+			sourceRef: `#${assoc.sourceRef}`,
+			targetRef: `#${assoc.targetRef}`,
+		},
+		children: [],
+	};
 }
 
 function serializeDiagram(diagram: DmnDiagram): XmlElement {
@@ -138,6 +257,16 @@ function serializeDiagram(diagram: DmnDiagram): XmlElement {
 		],
 	}));
 
+	const edges: XmlElement[] = diagram.edges.map((edge) => ({
+		name: "dmndi:DMNEdge",
+		attributes: { dmnElementRef: edge.dmnElementRef },
+		children: edge.waypoints.map((wp) => ({
+			name: "di:waypoint",
+			attributes: { x: String(wp.x), y: String(wp.y) },
+			children: [],
+		})),
+	}));
+
 	return {
 		name: "dmndi:DMNDI",
 		attributes: {},
@@ -145,7 +274,7 @@ function serializeDiagram(diagram: DmnDiagram): XmlElement {
 			{
 				name: "dmndi:DMNDiagram",
 				attributes: {},
-				children: shapes,
+				children: [...shapes, ...edges],
 			},
 		],
 	};
@@ -180,6 +309,21 @@ export function serializeDmn(definitions: DmnDefinitions): string {
 
 	for (const decision of definitions.decisions) {
 		children.push(serializeDecision(decision));
+	}
+	for (const id of definitions.inputData) {
+		children.push(serializeInputData(id));
+	}
+	for (const ks of definitions.knowledgeSources) {
+		children.push(serializeKnowledgeSource(ks));
+	}
+	for (const bkm of definitions.businessKnowledgeModels) {
+		children.push(serializeBusinessKnowledgeModel(bkm));
+	}
+	for (const ann of definitions.textAnnotations) {
+		children.push(serializeTextAnnotation(ann));
+	}
+	for (const assoc of definitions.associations) {
+		children.push(serializeAssociation(assoc));
 	}
 
 	if (definitions.diagram) {

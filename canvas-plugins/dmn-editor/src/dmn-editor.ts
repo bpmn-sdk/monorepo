@@ -13,6 +13,7 @@ import type {
 	HitPolicy,
 } from "@bpmn-sdk/core";
 import { injectDmnEditorStyles } from "./css.js";
+import { DrdCanvas } from "./drd-canvas.js";
 
 export interface DmnEditorOptions {
 	container: HTMLElement;
@@ -73,7 +74,7 @@ function hpOptionValue(opt: { hitPolicy: HitPolicy; aggregation?: DmnAggregation
 	return opt.aggregation ? `${opt.hitPolicy}|${opt.aggregation}` : opt.hitPolicy;
 }
 
-/** Native editable decision table editor. Zero external dependencies. */
+/** Native DMN editor with DRD canvas and editable decision tables. Zero external dependencies. */
 export class DmnEditor {
 	private _defs: DmnDefinitions | null = null;
 	private readonly _root: HTMLDivElement;
@@ -81,6 +82,11 @@ export class DmnEditor {
 	private readonly _handlers: Array<() => void> = [];
 	private _destroyed = false;
 	private _ctxMenu: HTMLElement | null = null;
+
+	// View state: "drd" = DRD canvas, "table" = specific decision table
+	private _view: "drd" | "table" = "drd";
+	private _activeDecisionId: string | null = null;
+	private _drdCanvas: DrdCanvas | null = null;
 
 	constructor(options: DmnEditorOptions) {
 		injectDmnEditorStyles();
@@ -95,6 +101,8 @@ export class DmnEditor {
 
 	async loadXML(xml: string): Promise<void> {
 		this._defs = Dmn.parse(xml);
+		this._view = "drd";
+		this._activeDecisionId = null;
 		this._render();
 	}
 
@@ -119,6 +127,8 @@ export class DmnEditor {
 		this._destroyed = true;
 		this._handlers.length = 0;
 		this._closeCtxMenu();
+		this._drdCanvas?.destroy();
+		this._drdCanvas = null;
 		this._root.remove();
 	}
 
@@ -127,13 +137,74 @@ export class DmnEditor {
 		for (const h of this._handlers) h();
 	}
 
+	// ── Routing ────────────────────────────────────────────────────────────────
+
 	private _render(): void {
 		this._body.innerHTML = "";
+		this._drdCanvas?.destroy();
+		this._drdCanvas = null;
+
 		if (!this._defs) return;
-		for (const decision of this._defs.decisions) {
-			this._body.appendChild(this._renderDecision(decision));
+
+		if (this._view === "drd") {
+			this._renderDrd();
+		} else {
+			this._renderTableView();
 		}
 	}
+
+	private _renderDrd(): void {
+		if (!this._defs) return;
+		const defs = this._defs;
+
+		this._drdCanvas = new DrdCanvas({
+			container: this._body,
+			defs,
+			onChange: () => this._emit(),
+			onDecisionOpen: (id) => {
+				this._activeDecisionId = id;
+				this._view = "table";
+				this._render();
+			},
+		});
+	}
+
+	private _renderTableView(): void {
+		if (!this._defs || !this._activeDecisionId) return;
+		const decision = this._defs.decisions.find((d) => d.id === this._activeDecisionId);
+		if (!decision) return;
+
+		// Back bar
+		const backBar = document.createElement("div");
+		backBar.className = "dme-back-bar";
+
+		const backBtn = document.createElement("button");
+		backBtn.type = "button";
+		backBtn.className = "dme-btn dme-back-btn";
+		backBtn.textContent = "← DRD";
+		backBtn.title = "Back to diagram";
+		backBtn.addEventListener("click", () => {
+			this._view = "drd";
+			this._activeDecisionId = null;
+			this._render();
+		});
+		backBar.appendChild(backBtn);
+
+		const title = document.createElement("span");
+		title.className = "dme-back-title";
+		title.textContent = decision.name ?? decision.id;
+		backBar.appendChild(title);
+
+		this._body.appendChild(backBar);
+
+		// Table content
+		const tableWrap = document.createElement("div");
+		tableWrap.className = "dme-table-wrap";
+		this._body.appendChild(tableWrap);
+		tableWrap.appendChild(this._renderDecision(decision));
+	}
+
+	// ── Context menu ────────────────────────────────────────────────────────────
 
 	private _closeCtxMenu(): void {
 		if (this._ctxMenu) {
@@ -185,8 +256,9 @@ export class DmnEditor {
 		}, 0);
 	}
 
+	// ── Decision table rendering ────────────────────────────────────────────────
+
 	private _renderDecision(decision: DmnDecision): HTMLElement {
-		const dt = decision.decisionTable;
 		const section = document.createElement("div");
 		section.className = "dme-decision";
 
@@ -200,10 +272,25 @@ export class DmnEditor {
 		nameInput.placeholder = "Decision name";
 		nameInput.addEventListener("input", () => {
 			decision.name = nameInput.value;
+			// Update breadcrumb title if in table view
+			const titleEl = this._body.querySelector(".dme-back-title");
+			if (titleEl) titleEl.textContent = decision.name || decision.id;
+			// Update DRD canvas label (re-render DRD after returning)
 			this._emit();
 		});
 		header.appendChild(nameInput);
 		section.appendChild(header);
+
+		// Ensure decision table exists
+		if (!decision.decisionTable) {
+			decision.decisionTable = {
+				id: uid(),
+				inputs: [],
+				outputs: [{ id: uid(), name: "result", label: "Result" }],
+				rules: [],
+			};
+		}
+		const dt = decision.decisionTable;
 
 		const tableWrapper = document.createElement("div");
 		const rerender = (): void => {
@@ -233,11 +320,11 @@ export class DmnEditor {
 		const table = document.createElement("table");
 		table.className = "dme-table";
 
-		// ── thead (single row) ──
+		// ── thead ──
 		const thead = document.createElement("thead");
 		const headerRow = document.createElement("tr");
 
-		// Hit policy cell (top-left)
+		// Hit policy cell
 		const hpTh = document.createElement("th");
 		hpTh.className = "dme-th-hp";
 
@@ -602,7 +689,6 @@ export class DmnEditor {
 			tr.appendChild(td);
 		}
 
-		// Annotation cell bound to rule.description
 		const annotTd = document.createElement("td");
 		annotTd.className = "dme-cell-annotation";
 		const annotTa = document.createElement("textarea");

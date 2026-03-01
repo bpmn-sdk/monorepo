@@ -23,6 +23,9 @@ const DMN_DEFS = {
 		{
 			id: "dec1",
 			name: "Decide",
+			informationRequirements: [],
+			knowledgeRequirements: [],
+			authorityRequirements: [],
 			decisionTable: {
 				id: "dt1",
 				hitPolicy: "UNIQUE" as const,
@@ -32,6 +35,11 @@ const DMN_DEFS = {
 			},
 		},
 	],
+	inputData: [],
+	knowledgeSources: [],
+	businessKnowledgeModels: [],
+	textAnnotations: [],
+	associations: [],
 };
 
 const FORM_DEF = { id: "form1", type: "default" as const, components: [] };

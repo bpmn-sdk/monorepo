@@ -537,8 +537,16 @@ const DMN_SHIPPING_COST: DmnDefinitions = {
 					},
 				],
 			},
+			informationRequirements: [],
+			knowledgeRequirements: [],
+			authorityRequirements: [],
 		},
 	],
+	inputData: [],
+	knowledgeSources: [],
+	businessKnowledgeModels: [],
+	textAnnotations: [],
+	associations: [],
 };
 
 // ── Form example: Support Ticket ───────────────────────────────────────────────
@@ -801,8 +809,16 @@ export const LOAN_DMN: DmnDefinitions = {
 					},
 				],
 			},
+			informationRequirements: [],
+			knowledgeRequirements: [],
+			authorityRequirements: [],
 		},
 	],
+	inputData: [],
+	knowledgeSources: [],
+	businessKnowledgeModels: [],
+	textAnnotations: [],
+	associations: [],
 };
 
 export const LOAN_FORM: FormDefinition = {
