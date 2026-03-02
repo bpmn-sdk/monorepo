@@ -1,4 +1,4 @@
-export { Bpmn } from "./bpmn/index.js";
+export { Bpmn, SAMPLE_BPMN_XML } from "./bpmn/index.js";
 export type {
 	ProcessBuilder,
 	BranchBuilder,

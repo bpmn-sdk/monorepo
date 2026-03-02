@@ -1,5 +1,25 @@
 # Progress
 
+## 2026-03-02 — Developer-experience refactor: storage-tabs-bridge + API improvements
+
+### New package: `@bpmn-sdk/canvas-plugin-storage-tabs-bridge`
+Extracted all cross-plugin wiring from `apps/landing/src/editor.ts` into a new standalone package. Reduces integration boilerplate from ~800 to ~180 lines.
+
+- `createStorageTabsBridge(options)` creates and wires `tabsPlugin`, `storagePlugin`, and `bridgePlugin` together
+- Owns tab↔file maps, MRU tracking, file-search palette commands, and the Ctrl+E file switcher
+- `getExamples: (api: TabsApi) => WelcomeExample[]` — lazy factory for welcome screen examples
+- Built-in `onDownloadTab` default (serialize to BPMN/DMN/Form + browser download)
+- Built-in `getRecentProjects` mapped from storage API
+- Built-in `onOpenFile` / `onRenameCurrentFile` / `onLeaveProject` wiring
+
+### New: `Bpmn.makeEmpty(processId?, processName?)` — minimal empty BPMN XML
+### New: `Bpmn.SAMPLE_XML` — 3-node sample diagram constant
+### New: `SAMPLE_BPMN_XML` named export from `@bpmn-sdk/core`
+### New: `Dmn.makeEmpty()` — returns a minimal `DmnDefinitions` with one empty decision table
+### New: `EditorOptions.persistTheme` — reads/writes `localStorage "bpmn-theme"` automatically in `BpmnEditor`
+### New: `TabsPluginOptions.enableFileImport` — built-in file picker + drag-and-drop in the tabs plugin
+### New: `TabsApi.openFilePicker()` — programmatic file picker trigger
+
 ## 2026-03-02 — Dark mode: full propagation fix + localStorage theme persistence
 
 ### Fix: menus and config panel not themed after theme switch

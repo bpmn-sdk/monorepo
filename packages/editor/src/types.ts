@@ -67,7 +67,14 @@ export type Tool = "select" | "pan" | "space" | `create:${CreateShapeType}`;
 export type HandleDir = "nw" | "n" | "ne" | "e" | "se" | "s" | "sw" | "w";
 export type PortDir = "top" | "right" | "bottom" | "left";
 
-export type EditorOptions = CanvasOptions;
+export type EditorOptions = CanvasOptions & {
+	/**
+	 * When true, the editor reads the initial theme from
+	 * `localStorage.getItem("bpmn-theme")` and persists theme changes back to
+	 * localStorage automatically. The stored key is `"bpmn-theme"`.
+	 */
+	persistTheme?: boolean;
+};
 
 export interface EditorEvents extends CanvasEvents {
 	"diagram:change": (defs: BpmnDefinitions) => void;

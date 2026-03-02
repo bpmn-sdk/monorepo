@@ -19,4 +19,21 @@ export const Dmn = {
 	export(definitions: DmnDefinitions): string {
 		return serializeDmn(definitions);
 	},
+
+	/**
+	 * Returns a minimal valid DMN definitions object with one empty decision table.
+	 * Useful for "New Decision" actions.
+	 */
+	makeEmpty(): DmnDefinitions {
+		const id = Math.random().toString(36).slice(2, 9);
+		return parseDmn(`<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/"
+  id="Definitions_${id}" name="New Decision" namespace="http://bpmn.io/schema/dmn">
+  <decision id="Decision_${id}" name="Decision 1">
+    <decisionTable id="decisionTable_${id}" hitPolicy="UNIQUE">
+      <output id="output_${id}" label="Result" name="result" typeRef="string"/>
+    </decisionTable>
+  </decision>
+</definitions>`);
+	},
 } as const;

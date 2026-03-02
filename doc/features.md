@@ -1,5 +1,22 @@
 # Features
 
+## Storage-tabs integration bridge (2026-03-02) — `@bpmn-sdk/canvas-plugin-storage-tabs-bridge`
+
+New package that wires storage and tabs together so client apps don't need to manually manage the cross-plugin state:
+
+- **`createStorageTabsBridge(options)`** — single factory that creates `tabsPlugin`, `storagePlugin`, and `bridgePlugin` pre-wired together
+- **Tab↔file maps** — automatically tracks which tab corresponds to which storage file; handles project open/leave/rename
+- **MRU tracking** — per-project most-recently-used file list; loaded on project open, updated on tab activate
+- **File-search commands** — registers "Switch to file" and "Rename current file" commands in the command palette (when `palette` option provided)
+- **Ctrl+E file switcher** — full keyboard-navigable switcher overlay; E to cycle, Tab/→ to search mode, Ctrl-release to commit
+- **Auto-save** — wires `onTabChange` to `storageApi.scheduleSave` for DMN/Form tabs
+- **Built-in download** — serializes BPMN/DMN/Form and triggers browser download (overridable)
+- **Built-in recent projects** — maps `storageApi.getRecentProjects()` to welcome screen dropdown
+- **`persistTheme`** on `BpmnEditor` — reads/writes `localStorage "bpmn-theme"` automatically
+- **`enableFileImport`** on `createTabsPlugin` — built-in hidden file input + drag-and-drop; `api.openFilePicker()` to trigger programmatically
+- **`Bpmn.makeEmpty()` / `Bpmn.SAMPLE_XML`** — convenience factories in `@bpmn-sdk/core`
+- **`Dmn.makeEmpty()`** — returns minimal `DmnDefinitions` with one empty decision table
+
 ## DMN DRD Canvas (2026-03-01) — `@bpmn-sdk/canvas-plugin-dmn-editor` + `@bpmn-sdk/core`
 
 - **Full DRG element model** — `DmnInputData`, `DmnKnowledgeSource`, `DmnBusinessKnowledgeModel`, `DmnTextAnnotation`, `DmnAssociation`, all three requirement types (`DmnInformationRequirement`, `DmnKnowledgeRequirement`, `DmnAuthorityRequirement`), waypoints, and diagram edges
