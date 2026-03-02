@@ -1,5 +1,18 @@
 # Progress
 
+## 2026-03-02 — Optimize button in BPMN editor
+
+Two-phase "Optimize Diagram" dialog wired into the editor HUD:
+
+### Files added
+- `apps/landing/src/optimize-dialog.ts` — modal dialog: Phase 1 lists findings with checkboxes for auto-fixable items; Phase 2 shows applied fix descriptions with "Open generated process in new tab" buttons
+
+### Files modified
+- `packages/editor/src/icons.ts` — added `IC.optimize` (wand + sparkle icon)
+- `packages/editor/src/hud.ts` — added `HudOptions.onOptimize?` callback + "Optimize" button in the action bar
+- `apps/landing/src/editor.ts` — wires `onOptimize` to open the dialog via `optimize(defs)` + `editor.load()`
+- `apps/landing/src/examples.ts` — added "Customer Notification Flow" example with 4 deliberate optimization findings (`feel/empty-condition`, `feel/missing-default-flow`, `flow/dead-end`, `task/reusable-group`)
+
 ## 2026-03-02 — `optimize()` — Static BPMN Optimization Analyzer in `@bpmn-sdk/core`
 
 New `optimize(defs, options?)` function that performs static analysis on a `BpmnDefinitions` object and returns an `OptimizationReport` with actionable findings and optional in-place fixes.

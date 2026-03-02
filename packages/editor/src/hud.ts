@@ -77,6 +77,8 @@ export interface HudOptions {
 	 * When provided, it is styled as a HUD button and placed in the bottom-left panel.
 	 */
 	rawModeButton?: HTMLButtonElement | null;
+	/** Called when the user clicks the Optimize button in the action bar. */
+	onOptimize?: () => void;
 }
 
 export function initEditorHud(editor: BpmnEditor, options: HudOptions = {}): void {
@@ -104,11 +106,22 @@ export function initEditorHud(editor: BpmnEditor, options: HudOptions = {}): voi
 	const btnDelete = hudBtn("btn-delete", "Delete");
 	const btnDuplicate = hudBtn("btn-duplicate", "Duplicate (Ctrl+D)");
 	const btnTopMore = hudBtn("btn-top-more", "More actions");
+	const btnOptimize = hudBtn("btn-optimize", "Optimize");
 
 	const hudTopCenter = document.createElement("div");
 	hudTopCenter.id = "hud-top-center";
 	hudTopCenter.className = "hud panel";
-	hudTopCenter.append(btnUndo, btnRedo, hudSep(), btnDelete, btnDuplicate, hudSep(), btnTopMore);
+	hudTopCenter.append(
+		btnUndo,
+		btnRedo,
+		hudSep(),
+		btnDelete,
+		btnDuplicate,
+		hudSep(),
+		btnTopMore,
+		hudSep(),
+		btnOptimize,
+	);
 
 	// Mobile collapse toggle — top center (hidden on desktop via CSS)
 	const btnTcToggle = hudBtn("btn-tc-toggle", "Actions");
@@ -257,6 +270,7 @@ export function initEditorHud(editor: BpmnEditor, options: HudOptions = {}): voi
 	btnDelete.innerHTML = IC.trash;
 	btnDuplicate.innerHTML = IC.duplicate;
 	btnTopMore.innerHTML = IC.dots;
+	btnOptimize.innerHTML = IC.optimize;
 	btnZoomOut.innerHTML = IC.zoomOut;
 	btnZoomIn.innerHTML = IC.zoomIn;
 
@@ -711,6 +725,10 @@ export function initEditorHud(editor: BpmnEditor, options: HudOptions = {}): voi
 	btnDuplicate.addEventListener("click", () => {
 		editor.duplicate();
 		collapseOnMobile(hudTopCenter);
+	});
+	btnOptimize.addEventListener("click", () => {
+		collapseOnMobile(hudTopCenter);
+		options.onOptimize?.();
 	});
 
 	// ── Label position menu ────────────────────────────────────────────────────

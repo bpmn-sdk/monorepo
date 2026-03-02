@@ -1,5 +1,14 @@
 # Features
 
+## Optimize button (2026-03-02) — editor HUD + landing app
+
+"Optimize Diagram" button in the BPMN editor action bar (wand+sparkle icon):
+
+- **Phase 1** — shows all findings from `optimize(defs)` with severity badges; auto-fixable findings are pre-checked
+- **Phase 2** — after applying selected fixes, shows results with "Open generated process in new tab" for extracted sub-processes
+- Supports dark and light HUD themes
+- Example diagram "Customer Notification Flow" on the welcome screen demonstrates 4 finding types
+
 ## `optimize()` — Static BPMN Optimization Analyzer (2026-03-02) — `@bpmn-sdk/core`
 
 New `optimize(defs, options?)` function exported from `@bpmn-sdk/core`:

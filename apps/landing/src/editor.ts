@@ -13,6 +13,7 @@ import { Bpmn, Dmn } from "@bpmn-sdk/core";
 import { BpmnEditor, initEditorHud } from "@bpmn-sdk/editor";
 import type { Tool } from "@bpmn-sdk/editor";
 import { makeExamples } from "./examples.js";
+import { showOptimizeDialog } from "./optimize-dialog.js";
 
 const LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
   <rect width="24" height="24" rx="4" fill="#0062ff"/>
@@ -197,4 +198,13 @@ editorRef = editor;
 initEditorHud(editor, {
 	openProcess: (processId) => bridge.tabsPlugin.api.navigateToProcess(processId),
 	rawModeButton: bridge.tabsPlugin.api.rawModeButton,
+	onOptimize() {
+		const defs = editorRef?.getDefinitions();
+		if (!defs) return;
+		showOptimizeDialog(
+			defs,
+			(xml) => editorRef?.load(xml),
+			(xml, name) => bridge.tabsPlugin.api.openTab({ type: "bpmn", xml, name }),
+		);
+	},
 });

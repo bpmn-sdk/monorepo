@@ -894,6 +894,99 @@ export const LOAN_FORM: FormDefinition = {
 	],
 };
 
+// ── Optimizable example ─────────────────────────────────────────────────────────
+// This diagram intentionally contains issues surfaced by optimize():
+//   feel/missing-default-flow — gw-channel has no default attribute
+//   feel/empty-condition      — Flow_2 exits the gateway with no condition
+//   flow/dead-end             — sendSms has no outgoing sequence flow
+//   task/reusable-group       — sendSms + sendEmail share type="notify-customer"
+
+const CUSTOMER_NOTIFICATION_BPMN = `<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions
+  xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+  xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+  xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
+  xmlns:di="http://www.omg.org/spec/DD/20100524/DI"
+  xmlns:zeebe="http://camunda.org/schema/zeebe/1.0"
+  id="Definitions_notification"
+  targetNamespace="http://bpmn.io/schema/bpmn">
+  <bpmn:process id="customer-notification" name="Customer Notification" isExecutable="true">
+    <bpmn:startEvent id="start" name="Customer Action">
+      <bpmn:outgoing>Flow_1</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:exclusiveGateway id="gw-channel" name="Notification Channel?">
+      <bpmn:incoming>Flow_1</bpmn:incoming>
+      <bpmn:outgoing>Flow_2</bpmn:outgoing>
+      <bpmn:outgoing>Flow_3</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="sendSms" name="Send SMS">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="notify-customer"/>
+        <zeebe:taskHeaders>
+          <zeebe:header key="channel" value="sms"/>
+        </zeebe:taskHeaders>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_2</bpmn:incoming>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="sendEmail" name="Send Email">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="notify-customer"/>
+        <zeebe:taskHeaders>
+          <zeebe:header key="channel" value="email"/>
+        </zeebe:taskHeaders>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_3</bpmn:incoming>
+      <bpmn:outgoing>Flow_4</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:endEvent id="end" name="Done">
+      <bpmn:incoming>Flow_4</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flow_1" sourceRef="start" targetRef="gw-channel"/>
+    <bpmn:sequenceFlow id="Flow_2" sourceRef="gw-channel" targetRef="sendSms"/>
+    <bpmn:sequenceFlow id="Flow_3" sourceRef="gw-channel" targetRef="sendEmail">
+      <bpmn:conditionExpression>= channel = "email"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_4" sourceRef="sendEmail" targetRef="end"/>
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="customer-notification_di">
+    <bpmndi:BPMNPlane id="customer-notification_di_plane" bpmnElement="customer-notification">
+      <bpmndi:BPMNShape id="start_di" bpmnElement="start">
+        <dc:Bounds x="150" y="107" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="gw-channel_di" bpmnElement="gw-channel" isMarkerVisible="true">
+        <dc:Bounds x="255" y="99" width="50" height="50"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="sendSms_di" bpmnElement="sendSms">
+        <dc:Bounds x="390" y="50" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="sendEmail_di" bpmnElement="sendEmail">
+        <dc:Bounds x="390" y="170" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="end_di" bpmnElement="end">
+        <dc:Bounds x="572" y="192" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_1_di" bpmnElement="Flow_1">
+        <di:waypoint x="186" y="125"/>
+        <di:waypoint x="255" y="124"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_2_di" bpmnElement="Flow_2">
+        <di:waypoint x="280" y="99"/>
+        <di:waypoint x="280" y="90"/>
+        <di:waypoint x="390" y="90"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_3_di" bpmnElement="Flow_3">
+        <di:waypoint x="280" y="149"/>
+        <di:waypoint x="280" y="210"/>
+        <di:waypoint x="390" y="210"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_4_di" bpmnElement="Flow_4">
+        <di:waypoint x="490" y="210"/>
+        <di:waypoint x="572" y="210"/>
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>`;
+
 // ── Welcome screen example entries ─────────────────────────────────────────────
 
 export function makeExamples(api: TabsApi, resolver: InMemoryFileResolver): WelcomeExample[] {
@@ -942,6 +1035,19 @@ export function makeExamples(api: TabsApi, resolver: InMemoryFileResolver): Welc
 			badge: "FEEL",
 			onOpen() {
 				api.openTab({ type: "feel", name: "FEEL Playground" });
+			},
+		},
+		{
+			label: "Customer Notification Flow",
+			description:
+				"Process with common issues: missing default flow, dead-end task, and reusable service tasks — try Optimize!",
+			badge: "BPMN",
+			onOpen() {
+				api.openTab({
+					type: "bpmn",
+					xml: CUSTOMER_NOTIFICATION_BPMN,
+					name: "Customer Notification Flow",
+				});
 			},
 		},
 	];
