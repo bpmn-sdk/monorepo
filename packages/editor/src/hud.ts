@@ -889,14 +889,20 @@ export function initEditorHud(editor: BpmnEditor, options: HudOptions = {}): voi
 			const processId = getCallActivityProcessId(sourceId);
 			if (processId) {
 				if (cfgToolbar.children.length > 0) cfgToolbar.append(hudSep());
-				const procs = options.getAvailableProcesses?.() ?? [];
-				const name = procs.find((p) => p.id === processId)?.name ?? processId;
+				const allProcs = options.getAvailableProcesses?.() ?? [];
+				const name = allProcs.find((p) => p.id === processId)?.name ?? processId;
 				const navBtn = document.createElement("button");
 				navBtn.className = "ref-link-btn";
-				navBtn.textContent = `${name} ↗`;
+				navBtn.textContent = `${name} \u2197`;
 				navBtn.title = `Open process: ${processId}`;
 				navBtn.addEventListener("click", () => options.openProcess?.(processId));
 				cfgToolbar.appendChild(navBtn);
+				const unlinkBtn = document.createElement("button");
+				unlinkBtn.className = "hud-btn";
+				unlinkBtn.title = "Unlink process";
+				unlinkBtn.textContent = "\u00d7";
+				unlinkBtn.addEventListener("click", () => clearCallActivityProcess(sourceId));
+				cfgToolbar.appendChild(unlinkBtn);
 			} else if (options.getAvailableProcesses) {
 				if (cfgToolbar.children.length > 0) cfgToolbar.append(hudSep());
 				const linkBtn = document.createElement("button");
@@ -909,7 +915,10 @@ export function initEditorHud(editor: BpmnEditor, options: HudOptions = {}): voi
 						return;
 					}
 					refMenuEl.innerHTML = "";
-					const procs = options.getAvailableProcesses?.() ?? [];
+					const currentIds = new Set((editor.getDefinitions()?.processes ?? []).map((p) => p.id));
+					const procs = (options.getAvailableProcesses?.() ?? []).filter(
+						(p) => !currentIds.has(p.id),
+					);
 					for (const proc of procs) {
 						const btn = document.createElement("button");
 						btn.className = "drop-item";
@@ -958,10 +967,16 @@ export function initEditorHud(editor: BpmnEditor, options: HudOptions = {}): voi
 				const name = forms.find((f) => f.id === formId)?.name ?? formId;
 				const navBtn = document.createElement("button");
 				navBtn.className = "ref-link-btn";
-				navBtn.textContent = `${name} ↗`;
+				navBtn.textContent = `${name} \u2197`;
 				navBtn.title = `Open form: ${formId}`;
 				navBtn.addEventListener("click", () => options.openForm?.(formId));
 				cfgToolbar.appendChild(navBtn);
+				const unlinkBtn = document.createElement("button");
+				unlinkBtn.className = "hud-btn";
+				unlinkBtn.title = "Unlink form";
+				unlinkBtn.textContent = "\u00d7";
+				unlinkBtn.addEventListener("click", () => clearUserTaskForm(sourceId));
+				cfgToolbar.appendChild(unlinkBtn);
 			} else if (options.getAvailableForms) {
 				if (cfgToolbar.children.length > 0) cfgToolbar.append(hudSep());
 				const linkBtn = document.createElement("button");
@@ -1006,10 +1021,16 @@ export function initEditorHud(editor: BpmnEditor, options: HudOptions = {}): voi
 				const name = decisions.find((d) => d.id === decisionId)?.name ?? decisionId;
 				const navBtn = document.createElement("button");
 				navBtn.className = "ref-link-btn";
-				navBtn.textContent = `${name} ↗`;
+				navBtn.textContent = `${name} \u2197`;
 				navBtn.title = `Open decision: ${decisionId}`;
 				navBtn.addEventListener("click", () => options.openDecision?.(decisionId));
 				cfgToolbar.appendChild(navBtn);
+				const unlinkBtn = document.createElement("button");
+				unlinkBtn.className = "hud-btn";
+				unlinkBtn.title = "Unlink decision";
+				unlinkBtn.textContent = "\u00d7";
+				unlinkBtn.addEventListener("click", () => clearBizRuleDecision(sourceId));
+				cfgToolbar.appendChild(unlinkBtn);
 			} else if (options.getAvailableDecisions) {
 				if (cfgToolbar.children.length > 0) cfgToolbar.append(hudSep());
 				const linkBtn = document.createElement("button");
@@ -1164,6 +1185,63 @@ export function initEditorHud(editor: BpmnEditor, options: HudOptions = {}): voi
 								children: [],
 							},
 						],
+					};
+				}),
+			})),
+		}));
+	}
+
+	function clearCallActivityProcess(elementId: string): void {
+		editor.applyChange((defs) => ({
+			...defs,
+			processes: defs.processes.map((proc) => ({
+				...proc,
+				flowElements: proc.flowElements.map((el) => {
+					if (el.id !== elementId) return el;
+					return {
+						...el,
+						extensionElements: el.extensionElements.filter((x) => {
+							const ln = x.name.includes(":") ? x.name.slice(x.name.indexOf(":") + 1) : x.name;
+							return ln !== "calledElement";
+						}),
+					};
+				}),
+			})),
+		}));
+	}
+
+	function clearUserTaskForm(elementId: string): void {
+		editor.applyChange((defs) => ({
+			...defs,
+			processes: defs.processes.map((proc) => ({
+				...proc,
+				flowElements: proc.flowElements.map((el) => {
+					if (el.id !== elementId) return el;
+					return {
+						...el,
+						extensionElements: el.extensionElements.filter((x) => {
+							const ln = x.name.includes(":") ? x.name.slice(x.name.indexOf(":") + 1) : x.name;
+							return ln !== "formDefinition" && ln !== "userTask";
+						}),
+					};
+				}),
+			})),
+		}));
+	}
+
+	function clearBizRuleDecision(elementId: string): void {
+		editor.applyChange((defs) => ({
+			...defs,
+			processes: defs.processes.map((proc) => ({
+				...proc,
+				flowElements: proc.flowElements.map((el) => {
+					if (el.id !== elementId) return el;
+					return {
+						...el,
+						extensionElements: el.extensionElements.filter((x) => {
+							const ln = x.name.includes(":") ? x.name.slice(x.name.indexOf(":") + 1) : x.name;
+							return ln !== "calledDecision";
+						}),
 					};
 				}),
 			})),

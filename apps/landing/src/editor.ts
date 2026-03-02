@@ -199,8 +199,8 @@ initEditorHud(editor, {
 	getAvailableProcesses: () => bridge.tabsPlugin.api.getAvailableProcesses(),
 	createProcess: (name, onCreated) => {
 		const processId = `Process_${Math.random().toString(36).slice(2, 9)}`;
-		bridge.tabsPlugin.api.openTab({ type: "bpmn", xml: Bpmn.makeEmpty(processId, name), name });
 		onCreated(processId);
+		bridge.tabsPlugin.api.openTab({ type: "bpmn", xml: Bpmn.makeEmpty(processId, name), name });
 	},
 	openDecision: (decisionId) => bridge.tabsPlugin.api.openDecision(decisionId),
 	getAvailableDecisions: () => bridge.tabsPlugin.api.getAvailableDecisions(),
