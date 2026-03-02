@@ -306,7 +306,20 @@ export class BpmnEditor {
 		injectEditorStyles();
 
 		this._id = String(_instanceCounter++);
-		this._theme = options.theme ?? "auto";
+
+		// Resolve initial theme — localStorage overrides the options.theme when persistTheme is on
+		let initialTheme = options.theme ?? "auto";
+		if (options.persistTheme) {
+			try {
+				const stored = localStorage.getItem("bpmn-theme");
+				if (stored === "dark" || stored === "light" || stored === "auto") {
+					initialTheme = stored;
+				}
+			} catch {
+				// localStorage unavailable — fall back to options.theme
+			}
+		}
+		this._theme = initialTheme;
 		this._fit = options.fit ?? "contain";
 
 		// ── DOM ──────────────────────────────────────────────────────
@@ -530,6 +543,17 @@ export class BpmnEditor {
 			if (this._defs) this.fitView();
 		});
 		this._ro.observe(this._host);
+
+		// Persist theme changes to localStorage when requested
+		if (options.persistTheme) {
+			new MutationObserver(() => {
+				try {
+					localStorage.setItem("bpmn-theme", this._host.getAttribute("data-theme") ?? "light");
+				} catch {
+					// ignore
+				}
+			}).observe(this._host, { attributes: true, attributeFilter: ["data-theme"] });
+		}
 	}
 
 	// ── Public API ─────────────────────────────────────────────────────
@@ -656,6 +680,11 @@ export class BpmnEditor {
 		const tx = (svgW - dW * scale) / 2 - bounds.minX * scale;
 		const ty = (svgH - dH * scale) / 2 - bounds.minY * scale;
 		this._viewport.set({ tx, ty, scale });
+	}
+
+	/** The host element that receives the `data-theme` attribute. */
+	get container(): HTMLElement {
+		return this._host;
 	}
 
 	getTheme(): "light" | "dark" {

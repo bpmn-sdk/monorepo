@@ -1,0 +1,14 @@
+{
+	"name": "@bpmn-sdk/ai-server",
+	"version": "0.0.1",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"start": "node dist/index.js",
+		"build": "tsc",
+		"typecheck": "tsc --noEmit",
+		"check": "biome check .",
+		"dev": "node --watch dist/index.js",
+		"bundle": "esbuild src/index.ts --bundle --platform=node --format=cjs --outfile=dist/bundle.cjs"
+	}
+}

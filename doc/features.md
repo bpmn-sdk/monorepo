@@ -1,5 +1,99 @@
 # Features
 
+## Tauri desktop app (2026-03-02) — `apps/desktop`
+
+Native desktop application wrapping the BPMN SDK editor using Tauri v2:
+
+- **Identical editor** to the browser version — same plugins, sidebar dock, AI integration
+- **AI server auto-start** — on launch, spawns the bundled Node.js AI server automatically; no manual `pnpm ai-server` required
+- **Small binary** — ~3–5 MB installer (vs 85+ MB Electron) via minimal Tauri features + release profile optimizations (`lto`, `opt-level = "s"`, `strip`)
+- **Hot-reload dev** — `pnpm desktop:dev` opens a native window with Vite HMR
+- **Cross-platform** — targets Linux/macOS/Windows via native OS WebView (WebKitGTK / WKWebView / Edge WebView2)
+- **Placeholder icons** generated via `scripts/gen-icons.mjs`; replace with `pnpm tauri icon icon.png`
+
+## Unified right sidebar dock (2026-03-02) — `apps/landing` + plugins
+
+VS Code / Figma style dock that unifies the Properties config panel and the AI chat panel:
+
+- **Single right dock** with Properties and AI tabs; no overlap, no z-index fighting
+- **Properties tab**: shows config panel for selected element; "Select an element…" empty state when nothing selected
+- **AI tab**: shows full AI chat panel (SSE streaming, Apply button, checkpoint history)
+- **Collapse/expand**: width-based collapse (38px strip) — button always accessible; state persisted to `localStorage`
+- **Resize**: left-edge drag; width 280–700px, persisted to `localStorage`
+- **Auto-expand**: selecting an element expands dock to Properties tab; clicking AI button expands to AI tab
+- **Backward compatible**: both plugins work without `container` (standalone/body mode unchanged)
+
+## AI integration (2026-03-02) — `apps/ai-server` + `@bpmn-sdk/canvas-plugin-ai-bridge`
+
+Local AI assistant for BPMN diagram creation and modification:
+
+- **AI panel** in the editor (right-side slide-in) with streaming chat interface
+- **Auto-apply**: AI responses containing a `CompactDiagram` JSON block get an "Apply to diagram" button; applies via `expand()` + auto-layout
+- **Checkpoints**: IndexedDB stores up to 50 checkpoints per project/file; "History" button shows list with restore
+- **Local server** (`pnpm ai-server`, port 3033): bridges browser to CLI-based AI — Claude CLI (`--output-format stream-json`) and GitHub Copilot CLI
+- **Compact format** (`compactify`/`expand`): 5-10x token reduction vs raw XML; exported from `@bpmn-sdk/core`
+
+## Reference navigation in element toolbar (2026-03-02) — `@bpmn-sdk/editor` HUD
+
+When a BPMN element with a linked reference is selected, the cfg toolbar shows navigation buttons:
+
+- **Call activity**: if `processId` set → "ProcessName ↗" navigate button; else → "Link process ▾" dropdown with available processes + "New process…" input modal
+- **User task**: if `formId` set → "FormId ↗" navigate button; else → "Link form ▾" dropdown
+- **Business rule task**: if `decisionId` set → "DecisionId ↗" navigate button; else → "Link decision ▾" dropdown
+- Reference action buttons removed from config panel; process/form/decision text fields remain for manual editing
+
+## Optimize plugin (2026-03-02) — `@bpmn-sdk/canvas-plugin-optimize`
+
+New self-contained canvas plugin encapsulating the two-phase optimize dialog:
+
+- `createOptimizePlugin(options)` returns `{ name, install(), button }` — button is injected into the HUD as `optimizeButton`
+- Dialog logic (styles, phase 1 findings list, phase 2 results) fully self-contained in the plugin
+
+## Custom storage dialogs (2026-03-02) — `@bpmn-sdk/canvas-plugin-storage`
+
+All browser `prompt()`/`confirm()` calls replaced with themed custom modals:
+
+- `showInputDialog(opts): Promise<string | null>` — text input modal with title, placeholder, default value
+- `showConfirmDialog(opts): Promise<boolean>` — confirmation modal with optional `danger` styling
+- Both exported from `@bpmn-sdk/canvas-plugin-storage`; used in storage and storage-tabs-bridge
+
+## Optimize button (2026-03-02) — editor HUD + landing app
+
+"Optimize Diagram" button in the BPMN editor action bar (wand+sparkle icon):
+
+- **Phase 1** — shows all findings from `optimize(defs)` with severity badges; auto-fixable findings are pre-checked
+- **Phase 2** — after applying selected fixes, shows results with "Open generated process in new tab" for extracted sub-processes
+- Supports dark and light HUD themes
+- Example diagram "Customer Notification Flow" on the welcome screen demonstrates 4 finding types
+
+## `optimize()` — Static BPMN Optimization Analyzer (2026-03-02) — `@bpmn-sdk/core`
+
+New `optimize(defs, options?)` function exported from `@bpmn-sdk/core`:
+
+- **11 finding types** across 3 categories: `feel`, `flow`, `task-reuse`
+- **FEEL analysis**: detects empty conditions, missing default flows, complex expressions (length/nesting/operators/variables), complex IO mappings, duplicate expressions
+- **Flow analysis**: detects unreachable elements, dead-end nodes, missing end events, redundant gateways, empty sub-processes
+- **Task reuse**: clusters service tasks by similarity (taskType + headers + IO) and flags groups that can be extracted to reusable call activities
+- **`applyFix`** on each applicable finding mutates `defs` in-place; task reuse fix returns a generated `BpmnDefinitions` for the extracted sub-process
+- **Configurable thresholds** via `OptimizeOptions`: FEEL length/nesting/operator/variable thresholds, reuse group minimum size, category filter
+
+## Storage-tabs integration bridge (2026-03-02) — `@bpmn-sdk/canvas-plugin-storage-tabs-bridge`
+
+New package that wires storage and tabs together so client apps don't need to manually manage the cross-plugin state:
+
+- **`createStorageTabsBridge(options)`** — single factory that creates `tabsPlugin`, `storagePlugin`, and `bridgePlugin` pre-wired together
+- **Tab↔file maps** — automatically tracks which tab corresponds to which storage file; handles project open/leave/rename
+- **MRU tracking** — per-project most-recently-used file list; loaded on project open, updated on tab activate
+- **File-search commands** — registers "Switch to file" and "Rename current file" commands in the command palette (when `palette` option provided)
+- **Ctrl+E file switcher** — full keyboard-navigable switcher overlay; E to cycle, Tab/→ to search mode, Ctrl-release to commit
+- **Auto-save** — wires `onTabChange` to `storageApi.scheduleSave` for DMN/Form tabs
+- **Built-in download** — serializes BPMN/DMN/Form and triggers browser download (overridable)
+- **Built-in recent projects** — maps `storageApi.getRecentProjects()` to welcome screen dropdown
+- **`persistTheme`** on `BpmnEditor` — reads/writes `localStorage "bpmn-theme"` automatically
+- **`enableFileImport`** on `createTabsPlugin` — built-in hidden file input + drag-and-drop; `api.openFilePicker()` to trigger programmatically
+- **`Bpmn.makeEmpty()` / `Bpmn.SAMPLE_XML`** — convenience factories in `@bpmn-sdk/core`
+- **`Dmn.makeEmpty()`** — returns minimal `DmnDefinitions` with one empty decision table
+
 ## DMN DRD Canvas (2026-03-01) — `@bpmn-sdk/canvas-plugin-dmn-editor` + `@bpmn-sdk/core`
 
 - **Full DRG element model** — `DmnInputData`, `DmnKnowledgeSource`, `DmnBusinessKnowledgeModel`, `DmnTextAnnotation`, `DmnAssociation`, all three requirement types (`DmnInformationRequirement`, `DmnKnowledgeRequirement`, `DmnAuthorityRequirement`), waypoints, and diagram edges

@@ -1,5 +1,299 @@
 # Progress
 
+## 2026-03-02 — Tauri desktop app
+
+### `apps/desktop` — new Tauri v2 desktop application
+
+- New `@bpmn-sdk/desktop` package: Vite frontend (same editor as landing) wrapped in a Tauri v2 native window
+- **Tauri Rust backend** (`src-tauri/`): minimal setup — no plugins, just `std::process::Command` to spawn the AI server
+- **AI server auto-start**: on launch, spawns `node ai-server.cjs` from the bundled resource directory; silently skipped if Node.js is unavailable or resource not present (dev mode)
+- **Minimal binary**: `opt-level = "s"`, `lto = true`, `panic = "abort"`, `strip = true` — target ~3–5 MB installer vs 85+ MB for Electron
+- **Vite config**: `port: 1420`, `clearScreen: false`, `src-tauri/**` excluded from watch
+- **Icon generation**: `scripts/gen-icons.mjs` generates placeholder 32×128×256px PNGs using pure Node.js built-ins (`zlib.deflateSync`); replace with `pnpm tauri icon icon.png` for production
+- **AI server bundling** (`@bpmn-sdk/ai-server`): new `bundle` script using `esbuild` produces `dist/bundle.cjs` — single-file CJS bundle with only Node.js built-in dependencies
+- **Root scripts**: `desktop:dev` and `desktop:build` shortcuts; `@tauri-apps/cli` and `esbuild` added to root devDeps
+- Tauri `src-tauri/` excluded from Biome linting via `biome.json`
+
+### Run commands
+
+- `pnpm desktop:dev` — open editor in a native window with hot-reload
+- `pnpm desktop:build` — bundle ai-server + compile Rust + produce installer
+
+## 2026-03-02 — Side dock refinements
+
+### `packages/editor` — dock moved + redesigned
+
+- Moved `dock.ts` from `apps/landing/src/` to `packages/editor/src/`; exported `createSideDock` + `SideDock` from `@bpmn-sdk/editor`
+- **Collapse handle redesign**: replaced tab-strip button with a 20×52px pill handle anchored at `left: -20px; top: 50%` on the dock's left edge — always visible and accessible
+- **Collapse fix**: set `el.style.width` directly in `collapse()`/`expand()` to override inline style; `--collapsed` CSS class now only hides tab-strip + panes
+- **Resize fix**: disable `transition: width` on mousedown, restore on mouseup — instantaneous drag feedback
+- **Watermark fix**: set `--bpmn-dock-width` CSS variable on `document.body`; dock CSS overrides `.bpmn-watermark { right: calc(var(--bpmn-dock-width) + 8px) }` so watermark always stays left of dock
+- **Empty state info**: Properties pane shows File and Process name rows when no element is selected; `dock.setDiagramInfo(processName, fileName)` updates them; `dock.showPanel()`/`hidePanel()` replace direct `propertiesEmptyState` manipulation
+- `SideDock` API: removed `propertiesEmptyState`; added `showPanel()`, `hidePanel()`, `setDiagramInfo()`
+
+### `apps/landing/src/editor.ts`
+
+- Import `createSideDock` from `@bpmn-sdk/editor` (no longer local file)
+- Use `dock.showPanel()`/`dock.hidePanel()` in config panel callbacks
+- Track `currentFileName` from `onTabActivate`; update `dock.setDiagramInfo()` on tab change and `diagram:change`
+
+## 2026-03-02 — Unified right sidebar dock
+
+### `apps/landing` — `dock.ts` new module
+
+- Added `createSideDock()` factory returning a `SideDock` with Properties and AI tabs
+- Width-based collapse (38px strip when collapsed; full width when expanded) with smooth `transition: width 0.22s ease`
+- Resize handle on left edge: drag to resize 280–700px; persists to `localStorage` (`bpmn-side-dock-width`)
+- Collapsed state persisted to `localStorage` (`bpmn-side-dock-collapsed`); restored on page load
+- Collapse button stays visible in the 38px strip so the dock can always be re-expanded manually
+- Dark default + `[data-bpmn-hud-theme="light"]` overrides
+
+### `@bpmn-sdk/canvas-plugin-config-panel` — hosted mode
+
+- `ConfigPanelOptions` gains `container?`, `onPanelShow?`, `onPanelHide?` optional fields
+- `ConfigPanelRenderer` constructor gains `opts?` bag for the three new fields
+- In hosted mode (`container` set): adds `bpmn-cfg-full--hosted` class, skips standalone resize handle and collapse button, appends to `container` instead of `document.body`
+- `onPanelShow` called after panel is appended; `onPanelHide` called after panel is removed
+- CSS: `.bpmn-cfg-full--hosted` overrides `position: static`, suppresses standalone controls
+
+### `@bpmn-sdk/canvas-plugin-ai-bridge` — docked mode
+
+- `AiBridgePluginOptions` gains `container?` and `onOpen?` optional fields
+- In docked mode: panel gets `ai-panel--docked` class, appended to `container`; button click calls `onOpen?.()` then `p.open()` (no toggle)
+- CSS: `.ai-panel--docked` overrides `position: static` + `transform: none`, always `display: flex`; hides standalone close button
+
+### `apps/landing/src/editor.ts`
+
+- Imports and creates `SideDock`; appends to `document.body`
+- `configPanel` wired with `container: dock.propertiesPane` + `onPanelShow` / `onPanelHide` callbacks
+- `aiBridgePlugin` wired with `container: dock.aiPane` + `onOpen` callback
+- Element selected → dock expands, Properties tab active, empty state hidden
+- AI button clicked → dock expands, AI tab active
+
+## 2026-03-02 — AI chat backend selector + bug fixes
+
+### `canvas-plugin-ai-bridge` — backend selector
+
+- Added `<select>` dropdown (Auto / Claude / Copilot) to the AI panel header
+- Selection persisted in `localStorage` (`bpmn-sdk-ai-backend`); passed as `backend` field in POST body
+- Added `.ai-backend-select` CSS (dark + light theme)
+
+### `ai-server` — multi-backend detection
+
+- `/status` now detects **all** available adapters in parallel and returns `{ ready, backend, available: string[] }`
+- `/chat` accepts optional `backend` field in body; picks requested adapter, falls back to first available
+
+### Bug fixes
+
+- Fixed SSE error field mismatch: server sends `{ type: "error", message: "..." }` but client was reading `event.text` → now reads `event.message ?? event.text ?? "AI error"`
+- Fixed double "Error:" prefix in error display: `err instanceof Error ? err.message : String(err)` instead of `` `Error: ${String(err)}` ``
+
+## 2026-03-02 — AI integration
+
+### Compact BPMN format in `@bpmn-sdk/core`
+
+New token-efficient representation for AI contexts (5-10x smaller than raw XML):
+
+- **Created** `packages/bpmn-sdk/src/bpmn/compact.ts` — `compactify(defs): CompactDiagram` and `expand(compact): BpmnDefinitions`
+- `CompactDiagram` → `{ id, processes: [{ id, name?, elements, flows }] }`
+- `CompactElement` → `{ id, type, name?, jobType?, calledProcess?, formId?, decisionId?, eventType?, attachedTo? }`
+- `CompactFlow` → `{ id, from, to, name?, condition? }`
+- `expand()` auto-lays-out the process via `layoutProcess()` and builds a full `BpmnDefinitions` with DI
+- Exported from `@bpmn-sdk/core` main index
+
+### Layout + ELEMENT_SIZES exported from `@bpmn-sdk/core`
+
+- Added `layoutProcess`, `layoutFlowNodes`, `ELEMENT_SIZES`, and layout types (`Bounds`, `LayoutNode`, `LayoutEdge`, `LayoutResult`, `Waypoint`) to main `packages/bpmn-sdk/src/index.ts`
+
+### `StorageApi.getCurrentContext()`
+
+- **Modified** `canvas-plugins/storage/src/storage-api.ts` — new `getCurrentContext(): { projectId: string; fileId: string } | null` public method
+
+### New `apps/ai-server`
+
+Local HTTP server bridging the editor to CLI-based AI tools:
+
+- **Created** `apps/ai-server/` — private Node.js ESM package
+- `GET /status` → `{ ready: boolean, backend: "claude" | "copilot" | null }`
+- `POST /chat` → SSE stream: `{"type":"token","text":"..."}` events → `{"type":"done"}`
+- Claude adapter: spawns `claude -p "..." --output-format stream-json`, parses streaming JSON events
+- Copilot adapter: spawns `gh copilot explain` (best-effort fallback)
+- Auto-detects available CLI at request time
+- `pnpm ai-server` root script to start it (port 3033 or `AI_SERVER_PORT` env var)
+- Added `@types/node: ^22.0.0` to root devDependencies
+
+### New `@bpmn-sdk/canvas-plugin-ai-bridge`
+
+Canvas plugin providing AI chat panel in the editor:
+
+- **Created** `canvas-plugins/ai-bridge/` — `createAiBridgePlugin(options)` returns `{ name, install(), button }`
+- AI panel fixed to right side, toggles open/closed via HUD button
+- Chat UI: message history, streaming tokens, code block rendering
+- Extracts `CompactDiagram` from AI responses (```json block) → "Apply to diagram" button
+- Apply: auto-saves checkpoint → `expand(compact)` → `Bpmn.export()` → `loadXml()`
+- IndexedDB checkpoint system (`bpmn-sdk-ai` database, max 50 per project+file)
+- History modal: lists checkpoints with timestamps, restore-on-click
+- Server status indicator (shows startup instructions when server not running)
+- Dark/light theme via `[data-bpmn-hud-theme]`
+
+### Wired in landing app
+
+- **Modified** `packages/editor/src/hud.ts` — added `aiButton?: HTMLButtonElement | null` to `HudOptions`
+- **Modified** `apps/landing/src/editor.ts` — imports `createAiBridgePlugin`, creates plugin, passes `aiButton` to `initEditorHud`
+- **Modified** `apps/landing/package.json` — added `@bpmn-sdk/canvas-plugin-ai-bridge: workspace:*`
+
+## 2026-03-02 — Three-part editor refactor
+
+### Task 1 — Optimize dialog extracted to `@bpmn-sdk/canvas-plugin-optimize`
+
+New self-contained canvas plugin; landing app no longer has inline dialog code.
+
+- **Created** `canvas-plugins/optimize/` — `createOptimizePlugin(options)` factory; returns `{ name, install(), button }`. The button is passed to `initEditorHud` as `optimizeButton`.
+- **Deleted** `apps/landing/src/optimize-dialog.ts` — dialog code moved verbatim into the plugin.
+- **Modified** `packages/editor/src/hud.ts` — `HudOptions.onOptimize` replaced with `optimizeButton?: HTMLButtonElement | null`; `IC.optimize` button construction removed.
+- **Modified** `packages/editor/src/icons.ts` — removed `IC.optimize`.
+- **Modified** `apps/landing/src/editor.ts` — imports and wires `createOptimizePlugin`; passes `optimizePlugin.button` to `initEditorHud`.
+
+### Task 2 — Reference management moved to element cfg toolbar
+
+Process/form/decision linking UI removed from config-panel and re-implemented in the HUD cfg toolbar.
+
+- **Modified** `packages/editor/src/hud.ts` — new `HudOptions` fields (`getAvailableProcesses`, `createProcess`, `openDecision`, `getAvailableDecisions`, `openForm`, `getAvailableForms`); `buildCfgToolbar` now shows link/navigate buttons for callActivity, userTask, businessRuleTask.
+- **Created** `packages/editor/src/modal.ts` — `showHudInputModal` for "New process…" input.
+- **Modified** `packages/editor/src/css.ts` — added `.ref-link-btn` CSS class.
+- **Modified** `canvas-plugins/tabs/src/tabs-plugin.ts` — added `getAvailableDecisions()` and `getAvailableForms()` to `TabsApi`.
+- **Modified** `canvas-plugins/config-panel-bpmn/src/index.ts` — removed `__selectProcess`, `__newProcess`, `__openProcess`, `__openForm`, `__openDecision` action fields; simplified `ConfigPanelBpmnOptions` to only `openFeelPlayground`.
+- **Modified** `apps/landing/src/editor.ts` — moved callbacks from `createConfigPanelBpmnPlugin` to `initEditorHud`; added `getAvailableDecisions`/`getAvailableForms`.
+
+### Task 3 — Browser dialogs replaced with custom modals
+
+All `prompt()`/`confirm()` calls in storage and storage-tabs-bridge replaced with themed custom modals.
+
+- **Created** `canvas-plugins/storage/src/dialog.ts` — `showInputDialog(opts): Promise<string | null>` and `showConfirmDialog(opts): Promise<boolean>`; exported from storage package.
+- **Modified** `canvas-plugins/storage/src/index.ts` — 5 browser dialog calls replaced.
+- **Modified** `canvas-plugins/storage-tabs-bridge/src/index.ts` — `prompt()` replaced with `showInputDialog`.
+
+## 2026-03-02 — Optimize button in BPMN editor
+
+Two-phase "Optimize Diagram" dialog wired into the editor HUD:
+
+### Files added
+- `apps/landing/src/optimize-dialog.ts` — modal dialog: Phase 1 lists findings with checkboxes for auto-fixable items; Phase 2 shows applied fix descriptions with "Open generated process in new tab" buttons
+
+### Files modified
+- `packages/editor/src/icons.ts` — added `IC.optimize` (wand + sparkle icon)
+- `packages/editor/src/hud.ts` — added `HudOptions.onOptimize?` callback + "Optimize" button in the action bar
+- `apps/landing/src/editor.ts` — wires `onOptimize` to open the dialog via `optimize(defs)` + `editor.load()`
+- `apps/landing/src/examples.ts` — added "Customer Notification Flow" example with 4 deliberate optimization findings (`feel/empty-condition`, `feel/missing-default-flow`, `flow/dead-end`, `task/reusable-group`)
+
+## 2026-03-02 — `optimize()` — Static BPMN Optimization Analyzer in `@bpmn-sdk/core`
+
+New `optimize(defs, options?)` function that performs static analysis on a `BpmnDefinitions` object and returns an `OptimizationReport` with actionable findings and optional in-place fixes.
+
+### Files added
+
+- `packages/bpmn-sdk/src/bpmn/optimize/types.ts` — Public types (`OptimizationFinding`, `OptimizationReport`, `OptimizeOptions`, `ApplyFixResult`)
+- `packages/bpmn-sdk/src/bpmn/optimize/utils.ts` — Internal graph helpers (flow index, BFS reachability, Zeebe extension readers, mutation helpers)
+- `packages/bpmn-sdk/src/bpmn/optimize/feel.ts` — FEEL expression analyzer (5 finding types)
+- `packages/bpmn-sdk/src/bpmn/optimize/flow.ts` — Flow structure analyzer (5 finding types)
+- `packages/bpmn-sdk/src/bpmn/optimize/tasks.ts` — Service task similarity + call activity extraction
+- `packages/bpmn-sdk/src/bpmn/optimize/index.ts` — `optimize()` entry point
+- `packages/bpmn-sdk/tests/optimize.test.ts` — 25 new tests (all passing)
+
+### Finding types
+
+| ID | Category | Severity |
+|---|---|---|
+| `feel/empty-condition` | feel | error |
+| `feel/missing-default-flow` | feel | warning |
+| `feel/complex-condition` | feel | warning |
+| `feel/complex-io-mapping` | feel | info |
+| `feel/duplicate-expression` | feel | info |
+| `flow/unreachable` | flow | error |
+| `flow/dead-end` | flow | warning |
+| `flow/no-end-event` | flow | warning |
+| `flow/redundant-gateway` | flow | info |
+| `flow/empty-subprocess` | flow | warning |
+| `task/reusable-group` | task-reuse | warning |
+
+### Fixes with `applyFix`
+
+- `feel/missing-default-flow` — sets gateway `default` attribute
+- `flow/dead-end` — generates and inserts an `EndEvent` with sequence flow
+- `flow/redundant-gateway` — removes gateway, reconnects source→target directly
+- `task/reusable-group` — replaces tasks with `callActivity`, returns extracted `BpmnDefinitions`
+
+---
+
+## 2026-03-02 — Developer-experience refactor: storage-tabs-bridge + API improvements
+
+### New package: `@bpmn-sdk/canvas-plugin-storage-tabs-bridge`
+Extracted all cross-plugin wiring from `apps/landing/src/editor.ts` into a new standalone package. Reduces integration boilerplate from ~800 to ~180 lines.
+
+- `createStorageTabsBridge(options)` creates and wires `tabsPlugin`, `storagePlugin`, and `bridgePlugin` together
+- Owns tab↔file maps, MRU tracking, file-search palette commands, and the Ctrl+E file switcher
+- `getExamples: (api: TabsApi) => WelcomeExample[]` — lazy factory for welcome screen examples
+- Built-in `onDownloadTab` default (serialize to BPMN/DMN/Form + browser download)
+- Built-in `getRecentProjects` mapped from storage API
+- Built-in `onOpenFile` / `onRenameCurrentFile` / `onLeaveProject` wiring
+
+### New: `Bpmn.makeEmpty(processId?, processName?)` — minimal empty BPMN XML
+### New: `Bpmn.SAMPLE_XML` — 3-node sample diagram constant
+### New: `SAMPLE_BPMN_XML` named export from `@bpmn-sdk/core`
+### New: `Dmn.makeEmpty()` — returns a minimal `DmnDefinitions` with one empty decision table
+### New: `EditorOptions.persistTheme` — reads/writes `localStorage "bpmn-theme"` automatically in `BpmnEditor`
+### New: `TabsPluginOptions.enableFileImport` — built-in file picker + drag-and-drop in the tabs plugin
+### New: `TabsApi.openFilePicker()` — programmatic file picker trigger
+
+## 2026-03-02 — Dark mode: full propagation fix + localStorage theme persistence
+
+### Fix: menus and config panel not themed after theme switch
+Three root causes, three targeted fixes:
+
+1. **`packages/editor/src/editor.ts`** — Added `get container(): HTMLElement` getter returning the host element (`bpmn-canvas-host` div), so external code can observe `data-theme` attribute changes without relying on internal fields.
+
+2. **`packages/editor/src/hud.ts`** — `document.body.dataset.bpmnHudTheme` was set once at HUD init (always the initial theme) and never updated. Added a `MutationObserver` on `editor.container` that calls `syncHudTheme()` whenever `data-theme` changes. This keeps the HUD toolbars and config panel (which use `[data-bpmn-hud-theme]` selectors on body) in sync with the active theme.
+
+3. **`canvas-plugins/main-menu/src/css.ts`** — The main menu dropdown is `position: fixed` and appended directly to `document.body`, outside the `.bpmn-canvas-host` element. The CSS custom properties (`--bpmn-overlay-bg`, `--bpmn-text`, `--bpmn-overlay-border`, `--bpmn-highlight`) are defined on `.bpmn-canvas-host[data-theme="dark"]` and do not cascade to body-level elements. Added `[data-bpmn-hud-theme="dark"]` overrides for all dropdown elements with explicit Catppuccin dark palette colors.
+
+### Feature: theme preference persisted to localStorage
+- **`apps/landing/src/editor.ts`** — Reads `"bpmn-theme"` from `localStorage` on startup (defaults to `"light"`) and passes it as the initial `theme` option to `BpmnEditor`. A `MutationObserver` on `editor.container` watches for `data-theme` changes and writes the resolved theme back to `localStorage`, so the preference survives page reloads.
+
+## 2026-03-02 — DMN DRD canvas: snap alignment + quick-add connected elements
+
+### Feature: snap/magnet alignment during node drag
+When dragging a node, its left/center/right edges and top/center/bottom edges are compared against all other nodes (threshold: 8 px / scale). On a match the drag position snaps to the aligned anchor and a dashed blue guide line is rendered across the canvas in diagram space. Guide lines clear on mouse-up.
+
+### Feature: quick-add connected elements from contextual toolbar
+The contextual toolbar now shows icon buttons for every node type that can be connected FROM the current selection, based on DMN connection rules:
+- **Decision / InputData** → Decision, Annotation
+- **KnowledgeSource** → Decision, KnowledgeSource, BKM, Annotation
+- **BKM** → Decision, BKM, Annotation
+- **TextAnnotation** → (none)
+
+Clicking a quick-add button uses smart placement (tries right → below → above, gap ×1–6) to find a non-overlapping position, creates the new node, auto-connects it with the correct edge type, and selects it.
+
+**Files:** `canvas-plugins/dmn-editor/src/drd-canvas.ts`, `canvas-plugins/dmn-editor/src/css.ts`
+
+## 2026-03-02 — DMN DRD canvas: dot grid, floating toolbars, contextual toolbar
+
+### Feature: dot-grid background
+SVG `<pattern>` with 20×20 tile, synced to the viewport transform on every pan/zoom/drag. Matches the BPMN editor look.
+
+### Feature: bottom-center floating toolbar (glass panel)
+The old top-bar with text buttons is replaced by an absolute-positioned floating glass panel at the bottom-center of the canvas. Contains SVG mini-shape icon buttons for each DRG element type (Decision, InputData, KnowledgeSource, BKM | TextAnnotation).
+
+### Feature: contextual toolbar below selected node
+When a node is selected, a floating glass panel appears 8px below it. Contents:
+- Decision nodes: **Edit Table** | Connect → | Delete
+- Other nodes: Connect → | Delete
+The panel follows the node during drag and repositions on pan/zoom.
+
+### Feature: connect mode from contextual toolbar
+Removed the global "Connect" toggle. Connect mode is now initiated from the Connect button in the contextual toolbar, with the source node pre-set. Clicking a target creates the connection; clicking empty space or pressing Escape cancels.
+
+**Files:** `canvas-plugins/dmn-editor/src/drd-canvas.ts`, `canvas-plugins/dmn-editor/src/css.ts`
+
 ## 2026-03-01 — DMN DRD (Decision Requirements Diagram) support
 
 ### Feature: full DRG element model in `@bpmn-sdk/core`

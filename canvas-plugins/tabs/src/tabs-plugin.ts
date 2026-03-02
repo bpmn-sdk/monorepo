@@ -14,6 +14,7 @@ import {
 	type FormDefinition,
 } from "@bpmn-sdk/core";
 import { injectTabsStyles } from "./css.js";
+import { InMemoryFileResolver } from "./file-resolver.js";
 import type { FileResolver } from "./file-resolver.js";
 
 /** A tab configuration — one of BPMN, DMN, Form, or FEEL Playground. */
@@ -109,6 +110,16 @@ export interface TabsPluginOptions {
 	 * (use the `diagram:change` canvas event for those).
 	 */
 	onTabChange?: (tabId: string, config: TabConfig) => void;
+	/**
+	 * When true, the plugin handles file import automatically:
+	 * - Creates a hidden `<input type="file">` for the "Import files" welcome screen button
+	 * - Adds drag-and-drop support to the canvas container
+	 * - Parses `.bpmn`, `.xml`, `.dmn`, `.form`, and `.json` files and opens them as tabs
+	 *
+	 * Use `tabsPlugin.api.openFilePicker()` to trigger the file picker programmatically
+	 * (e.g. from a menu item). The `resolver` option must be set to register DMN/Form files.
+	 */
+	enableFileImport?: boolean;
 }
 
 /** A single example entry shown on the welcome screen. */
@@ -167,9 +178,19 @@ export interface TabsApi {
 	navigateToProcess(processId: string): void;
 	/**
 	 * Get all BPMN processes tracked across open tabs.
-	 * Useful for providing a process picker in the config panel.
+	 * Useful for providing a process picker in the HUD toolbar.
 	 */
 	getAvailableProcesses(): Array<{ id: string; name?: string }>;
+	/**
+	 * Get all DMN decisions from open DMN tabs.
+	 * Useful for providing a decision picker in the HUD toolbar.
+	 */
+	getAvailableDecisions(): Array<{ id: string; name?: string }>;
+	/**
+	 * Get all forms from open form tabs.
+	 * Useful for providing a form picker in the HUD toolbar.
+	 */
+	getAvailableForms(): Array<{ id: string; name?: string }>;
 	/**
 	 * Get serialized content for all non-FEEL open tabs.
 	 * BPMN tabs return their current XML; DMN/Form tabs are serialized on demand.
@@ -195,6 +216,12 @@ export interface TabsApi {
 	 * Used when a project file is renamed via the command palette or main menu.
 	 */
 	renameTab(id: string, name: string): void;
+	/**
+	 * Programmatically open the file picker dialog.
+	 * Only available when `enableFileImport: true` was passed to `createTabsPlugin`.
+	 * No-op otherwise.
+	 */
+	openFilePicker(): void;
 }
 
 let _tabCounter = 0;
@@ -244,6 +271,33 @@ export function createTabsPlugin(options: TabsPluginOptions = {}): CanvasPlugin 
 	let rawModeBtn: HTMLButtonElement | null = null;
 
 	let isProjectMode = false;
+	let fileInputEl: HTMLInputElement | null = null;
+	let dndDragoverHandler: ((e: DragEvent) => void) | null = null;
+	let dndDropHandler: ((e: DragEvent) => void) | null = null;
+
+	async function importFiles(files: FileList | File[]): Promise<void> {
+		for (const file of Array.from(files)) {
+			const name = file.name;
+			const ext = name.slice(name.lastIndexOf(".")).toLowerCase();
+			try {
+				const text = await file.text();
+				if (ext === ".bpmn" || ext === ".xml") {
+					Bpmn.parse(text); // validate — throws on malformed XML
+					api.openTab({ type: "bpmn", xml: text, name });
+				} else if (ext === ".dmn") {
+					const defs = Dmn.parse(text);
+					if (resolver instanceof InMemoryFileResolver) resolver.registerDmn(defs);
+					api.openTab({ type: "dmn", defs, name: defs.name ?? name });
+				} else if (ext === ".form" || ext === ".json") {
+					const form = Form.parse(text);
+					if (resolver instanceof InMemoryFileResolver) resolver.registerForm(form);
+					api.openTab({ type: "form", form, name: form.id ?? name });
+				}
+			} catch (err) {
+				console.error(`[bpmn-sdk] Failed to import ${name}:`, err);
+			}
+		}
+	}
 
 	/** Tracks which tab ID each BPMN process ID belongs to. */
 	const bpmnProcessToTabId = new Map<string, string>();
@@ -394,7 +448,13 @@ export function createTabsPlugin(options: TabsPluginOptions = {}): CanvasPlugin 
 		importBtn.type = "button";
 		importBtn.className = "bpmn-welcome-btn secondary";
 		importBtn.textContent = "Import files\u2026";
-		importBtn.addEventListener("click", () => options.onImportFiles?.());
+		importBtn.addEventListener("click", () => {
+			if (options.onImportFiles) {
+				options.onImportFiles();
+			} else if (options.enableFileImport) {
+				api.openFilePicker();
+			}
+		});
 
 		actions.appendChild(newBtn);
 		actions.appendChild(importBtn);
@@ -1016,6 +1076,27 @@ export function createTabsPlugin(options: TabsPluginOptions = {}): CanvasPlugin 
 			}));
 		},
 
+		getAvailableDecisions(): Array<{ id: string; name?: string }> {
+			const result: Array<{ id: string; name?: string }> = [];
+			for (const tab of tabs) {
+				if (tab.config.type !== "dmn") continue;
+				for (const decision of tab.config.defs.decisions) {
+					result.push({ id: decision.id, name: decision.name ?? undefined });
+				}
+			}
+			return result;
+		},
+
+		getAvailableForms(): Array<{ id: string; name?: string }> {
+			const result: Array<{ id: string; name?: string }> = [];
+			for (const tab of tabs) {
+				if (tab.config.type !== "form") continue;
+				const formId = tab.config.form.id;
+				if (formId) result.push({ id: formId, name: tab.config.name });
+			}
+			return result;
+		},
+
 		getAllTabContent(): TabContentSnapshot[] {
 			const result: TabContentSnapshot[] = [];
 			for (const tab of tabs) {
@@ -1065,6 +1146,10 @@ export function createTabsPlugin(options: TabsPluginOptions = {}): CanvasPlugin 
 
 		get rawModeButton(): HTMLButtonElement | null {
 			return rawModeBtn;
+		},
+
+		openFilePicker(): void {
+			fileInputEl?.click();
 		},
 
 		openDecision(decisionId: string): void {
@@ -1209,6 +1294,34 @@ export function createTabsPlugin(options: TabsPluginOptions = {}): CanvasPlugin 
 			};
 			document.addEventListener("pointerdown", outsideClickHandler);
 
+			// File import — hidden input + drag-and-drop
+			if (options.enableFileImport) {
+				const fileInput = document.createElement("input");
+				fileInput.type = "file";
+				fileInput.multiple = true;
+				fileInput.accept = ".bpmn,.xml,.dmn,.form,.json";
+				fileInput.style.display = "none";
+				document.body.appendChild(fileInput);
+				fileInput.addEventListener("change", () => {
+					if (fileInput.files) {
+						void importFiles(fileInput.files);
+						fileInput.value = "";
+					}
+				});
+				fileInputEl = fileInput;
+
+				dndDragoverHandler = (e: DragEvent) => {
+					e.preventDefault();
+				};
+				dndDropHandler = (e: DragEvent) => {
+					e.preventDefault();
+					const files = e.dataTransfer?.files;
+					if (files && files.length > 0) void importFiles(files);
+				};
+				container.addEventListener("dragover", dndDragoverHandler);
+				container.addEventListener("drop", dndDropHandler);
+			}
+
 			// Subscribe to diagram:change to keep BPMN tab XML and process maps up to date
 			const anyOn = cApi.on.bind(cApi) as unknown as AnyOn;
 			offDiagramChange = anyOn("diagram:change", (rawDefs) => {
@@ -1245,6 +1358,18 @@ export function createTabsPlugin(options: TabsPluginOptions = {}): CanvasPlugin 
 			if (outsideClickHandler) {
 				document.removeEventListener("pointerdown", outsideClickHandler);
 				outsideClickHandler = null;
+			}
+			if (fileInputEl) {
+				fileInputEl.remove();
+				fileInputEl = null;
+			}
+			if (canvasApi && dndDragoverHandler) {
+				canvasApi.container.removeEventListener("dragover", dndDragoverHandler);
+				dndDragoverHandler = null;
+			}
+			if (canvasApi && dndDropHandler) {
+				canvasApi.container.removeEventListener("drop", dndDropHandler);
+				dndDropHandler = null;
 			}
 			dropdownEl?.remove();
 			dropdownEl = null;

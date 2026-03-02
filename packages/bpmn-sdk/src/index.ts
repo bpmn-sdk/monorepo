@@ -1,4 +1,4 @@
-export { Bpmn } from "./bpmn/index.js";
+export { Bpmn, SAMPLE_BPMN_XML } from "./bpmn/index.js";
 export type {
 	ProcessBuilder,
 	BranchBuilder,
@@ -175,3 +175,22 @@ export { generateId, resetIdCounter } from "./types/id-generator.js";
 export { parseXml, serializeXml } from "./xml/index.js";
 export { readDiColor, writeDiColor, BIOC_NS, COLOR_NS } from "./bpmn/di-color.js";
 export type { DiColor } from "./bpmn/di-color.js";
+export { optimize } from "./bpmn/optimize/index.js";
+export type {
+	OptimizationReport,
+	OptimizationFinding,
+	OptimizationSeverity,
+	OptimizationCategory,
+	ApplyFixResult,
+	OptimizeOptions,
+} from "./bpmn/optimize/types.js";
+export { layoutProcess, layoutFlowNodes } from "./layout/index.js";
+export type { Bounds, LayoutEdge, LayoutNode, LayoutResult, Waypoint } from "./layout/index.js";
+export { ELEMENT_SIZES } from "./layout/index.js";
+export { compactify, expand } from "./bpmn/compact.js";
+export type {
+	CompactDiagram,
+	CompactElement,
+	CompactFlow,
+	CompactProcess,
+} from "./bpmn/compact.js";
