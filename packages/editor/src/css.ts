@@ -385,6 +385,27 @@ export const HUD_CSS = `
   border-right-color: rgba(0,0,0,0.08);
 }
 
+/* ── Reference link button (wider text variant of hud-btn) ──────── */
+.ref-link-btn {
+  height: 32px; padding: 0 8px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+  font-size: 12px;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: background 0.1s, color 0.1s;
+  align-self: center;
+}
+.ref-link-btn:hover { background: rgba(255,255,255,0.08); color: #fff; }
+[data-bpmn-hud-theme="light"] .ref-link-btn { color: rgba(0,0,0,0.5); }
+[data-bpmn-hud-theme="light"] .ref-link-btn:hover { background: rgba(0,0,0,0.06); color: rgba(0,0,0,0.9); }
+
 /* ── Color swatches ──────────────────────────────────────────────── */
 .bpmn-color-swatches { display: flex; gap: 4px; padding: 2px 4px; align-items: center; }
 .bpmn-color-swatch {

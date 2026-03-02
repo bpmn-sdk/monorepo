@@ -1,6 +1,8 @@
 import { Bpmn, optimize } from "@bpmn-sdk/core";
 import type { BpmnDefinitions, OptimizationFinding } from "@bpmn-sdk/core";
 
+// ── Styles ────────────────────────────────────────────────────────────────────
+
 const STYLE_ID = "opt-dialog-styles";
 
 function injectStyles(): void {
@@ -138,6 +140,8 @@ function injectStyles(): void {
 	document.head.appendChild(style);
 }
 
+// ── Dialog helpers ────────────────────────────────────────────────────────────
+
 function makeHeader(title: string, subtitle: string): HTMLElement {
 	const header = document.createElement("div");
 	header.className = "opt-header";
@@ -165,7 +169,9 @@ function makeBtn(label: string, primary = false): HTMLButtonElement {
 	return btn;
 }
 
-export function showOptimizeDialog(
+// ── Dialog ────────────────────────────────────────────────────────────────────
+
+function showOptimizeDialog(
 	defs: BpmnDefinitions,
 	reload: (xml: string) => void,
 	openTab: (xml: string, name: string) => void,
@@ -313,4 +319,45 @@ export function showOptimizeDialog(
 	showPhase1();
 	overlay.append(panel);
 	document.body.append(overlay);
+}
+
+// ── Plugin ────────────────────────────────────────────────────────────────────
+
+const OPTIMIZE_ICON = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 14L8 7"/><path d="M11 2l.75 2.25L14 5l-2.25.75L11 8l-.75-2.25L8 5l2.25-.75z"/></svg>`;
+
+export interface OptimizePluginOptions {
+	/** Returns the current diagram definitions, or null if no diagram is loaded. */
+	getDefinitions: () => BpmnDefinitions | null;
+	/** Reloads the editor with the given XML. */
+	reload: (xml: string) => void;
+	/** Opens a new BPMN tab with the given XML and name. */
+	openTab: (xml: string, name: string) => void;
+}
+
+/**
+ * Creates an optimize plugin that provides a button for triggering
+ * the two-phase diagram optimization dialog.
+ *
+ * The returned `button` should be passed to `initEditorHud` as `optimizeButton`.
+ */
+export function createOptimizePlugin(options: OptimizePluginOptions): {
+	name: string;
+	install(): void;
+	button: HTMLButtonElement;
+} {
+	const button = document.createElement("button");
+	button.title = "Optimize";
+	button.innerHTML = OPTIMIZE_ICON;
+
+	button.addEventListener("click", () => {
+		const defs = options.getDefinitions();
+		if (!defs) return;
+		showOptimizeDialog(defs, options.reload, options.openTab);
+	});
+
+	return {
+		name: "optimize",
+		install(): void {},
+		button,
+	};
 }

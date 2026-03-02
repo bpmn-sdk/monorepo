@@ -50,9 +50,6 @@ export const IC = {
 	// ── Navigation ─────────────────────────────────────────────────────────
 	openProcess: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h4v4M13 3l-6 6"/><path d="M7 5H3v8h8V9"/></svg>`,
 
-	// ── Optimize ────────────────────────────────────────────────────────────
-	optimize: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 14L8 7"/><path d="M11 2l.75 2.25L14 5l-2.25.75L11 8l-.75-2.25L8 5l2.25-.75z"/></svg>`,
-
 	// ── BPMN Annotation ────────────────────────────────────────────────────
 	textAnnotation: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M6 3L3 3L3 13L6 13"/><line x1="7" y1="6" x2="13" y2="6"/><line x1="7" y1="9" x2="12" y2="9"/><line x1="7" y1="12" x2="10" y2="12"/></svg>`,
 

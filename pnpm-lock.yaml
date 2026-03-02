@@ -69,6 +69,9 @@ importers:
       '@bpmn-sdk/canvas-plugin-minimap':
         specifier: workspace:*
         version: link:../../canvas-plugins/minimap
+      '@bpmn-sdk/canvas-plugin-optimize':
+        specifier: workspace:*
+        version: link:../../canvas-plugins/optimize
       '@bpmn-sdk/canvas-plugin-storage-tabs-bridge':
         specifier: workspace:*
         version: link:../../canvas-plugins/storage-tabs-bridge
@@ -180,6 +183,12 @@ importers:
       '@bpmn-sdk/canvas':
         specifier: workspace:*
         version: link:../../packages/canvas
+      '@bpmn-sdk/core':
+        specifier: workspace:*
+        version: link:../../packages/bpmn-sdk
+
+  canvas-plugins/optimize:
+    dependencies:
       '@bpmn-sdk/core':
         specifier: workspace:*
         version: link:../../packages/bpmn-sdk

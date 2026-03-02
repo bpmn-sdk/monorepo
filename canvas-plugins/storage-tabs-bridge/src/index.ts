@@ -14,6 +14,7 @@
 import type { CanvasApi, CanvasPlugin } from "@bpmn-sdk/canvas";
 import type { CommandPalettePlugin } from "@bpmn-sdk/canvas-plugin-command-palette";
 import type { MainMenuApi } from "@bpmn-sdk/canvas-plugin-main-menu";
+import { showInputDialog } from "@bpmn-sdk/canvas-plugin-storage";
 import { createStoragePlugin } from "@bpmn-sdk/canvas-plugin-storage";
 import type { StorageApi } from "@bpmn-sdk/canvas-plugin-storage";
 import { InMemoryFileResolver, createTabsPlugin } from "@bpmn-sdk/canvas-plugin-tabs";
@@ -291,8 +292,11 @@ export function createStorageTabsBridge(
 			cmds.push({
 				id: "rename-current-file",
 				title: "Rename current file\u2026",
-				action: () => {
-					const newName = prompt("Rename file:", currentName)?.trim();
+				action: async () => {
+					const newName = await showInputDialog({
+						title: "Rename file",
+						defaultValue: currentName,
+					});
 					if (!newName || newName === currentName) return;
 					storageFileToName.set(fid, newName);
 					const tabId = storageFileIdToTabId.get(fid);

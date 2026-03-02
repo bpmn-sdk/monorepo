@@ -1,5 +1,36 @@
 # Progress
 
+## 2026-03-02 — Three-part editor refactor
+
+### Task 1 — Optimize dialog extracted to `@bpmn-sdk/canvas-plugin-optimize`
+
+New self-contained canvas plugin; landing app no longer has inline dialog code.
+
+- **Created** `canvas-plugins/optimize/` — `createOptimizePlugin(options)` factory; returns `{ name, install(), button }`. The button is passed to `initEditorHud` as `optimizeButton`.
+- **Deleted** `apps/landing/src/optimize-dialog.ts` — dialog code moved verbatim into the plugin.
+- **Modified** `packages/editor/src/hud.ts` — `HudOptions.onOptimize` replaced with `optimizeButton?: HTMLButtonElement | null`; `IC.optimize` button construction removed.
+- **Modified** `packages/editor/src/icons.ts` — removed `IC.optimize`.
+- **Modified** `apps/landing/src/editor.ts` — imports and wires `createOptimizePlugin`; passes `optimizePlugin.button` to `initEditorHud`.
+
+### Task 2 — Reference management moved to element cfg toolbar
+
+Process/form/decision linking UI removed from config-panel and re-implemented in the HUD cfg toolbar.
+
+- **Modified** `packages/editor/src/hud.ts` — new `HudOptions` fields (`getAvailableProcesses`, `createProcess`, `openDecision`, `getAvailableDecisions`, `openForm`, `getAvailableForms`); `buildCfgToolbar` now shows link/navigate buttons for callActivity, userTask, businessRuleTask.
+- **Created** `packages/editor/src/modal.ts` — `showHudInputModal` for "New process…" input.
+- **Modified** `packages/editor/src/css.ts` — added `.ref-link-btn` CSS class.
+- **Modified** `canvas-plugins/tabs/src/tabs-plugin.ts` — added `getAvailableDecisions()` and `getAvailableForms()` to `TabsApi`.
+- **Modified** `canvas-plugins/config-panel-bpmn/src/index.ts` — removed `__selectProcess`, `__newProcess`, `__openProcess`, `__openForm`, `__openDecision` action fields; simplified `ConfigPanelBpmnOptions` to only `openFeelPlayground`.
+- **Modified** `apps/landing/src/editor.ts` — moved callbacks from `createConfigPanelBpmnPlugin` to `initEditorHud`; added `getAvailableDecisions`/`getAvailableForms`.
+
+### Task 3 — Browser dialogs replaced with custom modals
+
+All `prompt()`/`confirm()` calls in storage and storage-tabs-bridge replaced with themed custom modals.
+
+- **Created** `canvas-plugins/storage/src/dialog.ts` — `showInputDialog(opts): Promise<string | null>` and `showConfirmDialog(opts): Promise<boolean>`; exported from storage package.
+- **Modified** `canvas-plugins/storage/src/index.ts` — 5 browser dialog calls replaced.
+- **Modified** `canvas-plugins/storage-tabs-bridge/src/index.ts` — `prompt()` replaced with `showInputDialog`.
+
 ## 2026-03-02 — Optimize button in BPMN editor
 
 Two-phase "Optimize Diagram" dialog wired into the editor HUD:

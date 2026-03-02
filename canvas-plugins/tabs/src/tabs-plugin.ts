@@ -178,9 +178,19 @@ export interface TabsApi {
 	navigateToProcess(processId: string): void;
 	/**
 	 * Get all BPMN processes tracked across open tabs.
-	 * Useful for providing a process picker in the config panel.
+	 * Useful for providing a process picker in the HUD toolbar.
 	 */
 	getAvailableProcesses(): Array<{ id: string; name?: string }>;
+	/**
+	 * Get all DMN decisions from open DMN tabs.
+	 * Useful for providing a decision picker in the HUD toolbar.
+	 */
+	getAvailableDecisions(): Array<{ id: string; name?: string }>;
+	/**
+	 * Get all forms from open form tabs.
+	 * Useful for providing a form picker in the HUD toolbar.
+	 */
+	getAvailableForms(): Array<{ id: string; name?: string }>;
 	/**
 	 * Get serialized content for all non-FEEL open tabs.
 	 * BPMN tabs return their current XML; DMN/Form tabs are serialized on demand.
@@ -1064,6 +1074,27 @@ export function createTabsPlugin(options: TabsPluginOptions = {}): CanvasPlugin 
 				id,
 				name: bpmnProcessNames.get(id),
 			}));
+		},
+
+		getAvailableDecisions(): Array<{ id: string; name?: string }> {
+			const result: Array<{ id: string; name?: string }> = [];
+			for (const tab of tabs) {
+				if (tab.config.type !== "dmn") continue;
+				for (const decision of tab.config.defs.decisions) {
+					result.push({ id: decision.id, name: decision.name ?? undefined });
+				}
+			}
+			return result;
+		},
+
+		getAvailableForms(): Array<{ id: string; name?: string }> {
+			const result: Array<{ id: string; name?: string }> = [];
+			for (const tab of tabs) {
+				if (tab.config.type !== "form") continue;
+				const formId = tab.config.form.id;
+				if (formId) result.push({ id: formId, name: tab.config.name });
+			}
+			return result;
 		},
 
 		getAllTabContent(): TabContentSnapshot[] {

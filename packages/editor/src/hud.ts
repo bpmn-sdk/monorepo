@@ -11,6 +11,7 @@ import {
 	getValidLabelPositions,
 } from "./element-groups.js";
 import { IC } from "./icons.js";
+import { showHudInputModal } from "./modal.js";
 import type { CreateShapeType, LabelPosition, Tool } from "./types.js";
 
 interface GroupDef {
@@ -68,17 +69,32 @@ const POSITION_LABELS: Record<LabelPosition, string> = {
 
 export interface HudOptions {
 	/**
-	 * Called when the user clicks the "Open Process" navigate button above a
-	 * call activity. Receives the `processId` from `zeebe:calledElement`.
+	 * Called when the user clicks the navigate link above a call activity that
+	 * already has a process linked. Receives the `processId` from `zeebe:calledElement`.
 	 */
 	openProcess?: (processId: string) => void;
+	/** Returns available BPMN processes for the "Link process ▾" dropdown on call activities. */
+	getAvailableProcesses?: () => Array<{ id: string; name?: string }>;
+	/** Called when the user requests a new process from the cfg toolbar. */
+	createProcess?: (name: string, onCreated: (id: string) => void) => void;
+	/** Called when the user clicks the navigate link above a business rule task. */
+	openDecision?: (decisionId: string) => void;
+	/** Returns available DMN decisions for the "Link decision ▾" dropdown on business rule tasks. */
+	getAvailableDecisions?: () => Array<{ id: string; name?: string }>;
+	/** Called when the user clicks the navigate link above a user task. */
+	openForm?: (formId: string) => void;
+	/** Returns available forms for the "Link form ▾" dropdown on user tasks. */
+	getAvailableForms?: () => Array<{ id: string; name?: string }>;
 	/**
 	 * Optional raw mode toggle button (from `tabsPlugin.api.rawModeButton`).
 	 * When provided, it is styled as a HUD button and placed in the bottom-left panel.
 	 */
 	rawModeButton?: HTMLButtonElement | null;
-	/** Called when the user clicks the Optimize button in the action bar. */
-	onOptimize?: () => void;
+	/**
+	 * Optional optimize button (from `createOptimizePlugin(...).button`).
+	 * When provided, it is styled as a HUD button and placed in the action bar.
+	 */
+	optimizeButton?: HTMLButtonElement | null;
 }
 
 export function initEditorHud(editor: BpmnEditor, options: HudOptions = {}): void {
@@ -106,22 +122,16 @@ export function initEditorHud(editor: BpmnEditor, options: HudOptions = {}): voi
 	const btnDelete = hudBtn("btn-delete", "Delete");
 	const btnDuplicate = hudBtn("btn-duplicate", "Duplicate (Ctrl+D)");
 	const btnTopMore = hudBtn("btn-top-more", "More actions");
-	const btnOptimize = hudBtn("btn-optimize", "Optimize");
 
 	const hudTopCenter = document.createElement("div");
 	hudTopCenter.id = "hud-top-center";
 	hudTopCenter.className = "hud panel";
-	hudTopCenter.append(
-		btnUndo,
-		btnRedo,
-		hudSep(),
-		btnDelete,
-		btnDuplicate,
-		hudSep(),
-		btnTopMore,
-		hudSep(),
-		btnOptimize,
-	);
+	hudTopCenter.append(btnUndo, btnRedo, hudSep(), btnDelete, btnDuplicate, hudSep(), btnTopMore);
+
+	if (options.optimizeButton) {
+		options.optimizeButton.className = "hud-btn";
+		hudTopCenter.append(hudSep(), options.optimizeButton);
+	}
 
 	// Mobile collapse toggle — top center (hidden on desktop via CSS)
 	const btnTcToggle = hudBtn("btn-tc-toggle", "Actions");
@@ -198,6 +208,10 @@ export function initEditorHud(editor: BpmnEditor, options: HudOptions = {}): voi
 	labelPosMenuEl.id = "label-pos-menu";
 	labelPosMenuEl.className = "dropdown";
 
+	const refMenuEl = document.createElement("div");
+	refMenuEl.id = "ref-menu";
+	refMenuEl.className = "dropdown";
+
 	document.body.append(
 		hudTopCenter,
 		hudBottomLeft,
@@ -207,6 +221,7 @@ export function initEditorHud(editor: BpmnEditor, options: HudOptions = {}): voi
 		zoomMenuEl,
 		moreMenuEl,
 		labelPosMenuEl,
+		refMenuEl,
 	);
 
 	// ── Theme ──────────────────────────────────────────────────────────────────
@@ -270,7 +285,6 @@ export function initEditorHud(editor: BpmnEditor, options: HudOptions = {}): voi
 	btnDelete.innerHTML = IC.trash;
 	btnDuplicate.innerHTML = IC.duplicate;
 	btnTopMore.innerHTML = IC.dots;
-	btnOptimize.innerHTML = IC.optimize;
 	btnZoomOut.innerHTML = IC.zoomOut;
 	btnZoomIn.innerHTML = IC.zoomIn;
 
@@ -726,10 +740,6 @@ export function initEditorHud(editor: BpmnEditor, options: HudOptions = {}): voi
 		editor.duplicate();
 		collapseOnMobile(hudTopCenter);
 	});
-	btnOptimize.addEventListener("click", () => {
-		collapseOnMobile(hudTopCenter);
-		options.onOptimize?.();
-	});
 
 	// ── Label position menu ────────────────────────────────────────────────────
 
@@ -875,22 +885,164 @@ export function initEditorHud(editor: BpmnEditor, options: HudOptions = {}): voi
 			cfgToolbar.appendChild(labelBtn);
 		}
 
-		if (sourceType === "callActivity" && options.openProcess) {
+		if (sourceType === "callActivity") {
 			const processId = getCallActivityProcessId(sourceId);
 			if (processId) {
-				if (cfgToolbar.children.length > 0) {
-					const sep = document.createElement("div");
-					sep.className = "hud-sep";
-					cfgToolbar.appendChild(sep);
-				}
+				if (cfgToolbar.children.length > 0) cfgToolbar.append(hudSep());
+				const procs = options.getAvailableProcesses?.() ?? [];
+				const name = procs.find((p) => p.id === processId)?.name ?? processId;
 				const navBtn = document.createElement("button");
-				navBtn.className = "hud-btn";
-				navBtn.innerHTML = IC.openProcess;
+				navBtn.className = "ref-link-btn";
+				navBtn.textContent = `${name} ↗`;
 				navBtn.title = `Open process: ${processId}`;
-				navBtn.addEventListener("click", () => {
-					options.openProcess?.(processId);
-				});
+				navBtn.addEventListener("click", () => options.openProcess?.(processId));
 				cfgToolbar.appendChild(navBtn);
+			} else if (options.getAvailableProcesses) {
+				if (cfgToolbar.children.length > 0) cfgToolbar.append(hudSep());
+				const linkBtn = document.createElement("button");
+				linkBtn.className = "ref-link-btn";
+				linkBtn.textContent = "Link process \u25be";
+				linkBtn.addEventListener("pointerdown", (e) => e.stopPropagation());
+				linkBtn.addEventListener("click", () => {
+					if (openDropdown === refMenuEl) {
+						closeAllDropdowns();
+						return;
+					}
+					refMenuEl.innerHTML = "";
+					const procs = options.getAvailableProcesses?.() ?? [];
+					for (const proc of procs) {
+						const btn = document.createElement("button");
+						btn.className = "drop-item";
+						btn.textContent = proc.name ?? proc.id;
+						btn.title = proc.id;
+						btn.addEventListener("click", () => {
+							setCallActivityProcess(sourceId, proc.id);
+							closeAllDropdowns();
+						});
+						refMenuEl.appendChild(btn);
+					}
+					if (options.createProcess) {
+						if (procs.length > 0) {
+							const sep = document.createElement("div");
+							sep.className = "drop-sep";
+							refMenuEl.appendChild(sep);
+						}
+						const newBtn = document.createElement("button");
+						newBtn.className = "drop-item";
+						newBtn.textContent = "New process\u2026";
+						newBtn.addEventListener("click", () => {
+							closeAllDropdowns();
+							showHudInputModal("New process name", "New Process", (newName) => {
+								options.createProcess?.(newName, (pid) => setCallActivityProcess(sourceId, pid));
+							});
+						});
+						refMenuEl.appendChild(newBtn);
+					}
+					if (procs.length === 0 && !options.createProcess) {
+						const empty = document.createElement("div");
+						empty.className = "drop-label";
+						empty.textContent = "No processes open";
+						refMenuEl.appendChild(empty);
+					}
+					showDropdown(refMenuEl, linkBtn, "above");
+				});
+				cfgToolbar.appendChild(linkBtn);
+			}
+		}
+
+		if (sourceType === "userTask") {
+			const formId = getUserTaskFormId(sourceId);
+			if (formId) {
+				if (cfgToolbar.children.length > 0) cfgToolbar.append(hudSep());
+				const forms = options.getAvailableForms?.() ?? [];
+				const name = forms.find((f) => f.id === formId)?.name ?? formId;
+				const navBtn = document.createElement("button");
+				navBtn.className = "ref-link-btn";
+				navBtn.textContent = `${name} ↗`;
+				navBtn.title = `Open form: ${formId}`;
+				navBtn.addEventListener("click", () => options.openForm?.(formId));
+				cfgToolbar.appendChild(navBtn);
+			} else if (options.getAvailableForms) {
+				if (cfgToolbar.children.length > 0) cfgToolbar.append(hudSep());
+				const linkBtn = document.createElement("button");
+				linkBtn.className = "ref-link-btn";
+				linkBtn.textContent = "Link form \u25be";
+				linkBtn.addEventListener("pointerdown", (e) => e.stopPropagation());
+				linkBtn.addEventListener("click", () => {
+					if (openDropdown === refMenuEl) {
+						closeAllDropdowns();
+						return;
+					}
+					refMenuEl.innerHTML = "";
+					const forms = options.getAvailableForms?.() ?? [];
+					for (const form of forms) {
+						const btn = document.createElement("button");
+						btn.className = "drop-item";
+						btn.textContent = form.name ?? form.id;
+						btn.title = form.id;
+						btn.addEventListener("click", () => {
+							setUserTaskForm(sourceId, form.id);
+							closeAllDropdowns();
+						});
+						refMenuEl.appendChild(btn);
+					}
+					if (forms.length === 0) {
+						const empty = document.createElement("div");
+						empty.className = "drop-label";
+						empty.textContent = "No forms open";
+						refMenuEl.appendChild(empty);
+					}
+					showDropdown(refMenuEl, linkBtn, "above");
+				});
+				cfgToolbar.appendChild(linkBtn);
+			}
+		}
+
+		if (sourceType === "businessRuleTask") {
+			const decisionId = getBizRuleDecisionId(sourceId);
+			if (decisionId) {
+				if (cfgToolbar.children.length > 0) cfgToolbar.append(hudSep());
+				const decisions = options.getAvailableDecisions?.() ?? [];
+				const name = decisions.find((d) => d.id === decisionId)?.name ?? decisionId;
+				const navBtn = document.createElement("button");
+				navBtn.className = "ref-link-btn";
+				navBtn.textContent = `${name} ↗`;
+				navBtn.title = `Open decision: ${decisionId}`;
+				navBtn.addEventListener("click", () => options.openDecision?.(decisionId));
+				cfgToolbar.appendChild(navBtn);
+			} else if (options.getAvailableDecisions) {
+				if (cfgToolbar.children.length > 0) cfgToolbar.append(hudSep());
+				const linkBtn = document.createElement("button");
+				linkBtn.className = "ref-link-btn";
+				linkBtn.textContent = "Link decision \u25be";
+				linkBtn.addEventListener("pointerdown", (e) => e.stopPropagation());
+				linkBtn.addEventListener("click", () => {
+					if (openDropdown === refMenuEl) {
+						closeAllDropdowns();
+						return;
+					}
+					refMenuEl.innerHTML = "";
+					const decisions = options.getAvailableDecisions?.() ?? [];
+					for (const dec of decisions) {
+						const btn = document.createElement("button");
+						btn.className = "drop-item";
+						btn.textContent = dec.name ?? dec.id;
+						btn.title = dec.id;
+						btn.addEventListener("click", () => {
+							setBizRuleDecision(sourceId, dec.id);
+							closeAllDropdowns();
+						});
+						refMenuEl.appendChild(btn);
+					}
+					if (decisions.length === 0) {
+						const empty = document.createElement("div");
+						empty.className = "drop-label";
+						empty.textContent = "No decisions open";
+						refMenuEl.appendChild(empty);
+					}
+					showDropdown(refMenuEl, linkBtn, "above");
+				});
+				cfgToolbar.appendChild(linkBtn);
 			}
 		}
 	}
@@ -907,6 +1059,115 @@ export function initEditorHud(editor: BpmnEditor, options: HudOptions = {}): voi
 			}
 		}
 		return null;
+	}
+
+	function getUserTaskFormId(id: string): string | null {
+		const defs = editor.getDefinitions();
+		if (!defs) return null;
+		for (const process of defs.processes) {
+			const el = process.flowElements.find((e) => e.id === id);
+			if (!el) continue;
+			for (const ext of el.extensionElements) {
+				const ln = ext.name.includes(":") ? ext.name.slice(ext.name.indexOf(":") + 1) : ext.name;
+				if (ln === "formDefinition") return ext.attributes.formId ?? null;
+			}
+		}
+		return null;
+	}
+
+	function getBizRuleDecisionId(id: string): string | null {
+		const defs = editor.getDefinitions();
+		if (!defs) return null;
+		for (const process of defs.processes) {
+			const el = process.flowElements.find((e) => e.id === id);
+			if (!el) continue;
+			for (const ext of el.extensionElements) {
+				const ln = ext.name.includes(":") ? ext.name.slice(ext.name.indexOf(":") + 1) : ext.name;
+				if (ln === "calledDecision") return ext.attributes.decisionId ?? null;
+			}
+		}
+		return null;
+	}
+
+	function setCallActivityProcess(elementId: string, processId: string): void {
+		editor.applyChange((defs) => ({
+			...defs,
+			processes: defs.processes.map((proc) => ({
+				...proc,
+				flowElements: proc.flowElements.map((el) => {
+					if (el.id !== elementId) return el;
+					const otherExts = el.extensionElements.filter((x) => {
+						const ln = x.name.includes(":") ? x.name.slice(x.name.indexOf(":") + 1) : x.name;
+						return ln !== "calledElement";
+					});
+					return {
+						...el,
+						extensionElements: [
+							...otherExts,
+							{
+								name: "zeebe:calledElement",
+								attributes: { processId, propagateAllChildVariables: "false" },
+								children: [],
+							},
+						],
+					};
+				}),
+			})),
+		}));
+	}
+
+	function setUserTaskForm(elementId: string, formId: string): void {
+		editor.applyChange((defs) => ({
+			...defs,
+			processes: defs.processes.map((proc) => ({
+				...proc,
+				flowElements: proc.flowElements.map((el) => {
+					if (el.id !== elementId) return el;
+					const otherExts = el.extensionElements.filter((x) => {
+						const ln = x.name.includes(":") ? x.name.slice(x.name.indexOf(":") + 1) : x.name;
+						return ln !== "formDefinition" && ln !== "userTask";
+					});
+					return {
+						...el,
+						extensionElements: [
+							...otherExts,
+							{
+								name: "zeebe:formDefinition",
+								attributes: { formId },
+								children: [],
+							},
+						],
+					};
+				}),
+			})),
+		}));
+	}
+
+	function setBizRuleDecision(elementId: string, decisionId: string): void {
+		editor.applyChange((defs) => ({
+			...defs,
+			processes: defs.processes.map((proc) => ({
+				...proc,
+				flowElements: proc.flowElements.map((el) => {
+					if (el.id !== elementId) return el;
+					const otherExts = el.extensionElements.filter((x) => {
+						const ln = x.name.includes(":") ? x.name.slice(x.name.indexOf(":") + 1) : x.name;
+						return ln !== "calledDecision";
+					});
+					return {
+						...el,
+						extensionElements: [
+							...otherExts,
+							{
+								name: "zeebe:calledDecision",
+								attributes: { decisionId, resultVariable: "result" },
+								children: [],
+							},
+						],
+					};
+				}),
+			})),
+		}));
 	}
 
 	function positionCfgToolbar(): void {

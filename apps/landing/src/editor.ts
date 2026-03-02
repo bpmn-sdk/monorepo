@@ -3,6 +3,7 @@ import { createCommandPaletteEditorPlugin } from "@bpmn-sdk/canvas-plugin-comman
 import { createConfigPanelPlugin } from "@bpmn-sdk/canvas-plugin-config-panel";
 import { createConfigPanelBpmnPlugin } from "@bpmn-sdk/canvas-plugin-config-panel-bpmn";
 import { createMainMenuPlugin } from "@bpmn-sdk/canvas-plugin-main-menu";
+import { createOptimizePlugin } from "@bpmn-sdk/canvas-plugin-optimize";
 import {
 	InMemoryFileResolver,
 	createStorageTabsBridge,
@@ -13,7 +14,6 @@ import { Bpmn, Dmn } from "@bpmn-sdk/core";
 import { BpmnEditor, initEditorHud } from "@bpmn-sdk/editor";
 import type { Tool } from "@bpmn-sdk/editor";
 import { makeExamples } from "./examples.js";
-import { showOptimizeDialog } from "./optimize-dialog.js";
 
 const LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
   <rect width="24" height="24" rx="4" fill="#0062ff"/>
@@ -147,18 +147,17 @@ const bridge = createStorageTabsBridge({
 });
 
 const configPanelBpmn = createConfigPanelBpmnPlugin(configPanel, {
-	openDecision: (decisionId) => bridge.tabsPlugin.api.openDecision(decisionId),
-	openForm: (formId) => bridge.tabsPlugin.api.openForm(formId),
-	openProcess: (processId) => bridge.tabsPlugin.api.navigateToProcess(processId),
-	getAvailableProcesses: () => bridge.tabsPlugin.api.getAvailableProcesses(),
-	createProcess: (name, onCreated) => {
-		const processId = `Process_${Math.random().toString(36).slice(2, 9)}`;
-		bridge.tabsPlugin.api.openTab({ type: "bpmn", xml: Bpmn.makeEmpty(processId, name), name });
-		onCreated(processId);
-	},
 	openFeelPlayground: (expression) => {
 		bridge.tabsPlugin.api.openTab({ type: "feel", name: "FEEL Playground", expression });
 	},
+});
+
+const optimizePlugin = createOptimizePlugin({
+	getDefinitions: () => editorRef?.getDefinitions() ?? null,
+	reload: (xml) => {
+		editorRef?.load(xml);
+	},
+	openTab: (xml, name) => bridge.tabsPlugin.api.openTab({ type: "bpmn", xml, name }),
 });
 
 palette.addCommands([
@@ -197,14 +196,16 @@ editorRef = editor;
 
 initEditorHud(editor, {
 	openProcess: (processId) => bridge.tabsPlugin.api.navigateToProcess(processId),
-	rawModeButton: bridge.tabsPlugin.api.rawModeButton,
-	onOptimize() {
-		const defs = editorRef?.getDefinitions();
-		if (!defs) return;
-		showOptimizeDialog(
-			defs,
-			(xml) => editorRef?.load(xml),
-			(xml, name) => bridge.tabsPlugin.api.openTab({ type: "bpmn", xml, name }),
-		);
+	getAvailableProcesses: () => bridge.tabsPlugin.api.getAvailableProcesses(),
+	createProcess: (name, onCreated) => {
+		const processId = `Process_${Math.random().toString(36).slice(2, 9)}`;
+		bridge.tabsPlugin.api.openTab({ type: "bpmn", xml: Bpmn.makeEmpty(processId, name), name });
+		onCreated(processId);
 	},
+	openDecision: (decisionId) => bridge.tabsPlugin.api.openDecision(decisionId),
+	getAvailableDecisions: () => bridge.tabsPlugin.api.getAvailableDecisions(),
+	openForm: (formId) => bridge.tabsPlugin.api.openForm(formId),
+	getAvailableForms: () => bridge.tabsPlugin.api.getAvailableForms(),
+	rawModeButton: bridge.tabsPlugin.api.rawModeButton,
+	optimizeButton: optimizePlugin.button,
 });

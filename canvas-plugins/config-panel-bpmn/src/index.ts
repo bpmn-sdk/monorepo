@@ -419,9 +419,9 @@ const GENERAL_TYPES: CreateShapeType[] = [
 	"task",
 ];
 
-// ── User task schema (formId + optional Open Form button) ────────────────────
+// ── User task schema (formId) ─────────────────────────────────────────────────
 
-function makeUserTaskSchema(onOpenForm?: (formId: string) => void): PanelSchema {
+function makeUserTaskSchema(): PanelSchema {
 	return {
 		compact: [{ key: "name", label: "Name", type: "text", placeholder: "Task name" }],
 		groups: [
@@ -437,21 +437,6 @@ function makeUserTaskSchema(onOpenForm?: (formId: string) => void): PanelSchema 
 						placeholder: "e.g. Form_0h3l094",
 						hint: "ID of the Camunda Form linked to this user task.",
 					},
-					...(onOpenForm
-						? [
-								{
-									key: "__openForm",
-									label: "Open Form ↗",
-									type: "action" as const,
-									condition: (v: Record<string, FieldValue>) =>
-										typeof v.formId === "string" && v.formId.length > 0,
-									onClick: (v: Record<string, FieldValue>) => {
-										const id = v.formId;
-										if (typeof id === "string" && id) onOpenForm(id);
-									},
-								},
-							]
-						: []),
 					{
 						key: "documentation",
 						label: "Documentation",
@@ -496,9 +481,9 @@ const USER_TASK_ADAPTER: PanelAdapter = {
 	},
 };
 
-// ── Business rule task schema (decisionId + resultVariable + Open Decision button) ──
+// ── Business rule task schema (decisionId + resultVariable) ──────────────────
 
-function makeBusinessRuleTaskSchema(onOpenDecision?: (decisionId: string) => void): PanelSchema {
+function makeBusinessRuleTaskSchema(): PanelSchema {
 	return {
 		compact: [{ key: "name", label: "Name", type: "text", placeholder: "Task name" }],
 		groups: [
@@ -521,21 +506,6 @@ function makeBusinessRuleTaskSchema(onOpenDecision?: (decisionId: string) => voi
 						placeholder: "result",
 						hint: "Process variable that receives the decision output.",
 					},
-					...(onOpenDecision
-						? [
-								{
-									key: "__openDecision",
-									label: "Open Decision ↗",
-									type: "action" as const,
-									condition: (v: Record<string, FieldValue>) =>
-										typeof v.decisionId === "string" && v.decisionId.length > 0,
-									onClick: (v: Record<string, FieldValue>) => {
-										const id = v.decisionId;
-										if (typeof id === "string" && id) onOpenDecision(id);
-									},
-								},
-							]
-						: []),
 					{
 						key: "documentation",
 						label: "Documentation",
@@ -667,11 +637,7 @@ const SCRIPT_TASK_ADAPTER: PanelAdapter = {
 
 // ── Call activity schema ──────────────────────────────────────────────────────
 
-function makeCallActivitySchema(
-	onOpenProcess: ((processId: string) => void) | undefined,
-	getAvailableProcesses: (() => Array<{ id: string; name?: string }>) | undefined,
-	createProcess: ((name: string, onCreated: (processId: string) => void) => void) | undefined,
-): PanelSchema {
+function makeCallActivitySchema(): PanelSchema {
 	return {
 		compact: [{ key: "name", label: "Name", type: "text", placeholder: "Activity name" }],
 		groups: [
@@ -692,67 +658,6 @@ function makeCallActivitySchema(
 						label: "Propagate all child variables",
 						type: "toggle",
 					},
-					...(getAvailableProcesses
-						? [
-								{
-									key: "__selectProcess",
-									label: "Select process…",
-									type: "action" as const,
-									onClick: (
-										_v: Record<string, FieldValue>,
-										setValue: (k: string, v: FieldValue) => void,
-									) => {
-										const procs = getAvailableProcesses();
-										if (procs.length === 0) {
-											alert("No BPMN processes are currently open.");
-											return;
-										}
-										const lines = procs
-											.map((p, i) => `${i + 1}. ${p.id}${p.name ? ` — ${p.name}` : ""}`)
-											.join("\n");
-										const input = prompt(`Select a process (enter number):\n${lines}`);
-										if (!input?.trim()) return;
-										const idx = Number.parseInt(input.trim(), 10) - 1;
-										const chosen = procs[idx];
-										if (chosen) setValue("processId", chosen.id);
-									},
-								},
-							]
-						: []),
-					...(createProcess
-						? [
-								{
-									key: "__newProcess",
-									label: "New process…",
-									type: "action" as const,
-									onClick: (
-										_v: Record<string, FieldValue>,
-										setValue: (k: string, v: FieldValue) => void,
-									) => {
-										const name = prompt("New process name:", "New Process");
-										if (!name?.trim()) return;
-										createProcess(name.trim(), (processId) => {
-											setValue("processId", processId);
-										});
-									},
-								},
-							]
-						: []),
-					...(onOpenProcess
-						? [
-								{
-									key: "__openProcess",
-									label: "Open Process ↗",
-									type: "action" as const,
-									condition: (v: Record<string, FieldValue>) =>
-										typeof v.processId === "string" && v.processId.length > 0,
-									onClick: (v: Record<string, FieldValue>) => {
-										const id = v.processId;
-										if (typeof id === "string" && id) onOpenProcess(id);
-									},
-								},
-							]
-						: []),
 					{
 						key: "documentation",
 						label: "Documentation",
@@ -1435,32 +1340,6 @@ const BOUNDARY_EVENT_ADAPTER: PanelAdapter = {
 
 export interface ConfigPanelBpmnOptions {
 	/**
-	 * Called when the user clicks "Open Decision ↗" in the businessRuleTask panel.
-	 * Typically implemented by calling `tabsPlugin.api.openDecision(decisionId)`.
-	 */
-	openDecision?: (decisionId: string) => void;
-	/**
-	 * Called when the user clicks "Open Form ↗" in the userTask panel.
-	 * Typically implemented by calling `tabsPlugin.api.openForm(formId)`.
-	 */
-	openForm?: (formId: string) => void;
-	/**
-	 * Called when the user clicks "Open Process ↗" in the callActivity panel.
-	 * Typically implemented by navigating to the BPMN tab with the matching process ID.
-	 */
-	openProcess?: (processId: string) => void;
-	/**
-	 * Returns the list of currently open BPMN processes available for selection
-	 * in the callActivity panel. When provided, a "Select process…" button appears.
-	 */
-	getAvailableProcesses?: () => Array<{ id: string; name?: string }>;
-	/**
-	 * Called when the user clicks "New process…" in the callActivity panel.
-	 * Should create a new BPMN tab and call `onCreated` with its process ID.
-	 * When provided, a "New process…" button appears.
-	 */
-	createProcess?: (name: string, onCreated: (processId: string) => void) => void;
-	/**
 	 * Called when the user clicks "Open in FEEL Playground ↗" in a FEEL expression field.
 	 * Typically implemented by calling `tabsPlugin.api.openTab({ type: "feel", ... })`.
 	 */
@@ -1477,12 +1356,9 @@ export interface ConfigPanelBpmnOptions {
  * connector template form is rendered; otherwise a generic connector selector
  * is shown. Custom templates can be registered via `registerTemplate`.
  *
- * Pass `openDecision` / `openForm` callbacks to enable "Open Decision ↗" /
- * "Open Form ↗" navigation buttons in the respective element panels.
- *
  * @param configPanel - The base config panel plugin returned by
  *   `createConfigPanelPlugin`.
- * @param options - Optional callbacks for DMN/form navigation.
+ * @param options - Optional callbacks for FEEL playground navigation.
  */
 export function createConfigPanelBpmnPlugin(
 	configPanel: ConfigPanelPlugin,
@@ -1491,13 +1367,9 @@ export function createConfigPanelBpmnPlugin(
 	/** Register an additional element template to make it available in the UI. */
 	registerTemplate(template: ElementTemplate): void;
 } {
-	const userTaskSchema = makeUserTaskSchema(options.openForm);
-	const businessRuleTaskSchema = makeBusinessRuleTaskSchema(options.openDecision);
-	const callActivitySchema = makeCallActivitySchema(
-		options.openProcess,
-		options.getAvailableProcesses,
-		options.createProcess,
-	);
+	const userTaskSchema = makeUserTaskSchema();
+	const businessRuleTaskSchema = makeBusinessRuleTaskSchema();
+	const callActivitySchema = makeCallActivitySchema();
 	const scriptTaskSchema = makeScriptTaskSchema(options.openFeelPlayground);
 	const sequenceFlowSchema = makeSequenceFlowSchema(options.openFeelPlayground);
 

@@ -2,6 +2,7 @@ import type { CanvasApi, CanvasPlugin } from "@bpmn-sdk/canvas";
 import type { MainMenuApi, MenuItem } from "@bpmn-sdk/canvas-plugin-main-menu";
 import { Bpmn } from "@bpmn-sdk/core";
 import type { BpmnDefinitions } from "@bpmn-sdk/core";
+import { showConfirmDialog, showInputDialog } from "./dialog.js";
 import { exportProjectAsZip } from "./export.js";
 import { StorageApi, type StorageApiOptions } from "./storage-api.js";
 import type { FileType, ProjectRecord, WorkspaceRecord } from "./types.js";
@@ -15,6 +16,7 @@ export type {
 } from "./types.js";
 export { StorageApi } from "./storage-api.js";
 export type { StorageApiOptions } from "./storage-api.js";
+export { showInputDialog, showConfirmDialog } from "./dialog.js";
 
 // ─── Plugin factory ───────────────────────────────────────────────────────────
 
@@ -121,15 +123,20 @@ export function createStoragePlugin(
 		});
 		items.push({
 			label: "Rename Workspace…",
-			onClick: () =>
-				void storageApi.renameWorkspace(ws.id, prompt("New name:", ws.name)?.trim() ?? ws.name),
+			onClick: async () => {
+				const newName = await showInputDialog({ title: "Rename workspace", defaultValue: ws.name });
+				if (newName) void storageApi.renameWorkspace(ws.id, newName);
+			},
 		});
 		items.push({
 			label: "Delete Workspace",
-			onClick: () => {
-				if (confirm(`Delete workspace "${ws.name}" and all its data?`)) {
-					void storageApi.deleteWorkspace(ws.id);
-				}
+			onClick: async () => {
+				const ok = await showConfirmDialog({
+					title: "Delete workspace",
+					message: `Delete workspace "${ws.name}" and all its data?`,
+					danger: true,
+				});
+				if (ok) void storageApi.deleteWorkspace(ws.id);
 			},
 		});
 		return items;
@@ -138,17 +145,16 @@ export function createStoragePlugin(
 	async function handleCreateWorkspace(
 		onProjectClick: (ws: WorkspaceRecord, proj: ProjectRecord) => void,
 	): Promise<void> {
-		const name = prompt("Workspace name:")?.trim();
+		const name = await showInputDialog({ title: "New workspace", placeholder: "Workspace name" });
 		if (!name) return;
 		await storageApi.createWorkspace(name);
-		// Trigger menu rebuild on next open via notify
 	}
 
 	async function handleCreateProject(
 		ws: WorkspaceRecord,
 		onProjectClick: (ws: WorkspaceRecord, proj: ProjectRecord) => void,
 	): Promise<void> {
-		const name = prompt("Project name:")?.trim();
+		const name = await showInputDialog({ title: "New project", placeholder: "Project name" });
 		if (!name) return;
 		await storageApi.createProject(ws.id, name);
 	}
@@ -173,12 +179,11 @@ export function createStoragePlugin(
 				const onRename = options.onRenameCurrentFile;
 				items.push({
 					label: "Rename current file\u2026",
-					onClick: () => {
-						const newName = prompt("Rename file:")?.trim();
+					onClick: async () => {
+						const newName = await showInputDialog({ title: "Rename file" });
 						if (!newName) return;
-						void storageApi.renameFile(currentFileId, newName).then(() => {
-							onRename(currentFileId, newName);
-						});
+						await storageApi.renameFile(currentFileId, newName);
+						onRename(currentFileId, newName);
 					},
 				});
 			}

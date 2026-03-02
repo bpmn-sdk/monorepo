@@ -1,5 +1,29 @@
 # Features
 
+## Reference navigation in element toolbar (2026-03-02) — `@bpmn-sdk/editor` HUD
+
+When a BPMN element with a linked reference is selected, the cfg toolbar shows navigation buttons:
+
+- **Call activity**: if `processId` set → "ProcessName ↗" navigate button; else → "Link process ▾" dropdown with available processes + "New process…" input modal
+- **User task**: if `formId` set → "FormId ↗" navigate button; else → "Link form ▾" dropdown
+- **Business rule task**: if `decisionId` set → "DecisionId ↗" navigate button; else → "Link decision ▾" dropdown
+- Reference action buttons removed from config panel; process/form/decision text fields remain for manual editing
+
+## Optimize plugin (2026-03-02) — `@bpmn-sdk/canvas-plugin-optimize`
+
+New self-contained canvas plugin encapsulating the two-phase optimize dialog:
+
+- `createOptimizePlugin(options)` returns `{ name, install(), button }` — button is injected into the HUD as `optimizeButton`
+- Dialog logic (styles, phase 1 findings list, phase 2 results) fully self-contained in the plugin
+
+## Custom storage dialogs (2026-03-02) — `@bpmn-sdk/canvas-plugin-storage`
+
+All browser `prompt()`/`confirm()` calls replaced with themed custom modals:
+
+- `showInputDialog(opts): Promise<string | null>` — text input modal with title, placeholder, default value
+- `showConfirmDialog(opts): Promise<boolean>` — confirmation modal with optional `danger` styling
+- Both exported from `@bpmn-sdk/canvas-plugin-storage`; used in storage and storage-tabs-bridge
+
 ## Optimize button (2026-03-02) — editor HUD + landing app
 
 "Optimize Diagram" button in the BPMN editor action bar (wand+sparkle icon):
