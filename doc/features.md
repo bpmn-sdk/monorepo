@@ -1,5 +1,16 @@
 # Features
 
+## `optimize()` — Static BPMN Optimization Analyzer (2026-03-02) — `@bpmn-sdk/core`
+
+New `optimize(defs, options?)` function exported from `@bpmn-sdk/core`:
+
+- **11 finding types** across 3 categories: `feel`, `flow`, `task-reuse`
+- **FEEL analysis**: detects empty conditions, missing default flows, complex expressions (length/nesting/operators/variables), complex IO mappings, duplicate expressions
+- **Flow analysis**: detects unreachable elements, dead-end nodes, missing end events, redundant gateways, empty sub-processes
+- **Task reuse**: clusters service tasks by similarity (taskType + headers + IO) and flags groups that can be extracted to reusable call activities
+- **`applyFix`** on each applicable finding mutates `defs` in-place; task reuse fix returns a generated `BpmnDefinitions` for the extracted sub-process
+- **Configurable thresholds** via `OptimizeOptions`: FEEL length/nesting/operator/variable thresholds, reuse group minimum size, category filter
+
 ## Storage-tabs integration bridge (2026-03-02) — `@bpmn-sdk/canvas-plugin-storage-tabs-bridge`
 
 New package that wires storage and tabs together so client apps don't need to manually manage the cross-plugin state:

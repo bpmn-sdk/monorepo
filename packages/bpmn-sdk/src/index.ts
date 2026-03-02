@@ -175,3 +175,12 @@ export { generateId, resetIdCounter } from "./types/id-generator.js";
 export { parseXml, serializeXml } from "./xml/index.js";
 export { readDiColor, writeDiColor, BIOC_NS, COLOR_NS } from "./bpmn/di-color.js";
 export type { DiColor } from "./bpmn/di-color.js";
+export { optimize } from "./bpmn/optimize/index.js";
+export type {
+	OptimizationReport,
+	OptimizationFinding,
+	OptimizationSeverity,
+	OptimizationCategory,
+	ApplyFixResult,
+	OptimizeOptions,
+} from "./bpmn/optimize/types.js";

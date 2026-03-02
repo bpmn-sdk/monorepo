@@ -1,5 +1,44 @@
 # Progress
 
+## 2026-03-02 — `optimize()` — Static BPMN Optimization Analyzer in `@bpmn-sdk/core`
+
+New `optimize(defs, options?)` function that performs static analysis on a `BpmnDefinitions` object and returns an `OptimizationReport` with actionable findings and optional in-place fixes.
+
+### Files added
+
+- `packages/bpmn-sdk/src/bpmn/optimize/types.ts` — Public types (`OptimizationFinding`, `OptimizationReport`, `OptimizeOptions`, `ApplyFixResult`)
+- `packages/bpmn-sdk/src/bpmn/optimize/utils.ts` — Internal graph helpers (flow index, BFS reachability, Zeebe extension readers, mutation helpers)
+- `packages/bpmn-sdk/src/bpmn/optimize/feel.ts` — FEEL expression analyzer (5 finding types)
+- `packages/bpmn-sdk/src/bpmn/optimize/flow.ts` — Flow structure analyzer (5 finding types)
+- `packages/bpmn-sdk/src/bpmn/optimize/tasks.ts` — Service task similarity + call activity extraction
+- `packages/bpmn-sdk/src/bpmn/optimize/index.ts` — `optimize()` entry point
+- `packages/bpmn-sdk/tests/optimize.test.ts` — 25 new tests (all passing)
+
+### Finding types
+
+| ID | Category | Severity |
+|---|---|---|
+| `feel/empty-condition` | feel | error |
+| `feel/missing-default-flow` | feel | warning |
+| `feel/complex-condition` | feel | warning |
+| `feel/complex-io-mapping` | feel | info |
+| `feel/duplicate-expression` | feel | info |
+| `flow/unreachable` | flow | error |
+| `flow/dead-end` | flow | warning |
+| `flow/no-end-event` | flow | warning |
+| `flow/redundant-gateway` | flow | info |
+| `flow/empty-subprocess` | flow | warning |
+| `task/reusable-group` | task-reuse | warning |
+
+### Fixes with `applyFix`
+
+- `feel/missing-default-flow` — sets gateway `default` attribute
+- `flow/dead-end` — generates and inserts an `EndEvent` with sequence flow
+- `flow/redundant-gateway` — removes gateway, reconnects source→target directly
+- `task/reusable-group` — replaces tasks with `callActivity`, returns extracted `BpmnDefinitions`
+
+---
+
 ## 2026-03-02 — Developer-experience refactor: storage-tabs-bridge + API improvements
 
 ### New package: `@bpmn-sdk/canvas-plugin-storage-tabs-bridge`
