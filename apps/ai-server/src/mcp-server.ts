@@ -53,31 +53,122 @@ function ensureProcess(processId: string): CompactProcess {
 }
 
 // ── Tool definitions ──────────────────────────────────────────────────────────
+//
+// IMPORTANT: add_http_call is listed FIRST (after get_diagram) so the LLM
+// encounters it before add_elements and uses it for any HTTP/REST task.
+
+const ELEMENT_SCHEMA = {
+	type: "object",
+	properties: {
+		id: { type: "string", description: "Unique element ID" },
+		type: {
+			type: "string",
+			description:
+				"BPMN element type. Events: startEvent | endEvent | intermediateThrowEvent | intermediateCatchEvent | boundaryEvent. " +
+				"Tasks: serviceTask | userTask | businessRuleTask | callActivity | scriptTask | sendTask | manualTask. " +
+				"Gateways: exclusiveGateway | parallelGateway | inclusiveGateway | eventBasedGateway. " +
+				"Containers: subProcess | adHocSubProcess.",
+		},
+		name: { type: "string", description: "Display name shown on the diagram" },
+		eventType: {
+			type: "string",
+			description:
+				"For events: timer | message | signal | error | escalation | cancel | terminate | conditional | link | compensate",
+		},
+		attachedTo: { type: "string", description: "boundaryEvent only: ID of the host activity" },
+		interrupting: {
+			type: "boolean",
+			description: "boundaryEvent only: false = non-interrupting (default true)",
+		},
+		jobType: {
+			type: "string",
+			description:
+				"serviceTask only: Zeebe worker job type. " +
+				"⚠️ For HTTP/REST API calls do NOT set this here — use the add_http_call tool instead.",
+		},
+		formId: { type: "string", description: "userTask only: linked Camunda form ID" },
+		calledProcess: { type: "string", description: "callActivity only: ID of the called process" },
+		decisionId: { type: "string", description: "businessRuleTask only: DMN decision ID" },
+		resultVariable: {
+			type: "string",
+			description: "businessRuleTask / serviceTask: process variable to store the task output",
+		},
+	},
+	required: ["id", "type"],
+};
+
+const FLOW_SCHEMA = {
+	type: "object",
+	properties: {
+		id: { type: "string" },
+		from: { type: "string", description: "Source element ID" },
+		to: { type: "string", description: "Target element ID" },
+		name: { type: "string" },
+		condition: { type: "string", description: "FEEL condition expression" },
+	},
+	required: ["id", "from", "to"],
+};
 
 const TOOLS = [
 	{
 		name: "get_diagram",
-		description:
-			"Return the current BPMN diagram as CompactDiagram JSON. Call this first to see what exists.",
+		description: "Return the current BPMN diagram. Call this first before making any changes.",
 		inputSchema: { type: "object", properties: {} },
+	},
+	{
+		name: "add_http_call",
+		description:
+			"⚠️ ALWAYS use this tool — not add_elements — for any HTTP/REST API call, webhook, or external service integration.\n" +
+			"Adds a Camunda HTTP connector service task (jobType: io.camunda:http-json:1) with the correct taskHeaders.\n" +
+			"Use your knowledge of the target API to provide a real endpoint URL, not a placeholder.",
+		inputSchema: {
+			type: "object",
+			properties: {
+				processId: { type: "string" },
+				id: { type: "string", description: "Unique element ID" },
+				name: { type: "string", description: "Task display name" },
+				url: {
+					type: "string",
+					description:
+						"Full API endpoint URL. Use your knowledge — e.g. https://api.github.com/repos/{owner}/{repo}/issues for GitHub.",
+				},
+				method: { type: "string", enum: ["GET", "POST", "PUT", "PATCH", "DELETE"] },
+				headers: {
+					type: "string",
+					description:
+						'Optional JSON string of HTTP headers, e.g. {"Authorization":"Bearer {{token}}","Accept":"application/json"}',
+				},
+				body: {
+					type: "string",
+					description: "Optional FEEL expression for the request body (POST/PUT/PATCH)",
+				},
+				resultVariable: {
+					type: "string",
+					description: "Optional process variable name to store the HTTP response",
+				},
+			},
+			required: ["processId", "id", "name", "url", "method"],
+		},
 	},
 	{
 		name: "add_elements",
 		description:
-			"Add elements and/or sequence flows to a process. Creates the process if it does not exist.",
+			"Add BPMN elements (tasks, events, gateways) and/or sequence flows to a process.\n" +
+			"⚠️ NOT for HTTP/REST API calls — use add_http_call for those.\n" +
+			"Creates the process if it does not exist.",
 		inputSchema: {
 			type: "object",
 			properties: {
 				processId: { type: "string", description: "Target process ID" },
 				elements: {
 					type: "array",
-					items: { type: "object" },
-					description: "CompactElement objects to add (id, type, name, jobType, …)",
+					items: ELEMENT_SCHEMA,
+					description: "BPMN elements to add",
 				},
 				flows: {
 					type: "array",
-					items: { type: "object" },
-					description: "CompactFlow objects to add (id, from, to, name?, condition?)",
+					items: FLOW_SCHEMA,
+					description: "Sequence flows to add",
 				},
 			},
 			required: ["processId"],
@@ -86,7 +177,7 @@ const TOOLS = [
 	{
 		name: "remove_elements",
 		description:
-			"Remove elements and/or flows. Removing an element also removes its connecting flows.",
+			"Remove BPMN elements and/or sequence flows. Removing an element also removes its connecting flows.",
 		inputSchema: {
 			type: "object",
 			properties: {
@@ -99,13 +190,18 @@ const TOOLS = [
 	},
 	{
 		name: "update_element",
-		description: "Merge changes into an existing element (name, type, jobType, taskHeaders, etc.).",
+		description:
+			"Merge changes into an existing BPMN element (rename, change type, set jobType, etc.).",
 		inputSchema: {
 			type: "object",
 			properties: {
 				processId: { type: "string" },
 				elementId: { type: "string" },
-				changes: { type: "object", description: "Partial CompactElement fields to merge in" },
+				changes: {
+					...ELEMENT_SCHEMA,
+					required: [],
+					description: "Fields to update — only the provided fields are changed",
+				},
 			},
 			required: ["processId", "elementId", "changes"],
 		},
@@ -124,45 +220,17 @@ const TOOLS = [
 		},
 	},
 	{
-		name: "add_http_call",
-		description:
-			"Add an HTTP REST service task using the Camunda built-in connector (jobType: io.camunda:http-json:1). " +
-			"Always use this tool — never add_elements — when adding any HTTP API call or external service request. " +
-			"Use real API endpoint URLs from your knowledge, not placeholders.",
-		inputSchema: {
-			type: "object",
-			properties: {
-				processId: { type: "string" },
-				id: { type: "string", description: "Unique element ID" },
-				name: { type: "string", description: "Task display name" },
-				url: { type: "string", description: "Full API endpoint URL" },
-				method: { type: "string", enum: ["GET", "POST", "PUT", "PATCH", "DELETE"] },
-				headers: {
-					type: "string",
-					description:
-						'Optional JSON string of request headers, e.g. {"Authorization":"Bearer {{token}}"}',
-				},
-				body: {
-					type: "string",
-					description: "Optional FEEL expression for the request body (POST/PUT)",
-				},
-				resultVariable: {
-					type: "string",
-					description: "Optional process variable name to store the response",
-				},
-			},
-			required: ["processId", "id", "name", "url", "method"],
-		},
-	},
-	{
 		name: "replace_diagram",
 		description:
-			"Replace the entire diagram with a new CompactDiagram. " +
-			"Use only when creating a new diagram from scratch or doing a major structural rewrite.",
+			"Replace the entire diagram. Use only when creating a new diagram from scratch or doing a full structural rewrite.",
 		inputSchema: {
 			type: "object",
 			properties: {
-				diagram: { type: "object", description: "Complete CompactDiagram object" },
+				diagram: {
+					type: "object",
+					description:
+						"Complete diagram object: { id, processes: [{ id, name?, elements: [...], flows: [...] }] }",
+				},
 			},
 			required: ["diagram"],
 		},
@@ -172,6 +240,7 @@ const TOOLS = [
 // ── Tool execution ────────────────────────────────────────────────────────────
 
 function callTool(name: string, args: Record<string, unknown>): string {
+	process.stderr.write(`[mcp] tool: ${name} args: ${JSON.stringify(args)}\n`);
 	switch (name) {
 		case "get_diagram":
 			return JSON.stringify(state, null, 2);

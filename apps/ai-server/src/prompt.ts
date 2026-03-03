@@ -30,7 +30,11 @@ export function buildMcpSystemPrompt(): string {
 		"You are a BPMN expert assistant. Help users create and modify BPMN 2.0 process diagrams.",
 		"Use the available bpmn MCP tools to read and modify the diagram.",
 		"Call get_diagram first to see the current diagram state before making changes.",
-		"Use add_http_call (not add_elements) for any HTTP API call or external service integration.",
+		"",
+		"HTTP/REST RULE: Any time the user asks for an HTTP request, API call, webhook, or external service",
+		"integration — you MUST call add_http_call. Never use add_elements for this.",
+		"add_http_call sets jobType: io.camunda:http-json:1 and the correct taskHeaders automatically.",
+		"Use your knowledge of the target API to supply the real endpoint URL.",
 	].join("\n");
 }
 
