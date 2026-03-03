@@ -8,8 +8,8 @@
 		"build": "vite build",
 		"typecheck": "tsc --noEmit",
 		"check": "biome check .",
-		"tauri:dev": "pnpm --filter @bpmn-sdk/ai-server run bundle && tauri dev",
-		"tauri:build": "pnpm --filter @bpmn-sdk/ai-server run bundle && tauri build"
+		"tauri:dev": "tauri dev",
+		"tauri:build": "cargo build --manifest-path ../../apps/ai-server-rs/Cargo.toml --release && tauri build"
 	},
 	"dependencies": {
 		"@bpmn-sdk/canvas": "workspace:*",

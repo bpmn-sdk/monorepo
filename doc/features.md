@@ -1,5 +1,16 @@
 # Features
 
+## Native Rust AI server with embedded QuickJS (2026-03-03) — `apps/ai-server-rs`
+
+The Tauri desktop app now bundles two native Rust binaries instead of a Node.js bundle:
+
+- **`ai-server`** — HTTP server on port 3033 (axum, CORS, SSE). Detects and proxies Claude/Copilot/Gemini CLIs. Converts CompactDiagram ↔ BPMN XML via the embedded `@bpmn-sdk/core` bridge.
+- **`bpmn-mcp`** — stdio MCP server (JSON-RPC 2.0). Used as the LLM's tool executor when MCP is supported. Maintains stateful BPMN diagram in-memory via the bridge.
+
+**Core bridge** (`bridge.ts` → `bridge.bundle.js` → `include_str!`): `@bpmn-sdk/core` is compiled to an IIFE JS bundle at Rust build time and evaluated in a dedicated QuickJS (`rquickjs`) thread. When core changes, rebuilding the Rust package automatically picks up the update — no divergence between JS and Rust.
+
+No Node.js required on the user's machine for the desktop app.
+
 ## History tab in sidebar dock (2026-03-03) — `canvas-plugins/history`, `packages/editor`
 
 A dedicated "History" tab sits between Properties and AI in the right sidebar. It shows a chronological list of AI checkpoints for the currently open file with one-click restore (confirm dialog). The tab is disabled for in-memory files that have no storage context.

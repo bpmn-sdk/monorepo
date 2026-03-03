@@ -1,5 +1,28 @@
 # Progress
 
+## 2026-03-03 — Rust AI server with embedded QuickJS core bridge (`apps/ai-server-rs`)
+
+New standalone Rust package (`bpmn-ai-server`) replacing the Node.js `ai-server.cjs` bundle in the Tauri desktop app. Eliminates the Node.js runtime dependency from the desktop distribution.
+
+### Architecture
+- **`apps/ai-server/src/bridge.ts`** — new TypeScript bridge that exposes all `@bpmn-sdk/core` operations as `globalThis.Bridge.*` functions (IIFE bundle, platform=neutral). Includes stateful MCP operations (`mcpInit`, `mcpGetDiagram`, `mcpExportXml`, `mcpAddElements`, etc.) and stateless HTTP helpers (`expandAndExport`, `optimizeFindings`).
+- **`apps/ai-server-rs/`** — Rust crate with two binaries:
+  - `ai-server` — axum HTTP server (port 3033), CORS, SSE, `/status` + `/chat` routes
+  - `bpmn-mcp` — JSON-RPC 2.0 stdio MCP server (replaces `mcp-server.ts`)
+- **`build.rs`** — runs `pnpm --filter @bpmn-sdk/ai-server run bridge` at Rust build time, copies `bridge.bundle.js` to `OUT_DIR`, embeds it with `include_str!`
+- **`src/bridge.rs`** — QuickJS thread with `std::sync::mpsc` channel; async HTTP methods and sync MCP methods dispatch via `tokio::sync::oneshot`
+- **`src/adapters.rs`** — ports of `claude.ts`, `copilot.ts`, `gemini.ts` spawning CLIs via `tokio::process::Command`
+- **`src/prompt.rs`** — `build_mcp_system_prompt`, `build_mcp_improve_prompt`, `build_system_prompt` (pure Rust strings)
+- **`src/mcp_tools.rs`** — all 7 tool definitions + dispatch calling `bridge.mcp_*_sync()` methods
+- **`src/mcp_server.rs`** — JSON-RPC 2.0 stdio loop (single-threaded, no tokio)
+
+### Package changes
+- **`apps/ai-server/package.json`** — added `bridge` script: `esbuild src/bridge.ts --bundle --format=iife --global-name=Bridge --platform=neutral`; `bundle` script now also runs bridge build
+- **`apps/desktop/src-tauri/tauri.conf.json`** — resources updated to `ai-server` + `bpmn-mcp` native binaries (removed `ai-server.cjs`)
+- **`apps/desktop/src-tauri/src/lib.rs`** — `spawn_ai_server` now runs the native binary directly with `BPMN_MCP_PATH` env var; `tauri:dev` no longer pre-bundles Node.js server
+- **`apps/desktop/package.json`** — `tauri:build` runs `cargo build --release` (which triggers bridge bundle via build.rs) then `tauri build`; `tauri:dev` just runs `tauri dev`
+- **Root `package.json`** — added `ai-server-rs` and `ai-server-rs:build` scripts
+
 ## 2026-03-03 — Extract history into dedicated canvas-plugin; polish History tab; remove AI History button
 
 ### New package: `canvas-plugins/history` → `@bpmn-sdk/canvas-plugin-history`
