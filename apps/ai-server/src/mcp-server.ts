@@ -2,16 +2,31 @@
  * Minimal stdio MCP server for BPMN diagram editing.
  * Zero external dependencies — pure Node.js built-ins + @bpmn-sdk/core (workspace package).
  *
- * Usage:
- *   node dist/mcp-server.js [--input <diagram.json>] [--output <result.json>]
+ * State is stored as BpmnDefinitions (BPMN XML) so core builder APIs (e.g. restConnector)
+ * produce the correct zeebe:ioMapping extension structure — not the lossy CompactDiagram format.
  *
- * The server reads an initial CompactDiagram from --input (optional) and writes
- * the current state to --output after every mutating tool call.
+ * Usage:
+ *   node dist/mcp-server.js [--input <diagram.bpmn>] [--output <result.bpmn>]
  */
 
 import { readFileSync, writeFileSync } from "node:fs";
 import { createInterface } from "node:readline";
-import type { CompactDiagram, CompactElement, CompactFlow, CompactProcess } from "@bpmn-sdk/core";
+import {
+	Bpmn,
+	type BpmnDefinitions,
+	type BpmnDiEdge,
+	type BpmnDiShape,
+	type BpmnDiagram,
+	type BpmnFlowElement,
+	type BpmnProcess,
+	type CompactDiagram,
+	type CompactElement,
+	type CompactFlow,
+	type RestConnectorConfig,
+	compactify,
+	expand,
+	layoutProcess,
+} from "@bpmn-sdk/core";
 
 // ── CLI args ──────────────────────────────────────────────────────────────────
 
@@ -25,28 +40,82 @@ const outputFile = getArg("--output");
 
 // ── State ─────────────────────────────────────────────────────────────────────
 
-let state: CompactDiagram = { id: "Definitions_1", processes: [] };
+let state: BpmnDefinitions = Bpmn.parse(Bpmn.makeEmpty("Process_1", "New Process"));
 
 if (inputFile) {
 	try {
-		state = JSON.parse(readFileSync(inputFile, "utf8")) as CompactDiagram;
+		// Input is BPMN XML written by index.ts (expand + Bpmn.export)
+		state = Bpmn.parse(readFileSync(inputFile, "utf8"));
 	} catch {
 		/* start with empty diagram if file is unreadable */
 	}
 }
 
-function saveState(): void {
-	if (outputFile) writeFileSync(outputFile, JSON.stringify(state));
+function buildDiagram(proc: BpmnProcess): BpmnDiagram {
+	const layout = layoutProcess(proc);
+	const shapes: BpmnDiShape[] = layout.nodes.map((n) => ({
+		id: `${n.id}_di`,
+		bpmnElement: n.id,
+		isExpanded: n.isExpanded,
+		bounds: n.bounds,
+		label: n.labelBounds ? { bounds: n.labelBounds } : undefined,
+		unknownAttributes: {},
+	}));
+	const edges: BpmnDiEdge[] = layout.edges.map((e) => ({
+		id: `${e.id}_di`,
+		bpmnElement: e.id,
+		waypoints: e.waypoints,
+		unknownAttributes: {},
+	}));
+	return {
+		id: `BPMNDiagram_${proc.id}`,
+		plane: {
+			id: `BPMNPlane_${proc.id}`,
+			bpmnElement: proc.id,
+			shapes,
+			edges,
+		},
+	};
 }
 
-function findProcess(processId: string): CompactProcess | undefined {
+function saveState(): void {
+	if (!outputFile) return;
+	state.diagrams = state.processes.map((proc) => buildDiagram(proc));
+	writeFileSync(outputFile, Bpmn.export(state));
+}
+
+function recomputeIncomingOutgoing(proc: BpmnProcess): void {
+	const elementMap = new Map<string, BpmnFlowElement>();
+	for (const el of proc.flowElements) {
+		el.incoming = [];
+		el.outgoing = [];
+		elementMap.set(el.id, el);
+	}
+	for (const sf of proc.sequenceFlows) {
+		const src = elementMap.get(sf.sourceRef);
+		const tgt = elementMap.get(sf.targetRef);
+		if (src) src.outgoing.push(sf.id);
+		if (tgt) tgt.incoming.push(sf.id);
+	}
+}
+
+function findProcess(processId: string): BpmnProcess | undefined {
 	return state.processes.find((p) => p.id === processId);
 }
 
-function ensureProcess(processId: string): CompactProcess {
+function ensureProcess(processId: string): BpmnProcess {
 	let proc = state.processes.find((p) => p.id === processId);
 	if (!proc) {
-		proc = { id: processId, elements: [], flows: [] };
+		proc = {
+			id: processId,
+			isExecutable: true,
+			extensionElements: [],
+			flowElements: [],
+			sequenceFlows: [],
+			textAnnotations: [],
+			associations: [],
+			unknownAttributes: {},
+		};
 		state.processes.push(proc);
 	}
 	return proc;
@@ -119,7 +188,7 @@ const TOOLS = [
 		name: "add_http_call",
 		description:
 			"⚠️ ALWAYS use this tool — not add_elements — for any HTTP/REST API call, webhook, or external service integration.\n" +
-			"Adds a Camunda HTTP connector service task (jobType: io.camunda:http-json:1) with the correct taskHeaders.\n" +
+			"Adds a Camunda HTTP connector service task (jobType: io.camunda:http-json:1) with the correct zeebe:ioMapping inputs.\n" +
 			"Use your knowledge of the target API to provide a real endpoint URL, not a placeholder.",
 		inputSchema: {
 			type: "object",
@@ -190,17 +259,17 @@ const TOOLS = [
 	},
 	{
 		name: "update_element",
-		description:
-			"Merge changes into an existing BPMN element (rename, change type, set jobType, etc.).",
+		description: "Rename an existing BPMN element or change its display name.",
 		inputSchema: {
 			type: "object",
 			properties: {
 				processId: { type: "string" },
 				elementId: { type: "string" },
 				changes: {
-					...ELEMENT_SCHEMA,
-					required: [],
-					description: "Fields to update — only the provided fields are changed",
+					type: "object",
+					properties: { name: { type: "string", description: "New display name" } },
+					description:
+						"Fields to update — only name is supported; use remove + add for structural changes",
 				},
 			},
 			required: ["processId", "elementId", "changes"],
@@ -243,20 +312,39 @@ function callTool(name: string, args: Record<string, unknown>): string {
 	process.stderr.write(`[mcp] tool: ${name} args: ${JSON.stringify(args)}\n`);
 	switch (name) {
 		case "get_diagram":
-			return JSON.stringify(state, null, 2);
+			return JSON.stringify(compactify(state), null, 2);
 
 		case "add_elements": {
 			const proc = ensureProcess(args.processId as string);
 			const elements = (args.elements as CompactElement[] | undefined) ?? [];
 			const flows = (args.flows as CompactFlow[] | undefined) ?? [];
-			for (const el of elements) {
-				if (!proc.elements.some((e) => e.id === el.id)) proc.elements.push(el);
+
+			// Use expand() to create properly structured BpmnFlowElement objects
+			const miniCompact: CompactDiagram = {
+				id: "__temp__",
+				processes: [{ id: proc.id, elements, flows }],
+			};
+			const tempDefs = expand(miniCompact);
+			const tempProc = tempDefs.processes[0];
+			if (!tempProc) return "Failed to expand elements.";
+
+			let addedEls = 0;
+			let addedFlows = 0;
+			for (const el of tempProc.flowElements) {
+				if (!proc.flowElements.some((e) => e.id === el.id)) {
+					proc.flowElements.push(el);
+					addedEls++;
+				}
 			}
-			for (const fl of flows) {
-				if (!proc.flows.some((f) => f.id === fl.id)) proc.flows.push(fl);
+			for (const sf of tempProc.sequenceFlows) {
+				if (!proc.sequenceFlows.some((f) => f.id === sf.id)) {
+					proc.sequenceFlows.push(sf);
+					addedFlows++;
+				}
 			}
+			recomputeIncomingOutgoing(proc);
 			saveState();
-			return `Added ${elements.length} element(s) and ${flows.length} flow(s) to ${args.processId as string}.`;
+			return `Added ${addedEls} element(s) and ${addedFlows} flow(s) to ${args.processId as string}.`;
 		}
 
 		case "remove_elements": {
@@ -264,14 +352,15 @@ function callTool(name: string, args: Record<string, unknown>): string {
 			if (!proc) return `Process ${args.processId as string} not found.`;
 			const dropEls = new Set((args.elementIds as string[] | undefined) ?? []);
 			const dropFlows = new Set((args.flowIds as string[] | undefined) ?? []);
-			const removedEls = proc.elements.filter((e) => dropEls.has(e.id)).length;
-			proc.elements = proc.elements.filter((e) => !dropEls.has(e.id));
-			const removedFlows = proc.flows.filter(
-				(f) => dropFlows.has(f.id) || dropEls.has(f.from) || dropEls.has(f.to),
+			const removedEls = proc.flowElements.filter((e) => dropEls.has(e.id)).length;
+			proc.flowElements = proc.flowElements.filter((e) => !dropEls.has(e.id));
+			const removedFlows = proc.sequenceFlows.filter(
+				(f) => dropFlows.has(f.id) || dropEls.has(f.sourceRef) || dropEls.has(f.targetRef),
 			).length;
-			proc.flows = proc.flows.filter(
-				(f) => !dropFlows.has(f.id) && !dropEls.has(f.from) && !dropEls.has(f.to),
+			proc.sequenceFlows = proc.sequenceFlows.filter(
+				(f) => !dropFlows.has(f.id) && !dropEls.has(f.sourceRef) && !dropEls.has(f.targetRef),
 			);
+			recomputeIncomingOutgoing(proc);
 			saveState();
 			return `Removed ${removedEls} element(s) and ${removedFlows} flow(s).`;
 		}
@@ -279,10 +368,11 @@ function callTool(name: string, args: Record<string, unknown>): string {
 		case "update_element": {
 			const proc = findProcess(args.processId as string);
 			if (!proc) return `Process ${args.processId as string} not found.`;
-			const el = proc.elements.find((e) => e.id === (args.elementId as string));
+			const el = proc.flowElements.find((e) => e.id === (args.elementId as string));
 			if (!el)
 				return `Element ${args.elementId as string} not found in ${args.processId as string}.`;
-			Object.assign(el, args.changes as Partial<CompactElement>);
+			const changes = args.changes as Record<string, unknown>;
+			if (changes.name !== undefined) el.name = changes.name as string;
 			saveState();
 			return `Updated element ${args.elementId as string}.`;
 		}
@@ -290,40 +380,49 @@ function callTool(name: string, args: Record<string, unknown>): string {
 		case "set_condition": {
 			const proc = findProcess(args.processId as string);
 			if (!proc) return `Process ${args.processId as string} not found.`;
-			proc.flows = proc.flows.map((f): CompactFlow => {
-				if (f.id !== (args.flowId as string)) return f;
-				if (args.condition === null) {
-					return { id: f.id, from: f.from, to: f.to, ...(f.name ? { name: f.name } : {}) };
-				}
-				return { ...f, condition: args.condition as string };
-			});
+			const sf = proc.sequenceFlows.find((f) => f.id === (args.flowId as string));
+			if (!sf) return `Flow ${args.flowId as string} not found in ${args.processId as string}.`;
+			if (args.condition === null) {
+				sf.conditionExpression = undefined;
+			} else {
+				sf.conditionExpression = { text: args.condition as string, attributes: {} };
+			}
 			saveState();
 			return `Condition set on flow ${args.flowId as string}.`;
 		}
 
 		case "add_http_call": {
 			const proc = ensureProcess(args.processId as string);
-			const taskHeaders: Record<string, string> = {
-				url: args.url as string,
-				method: args.method as string,
-			};
-			if (args.headers) taskHeaders.headers = args.headers as string;
-			if (args.body) taskHeaders.body = args.body as string;
-			const el: CompactElement = {
-				id: args.id as string,
-				type: "serviceTask",
+			const config: RestConnectorConfig = {
 				name: args.name as string,
-				jobType: "io.camunda:http-json:1",
-				taskHeaders,
+				method: args.method as "GET" | "POST" | "PUT" | "PATCH" | "DELETE",
+				url: args.url as string,
 			};
-			if (args.resultVariable) el.resultVariable = args.resultVariable as string;
-			if (!proc.elements.some((e) => e.id === el.id)) proc.elements.push(el);
+			if (args.headers) config.headers = args.headers as string;
+			if (args.body) config.body = args.body as string;
+			if (args.resultVariable) config.resultVariable = args.resultVariable as string;
+
+			// Use ProcessBuilder.restConnector() to create the correct zeebe:ioMapping structure.
+			// This is essential: compact.ts creates zeebe:taskHeaders, but the Camunda HTTP
+			// connector reads from zeebe:ioMapping inputs — these are completely different.
+			const tempDefs = Bpmn.createProcess("__temp__")
+				.restConnector(args.id as string, config)
+				.build();
+			const tempProc = tempDefs.processes[0];
+			const el = tempProc?.flowElements.find((e) => e.id === (args.id as string));
+			if (!el) return "Failed to create REST connector element.";
+
+			if (!proc.flowElements.some((e) => e.id === el.id)) {
+				el.incoming = [];
+				el.outgoing = [];
+				proc.flowElements.push(el);
+			}
 			saveState();
 			return `Added HTTP task "${args.name as string}" (${args.method as string} ${args.url as string}).`;
 		}
 
 		case "replace_diagram": {
-			state = args.diagram as CompactDiagram;
+			state = expand(args.diagram as CompactDiagram);
 			saveState();
 			return "Diagram replaced.";
 		}

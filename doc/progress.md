@@ -1,5 +1,28 @@
 # Progress
 
+## 2026-03-03 — Fix: MCP server uses correct Camunda HTTP connector XML structure
+
+Root cause: `mcp-server.ts` stored state as `CompactDiagram` (JSON). When `add_http_call` ran, it
+produced a `CompactElement` with `taskHeaders: { url, method }`. `compact.ts` `makeExtensions()`
+converted this to `zeebe:taskHeaders` XML — but the Camunda HTTP connector reads from
+`zeebe:ioMapping inputs`, not `zeebe:taskHeaders`. These are completely different XML structures.
+
+### `apps/ai-server/src/mcp-server.ts`
+- **State changed from `CompactDiagram` (JSON) to `BpmnDefinitions` (BPMN XML)**
+- `saveState()` now calls `layoutProcess()` per process and serializes with `Bpmn.export()` (XML)
+- `get_diagram` returns `compactify(state)` JSON — readable format for the LLM, full fidelity in state
+- `add_http_call` uses `Bpmn.createProcess("__temp__").restConnector(id, config).build()` to extract
+  a properly structured `BpmnFlowElement` with `zeebe:ioMapping inputs` — exactly what the Camunda
+  HTTP connector requires. No more `zeebe:taskHeaders` shortcut.
+- `add_elements` expands a mini-CompactDiagram via `expand()`, merges elements/flows into state
+- `remove_elements`, `set_condition` work directly on `BpmnProcess.flowElements` / `.sequenceFlows`
+- `recomputeIncomingOutgoing()` helper keeps `incoming`/`outgoing` arrays consistent after mutations
+- `replace_diagram` calls `expand()` on the CompactDiagram argument
+
+### `apps/ai-server/src/index.ts`
+- Input file written as BPMN XML (`Bpmn.export(expand(currentCompact))`) — mcp-server reads XML
+- Output file read as BPMN XML directly — no `expand()` + `Bpmn.export()` roundtrip needed
+
 ## 2026-03-03 — MCP server for AI diagram editing
 
 ### `apps/ai-server` — MCP server + adapter overhaul

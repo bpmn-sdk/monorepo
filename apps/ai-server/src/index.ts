@@ -189,7 +189,8 @@ const server = http.createServer(async (req, res) => {
 			outputFile = join(tmpDir, "output.json");
 			mcpConfigFile = join(tmpDir, "mcp.json");
 
-			if (currentCompact) writeFileSync(inputFile, JSON.stringify(currentCompact));
+			// Write input as BPMN XML (mcp-server reads XML, not CompactDiagram JSON)
+			if (currentCompact) writeFileSync(inputFile, Bpmn.export(expand(currentCompact)));
 
 			const mcpConfig = {
 				mcpServers: {
@@ -228,29 +229,26 @@ const server = http.createServer(async (req, res) => {
 		}
 
 		// ── Post-process: get final diagram and emit XML ──────────────────────────
-		let finalCompact: CompactDiagram | null = null;
-
 		if (outputFile) {
-			// MCP path: read diagram state written by the mcp-server
+			// MCP path: mcp-server writes BPMN XML directly — read and emit as-is
 			try {
-				finalCompact = JSON.parse(readFileSync(outputFile, "utf8")) as CompactDiagram;
-				console.log("[server] MCP output file read successfully");
+				const xml = readFileSync(outputFile, "utf8");
+				res.write(`data: ${JSON.stringify({ type: "xml", xml })}\n\n`);
+				console.log("[server] MCP XML output read successfully");
 			} catch {
 				console.log("[server] MCP output file not written (no diagram changes)");
 			}
 		} else {
 			// Fallback path: extract CompactDiagram from LLM text response
-			finalCompact = extractCompactDiagram(accumulated.join(""));
-		}
-
-		if (finalCompact) {
-			try {
-				const defs = expand(finalCompact);
-				const xml = Bpmn.export(defs);
-				res.write(`data: ${JSON.stringify({ type: "xml", xml })}\n\n`);
-				console.log("[server] XML emitted via core expand + export");
-			} catch (err) {
-				console.error("[server] failed to expand result:", String(err));
+			const finalCompact = extractCompactDiagram(accumulated.join(""));
+			if (finalCompact) {
+				try {
+					const xml = Bpmn.export(expand(finalCompact));
+					res.write(`data: ${JSON.stringify({ type: "xml", xml })}\n\n`);
+					console.log("[server] XML emitted via core expand + export");
+				} catch (err) {
+					console.error("[server] failed to expand result:", String(err));
+				}
 			}
 		}
 
