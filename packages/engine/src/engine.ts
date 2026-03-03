@@ -2,6 +2,15 @@ import type { BpmnDefinitions, DmnDecision, DmnDefinitions, FormDefinition } fro
 import { ProcessInstance } from "./instance.js";
 import type { JobHandler } from "./types.js";
 
+/** Options for {@link Engine.start}. */
+export interface StartOptions {
+	/**
+	 * Hook called just before each element completes. Return a Promise to pause
+	 * execution at that point — useful for step-by-step simulation.
+	 */
+	beforeComplete?: (elementId: string) => Promise<void>;
+}
+
 export class Engine {
 	private readonly processes = new Map<string, import("@bpmn-sdk/core").BpmnProcess>();
 	private readonly decisions = new Map<string, DmnDecision>();
@@ -45,7 +54,11 @@ export class Engine {
 	}
 
 	/** Start a new process instance. Throws if processId is not deployed. */
-	start(processId: string, variables?: Record<string, unknown>): ProcessInstance {
+	start(
+		processId: string,
+		variables?: Record<string, unknown>,
+		options?: StartOptions,
+	): ProcessInstance {
 		const process = this.processes.get(processId);
 		if (process === undefined) {
 			throw new Error(`Process "${processId}" is not deployed`);
@@ -58,6 +71,9 @@ export class Engine {
 			this.workers,
 			variables ?? {},
 		);
+		if (options?.beforeComplete !== undefined) {
+			instance.beforeComplete = options.beforeComplete;
+		}
 		instance.start();
 		return instance;
 	}

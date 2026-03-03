@@ -1,5 +1,36 @@
 # Progress
 
+## 2026-03-03 — `@bpmn-sdk/canvas-plugin-process-runner` (`canvas-plugins/process-runner`)
+
+New canvas plugin that embeds a process execution toolbar directly on the canvas, wiring `@bpmn-sdk/engine` and (optionally) `@bpmn-sdk/canvas-plugin-token-highlight` together.
+
+### Toolbar
+A floating control bar is injected at the top-center of the canvas container:
+- **Play (split button)** — left side runs the process immediately; right chevron opens a dropdown menu. A 500 ms long-press on the play side also opens the dropdown.
+- **Step** — starts the process in step-by-step mode: execution pauses after every element's I/O mapping is applied (just before it moves to the next element). The button turns amber ("→ Next") when a step is waiting, and advances one step per click.
+- **Stop** — cancels the running instance and resets highlights.
+
+### Dropdown
+- "▶ Play" — immediate auto-run
+- "▶ Play with payload…" — opens the JSON payload modal
+
+### JSON payload modal
+A floating dialog with a monospace textarea accepts any JSON object as initial variables. Inline parse-error feedback prevents invalid JSON from being submitted. Respects dark/light theme.
+
+### Step-by-step execution
+Uses a new `beforeComplete` hook on `ProcessInstance` (added to `@bpmn-sdk/engine`). In step mode, the hook enqueues a deferred promise per element. Clicking "Next" resolves the earliest-queued promise, letting that element proceed. Multiple concurrent tokens (e.g. after a parallel split) each get their own queue entry.
+
+### Token-highlight integration
+If the token-highlight plugin is passed as `options.tokenHighlight`, `api.trackInstance()` is wired automatically. Highlights clear on stop or diagram reload.
+
+### Engine changes (`packages/engine`)
+- `ProcessInstance.beforeComplete?: (elementId: string) => Promise<void>` — public hook field; called inside `complete()` after I/O output mapping, before `element:leaving`. If the instance is cancelled while awaiting, execution stops cleanly.
+- `Engine.start(processId, variables?, options?: StartOptions)` — new optional `StartOptions` parameter (`{ beforeComplete? }`).
+- `StartOptions` exported from `packages/engine/src/index.ts`.
+
+### Fixed
+- `canvas-plugins/token-highlight` — added `vitest.config.ts` with `passWithNoTests: true` (was failing the turbo test pipeline with "no test files found").
+
 ## 2026-03-03 — `@bpmn-sdk/canvas-plugin-token-highlight` (`canvas-plugins/token-highlight`)
 
 New canvas plugin that highlights the current and past token positions when used alongside `@bpmn-sdk/engine`.

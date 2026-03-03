@@ -1,5 +1,17 @@
 # Features
 
+## Process Runner Canvas Plugin (2026-03-03) — `canvas-plugins/process-runner`
+
+Interactive BPMN execution toolbar embedded directly on the canvas.
+
+- **Auto-play** — runs the entire process instance immediately with no configuration.
+- **Play with JSON payload** — modal dialog lets you supply initial variables as a JSON object before executing.
+- **Step-by-step** — starts in step mode; execution pauses after each element's I/O mapping. Click "→ Next" to advance one step at a time.
+- **Stop** — cancels the running instance at any point.
+- **Token-highlight integration** — pass `tokenHighlight: createTokenHighlightPlugin()` to see active/visited nodes and edges update in real-time.
+- **Auto-deploy** — subscribes to `diagram:load`; automatically deploys the loaded diagram into the engine so the toolbar is always ready.
+- **Structural typing** — depends only on `@bpmn-sdk/canvas`; engine and token-highlight are accepted via structural interfaces, no hard runtime coupling.
+
 ## Token Highlight Canvas Plugin (2026-03-03) — `canvas-plugins/token-highlight`
 
 Visualizes live process execution state on the BPMN canvas when paired with `@bpmn-sdk/engine`.

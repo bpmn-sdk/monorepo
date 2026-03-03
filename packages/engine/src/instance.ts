@@ -76,6 +76,13 @@ export class ProcessInstance {
 	private readonly forms: Map<string, FormDefinition>;
 	private readonly jobWorkers: Map<string, JobHandler>;
 
+	/**
+	 * Optional hook called just before an element completes (token moves on).
+	 * Returning a Promise lets the caller pause execution — useful for
+	 * step-by-step simulation. Set via {@link Engine.start} options.
+	 */
+	beforeComplete?: (elementId: string) => Promise<void>;
+
 	constructor(
 		process: BpmnProcess,
 		decisions: Map<string, DmnDecision>,
@@ -675,6 +682,11 @@ export class ProcessInstance {
 				this.variables.set(ctx.scopeId, out.target, val);
 				this.emit({ type: "variable:set", name: out.target, value: val, scopeId: ctx.scopeId });
 			}
+		}
+
+		if (this.beforeComplete !== undefined) {
+			await this.beforeComplete(token.elementId);
+			if (this._state !== "active") return;
 		}
 
 		this.emit({

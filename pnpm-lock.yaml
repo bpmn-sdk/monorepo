@@ -270,6 +270,12 @@ importers:
         specifier: workspace:*
         version: link:../../packages/bpmn-sdk
 
+  canvas-plugins/process-runner:
+    dependencies:
+      '@bpmn-sdk/canvas':
+        specifier: workspace:*
+        version: link:../../packages/canvas
+
   canvas-plugins/storage:
     dependencies:
       '@bpmn-sdk/canvas':
