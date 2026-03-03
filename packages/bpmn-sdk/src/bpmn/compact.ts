@@ -22,13 +22,23 @@ export interface CompactElement {
 	name?: string;
 	/** Zeebe job type (serviceTask: zeebe:taskDefinition.type) */
 	jobType?: string;
+	/**
+	 * Zeebe task headers (key→value).
+	 * For the Camunda HTTP connector use jobType "io.camunda:http-json:1" and set:
+	 *   url, method, and optionally headers/body/connectionTimeoutInSeconds.
+	 */
+	taskHeaders?: Record<string, string>;
 	/** Called process ID (callActivity: zeebe:calledElement.processId) */
 	calledProcess?: string;
 	/** Linked form ID (userTask: zeebe:formDefinition.formId) */
 	formId?: string;
 	/** Linked decision ID (businessRuleTask: zeebe:calledDecision.decisionId) */
 	decisionId?: string;
-	/** Variable receiving decision result */
+	/**
+	 * Primary output variable.
+	 * - For businessRuleTask: stored in zeebe:calledDecision.resultVariable.
+	 * - For serviceTask with jobType: stored as a zeebe:ioMapping output (source "= response").
+	 */
 	resultVariable?: string;
 	/** Event definition type (timer, error, message, signal, …) */
 	eventType?: string;
@@ -73,6 +83,18 @@ function compactifyElement(el: BpmnFlowElement): CompactElement {
 	const jobType = findAttr(ext, "zeebe:taskDefinition", "type");
 	if (jobType) result.jobType = jobType;
 
+	// Extract task headers (key→value map from zeebe:taskHeaders children)
+	const taskHeadersEl = ext.find((e) => e.name === "zeebe:taskHeaders");
+	if (taskHeadersEl && taskHeadersEl.children.length > 0) {
+		const headers: Record<string, string> = {};
+		for (const child of taskHeadersEl.children) {
+			const key = child.attributes.key;
+			const value = child.attributes.value;
+			if (key !== undefined && value !== undefined) headers[key] = value;
+		}
+		if (Object.keys(headers).length > 0) result.taskHeaders = headers;
+	}
+
 	const calledProcess = findAttr(ext, "zeebe:calledElement", "processId");
 	if (calledProcess) result.calledProcess = calledProcess;
 
@@ -84,6 +106,16 @@ function compactifyElement(el: BpmnFlowElement): CompactElement {
 		result.decisionId = decisionId;
 		const rv = findAttr(ext, "zeebe:calledDecision", "resultVariable");
 		if (rv) result.resultVariable = rv;
+	} else {
+		// For service tasks: extract the primary output variable from ioMapping
+		const ioMappingEl = ext.find((e) => e.name === "zeebe:ioMapping");
+		if (ioMappingEl) {
+			const outputs = ioMappingEl.children.filter((c) => c.name === "zeebe:output");
+			if (outputs.length === 1) {
+				const target = outputs[0]?.attributes.target;
+				if (target) result.resultVariable = target;
+			}
+		}
 	}
 
 	if ("eventDefinitions" in el && el.eventDefinitions.length > 0) {
@@ -149,6 +181,17 @@ function makeExtensions(el: CompactElement): XmlElement[] {
 	if (el.jobType) {
 		ext.push({ name: "zeebe:taskDefinition", attributes: { type: el.jobType }, children: [] });
 	}
+	if (el.taskHeaders && Object.keys(el.taskHeaders).length > 0) {
+		ext.push({
+			name: "zeebe:taskHeaders",
+			attributes: {},
+			children: Object.entries(el.taskHeaders).map(([key, value]) => ({
+				name: "zeebe:header",
+				attributes: { key, value },
+				children: [],
+			})),
+		});
+	}
 	if (el.calledProcess) {
 		ext.push({
 			name: "zeebe:calledElement",
@@ -167,6 +210,19 @@ function makeExtensions(el: CompactElement): XmlElement[] {
 				resultVariable: el.resultVariable ?? "result",
 			},
 			children: [],
+		});
+	} else if (el.resultVariable && el.jobType) {
+		// Service task with a result variable: map the connector response to the variable
+		ext.push({
+			name: "zeebe:ioMapping",
+			attributes: {},
+			children: [
+				{
+					name: "zeebe:output",
+					attributes: { source: "= response", target: el.resultVariable },
+					children: [],
+				},
+			],
 		});
 	}
 	return ext;

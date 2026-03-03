@@ -1,10 +1,11 @@
 /**
- * Adapter for the new GitHub Copilot CLI (`copilot` / `@github/copilot`, GA Feb 2026).
- * Note: the old `gh copilot` extension was deprecated Oct 2025 and is no longer supported.
+ * Adapter for Google Gemini CLI.
+ * MCP is not supported per-invocation (requires global settings.json),
+ * so this adapter falls back to the system-prompt approach.
  */
 import { spawn } from "node:child_process";
 
-export const supportsMcp = true;
+export const supportsMcp = false;
 
 interface Message {
 	role: string;
@@ -13,7 +14,7 @@ interface Message {
 
 export async function available(): Promise<boolean> {
 	return new Promise((resolve) => {
-		const proc = spawn("copilot", ["--version"], { stdio: "ignore" });
+		const proc = spawn("gemini", ["--version"], { stdio: "ignore" });
 		proc.on("error", () => resolve(false));
 		proc.on("close", (code) => resolve(code === 0));
 	});
@@ -22,23 +23,18 @@ export async function available(): Promise<boolean> {
 export async function stream(
 	messages: Message[],
 	systemPrompt: string,
-	mcpConfigFile: string | null,
+	_mcpConfigFile: string | null,
 	onToken: (text: string) => void,
 ): Promise<void> {
 	const lastUser = [...messages].reverse().find((m) => m.role === "user");
 	const prompt = `${systemPrompt}\n\nUser: ${lastUser?.content ?? "help"}`;
 
-	const args = ["-p", prompt, "--yolo"];
+	const args = ["--prompt", prompt, "--yolo"];
 
-	if (mcpConfigFile) {
-		args.push("--additional-mcp-config", mcpConfigFile);
-		args.push("--allow-all-tools");
-	}
-
-	console.log(`[copilot] spawning with MCP: ${mcpConfigFile !== null}`);
+	console.log("[gemini] spawning (no MCP support — using system prompt fallback)");
 
 	await new Promise<void>((resolve, reject) => {
-		const proc = spawn("copilot", args, {
+		const proc = spawn("gemini", args, {
 			stdio: ["ignore", "pipe", "pipe"],
 		});
 
@@ -47,17 +43,17 @@ export async function stream(
 		});
 
 		proc.stderr?.on("data", (chunk: Buffer) => {
-			process.stderr.write(`[copilot stderr] ${chunk.toString()}`);
+			process.stderr.write(`[gemini stderr] ${chunk.toString()}`);
 		});
 
 		proc.on("error", (err) => {
-			console.error(`[copilot] spawn error: ${String(err)}`);
+			console.error(`[gemini] spawn error: ${String(err)}`);
 			reject(err);
 		});
 		proc.on("close", (code) => {
-			console.log(`[copilot] exited with code ${code}`);
+			console.log(`[gemini] exited with code ${code}`);
 			if (code === 0) resolve();
-			else reject(new Error(`copilot exited with code ${code}`));
+			else reject(new Error(`gemini exited with code ${code}`));
 		});
 	});
 }

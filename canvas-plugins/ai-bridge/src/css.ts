@@ -78,6 +78,21 @@ export function injectAiBridgeStyles(): void {
   color: rgba(255,255,255,0.65);
   overflow-x: auto; white-space: pre;
 }
+.ai-quick-actions {
+  padding: 6px 10px;
+  display: flex; gap: 6px; flex-wrap: wrap;
+  border-top: 1px solid rgba(255,255,255,0.06);
+  flex-shrink: 0;
+}
+.ai-quick-btn {
+  padding: 4px 10px; border-radius: 14px;
+  background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.12);
+  color: rgba(255,255,255,0.65); font-size: 12px; cursor: pointer;
+  font-family: inherit; white-space: nowrap;
+  transition: background 0.15s, color 0.15s;
+}
+.ai-quick-btn:hover:not(:disabled) { background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.9); }
+.ai-quick-btn:disabled { opacity: 0.35; cursor: default; }
 .ai-input-area {
   padding: 10px; border-top: 1px solid rgba(255,255,255,0.08);
   display: flex; gap: 8px; align-items: flex-end;
@@ -193,6 +208,11 @@ export function injectAiBridgeStyles(): void {
 [data-bpmn-hud-theme="light"] .ai-backend-select {
   background: rgba(0,0,0,0.04); border-color: rgba(0,0,0,0.1); color: rgba(0,0,0,0.55);
 }
+[data-bpmn-hud-theme="light"] .ai-quick-actions { border-top-color: rgba(0,0,0,0.06); }
+[data-bpmn-hud-theme="light"] .ai-quick-btn {
+  background: rgba(0,0,0,0.04); border-color: rgba(0,0,0,0.1); color: rgba(0,0,0,0.55);
+}
+[data-bpmn-hud-theme="light"] .ai-quick-btn:hover:not(:disabled) { background: rgba(0,0,0,0.08); color: rgba(0,0,0,0.8); }
 [data-bpmn-hud-theme="light"] .ai-input-area { border-top-color: rgba(0,0,0,0.08); }
 [data-bpmn-hud-theme="light"] .ai-hist-panel { background: rgba(252,252,254,0.98); border-color: rgba(0,0,0,0.1); }
 [data-bpmn-hud-theme="light"] .ai-hist-header { color: rgba(0,0,0,0.88); border-bottom-color: rgba(0,0,0,0.08); }

@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
-import { buildSystemPrompt } from "../prompt.js";
+
+export const supportsMcp = true;
 
 interface Message {
 	role: string;
@@ -23,10 +24,10 @@ export async function available(): Promise<boolean> {
 
 export async function stream(
 	messages: Message[],
-	context: unknown,
+	systemPrompt: string,
+	mcpConfigFile: string | null,
 	onToken: (text: string) => void,
 ): Promise<void> {
-	const systemPrompt = buildSystemPrompt(context);
 	// Build conversation as a single prompt string
 	const parts = [systemPrompt, ""];
 	for (const msg of messages) {
@@ -36,9 +37,25 @@ export async function stream(
 	const fullPrompt = parts.join("\n");
 
 	const args = ["-p", fullPrompt, "--output-format", "stream-json", "--verbose"];
-	console.log(
-		`[claude] spawning: claude ${args.slice(0, 1).join(" ")} <prompt> --output-format stream-json`,
-	);
+
+	if (mcpConfigFile) {
+		args.push("--mcp-config", mcpConfigFile);
+		args.push(
+			"--allowedTools",
+			[
+				"mcp__bpmn__get_diagram",
+				"mcp__bpmn__add_elements",
+				"mcp__bpmn__remove_elements",
+				"mcp__bpmn__update_element",
+				"mcp__bpmn__set_condition",
+				"mcp__bpmn__add_http_call",
+				"mcp__bpmn__replace_diagram",
+			].join(","),
+		);
+		args.push("--strict-mcp-config");
+	}
+
+	console.log(`[claude] spawning with MCP: ${mcpConfigFile !== null}`);
 
 	await new Promise<void>((resolve, reject) => {
 		const proc = spawn("claude", args, {

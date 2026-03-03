@@ -1,5 +1,106 @@
 # Progress
 
+## 2026-03-03 — MCP server for AI diagram editing
+
+### `apps/ai-server` — MCP server + adapter overhaul
+
+Replaced the fragile JSON-in-prompt approach with a proper MCP server, giving the LLM structured tools to read and modify diagrams.
+
+**`src/mcp-server.ts`** (new, zero external deps):
+- Minimal stdio JSON-RPC 2.0 MCP server — pure Node.js built-ins + `@bpmn-sdk/core`
+- Tools: `get_diagram`, `add_elements`, `remove_elements`, `update_element`, `set_condition`, `add_http_call`, `replace_diagram`
+- `add_http_call` always uses `jobType: "io.camunda:http-json:1"` — HTTP connector is now structural, not instructional
+- Reads initial diagram from `--input` file; writes state to `--output` file after every mutating call
+- `bundle` script now also bundles `mcp-server.ts` → `dist/mcp-server.cjs` for the desktop app
+
+**Adapters:**
+- `adapters/claude.ts` — added `--mcp-config`, `--allowedTools mcp__bpmn__*`, `--strict-mcp-config` support
+- `adapters/copilot.ts` — switched from deprecated `gh copilot explain` (dead since Oct 2025) to new `copilot -p` CLI (`@github/copilot`, GA Feb 2026); MCP via `--additional-mcp-config --allow-all-tools`
+- `adapters/gemini.ts` (new) — `gemini -p --yolo`; `supportsMcp = false` (Gemini requires global settings.json for MCP, no per-invocation support); falls back to system-prompt approach
+
+**`src/index.ts`** — MCP flow:
+1. Creates temp dir with `input.json`, `output.json`, `mcp.json`
+2. Passes `--mcp-config` to Claude/Copilot; `null` for Gemini
+3. After streaming, reads `output.json` for diagram state (MCP path) or extracts CompactDiagram from LLM text (Gemini fallback)
+4. Expands + exports via `@bpmn-sdk/core` and emits `{ type: "xml" }` SSE event
+5. Cleans up temp dir
+
+**`src/prompt.ts`** — simplified:
+- `buildMcpSystemPrompt()` — 4 lines; LLM uses tools, no format instructions needed
+- `buildMcpImprovePrompt(findings)` — passes core `optimize()` findings; LLM uses tools to apply fixes
+- `buildSystemPrompt(context)` kept for Gemini fallback (full CompactDiagram format instructions)
+- Deleted `apply-ops.ts` (server-side ops patching replaced by MCP state management)
+
+### `canvas-plugins/ai-bridge/src/panel.ts`
+- Added "Gemini" to backend selector
+- Removed client-side `extractCompactDiagram` / `expand` — server now always provides XML
+- Apply button logic simplified: only shown when `directXml` is set (server emitted `{ type: "xml" }`)
+
+## 2026-03-03 — Fix: HTTP connector not used for API requests
+
+### `apps/ai-server` — prompt redesign
+
+Root cause: the HTTP connector rule was a short note buried at the end of the format examples' "Rules" line. The LLM read the format examples first, pattern-matched a generic serviceTask shape, and ignored the connector rule.
+
+- Extracted a prominent `HTTP_CONNECTOR_RULE` block that appears **before** the format examples in `buildSystemPrompt`
+- Explicitly states "Never add a plain serviceTask for these" — removes ambiguity
+- Instructs the LLM to use its knowledge for the real API endpoint URL (not a placeholder)
+- Includes a concrete GitHub Issues API example with correct endpoint, method, and Accept header
+- Documents FEEL expression syntax for dynamic URL segments (`= "https://..." + var + "/"`)
+- Simplified OPS_FORMAT and COMPACT_FORMAT to be concise format references; connector-specific details live only in the rule block
+
+## 2026-03-03 — HTTP REST connector support in CompactElement
+
+### `packages/bpmn-sdk` — `compact.ts`
+
+- Added `taskHeaders?: Record<string, string>` to `CompactElement` — maps to/from `zeebe:taskHeaders` in the BPMN model
+- `resultVariable` now also works for service tasks (not only business rule tasks): stored as a `zeebe:ioMapping` output (`source: "= response"`) when `jobType` is set
+- `compactifyElement()` extracts task headers from `zeebe:taskHeaders` children and extracts the primary output variable from `zeebe:ioMapping` single-output configs
+- `makeExtensions()` emits `zeebe:taskHeaders` from the map and `zeebe:ioMapping` for service tasks with a result variable
+
+### `apps/ai-server` — HTTP connector in prompts
+
+- Both OPS_FORMAT and COMPACT_FORMAT examples now show the Camunda HTTP connector (`io.camunda:http-json:1`) with `taskHeaders` and `resultVariable`
+- A `CONNECTOR_NOTE` constant is appended to the rules in all prompt sections, instructing the LLM to always use `io.camunda:http-json:1` for HTTP/REST calls
+
+## 2026-03-03 — All AI chat uses core SDK end-to-end
+
+### `apps/ai-server` — operations format + universal XML emit
+
+- **New `apply-ops.ts`** — LLM can now output either:
+  - `{ "ops": [...] }` — an operations patch (preferred for targeted edits like adding a node, renaming, setting a condition)
+  - `{ "processes": [...] }` — a full `CompactDiagram` (for new diagrams or major restructuring)
+- Operations: `add` (elements + flows), `remove` (elements + dangling flows auto-removed), `update` (merge changes into an element), `condition` (set or clear FEEL condition on a flow)
+- `parseResponse(text, current)` — detects which format the LLM used and returns a `CompactDiagram` to pass to core; ops are applied to the existing diagram, full diagram replaces it
+- **All requests now go through core**: after every response, server calls `expand()` + `Bpmn.export()` and emits `{ type: "xml", xml }` — the frontend never manipulates BPMN XML
+- System prompt updated to explain ops format first (preferred), full CompactDiagram second (fallback)
+
+### `canvas-plugins/ai-bridge` — regular `send()` now uses server XML
+
+- `send()` now captures the `xml` SSE event via `onXml` callback and passes it to `finalizeAiMessage` — consistent with the improve action
+
+## 2026-03-03 — AI quick actions: Improve diagram
+
+### `canvas-plugins/ai-bridge` — quick-action buttons
+
+- Added a quick-actions bar above the input area in the AI panel
+- **"✦ Improve diagram"** button triggers a one-shot improvement pass with a focused system prompt
+- Sends `action: "improve"` to the backend; disables both send and action buttons while streaming
+- `streamChat` now accepts an `onXml` callback — receives the validated XML from the server's `{ type: "xml" }` SSE event
+- `finalizeAiMessage` accepts optional `directXml`: when set, the "Apply to diagram" button uses the server-produced XML directly (no client-side `expand()` call)
+
+### `apps/ai-server` — core-backed improve pipeline
+
+- Added `@bpmn-sdk/core` as a runtime dependency
+- For `action === "improve"`:
+  1. `expand(context)` — deserializes the CompactDiagram into a full `BpmnDefinitions` using core
+  2. `optimize(defs)` — runs static analysis (FEEL complexity, flow issues, task-reuse) and collects concrete findings with element IDs
+  3. `buildImprovePrompt(context, findings)` — tells the LLM exactly which elements to fix; no re-analysis needed
+  4. Streams explanation tokens to the client as they arrive
+  5. After streaming: extracts the CompactDiagram from the LLM response, calls `expand()` + `Bpmn.export()` to produce validated XML
+  6. Emits `{ type: "xml", xml }` SSE event — client uses this directly without any XML parsing
+- Refactored adapters (`claude.ts`, `copilot.ts`) to accept `systemPrompt: string` directly — prompt building is owned by `index.ts`
+
 ## 2026-03-02 — Tauri desktop app
 
 ### `apps/desktop` — new Tauri v2 desktop application
