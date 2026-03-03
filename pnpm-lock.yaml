@@ -42,7 +42,11 @@ importers:
         specifier: ^3.0.5
         version: 3.2.4(@types/node@22.19.11)(happy-dom@20.7.0)(tsx@4.21.0)
 
-  apps/ai-server: {}
+  apps/ai-server:
+    dependencies:
+      '@bpmn-sdk/core':
+        specifier: workspace:*
+        version: link:../../packages/bpmn-sdk
 
   apps/desktop:
     dependencies:
@@ -122,6 +126,9 @@ importers:
       '@bpmn-sdk/canvas-plugin-config-panel-bpmn':
         specifier: workspace:*
         version: link:../../canvas-plugins/config-panel-bpmn
+      '@bpmn-sdk/canvas-plugin-history':
+        specifier: workspace:*
+        version: link:../../canvas-plugins/history
       '@bpmn-sdk/canvas-plugin-main-menu':
         specifier: workspace:*
         version: link:../../canvas-plugins/main-menu
@@ -152,6 +159,9 @@ importers:
 
   canvas-plugins/ai-bridge:
     dependencies:
+      '@bpmn-sdk/canvas-plugin-history':
+        specifier: workspace:*
+        version: link:../history
       '@bpmn-sdk/core':
         specifier: workspace:*
         version: link:../../packages/bpmn-sdk
@@ -237,6 +247,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/bpmn-sdk
 
+  canvas-plugins/history: {}
+
   canvas-plugins/main-menu:
     dependencies:
       '@bpmn-sdk/canvas':
@@ -257,6 +269,12 @@ importers:
       '@bpmn-sdk/core':
         specifier: workspace:*
         version: link:../../packages/bpmn-sdk
+
+  canvas-plugins/process-runner:
+    dependencies:
+      '@bpmn-sdk/canvas':
+        specifier: workspace:*
+        version: link:../../packages/canvas
 
   canvas-plugins/storage:
     dependencies:
@@ -309,6 +327,15 @@ importers:
         specifier: workspace:*
         version: link:../../packages/bpmn-sdk
 
+  canvas-plugins/token-highlight:
+    dependencies:
+      '@bpmn-sdk/canvas':
+        specifier: workspace:*
+        version: link:../../packages/canvas
+      '@bpmn-sdk/core':
+        specifier: workspace:*
+        version: link:../../packages/bpmn-sdk
+
   canvas-plugins/watermark:
     dependencies:
       '@bpmn-sdk/canvas':
@@ -337,6 +364,17 @@ importers:
       '@bpmn-sdk/core':
         specifier: workspace:*
         version: link:../bpmn-sdk
+
+  packages/engine:
+    dependencies:
+      '@bpmn-sdk/core':
+        specifier: workspace:*
+        version: link:../bpmn-sdk
+      '@bpmn-sdk/feel':
+        specifier: workspace:*
+        version: link:../feel
+
+  packages/engine-ts: {}
 
   packages/feel: {}
 

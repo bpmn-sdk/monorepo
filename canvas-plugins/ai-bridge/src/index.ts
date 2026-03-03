@@ -29,6 +29,8 @@ export function createAiBridgePlugin(options: AiBridgePluginOptions): {
 	name: string;
 	install(): void;
 	button: HTMLButtonElement;
+	/** Initialize the panel (if not yet created) and open it. */
+	openPanel(): void;
 } {
 	const serverUrl = options.serverUrl ?? DEFAULT_SERVER;
 
@@ -71,9 +73,21 @@ export function createAiBridgePlugin(options: AiBridgePluginOptions): {
 		}
 	});
 
+	function openPanel(): void {
+		const p = getOrCreatePanel();
+		if (options.container) {
+			options.onOpen?.();
+			p.open();
+		} else {
+			p.open();
+			panelOpen = true;
+		}
+	}
+
 	return {
 		name: "ai-bridge",
 		install(): void {},
 		button,
+		openPanel,
 	};
 }

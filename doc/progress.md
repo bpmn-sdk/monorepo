@@ -1,5 +1,315 @@
 # Progress
 
+## 2026-03-03 — `@bpmn-sdk/canvas-plugin-process-runner` (`canvas-plugins/process-runner`)
+
+New canvas plugin that embeds a process execution toolbar directly on the canvas, wiring `@bpmn-sdk/engine` and (optionally) `@bpmn-sdk/canvas-plugin-token-highlight` together.
+
+### Toolbar
+A floating control bar is injected at the top-center of the canvas container:
+- **Play (split button)** — left side runs the process immediately; right chevron opens a dropdown menu. A 500 ms long-press on the play side also opens the dropdown.
+- **Step** — starts the process in step-by-step mode: execution pauses after every element's I/O mapping is applied (just before it moves to the next element). The button turns amber ("→ Next") when a step is waiting, and advances one step per click.
+- **Stop** — cancels the running instance and resets highlights.
+
+### Dropdown
+- "▶ Play" — immediate auto-run
+- "▶ Play with payload…" — opens the JSON payload modal
+
+### JSON payload modal
+A floating dialog with a monospace textarea accepts any JSON object as initial variables. Inline parse-error feedback prevents invalid JSON from being submitted. Respects dark/light theme.
+
+### Step-by-step execution
+Uses a new `beforeComplete` hook on `ProcessInstance` (added to `@bpmn-sdk/engine`). In step mode, the hook enqueues a deferred promise per element. Clicking "Next" resolves the earliest-queued promise, letting that element proceed. Multiple concurrent tokens (e.g. after a parallel split) each get their own queue entry.
+
+### Token-highlight integration
+If the token-highlight plugin is passed as `options.tokenHighlight`, `api.trackInstance()` is wired automatically. Highlights clear on stop or diagram reload.
+
+### Engine changes (`packages/engine`)
+- `ProcessInstance.beforeComplete?: (elementId: string) => Promise<void>` — public hook field; called inside `complete()` after I/O output mapping, before `element:leaving`. If the instance is cancelled while awaiting, execution stops cleanly.
+- `Engine.start(processId, variables?, options?: StartOptions)` — new optional `StartOptions` parameter (`{ beforeComplete? }`).
+- `StartOptions` exported from `packages/engine/src/index.ts`.
+
+### Fixed
+- `canvas-plugins/token-highlight` — added `vitest.config.ts` with `passWithNoTests: true` (was failing the turbo test pipeline with "no test files found").
+
+## 2026-03-03 — `@bpmn-sdk/canvas-plugin-token-highlight` (`canvas-plugins/token-highlight`)
+
+New canvas plugin that highlights the current and past token positions when used alongside `@bpmn-sdk/engine`.
+
+### Visual design
+- **Active elements** (token currently here): amber/orange stroke (`#f59e0b`), translucent amber fill, animated glow pulse on the `<g>` group via CSS `drop-shadow` keyframes.
+- **Visited elements** (token has passed through): emerald green stroke (`#10b981`), translucent green fill.
+- **Active edges** (token is about to traverse this flow): amber animated dashed stroke with a flowing dash animation.
+- **Visited edges**: emerald green stroke. Arrowhead fill is also recolored via `.bpmn-arrow-fill`.
+
+### Edge highlight logic
+An edge is highlighted only when its source element has been visited, eliminating false positives on branches not taken by an exclusive gateway. Active edge = source visited + target active; visited edge = source visited + target visited. Sub-process flows are also indexed.
+
+### API
+- `createTokenHighlightPlugin()` → `CanvasPlugin & { api: TokenHighlightApi }`
+- `api.trackInstance(instance)` — structural interface (no engine dep), returns unsubscribe
+- `api.setActive(ids)` / `api.addVisited(ids)` / `api.clear()` — manual control
+
+## 2026-03-03 — `@bpmn-sdk/engine` — Lightweight BPMN Simulation Engine (`packages/engine`)
+
+New `packages/engine` package providing a zero-dependency, browser+Node compatible BPMN simulation engine.
+
+### Architecture
+- **`variables.ts`** — Hierarchical scope chain (`VariableStore`); reads walk up to parent, writes update nearest owning scope or fall back to local.
+- **`dmn.ts`** — DMN decision table evaluator using `@bpmn-sdk/feel`; supports UNIQUE, FIRST, ANY, COLLECT (SUM/MIN/MAX/COUNT), RULE ORDER, OUTPUT ORDER, PRIORITY hit policies.
+- **`zeebe.ts`** — `parseZeebeExt(XmlElement[])` parses Zeebe extension elements into a typed `ParsedZeebeExt` struct.
+- **`timers.ts`** — `scheduleTimer()` supports ISO 8601 durations (PT2M), dates, and cycles (R3/PT5S); returns a cancel function.
+- **`types.ts`** — Public `ProcessEvent` discriminated union, `Job` interface, `JobHandler` type.
+- **`instance.ts`** — `ProcessInstance` — token-based executor; per-scope `ScopeCtx` maps; async dispatch by element type; parallel gateway join tracking; boundary timer cancellation; error propagation through scope chain.
+- **`engine.ts`** — `Engine` — deployment registry for processes/decisions/forms; `start()` factory; `registerJobWorker()` with unsubscribe.
+
+### Element coverage (v1)
+StartEvent, EndEvent (none/terminate/error), Task, ManualTask, ServiceTask (job workers or auto-complete), UserTask, ScriptTask (FEEL expression), BusinessRuleTask (DMN), ExclusiveGateway, ParallelGateway (split+join), InclusiveGateway, IntermediateCatchEvent (timer/message), BoundaryEvent (timer/error), SubProcess.
+
+### Package
+- `pnpm --filter @bpmn-sdk/engine run build` — zero TS errors
+- 30 tests passing (variables, DMN, engine integration)
+
+## 2026-03-03 — Rust AI server with embedded QuickJS core bridge (`apps/ai-server-rs`)
+
+New standalone Rust package (`bpmn-ai-server`) replacing the Node.js `ai-server.cjs` bundle in the Tauri desktop app. Eliminates the Node.js runtime dependency from the desktop distribution.
+
+### Architecture
+- **`apps/ai-server/src/bridge.ts`** — new TypeScript bridge that exposes all `@bpmn-sdk/core` operations as `globalThis.Bridge.*` functions (IIFE bundle, platform=neutral). Includes stateful MCP operations (`mcpInit`, `mcpGetDiagram`, `mcpExportXml`, `mcpAddElements`, etc.) and stateless HTTP helpers (`expandAndExport`, `optimizeFindings`).
+- **`apps/ai-server-rs/`** — Rust crate with two binaries:
+  - `ai-server` — axum HTTP server (port 3033), CORS, SSE, `/status` + `/chat` routes
+  - `bpmn-mcp` — JSON-RPC 2.0 stdio MCP server (replaces `mcp-server.ts`)
+- **`build.rs`** — runs `pnpm --filter @bpmn-sdk/ai-server run bridge` at Rust build time, copies `bridge.bundle.js` to `OUT_DIR`, embeds it with `include_str!`
+- **`src/bridge.rs`** — QuickJS thread with `std::sync::mpsc` channel; async HTTP methods and sync MCP methods dispatch via `tokio::sync::oneshot`
+- **`src/adapters.rs`** — ports of `claude.ts`, `copilot.ts`, `gemini.ts` spawning CLIs via `tokio::process::Command`
+- **`src/prompt.rs`** — `build_mcp_system_prompt`, `build_mcp_improve_prompt`, `build_system_prompt` (pure Rust strings)
+- **`src/mcp_tools.rs`** — all 7 tool definitions + dispatch calling `bridge.mcp_*_sync()` methods
+- **`src/mcp_server.rs`** — JSON-RPC 2.0 stdio loop (single-threaded, no tokio)
+
+### Package changes
+- **`apps/ai-server/package.json`** — added `bridge` script: `esbuild src/bridge.ts --bundle --format=iife --global-name=Bridge --platform=neutral`; `bundle` script now also runs bridge build
+- **`apps/desktop/src-tauri/tauri.conf.json`** — resources updated to `ai-server` + `bpmn-mcp` native binaries (removed `ai-server.cjs`)
+- **`apps/desktop/src-tauri/src/lib.rs`** — `spawn_ai_server` now runs the native binary directly with `BPMN_MCP_PATH` env var; `tauri:dev` no longer pre-bundles Node.js server
+- **`apps/desktop/package.json`** — `tauri:build` runs `cargo build --release` (which triggers bridge bundle via build.rs) then `tauri build`; `tauri:dev` just runs `tauri dev`
+- **Root `package.json`** — added `ai-server-rs` and `ai-server-rs:build` scripts
+
+## 2026-03-03 — Extract history into dedicated canvas-plugin; polish History tab; remove AI History button
+
+### New package: `canvas-plugins/history` → `@bpmn-sdk/canvas-plugin-history`
+- `src/checkpoint.ts` — IndexedDB checkpoint storage (moved from ai-bridge, unchanged)
+- `src/history-panel.ts` — redesigned History tab pane with date grouping, time-only display,
+  custom in-editor confirm dialog; calls `injectHistoryStyles()` on first mount
+- `src/css.ts` — full `bpmn-hist-*` design: pane chrome, date group labels, item rows, restore
+  button, custom confirm dialog, light-theme overrides; injected lazily once per page
+- `src/index.ts` — exports: `saveCheckpoint`, `listCheckpoints`, `Checkpoint`,
+  `createHistoryPanel`, `HistoryPanelOptions`
+
+### `canvas-plugins/ai-bridge`
+- Removed `checkpoint.ts` and `history-panel.ts` (both now in the history package)
+- Removed all `ai-hist-*` and `bpmn-hist-*` CSS from `css.ts`
+- Removed History button (`histBtn`) and `showHistoryModal()` from `panel.ts`
+- `panel.ts` now imports `saveCheckpoint` from `@bpmn-sdk/canvas-plugin-history`
+- `index.ts` no longer re-exports history types
+- Added `@bpmn-sdk/canvas-plugin-history: workspace:*` dependency
+
+### `apps/landing/src/editor.ts`
+- Imports `createHistoryPanel`, `saveCheckpoint` from `@bpmn-sdk/canvas-plugin-history`
+- Import of `createAiBridgePlugin` remains from `@bpmn-sdk/canvas-plugin-ai-bridge`
+
+## 2026-03-03 — History panel redesign + custom confirm dialog
+
+### `canvas-plugins/ai-bridge/src/history-panel.ts`
+- Full redesign with new `bpmn-hist-*` class namespace
+- Checkpoints grouped by date with "Today" / "Yesterday" / long-form labels
+- Each item shows time only (HH:MM:SS) instead of full locale string
+- `window.confirm` replaced with a custom in-editor dialog (`showConfirm`) that matches
+  the dark editor aesthetic
+
+### `canvas-plugins/ai-bridge/src/css.ts`
+- Replaced the two stub `.ai-hist-pane*` rules with a full `.bpmn-hist-*` design system:
+  - `.bpmn-hist-pane/header/header-title/refresh` — panel chrome
+  - `.bpmn-hist-group-label` — uppercase date section headers
+  - `.bpmn-hist-item/item-time/restore` — row layout, tabular-nums time, blue accent restore button
+  - `.bpmn-hist-empty` — centered empty state
+  - `.bpmn-hist-confirm-overlay/panel/title/body/actions/cancel/ok` — custom confirm dialog
+  - Full light-theme overrides for all new classes
+
+## 2026-03-03 — Fix: main menu z-index + checkpoint on every change
+
+### `canvas-plugins/main-menu/src/css.ts`
+- `.bpmn-main-menu-panel` z-index bumped from 110 → 10000 (above dock at 9999)
+- `.bpmn-menu-dropdown` z-index bumped from 1000 → 10001 (above dock)
+
+### `canvas-plugins/ai-bridge/src/index.ts`
+- `saveCheckpoint` is now exported from the package
+
+### `apps/landing/src/editor.ts`
+- `diagram:change` handler saves a checkpoint 600 ms after the last change (auto-save fires at 500 ms).
+  Only fires when a storage context is available (`getCurrentContext()` non-null). The existing
+  day-based retention (50 today, 1/day × 10 days) applies automatically.
+
+## 2026-03-03 — Fix: 6 editor bugs (drag-drop, AI tab, history button, History tab, optimize false positive)
+
+### Bug 1 — `packages/editor/src/editor.ts`
+- Fixed drag-drop: `_doCreate` now reads `_createEdgeDropTarget` into `pendingEdgeDrop` before calling
+  `_setCreateEdgeDropHighlight(null)` which zeroed it out. First drop now connects correctly.
+
+### Bug 2 + 3 — AI tab activation + server-not-running message
+- `packages/editor/src/dock.ts`: Added `setAiTabClickHandler(fn)` — called when AI tab is clicked;
+  added `setHistoryTabClickHandler(fn)` and `setHistoryTabEnabled(enabled)` for new History tab.
+- `canvas-plugins/ai-bridge/src/index.ts`: Added `openPanel()` to returned object — lazily initializes
+  the panel on first call. The AI tab click handler calls `openPanel()` so the panel is created even
+  when the AI toolbar button was never clicked.
+- `canvas-plugins/ai-bridge/src/css.ts`: Fixed `.ai-panel-status-err code` color from
+  `rgba(255,255,255,0.6)` to `rgba(255,255,255,0.9)` — error message was nearly invisible.
+- `canvas-plugins/ai-bridge/src/panel.ts`: `showNotRunning()` now removes any existing `<code>`
+  element before appending a new one (prevented duplicate elements on repeated calls).
+
+### Bug 4 — History button no-context message
+- `canvas-plugins/ai-bridge/src/panel.ts`: When `getCurrentContext()` returns null, the History modal
+  now shows "History is only available for saved files…" instead of the confusing "No checkpoints yet".
+
+### Bug 5 — New History tab in sidebar
+- `packages/editor/src/dock.ts`: Added "History" tab between Properties and AI; `historyPane` div;
+  `setHistoryTabEnabled(enabled)` disables the tab (and switches to Properties if it was active);
+  disabled tab CSS; `switchTab` updated to `"properties" | "history" | "ai"`.
+- `canvas-plugins/ai-bridge/src/history-panel.ts` (new): `createHistoryPanel(options)` returns a
+  persistent pane `{ el, refresh() }` — list of checkpoints with timestamp + Restore button (confirm
+  dialog). Empty state distinguishes "no context" from "no checkpoints yet".
+- `canvas-plugins/ai-bridge/src/checkpoint.ts`: Day-based retention — keeps last 50 checkpoints from
+  today + 1 (latest) per day for the last 10 days. Anything older is pruned automatically.
+- `canvas-plugins/ai-bridge/src/css.ts`: Added `.ai-hist-pane` and `.ai-hist-pane-header` styles.
+- `canvas-plugins/ai-bridge/src/index.ts`: Exports `createHistoryPanel` and `HistoryPanelOptions`.
+- `apps/landing/src/editor.ts`: Wires history panel into `dock.historyPane`; refreshes on tab click;
+  enables/disables History tab based on `getCurrentContext()` after each tab activation.
+
+### Bug 6 — `packages/bpmn-sdk/src/bpmn/optimize/feel.ts`
+- REST connector tasks (`io.camunda:http-json:1`) are now skipped in the IO mapping complexity check.
+  Their auto-generated `zeebe:ioMapping inputs` (url, method, headers) are not user-authored FEEL.
+
+## 2026-03-03 — Fix: MCP server uses correct Camunda HTTP connector XML structure
+
+Root cause: `mcp-server.ts` stored state as `CompactDiagram` (JSON). When `add_http_call` ran, it
+produced a `CompactElement` with `taskHeaders: { url, method }`. `compact.ts` `makeExtensions()`
+converted this to `zeebe:taskHeaders` XML — but the Camunda HTTP connector reads from
+`zeebe:ioMapping inputs`, not `zeebe:taskHeaders`. These are completely different XML structures.
+
+### `apps/ai-server/src/mcp-server.ts`
+- **State changed from `CompactDiagram` (JSON) to `BpmnDefinitions` (BPMN XML)**
+- `saveState()` now calls `layoutProcess()` per process and serializes with `Bpmn.export()` (XML)
+- `get_diagram` returns `compactify(state)` JSON — readable format for the LLM, full fidelity in state
+- `add_http_call` uses `Bpmn.createProcess("__temp__").restConnector(id, config).build()` to extract
+  a properly structured `BpmnFlowElement` with `zeebe:ioMapping inputs` — exactly what the Camunda
+  HTTP connector requires. No more `zeebe:taskHeaders` shortcut.
+- `add_elements` expands a mini-CompactDiagram via `expand()`, merges elements/flows into state
+- `remove_elements`, `set_condition` work directly on `BpmnProcess.flowElements` / `.sequenceFlows`
+- `recomputeIncomingOutgoing()` helper keeps `incoming`/`outgoing` arrays consistent after mutations
+- `replace_diagram` calls `expand()` on the CompactDiagram argument
+
+### `apps/ai-server/src/index.ts`
+- Input file written as BPMN XML (`Bpmn.export(expand(currentCompact))`) — mcp-server reads XML
+- Output file read as BPMN XML directly — no `expand()` + `Bpmn.export()` roundtrip needed
+
+## 2026-03-03 — MCP server for AI diagram editing
+
+### `apps/ai-server` — MCP server + adapter overhaul
+
+Replaced the fragile JSON-in-prompt approach with a proper MCP server, giving the LLM structured tools to read and modify diagrams.
+
+**`src/mcp-server.ts`** (new, zero external deps):
+- Minimal stdio JSON-RPC 2.0 MCP server — pure Node.js built-ins + `@bpmn-sdk/core`
+- Tools: `get_diagram`, `add_elements`, `remove_elements`, `update_element`, `set_condition`, `add_http_call`, `replace_diagram`
+- `add_http_call` always uses `jobType: "io.camunda:http-json:1"` — HTTP connector is now structural, not instructional
+- Reads initial diagram from `--input` file; writes state to `--output` file after every mutating call
+- `bundle` script now also bundles `mcp-server.ts` → `dist/mcp-server.cjs` for the desktop app
+
+**Adapters:**
+- `adapters/claude.ts` — added `--mcp-config`, `--allowedTools mcp__bpmn__*`, `--strict-mcp-config` support
+- `adapters/copilot.ts` — switched from deprecated `gh copilot explain` (dead since Oct 2025) to new `copilot -p` CLI (`@github/copilot`, GA Feb 2026); MCP via `--additional-mcp-config --allow-all-tools`
+- `adapters/gemini.ts` (new) — `gemini -p --yolo`; `supportsMcp = false` (Gemini requires global settings.json for MCP, no per-invocation support); falls back to system-prompt approach
+
+**`src/index.ts`** — MCP flow:
+1. Creates temp dir with `input.json`, `output.json`, `mcp.json`
+2. Passes `--mcp-config` to Claude/Copilot; `null` for Gemini
+3. After streaming, reads `output.json` for diagram state (MCP path) or extracts CompactDiagram from LLM text (Gemini fallback)
+4. Expands + exports via `@bpmn-sdk/core` and emits `{ type: "xml" }` SSE event
+5. Cleans up temp dir
+
+**`src/prompt.ts`** — simplified:
+- `buildMcpSystemPrompt()` — 4 lines; LLM uses tools, no format instructions needed
+- `buildMcpImprovePrompt(findings)` — passes core `optimize()` findings; LLM uses tools to apply fixes
+- `buildSystemPrompt(context)` kept for Gemini fallback (full CompactDiagram format instructions)
+- Deleted `apply-ops.ts` (server-side ops patching replaced by MCP state management)
+
+### `canvas-plugins/ai-bridge/src/panel.ts`
+- Added "Gemini" to backend selector
+- Removed client-side `extractCompactDiagram` / `expand` — server now always provides XML
+- Apply button logic simplified: only shown when `directXml` is set (server emitted `{ type: "xml" }`)
+
+## 2026-03-03 — Fix: HTTP connector not used for API requests
+
+### `apps/ai-server` — prompt redesign
+
+Root cause: the HTTP connector rule was a short note buried at the end of the format examples' "Rules" line. The LLM read the format examples first, pattern-matched a generic serviceTask shape, and ignored the connector rule.
+
+- Extracted a prominent `HTTP_CONNECTOR_RULE` block that appears **before** the format examples in `buildSystemPrompt`
+- Explicitly states "Never add a plain serviceTask for these" — removes ambiguity
+- Instructs the LLM to use its knowledge for the real API endpoint URL (not a placeholder)
+- Includes a concrete GitHub Issues API example with correct endpoint, method, and Accept header
+- Documents FEEL expression syntax for dynamic URL segments (`= "https://..." + var + "/"`)
+- Simplified OPS_FORMAT and COMPACT_FORMAT to be concise format references; connector-specific details live only in the rule block
+
+## 2026-03-03 — HTTP REST connector support in CompactElement
+
+### `packages/bpmn-sdk` — `compact.ts`
+
+- Added `taskHeaders?: Record<string, string>` to `CompactElement` — maps to/from `zeebe:taskHeaders` in the BPMN model
+- `resultVariable` now also works for service tasks (not only business rule tasks): stored as a `zeebe:ioMapping` output (`source: "= response"`) when `jobType` is set
+- `compactifyElement()` extracts task headers from `zeebe:taskHeaders` children and extracts the primary output variable from `zeebe:ioMapping` single-output configs
+- `makeExtensions()` emits `zeebe:taskHeaders` from the map and `zeebe:ioMapping` for service tasks with a result variable
+
+### `apps/ai-server` — HTTP connector in prompts
+
+- Both OPS_FORMAT and COMPACT_FORMAT examples now show the Camunda HTTP connector (`io.camunda:http-json:1`) with `taskHeaders` and `resultVariable`
+- A `CONNECTOR_NOTE` constant is appended to the rules in all prompt sections, instructing the LLM to always use `io.camunda:http-json:1` for HTTP/REST calls
+
+## 2026-03-03 — All AI chat uses core SDK end-to-end
+
+### `apps/ai-server` — operations format + universal XML emit
+
+- **New `apply-ops.ts`** — LLM can now output either:
+  - `{ "ops": [...] }` — an operations patch (preferred for targeted edits like adding a node, renaming, setting a condition)
+  - `{ "processes": [...] }` — a full `CompactDiagram` (for new diagrams or major restructuring)
+- Operations: `add` (elements + flows), `remove` (elements + dangling flows auto-removed), `update` (merge changes into an element), `condition` (set or clear FEEL condition on a flow)
+- `parseResponse(text, current)` — detects which format the LLM used and returns a `CompactDiagram` to pass to core; ops are applied to the existing diagram, full diagram replaces it
+- **All requests now go through core**: after every response, server calls `expand()` + `Bpmn.export()` and emits `{ type: "xml", xml }` — the frontend never manipulates BPMN XML
+- System prompt updated to explain ops format first (preferred), full CompactDiagram second (fallback)
+
+### `canvas-plugins/ai-bridge` — regular `send()` now uses server XML
+
+- `send()` now captures the `xml` SSE event via `onXml` callback and passes it to `finalizeAiMessage` — consistent with the improve action
+
+## 2026-03-03 — AI quick actions: Improve diagram
+
+### `canvas-plugins/ai-bridge` — quick-action buttons
+
+- Added a quick-actions bar above the input area in the AI panel
+- **"✦ Improve diagram"** button triggers a one-shot improvement pass with a focused system prompt
+- Sends `action: "improve"` to the backend; disables both send and action buttons while streaming
+- `streamChat` now accepts an `onXml` callback — receives the validated XML from the server's `{ type: "xml" }` SSE event
+- `finalizeAiMessage` accepts optional `directXml`: when set, the "Apply to diagram" button uses the server-produced XML directly (no client-side `expand()` call)
+
+### `apps/ai-server` — core-backed improve pipeline
+
+- Added `@bpmn-sdk/core` as a runtime dependency
+- For `action === "improve"`:
+  1. `expand(context)` — deserializes the CompactDiagram into a full `BpmnDefinitions` using core
+  2. `optimize(defs)` — runs static analysis (FEEL complexity, flow issues, task-reuse) and collects concrete findings with element IDs
+  3. `buildImprovePrompt(context, findings)` — tells the LLM exactly which elements to fix; no re-analysis needed
+  4. Streams explanation tokens to the client as they arrive
+  5. After streaming: extracts the CompactDiagram from the LLM response, calls `expand()` + `Bpmn.export()` to produce validated XML
+  6. Emits `{ type: "xml", xml }` SSE event — client uses this directly without any XML parsing
+- Refactored adapters (`claude.ts`, `copilot.ts`) to accept `systemPrompt: string` directly — prompt building is owned by `index.ts`
+
 ## 2026-03-02 — Tauri desktop app
 
 ### `apps/desktop` — new Tauri v2 desktop application

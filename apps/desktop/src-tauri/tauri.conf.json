@@ -31,7 +31,8 @@
     "targets": "all",
     "icon": ["icons/32x32.png", "icons/128x128.png", "icons/256x256.png"],
     "resources": {
-      "../../ai-server/dist/bundle.cjs": "ai-server.cjs"
+      "../../ai-server-rs/target/release/ai-server": "ai-server",
+      "../../ai-server-rs/target/release/bpmn-mcp": "bpmn-mcp"
     }
   }
 }

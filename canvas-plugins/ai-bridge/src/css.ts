@@ -38,7 +38,7 @@ export function injectAiBridgeStyles(): void {
 .ai-panel-status-err code {
   display: block; margin-top: 4px;
   background: rgba(255,255,255,0.05); border-radius: 4px;
-  padding: 4px 8px; font-size: 11px; color: rgba(255,255,255,0.6);
+  padding: 4px 8px; font-size: 11px; color: rgba(255,255,255,0.9);
   user-select: all;
 }
 .ai-messages {
@@ -78,6 +78,21 @@ export function injectAiBridgeStyles(): void {
   color: rgba(255,255,255,0.65);
   overflow-x: auto; white-space: pre;
 }
+.ai-quick-actions {
+  padding: 6px 10px;
+  display: flex; gap: 6px; flex-wrap: wrap;
+  border-top: 1px solid rgba(255,255,255,0.06);
+  flex-shrink: 0;
+}
+.ai-quick-btn {
+  padding: 4px 10px; border-radius: 14px;
+  background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.12);
+  color: rgba(255,255,255,0.65); font-size: 12px; cursor: pointer;
+  font-family: inherit; white-space: nowrap;
+  transition: background 0.15s, color 0.15s;
+}
+.ai-quick-btn:hover:not(:disabled) { background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.9); }
+.ai-quick-btn:disabled { opacity: 0.35; cursor: default; }
 .ai-input-area {
   padding: 10px; border-top: 1px solid rgba(255,255,255,0.08);
   display: flex; gap: 8px; align-items: flex-end;
@@ -115,38 +130,6 @@ export function injectAiBridgeStyles(): void {
   font-family: inherit; outline: none;
 }
 .ai-backend-select:hover { background: rgba(255,255,255,0.1); }
-.ai-hist-overlay {
-  position: fixed; inset: 0; z-index: 160;
-  background: rgba(0,0,0,0.5);
-  display: flex; align-items: center; justify-content: center;
-}
-.ai-hist-panel {
-  background: rgba(22,22,30,0.97); border: 1px solid rgba(255,255,255,0.12);
-  border-radius: 10px; width: 420px; max-height: 60vh;
-  display: flex; flex-direction: column;
-  box-shadow: 0 12px 40px rgba(0,0,0,0.6);
-}
-.ai-hist-header {
-  padding: 12px 16px; border-bottom: 1px solid rgba(255,255,255,0.08);
-  font-weight: 600; font-size: 14px; color: rgba(255,255,255,0.9);
-  display: flex; justify-content: space-between; align-items: center;
-}
-.ai-hist-list { flex: 1; overflow-y: auto; padding: 6px 0; }
-.ai-hist-item {
-  padding: 8px 16px; cursor: pointer;
-  border-bottom: 1px solid rgba(255,255,255,0.04);
-  display: flex; justify-content: space-between; align-items: center;
-}
-.ai-hist-item:hover { background: rgba(255,255,255,0.04); }
-.ai-hist-time { font-size: 12px; color: rgba(255,255,255,0.5); }
-.ai-hist-restore {
-  font-size: 11.5px; padding: 3px 8px;
-  background: rgba(60,120,220,0.25); border: 1px solid rgba(60,120,220,0.4);
-  border-radius: 4px; color: rgba(150,190,255,0.9); cursor: pointer;
-}
-.ai-hist-empty {
-  padding: 24px; text-align: center; color: rgba(255,255,255,0.35); font-size: 12px;
-}
 /* Docked mode — renders inside a dock pane instead of as a fixed overlay */
 .ai-panel--docked {
   position: static !important;
@@ -193,6 +176,11 @@ export function injectAiBridgeStyles(): void {
 [data-bpmn-hud-theme="light"] .ai-backend-select {
   background: rgba(0,0,0,0.04); border-color: rgba(0,0,0,0.1); color: rgba(0,0,0,0.55);
 }
+[data-bpmn-hud-theme="light"] .ai-quick-actions { border-top-color: rgba(0,0,0,0.06); }
+[data-bpmn-hud-theme="light"] .ai-quick-btn {
+  background: rgba(0,0,0,0.04); border-color: rgba(0,0,0,0.1); color: rgba(0,0,0,0.55);
+}
+[data-bpmn-hud-theme="light"] .ai-quick-btn:hover:not(:disabled) { background: rgba(0,0,0,0.08); color: rgba(0,0,0,0.8); }
 [data-bpmn-hud-theme="light"] .ai-input-area { border-top-color: rgba(0,0,0,0.08); }
 [data-bpmn-hud-theme="light"] .ai-hist-panel { background: rgba(252,252,254,0.98); border-color: rgba(0,0,0,0.1); }
 [data-bpmn-hud-theme="light"] .ai-hist-header { color: rgba(0,0,0,0.88); border-bottom-color: rgba(0,0,0,0.08); }

@@ -1,7 +1,6 @@
-import { Bpmn, compactify, expand } from "@bpmn-sdk/core";
-import type { BpmnDefinitions, CompactDiagram } from "@bpmn-sdk/core";
-import type { Checkpoint } from "./checkpoint.js";
-import { listCheckpoints, saveCheckpoint } from "./checkpoint.js";
+import { saveCheckpoint } from "@bpmn-sdk/canvas-plugin-history";
+import { Bpmn, compactify } from "@bpmn-sdk/core";
+import type { BpmnDefinitions } from "@bpmn-sdk/core";
 import { injectAiBridgeStyles } from "./css.js";
 
 const DEFAULT_SERVER = "http://localhost:3033";
@@ -25,11 +24,18 @@ async function* streamChat(
 	messages: ChatMessage[],
 	context: unknown,
 	backend: string,
+	action?: string,
+	onXml?: (xml: string) => void,
 ): AsyncGenerator<string> {
 	const res = await fetch(`${serverUrl}/chat`, {
 		method: "POST",
 		headers: { "Content-Type": "application/json" },
-		body: JSON.stringify({ messages, context, backend: backend === "auto" ? null : backend }),
+		body: JSON.stringify({
+			messages,
+			context,
+			backend: backend === "auto" ? null : backend,
+			action: action ?? null,
+		}),
 	});
 	if (!res.ok || !res.body) throw new Error(`Server returned ${res.status}`);
 
@@ -48,8 +54,14 @@ async function* streamChat(
 				const trimmed = line.trim();
 				if (!trimmed) continue;
 				try {
-					const event = JSON.parse(trimmed) as { type: string; text?: string; message?: string };
+					const event = JSON.parse(trimmed) as {
+						type: string;
+						text?: string;
+						message?: string;
+						xml?: string;
+					};
 					if (event.type === "token" && event.text) yield event.text;
+					if (event.type === "xml" && event.xml) onXml?.(event.xml);
 					if (event.type === "done") return;
 					if (event.type === "error") throw new Error(event.message ?? event.text ?? "AI error");
 				} catch (e) {
@@ -61,85 +73,6 @@ async function* streamChat(
 	} finally {
 		reader.releaseLock();
 	}
-}
-
-// ── Compact diagram extraction ────────────────────────────────────────────────
-
-function extractCompactDiagram(text: string): CompactDiagram | null {
-	const match = /```json\s*\n([\s\S]*?)\n```/.exec(text);
-	if (!match?.[1]) return null;
-	try {
-		const parsed = JSON.parse(match[1]) as unknown;
-		if (
-			typeof parsed === "object" &&
-			parsed !== null &&
-			"processes" in parsed &&
-			Array.isArray((parsed as Record<string, unknown>).processes)
-		) {
-			return parsed as CompactDiagram;
-		}
-	} catch {
-		/* invalid JSON */
-	}
-	return null;
-}
-
-// ── History modal ─────────────────────────────────────────────────────────────
-
-function showHistoryModal(checkpoints: Checkpoint[], onRestore: (xml: string) => void): void {
-	const overlay = document.createElement("div");
-	overlay.className = "ai-hist-overlay";
-	overlay.addEventListener("click", (e) => {
-		if (e.target === overlay) overlay.remove();
-	});
-
-	const panel = document.createElement("div");
-	panel.className = "ai-hist-panel";
-
-	const header = document.createElement("div");
-	header.className = "ai-hist-header";
-	const title = document.createElement("span");
-	title.textContent = "Checkpoint History";
-	const closeBtn = document.createElement("button");
-	closeBtn.className = "ai-hdr-btn";
-	closeBtn.textContent = "×";
-	closeBtn.addEventListener("click", () => overlay.remove());
-	header.append(title, closeBtn);
-
-	const list = document.createElement("div");
-	list.className = "ai-hist-list";
-
-	if (checkpoints.length === 0) {
-		const empty = document.createElement("div");
-		empty.className = "ai-hist-empty";
-		empty.textContent =
-			"No checkpoints saved yet. Checkpoints are created when you apply AI changes.";
-		list.append(empty);
-	} else {
-		for (const cp of checkpoints) {
-			const item = document.createElement("div");
-			item.className = "ai-hist-item";
-
-			const timeEl = document.createElement("span");
-			timeEl.className = "ai-hist-time";
-			timeEl.textContent = new Date(cp.timestamp).toLocaleString();
-
-			const restoreBtn = document.createElement("button");
-			restoreBtn.className = "ai-hist-restore";
-			restoreBtn.textContent = "Restore";
-			restoreBtn.addEventListener("click", () => {
-				onRestore(cp.xml);
-				overlay.remove();
-			});
-
-			item.append(timeEl, restoreBtn);
-			list.append(item);
-		}
-	}
-
-	panel.append(header, list);
-	overlay.append(panel);
-	document.body.append(overlay);
 }
 
 // ── Panel ─────────────────────────────────────────────────────────────────────
@@ -171,6 +104,7 @@ export function createAiPanel(options: PanelOptions): {
 		["auto", "Auto"],
 		["claude", "Claude"],
 		["copilot", "Copilot"],
+		["gemini", "Gemini"],
 	] as const) {
 		const opt = document.createElement("option");
 		opt.value = value;
@@ -182,18 +116,13 @@ export function createAiPanel(options: PanelOptions): {
 		localStorage.setItem("bpmn-sdk-ai-backend", backendSelect.value);
 	});
 
-	const histBtn = document.createElement("button");
-	histBtn.className = "ai-hdr-btn";
-	histBtn.title = "Checkpoint history";
-	histBtn.textContent = "History";
-
 	const closeBtn = document.createElement("button");
 	closeBtn.className = "ai-hdr-btn";
 	closeBtn.title = "Close";
 	closeBtn.textContent = "×";
 	closeBtn.addEventListener("click", () => close());
 
-	actions.append(backendSelect, histBtn, closeBtn);
+	actions.append(backendSelect, closeBtn);
 	header.append(titleEl, actions);
 
 	// ── Status bar ──
@@ -204,6 +133,16 @@ export function createAiPanel(options: PanelOptions): {
 	// ── Messages ──
 	const messagesEl = document.createElement("div");
 	messagesEl.className = "ai-messages";
+
+	// ── Quick actions ──
+	const quickActions = document.createElement("div");
+	quickActions.className = "ai-quick-actions";
+
+	const improveBtn = document.createElement("button");
+	improveBtn.className = "ai-quick-btn";
+	improveBtn.textContent = "✦ Improve diagram";
+	improveBtn.title = "Analyze and improve the current diagram";
+	quickActions.append(improveBtn);
 
 	// ── Input area ──
 	const inputArea = document.createElement("div");
@@ -219,7 +158,7 @@ export function createAiPanel(options: PanelOptions): {
 	sendBtn.textContent = "Send";
 
 	inputArea.append(textarea, sendBtn);
-	panel.append(header, statusBar, messagesEl, inputArea);
+	panel.append(header, statusBar, messagesEl, quickActions, inputArea);
 
 	// ── State ──
 	const history: ChatMessage[] = [];
@@ -247,6 +186,8 @@ export function createAiPanel(options: PanelOptions): {
 	function showNotRunning(): void {
 		statusBar.className = "ai-panel-status ai-panel-status-err";
 		statusEl.textContent = "AI server not running. Start with:";
+		// Remove any previously appended code element before adding a new one
+		statusBar.querySelector("code")?.remove();
 		const code = document.createElement("code");
 		code.textContent = "pnpm ai-server";
 		statusBar.append(code);
@@ -262,11 +203,13 @@ export function createAiPanel(options: PanelOptions): {
 		return msg;
 	}
 
-	function finalizeAiMessage(msgEl: HTMLElement, fullText: string): void {
+	function finalizeAiMessage(msgEl: HTMLElement, fullText: string, directXml?: string): void {
 		msgEl.classList.remove("ai-msg-cursor");
 		msgEl.textContent = "";
 
-		// Render text with code blocks highlighted
+		// Render text — highlight JSON code blocks if present, otherwise plain text.
+		// In MCP mode the LLM returns plain prose (no JSON block); in fallback mode it
+		// returns a CompactDiagram code block. Both cases must support the apply button.
 		const jsonMatch = /```json\s*\n([\s\S]*?)\n```/.exec(fullText);
 		if (jsonMatch) {
 			const before = fullText.slice(0, jsonMatch.index).trim();
@@ -289,37 +232,35 @@ export function createAiPanel(options: PanelOptions): {
 				textEl.textContent = after;
 				msgEl.append(textEl);
 			}
-
-			// Try to extract and show Apply button
-			const compact = extractCompactDiagram(fullText);
-			if (compact) {
-				const applyBtn = document.createElement("button");
-				applyBtn.className = "ai-msg-apply";
-				applyBtn.textContent = "Apply to diagram";
-				applyBtn.addEventListener("click", async () => {
-					applyBtn.disabled = true;
-					applyBtn.textContent = "Applying…";
-					try {
-						// Save checkpoint of current state before applying
-						const currentDefs = options.getDefinitions();
-						if (currentDefs) {
-							const ctx = options.getCurrentContext?.();
-							if (ctx) {
-								await saveCheckpoint(ctx.projectId, ctx.fileId, Bpmn.export(currentDefs));
-							}
-						}
-						const expanded = expand(compact);
-						options.loadXml(Bpmn.export(expanded));
-						applyBtn.textContent = "Applied ✓";
-					} catch (err) {
-						applyBtn.disabled = false;
-						applyBtn.textContent = `Apply failed: ${String(err)}`;
-					}
-				});
-				msgEl.append(applyBtn);
-			}
 		} else {
 			msgEl.textContent = fullText;
+		}
+
+		// Show the apply button whenever the server produced validated XML —
+		// independent of whether the response text contained a JSON code block.
+		if (directXml !== undefined) {
+			const applyBtn = document.createElement("button");
+			applyBtn.className = "ai-msg-apply";
+			applyBtn.textContent = "Apply to diagram";
+			applyBtn.addEventListener("click", async () => {
+				applyBtn.disabled = true;
+				applyBtn.textContent = "Applying…";
+				try {
+					const currentDefs = options.getDefinitions();
+					if (currentDefs) {
+						const ctx = options.getCurrentContext?.();
+						if (ctx) {
+							await saveCheckpoint(ctx.projectId, ctx.fileId, Bpmn.export(currentDefs));
+						}
+					}
+					options.loadXml(directXml);
+					applyBtn.textContent = "Applied ✓";
+				} catch (err) {
+					applyBtn.disabled = false;
+					applyBtn.textContent = `Apply failed: ${String(err)}`;
+				}
+			});
+			msgEl.append(applyBtn);
 		}
 
 		messagesEl.scrollTop = messagesEl.scrollHeight;
@@ -344,6 +285,9 @@ export function createAiPanel(options: PanelOptions): {
 		const defs = options.getDefinitions();
 		const context = defs ? compactify(defs) : null;
 
+		// Capture the validated XML that the server produces via core expand+export.
+		let resultXml: string | undefined;
+
 		let fullText = "";
 		try {
 			for await (const token of streamChat(
@@ -351,6 +295,10 @@ export function createAiPanel(options: PanelOptions): {
 				history,
 				context,
 				backendSelect.value,
+				undefined,
+				(xml) => {
+					resultXml = xml;
+				},
 			)) {
 				fullText += token;
 				aiMsgEl.textContent = fullText;
@@ -360,13 +308,69 @@ export function createAiPanel(options: PanelOptions): {
 			fullText = err instanceof Error ? err.message : String(err);
 		}
 
-		finalizeAiMessage(aiMsgEl, fullText);
+		finalizeAiMessage(aiMsgEl, fullText, resultXml);
 		history.push({ role: "ai", content: fullText });
 
 		sending = false;
 		sendBtn.disabled = false;
 		textarea.focus();
 	}
+
+	// ── Send with a specific action (quick-action buttons) ──
+	async function sendAction(label: string, action: string): Promise<void> {
+		if (sending) return;
+		const defs = options.getDefinitions();
+		if (!defs) return;
+
+		sending = true;
+		sendBtn.disabled = true;
+		improveBtn.disabled = true;
+
+		const userMsg: ChatMessage = { role: "user", content: label };
+		history.push(userMsg);
+		addMessage("user", label);
+
+		const aiMsgEl = addMessage("ai", "");
+		aiMsgEl.classList.add("ai-msg-cursor");
+
+		const context = compactify(defs);
+
+		// Server will emit a { type: "xml" } event after streaming when it has
+		// validated and expanded the CompactDiagram via the core package.
+		let resultXml: string | undefined;
+
+		let fullText = "";
+		try {
+			for await (const token of streamChat(
+				options.serverUrl,
+				history,
+				context,
+				backendSelect.value,
+				action,
+				(xml) => {
+					resultXml = xml;
+				},
+			)) {
+				fullText += token;
+				aiMsgEl.textContent = fullText;
+				messagesEl.scrollTop = messagesEl.scrollHeight;
+			}
+		} catch (err) {
+			fullText = err instanceof Error ? err.message : String(err);
+		}
+
+		finalizeAiMessage(aiMsgEl, fullText, resultXml);
+		history.push({ role: "ai", content: fullText });
+
+		sending = false;
+		sendBtn.disabled = false;
+		improveBtn.disabled = false;
+		textarea.focus();
+	}
+
+	improveBtn.addEventListener("click", () => {
+		void sendAction("Improve this diagram", "improve");
+	});
 
 	sendBtn.addEventListener("click", () => {
 		void send();
@@ -376,17 +380,6 @@ export function createAiPanel(options: PanelOptions): {
 			e.preventDefault();
 			void send();
 		}
-	});
-
-	// ── History button ──
-	histBtn.addEventListener("click", async () => {
-		const ctx = options.getCurrentContext?.();
-		if (!ctx) {
-			showHistoryModal([], options.loadXml);
-			return;
-		}
-		const checkpoints = await listCheckpoints(ctx.projectId, ctx.fileId);
-		showHistoryModal(checkpoints, options.loadXml);
 	});
 
 	// ── Open/close ──

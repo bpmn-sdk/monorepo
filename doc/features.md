@@ -1,5 +1,94 @@
 # Features
 
+## Process Runner Canvas Plugin (2026-03-03) — `canvas-plugins/process-runner`
+
+Interactive BPMN execution toolbar embedded directly on the canvas.
+
+- **Auto-play** — runs the entire process instance immediately with no configuration.
+- **Play with JSON payload** — modal dialog lets you supply initial variables as a JSON object before executing.
+- **Step-by-step** — starts in step mode; execution pauses after each element's I/O mapping. Click "→ Next" to advance one step at a time.
+- **Stop** — cancels the running instance at any point.
+- **Token-highlight integration** — pass `tokenHighlight: createTokenHighlightPlugin()` to see active/visited nodes and edges update in real-time.
+- **Auto-deploy** — subscribes to `diagram:load`; automatically deploys the loaded diagram into the engine so the toolbar is always ready.
+- **Structural typing** — depends only on `@bpmn-sdk/canvas`; engine and token-highlight are accepted via structural interfaces, no hard runtime coupling.
+
+## Token Highlight Canvas Plugin (2026-03-03) — `canvas-plugins/token-highlight`
+
+Visualizes live process execution state on the BPMN canvas when paired with `@bpmn-sdk/engine`.
+
+- **Active elements** — amber glow pulse; marks nodes where a token is currently present.
+- **Visited elements** — green tint; marks nodes the token has already left.
+- **Active/visited edges** — colored and animated sequence flows; only highlights edges whose source has been visited, so untaken gateway branches stay neutral.
+- **`trackInstance(instance)`** — one call auto-wires to any `ProcessInstance` via structural typing (no engine dependency required).
+- **Manual API** — `setActive()`, `addVisited()`, `clear()` for custom control.
+
+## BPMN Simulation Engine (2026-03-03) — `packages/engine` (`@bpmn-sdk/engine`)
+
+Lightweight, zero-external-dependency BPMN simulation engine for browser and Node.js.
+
+- **`Engine`** — Deploy BPMN/DMN/Form definitions; start process instances with optional input variables; register job workers by type.
+- **`ProcessInstance`** — Token-based execution; `onChange(callback)` → real-time `ProcessEvent` stream; `cancel()`; `activeElements` / `state` / `variables_snapshot`.
+- **Job workers** — Register handlers for service/user tasks. Auto-completes in simulation mode when no handler is registered.
+- **Gateways** — Exclusive (condition eval), Parallel (split+join), Inclusive (all matching flows).
+- **Timers** — ISO 8601 durations/dates/cycles via `setTimeout`.
+- **DMN** — Business rule tasks evaluate decision tables via `@bpmn-sdk/feel`; supports all major hit policies.
+- **Sub-processes** — Isolated child scope; completes when all tokens in sub-scope are consumed.
+- **Error propagation** — Error end events propagate through scope chain to the nearest error boundary event.
+
+## Native Rust AI server with embedded QuickJS (2026-03-03) — `apps/ai-server-rs`
+
+The Tauri desktop app now bundles two native Rust binaries instead of a Node.js bundle:
+
+- **`ai-server`** — HTTP server on port 3033 (axum, CORS, SSE). Detects and proxies Claude/Copilot/Gemini CLIs. Converts CompactDiagram ↔ BPMN XML via the embedded `@bpmn-sdk/core` bridge.
+- **`bpmn-mcp`** — stdio MCP server (JSON-RPC 2.0). Used as the LLM's tool executor when MCP is supported. Maintains stateful BPMN diagram in-memory via the bridge.
+
+**Core bridge** (`bridge.ts` → `bridge.bundle.js` → `include_str!`): `@bpmn-sdk/core` is compiled to an IIFE JS bundle at Rust build time and evaluated in a dedicated QuickJS (`rquickjs`) thread. When core changes, rebuilding the Rust package automatically picks up the update — no divergence between JS and Rust.
+
+No Node.js required on the user's machine for the desktop app.
+
+## History tab in sidebar dock (2026-03-03) — `canvas-plugins/history`, `packages/editor`
+
+A dedicated "History" tab sits between Properties and AI in the right sidebar. It shows a chronological list of AI checkpoints for the currently open file with one-click restore (confirm dialog). The tab is disabled for in-memory files that have no storage context.
+
+Day-based checkpoint retention: up to 50 checkpoints from today + 1 (latest) per day for the last 10 days. Older entries are pruned automatically on each save.
+
+## MCP-based AI diagram editing (2026-03-03) — `apps/ai-server`
+
+The AI server exposes a minimal stdio MCP server (`mcp-server.ts`) that gives the LLM structured tools to read and modify BPMN diagrams. Zero external dependencies — pure Node.js built-ins + `@bpmn-sdk/core`.
+
+Tools: `get_diagram`, `add_elements`, `remove_elements`, `update_element`, `set_condition`, `add_http_call`, `replace_diagram`.
+
+`add_http_call` always sets `jobType: "io.camunda:http-json:1"` — the Camunda HTTP REST connector is baked into the tool signature so the LLM can't use the wrong task type.
+
+Adapters supported:
+- **Claude** (`claude -p --mcp-config --allowedTools --strict-mcp-config`) — full MCP
+- **Copilot** (`copilot -p --additional-mcp-config --allow-all-tools`, new `@github/copilot` GA Feb 2026) — full MCP
+- **Gemini** (`gemini -p --yolo`) — fallback to system-prompt approach (no per-invocation MCP)
+
+All diagram changes go through `expand()` + `Bpmn.export()` in core; the client receives validated XML via `{ type: "xml" }` SSE and never manipulates BPMN directly.
+
+## Core-mediated AI pipeline (2026-03-03) — `apps/ai-server`
+
+All AI chat requests now flow exclusively through the `@bpmn-sdk/core` package on the server:
+
+1. **Operations format** — LLM outputs targeted ops (`add`, `remove`, `update`, `condition`) instead of re-generating the entire diagram for small changes. This is much more efficient for common tasks (add a node, rename, set a condition, add a REST connector task type).
+2. **Fallback full diagram** — LLM can still output a full `CompactDiagram` for new diagrams or structural rewrites.
+3. **Server-side validation** — `parseResponse()` applies ops to the current diagram, then `expand()` + `Bpmn.export()` validate and serialize the result. The frontend receives ready-made XML via a `{ type: "xml" }` SSE event.
+4. **No client-side XML manipulation** — the apply button in the AI panel uses the server-produced XML directly.
+
+## AI quick actions (2026-03-03) — `canvas-plugins/ai-bridge`
+
+One-click AI operations on the current diagram, accessible via a quick-actions bar above the chat input:
+
+- **Improve diagram** — analyzes the open diagram and returns an improved version in one shot, covering:
+  - Sub-process consolidation (groups 3+ consecutive related tasks)
+  - Simplification (removes redundant gateways and over-engineered paths)
+  - Name normalization (verb-noun title case, consistent tone)
+  - FEEL expression cleanup (minimal, readable conditions)
+- Backend uses the core `optimize()` engine to pre-detect concrete issues (FEEL complexity, flow problems, task-reuse opportunities) before calling the LLM — the LLM receives a specific list of what to fix, not a generic "improve" instruction
+- After streaming, the server validates the LLM's output by calling `expand()` + `Bpmn.export()` from core, then emits the result as a `{ type: "xml" }` SSE event — the client applies it directly without any client-side XML parsing
+- The response appears as a normal AI message with an "Apply to diagram" button
+
 ## Tauri desktop app (2026-03-02) — `apps/desktop`
 
 Native desktop application wrapping the BPMN SDK editor using Tauri v2:

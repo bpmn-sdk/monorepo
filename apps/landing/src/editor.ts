@@ -3,6 +3,7 @@ import { createCommandPalettePlugin } from "@bpmn-sdk/canvas-plugin-command-pale
 import { createCommandPaletteEditorPlugin } from "@bpmn-sdk/canvas-plugin-command-palette-editor";
 import { createConfigPanelPlugin } from "@bpmn-sdk/canvas-plugin-config-panel";
 import { createConfigPanelBpmnPlugin } from "@bpmn-sdk/canvas-plugin-config-panel-bpmn";
+import { createHistoryPanel, saveCheckpoint } from "@bpmn-sdk/canvas-plugin-history";
 import { createMainMenuPlugin } from "@bpmn-sdk/canvas-plugin-main-menu";
 import { createOptimizePlugin } from "@bpmn-sdk/canvas-plugin-optimize";
 import {
@@ -146,7 +147,10 @@ const bridge = createStorageTabsBridge({
 	palette,
 	enableFileImport: true,
 	sideDock: dock,
-	onWelcomeShow: () => setHudVisible(false),
+	onWelcomeShow: () => {
+		setHudVisible(false);
+		dock.setHistoryTabEnabled(false);
+	},
 	onTabActivate(id, config) {
 		const isBpmn = config.type === "bpmn";
 		setHudVisible(true);
@@ -165,6 +169,12 @@ const bridge = createStorageTabsBridge({
 			isBpmn ? (editorRef?.getDefinitions()?.processes[0]?.name ?? null) : null,
 			currentFileName,
 		);
+		// Defer: the bridge sets the storage file ID synchronously after openTab() returns,
+		// which is after this callback fires. A microtask runs after all sync code settles.
+		void Promise.resolve().then(() => {
+			const hasStorageCtx = isBpmn && bridge.storagePlugin.api.getCurrentContext() !== null;
+			dock.setHistoryTabEnabled(hasStorageCtx);
+		});
 	},
 });
 
@@ -193,6 +203,24 @@ const aiBridgePlugin = createAiBridgePlugin({
 		if (dock.collapsed) dock.expand();
 		dock.switchTab("ai");
 	},
+});
+
+// Wire AI tab click to initialize+open the panel (it's lazily created on first use)
+dock.setAiTabClickHandler(() => {
+	if (dock.collapsed) dock.expand();
+	aiBridgePlugin.openPanel();
+});
+
+// History pane
+const historyPanel = createHistoryPanel({
+	getCurrentContext: () => bridge.storagePlugin.api.getCurrentContext(),
+	loadXml: (xml) => {
+		editorRef?.load(xml);
+	},
+});
+dock.historyPane.appendChild(historyPanel.el);
+dock.setHistoryTabClickHandler(() => {
+	void historyPanel.refresh();
 });
 
 palette.addCommands([
@@ -229,11 +257,25 @@ const editor = new BpmnEditor({
 });
 editorRef = editor;
 
-// Keep dock diagram info up-to-date on diagram changes
+// Keep dock diagram info up-to-date on diagram changes; save checkpoints on auto-save cadence
 type AnyOn = (event: string, handler: (...args: unknown[]) => void) => () => void;
 const editorOn = (editor as unknown as { on: AnyOn }).on.bind(editor);
+
+let _checkpointTimer: ReturnType<typeof setTimeout> | null = null;
 editorOn("diagram:change", () => {
 	dock.setDiagramInfo(editorRef?.getDefinitions()?.processes[0]?.name ?? null, currentFileName);
+
+	// Save a checkpoint ~600 ms after the last change (auto-save runs at 500 ms).
+	// Only for files that are persisted in storage (context must be available).
+	if (_checkpointTimer !== null) clearTimeout(_checkpointTimer);
+	_checkpointTimer = setTimeout(() => {
+		_checkpointTimer = null;
+		const ctx = bridge.storagePlugin.api.getCurrentContext();
+		if (!ctx) return;
+		const defs = editorRef?.getDefinitions();
+		if (!defs) return;
+		void saveCheckpoint(ctx.projectId, ctx.fileId, Bpmn.export(defs));
+	}, 600);
 });
 
 initEditorHud(editor, {

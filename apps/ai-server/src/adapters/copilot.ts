@@ -1,5 +1,10 @@
+/**
+ * Adapter for the new GitHub Copilot CLI (`copilot` / `@github/copilot`, GA Feb 2026).
+ * Note: the old `gh copilot` extension was deprecated Oct 2025 and is no longer supported.
+ */
 import { spawn } from "node:child_process";
-import { buildSystemPrompt } from "../prompt.js";
+
+export const supportsMcp = true;
 
 interface Message {
 	role: string;
@@ -8,7 +13,7 @@ interface Message {
 
 export async function available(): Promise<boolean> {
 	return new Promise((resolve) => {
-		const proc = spawn("gh", ["copilot", "--version"], { stdio: "ignore" });
+		const proc = spawn("copilot", ["--version"], { stdio: "ignore" });
 		proc.on("error", () => resolve(false));
 		proc.on("close", (code) => resolve(code === 0));
 	});
@@ -16,16 +21,24 @@ export async function available(): Promise<boolean> {
 
 export async function stream(
 	messages: Message[],
-	context: unknown,
+	systemPrompt: string,
+	mcpConfigFile: string | null,
 	onToken: (text: string) => void,
 ): Promise<void> {
-	const systemPrompt = buildSystemPrompt(context);
 	const lastUser = [...messages].reverse().find((m) => m.role === "user");
-	const prompt = `${systemPrompt}\n\nUser request: ${lastUser?.content ?? "help"}`;
+	const prompt = `${systemPrompt}\n\nUser: ${lastUser?.content ?? "help"}`;
+
+	const args = ["-p", prompt, "--yolo"];
+
+	if (mcpConfigFile) {
+		args.push("--additional-mcp-config", mcpConfigFile);
+		args.push("--allow-all-tools");
+	}
+
+	console.log(`[copilot] spawning with MCP: ${mcpConfigFile !== null}`);
 
 	await new Promise<void>((resolve, reject) => {
-		// gh copilot suggest is for shell commands; we use explain as a best-effort fallback
-		const proc = spawn("gh", ["copilot", "explain", prompt], {
+		const proc = spawn("copilot", args, {
 			stdio: ["ignore", "pipe", "pipe"],
 		});
 
@@ -33,10 +46,18 @@ export async function stream(
 			onToken(chunk.toString());
 		});
 
-		proc.on("error", reject);
+		proc.stderr?.on("data", (chunk: Buffer) => {
+			process.stderr.write(`[copilot stderr] ${chunk.toString()}`);
+		});
+
+		proc.on("error", (err) => {
+			console.error(`[copilot] spawn error: ${String(err)}`);
+			reject(err);
+		});
 		proc.on("close", (code) => {
+			console.log(`[copilot] exited with code ${code}`);
 			if (code === 0) resolve();
-			else reject(new Error(`gh copilot exited with code ${code}`));
+			else reject(new Error(`copilot exited with code ${code}`));
 		});
 	});
 }
