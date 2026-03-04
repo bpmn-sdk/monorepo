@@ -66,6 +66,17 @@ import {
 	xmlLocalName,
 } from "./util.js";
 
+/** Validates that a field value is valid JSON, or returns an error message. */
+function validateJson(value: FieldValue): string | null {
+	if (typeof value !== "string" || value.trim() === "") return null;
+	try {
+		JSON.parse(value);
+		return null;
+	} catch (e) {
+		return e instanceof SyntaxError ? e.message : "Invalid JSON";
+	}
+}
+
 // ── Built-in template registry ────────────────────────────────────────────────
 
 /**
@@ -201,6 +212,7 @@ const GENERIC_SERVICE_TASK_SCHEMA: PanelSchema = {
 					type: "textarea",
 					placeholder: '{"myVariable": "value"}',
 					hint: "Mock output written to process variables in play mode when no job worker is registered.",
+					validate: validateJson,
 				},
 				{
 					key: "documentation",
@@ -458,6 +470,7 @@ function makeUserTaskSchema(): PanelSchema {
 						type: "textarea",
 						placeholder: '{"myVariable": "value"}',
 						hint: "Mock output written to process variables in play mode when no job worker is registered.",
+						validate: validateJson,
 					},
 					{
 						key: "documentation",

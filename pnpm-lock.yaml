@@ -204,6 +204,9 @@ importers:
       '@bpmn-sdk/core':
         specifier: workspace:*
         version: link:../../packages/bpmn-sdk
+      '@bpmn-sdk/feel':
+        specifier: workspace:*
+        version: link:../../packages/feel
 
   canvas-plugins/config-panel-bpmn:
     dependencies:

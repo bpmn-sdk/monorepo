@@ -44,6 +44,11 @@ export interface FieldSchema {
 	 * expression in an external playground/editor.
 	 */
 	openInPlayground?: (values: Record<string, FieldValue>) => void;
+	/**
+	 * Custom validation function. Called after the built-in required/FEEL checks.
+	 * Return `null` when the value is valid, or an error message string when invalid.
+	 */
+	validate?: (value: FieldValue) => string | null;
 }
 
 /** A named group of fields shown as a section in the full editor. */

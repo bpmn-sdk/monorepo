@@ -1,5 +1,18 @@
 # Progress
 
+## 2026-03-04 — Config panel: FEEL validation, JSON validation, FEEL/string toggle
+
+**`canvas-plugins/config-panel`**:
+- Added `validate?: (value: FieldValue) => string | null` to `FieldSchema` — custom per-field validation returning an error message or null.
+- Added `@bpmn-sdk/feel` dependency; replaced heuristic `hasFEELSyntaxError` with `validateFeelExpression` using the real FEEL parser (`parseExpression`). Invalid FEEL expressions now show the parser's error message.
+- Added `_fieldError()` method returning the error message string (used by `_fieldHasError()`, `_refreshValidation`, and `_renderField`).
+- All `feel-expression` fields now show a **FEEL/string mode toggle** pill next to the label. Clicking it adds/removes the `=` prefix and updates validation accordingly.
+- Added `.bpmn-cfg-field-error` div below each field (hidden when valid) that shows the validation error message. Updated `_refreshValidation` to keep it in sync.
+- `_refreshInputs` also updates the FEEL mode toggle button state when values change externally.
+
+**`canvas-plugins/config-panel-bpmn`**:
+- Added `validateJson` helper; wired as `validate: validateJson` on `exampleOutputJson` fields for both service tasks and user tasks — invalid JSON now shows a parse error.
+
 ## 2026-03-04 — exampleOutputJson: play-mode mock output support
 
 Implements `camundaModeler:exampleOutputJson` — a JSON string stored as a `zeebe:property` on task elements that provides mock output data for play-mode simulation.
