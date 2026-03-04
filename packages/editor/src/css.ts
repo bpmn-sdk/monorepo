@@ -229,6 +229,11 @@ export const HUD_CSS = `
   border-radius: 0;
   box-shadow: none;
   padding: 0 2px;
+  /* Pass clicks through the transparent background to the tab bar center slot. */
+  pointer-events: none;
+}
+#hud-top-center.panel > * {
+  pointer-events: auto;
 }
 
 /* ── Icon buttons ────────────────────────────────────────────────── */

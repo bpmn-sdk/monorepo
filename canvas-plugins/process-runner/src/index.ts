@@ -13,7 +13,7 @@ interface InstanceLike {
 
 /** Minimal interface satisfied by `Engine` from `@bpmn-sdk/engine`. */
 interface EngineLike {
-	deploy(d: { bpmn: unknown }): void;
+	deploy(d: { bpmn?: unknown }): void;
 	start(
 		processId: string,
 		variables?: Record<string, unknown>,
@@ -42,6 +42,10 @@ export interface ProcessRunnerOptions {
 	 * be highlighted in real-time as the instance runs.
 	 */
 	tokenHighlight?: TokenHighlightLike;
+	/** Called when the user enters play mode by clicking the Play trigger button. */
+	onEnterPlayMode?: () => void;
+	/** Called when the user exits play mode by clicking the Exit button. */
+	onExitPlayMode?: () => void;
 }
 
 // ── Internal state ──────────────────────────────────────────────────────────
@@ -50,20 +54,30 @@ type RunMode = "idle" | "running-auto" | "running-step";
 
 // ── Plugin factory ──────────────────────────────────────────────────────────
 
-export function createProcessRunnerPlugin(options: ProcessRunnerOptions): CanvasPlugin {
+const PLAY_ICON =
+	'<svg viewBox="0 0 16 16" fill="currentColor"><path d="M4 2.5l10 5.5-10 5.5V2.5z"/></svg>';
+
+export function createProcessRunnerPlugin(
+	options: ProcessRunnerOptions,
+): CanvasPlugin & { toolbar: HTMLDivElement; playButton: HTMLButtonElement } {
 	const { engine } = options;
 
 	let canvasApi: CanvasApi | null = null;
 	let currentInstance: InstanceLike | null = null;
 	let stopTrackHighlight: (() => void) | undefined;
 	let mode: RunMode = "idle";
+	let playModeActive = false;
 
 	/** Pending step resolvers — each represents a paused beforeComplete call. */
 	const stepQueue: Array<() => void> = [];
 
-	let toolbarEl: HTMLDivElement | null = null;
-	let dropdownEl: HTMLDivElement | null = null;
-	let modalOverlayEl: HTMLDivElement | null = null;
+	const toolbarEl = document.createElement("div");
+	toolbarEl.className = "bpmn-runner-toolbar";
+
+	/** Entry button placed in the HUD action bar (styled by initEditorHud). */
+	const playButtonEl = document.createElement("button");
+	playButtonEl.title = "Play mode";
+	playButtonEl.innerHTML = PLAY_ICON;
 
 	const unsubs: Array<() => void> = [];
 
@@ -73,6 +87,7 @@ export function createProcessRunnerPlugin(options: ProcessRunnerOptions): Canvas
 		return engine.getDeployedProcesses()[0];
 	}
 
+	/** Cancel running instance and reset run state. Stays in play mode. */
 	function cleanup(): void {
 		currentInstance?.cancel();
 		currentInstance = null;
@@ -82,6 +97,20 @@ export function createProcessRunnerPlugin(options: ProcessRunnerOptions): Canvas
 		options.tokenHighlight?.api.clear();
 		mode = "idle";
 		updateToolbar();
+	}
+
+	/** Exit play mode entirely (also cancels any running instance). */
+	function exitPlayMode(): void {
+		currentInstance?.cancel();
+		currentInstance = null;
+		stopTrackHighlight?.();
+		stopTrackHighlight = undefined;
+		stepQueue.length = 0;
+		options.tokenHighlight?.api.clear();
+		mode = "idle";
+		playModeActive = false;
+		updateToolbar();
+		options.onExitPlayMode?.();
 	}
 
 	function startInstance(vars?: Record<string, unknown>, stepMode = false): void {
@@ -136,103 +165,64 @@ export function createProcessRunnerPlugin(options: ProcessRunnerOptions): Canvas
 		return b;
 	}
 
+	playButtonEl.addEventListener("click", () => {
+		playModeActive = true;
+		updateToolbar();
+		options.onEnterPlayMode?.();
+	});
+
 	function updateToolbar(): void {
-		if (toolbarEl === null) return;
-		// Clear children
 		while (toolbarEl.firstChild !== null) {
 			toolbarEl.removeChild(toolbarEl.firstChild);
 		}
 
-		if (mode === "idle") {
-			renderIdleToolbar();
-		} else if (mode === "running-auto") {
-			renderRunningAutoToolbar();
-		} else {
-			renderRunningStepToolbar();
-		}
-	}
+		// Hide the HUD entry button while in play mode
+		playButtonEl.style.display = playModeActive ? "none" : "";
 
-	function renderIdleToolbar(): void {
-		if (toolbarEl === null) return;
-
-		// ── Split play button ──────────────────────────────────────────────
-		const split = document.createElement("div");
-		split.className = "bpmn-runner-split";
-
-		const playBtn = btn("\u25B6 Play");
-
-		// Long-press (500 ms) → dropdown; short click → run
-		let pressTimer: ReturnType<typeof setTimeout> | null = null;
-
-		playBtn.addEventListener("mousedown", () => {
-			pressTimer = setTimeout(() => {
-				pressTimer = null;
-				showDropdown(split);
-			}, 500);
-		});
-		playBtn.addEventListener("mouseup", () => {
-			if (pressTimer !== null) {
-				clearTimeout(pressTimer);
-				pressTimer = null;
-				hideDropdown();
-				startInstance();
-			}
-		});
-		playBtn.addEventListener("mouseleave", () => {
-			if (pressTimer !== null) {
-				clearTimeout(pressTimer);
-				pressTimer = null;
-			}
-		});
-
-		const chevronBtn = btn("\u25BE", "bpmn-runner-btn--divider");
-		chevronBtn.addEventListener("click", () => {
-			if (dropdownEl !== null && dropdownEl.parentElement === split) {
-				hideDropdown();
+		if (playModeActive) {
+			if (mode === "idle") {
+				renderPlayIdleToolbar();
+			} else if (mode === "running-auto") {
+				renderPlayRunningAutoToolbar();
 			} else {
-				showDropdown(split);
+				renderPlayRunningStepToolbar();
 			}
-		});
-
-		split.appendChild(playBtn);
-		split.appendChild(chevronBtn);
-		toolbarEl.appendChild(split);
-
-		// ── Step button ────────────────────────────────────────────────────
-		const stepBtn = btn("\u21A6 Step", "bpmn-runner-btn--step");
-		stepBtn.addEventListener("click", () => {
-			startInstance(undefined, true);
-		});
-		toolbarEl.appendChild(stepBtn);
-	}
-
-	function renderRunningAutoToolbar(): void {
-		if (toolbarEl === null) return;
-		const stopBtn = btn("\u25A0 Stop", "bpmn-runner-btn--stop");
-		stopBtn.addEventListener("click", cleanup);
-		toolbarEl.appendChild(stopBtn);
-	}
-
-	function renderRunningStepToolbar(): void {
-		if (toolbarEl === null) return;
-
-		const stopBtn = btn("\u25A0 Stop", "bpmn-runner-btn--stop");
-		stopBtn.addEventListener("click", cleanup);
-		toolbarEl.appendChild(stopBtn);
-
-		const isPending = stepQueue.length > 0;
-		let stepClass: string;
-		let stepLabel: string;
-
-		if (isPending) {
-			stepClass = "bpmn-runner-btn--step-pending";
-			stepLabel = "\u2192 Next";
-		} else {
-			stepClass = "bpmn-runner-btn--step-waiting";
-			stepLabel = "\u21A6 Step";
 		}
+	}
 
-		const nextBtn = btn(stepLabel, stepClass);
+	/** Play mode, idle: Run + One Step + Exit. */
+	function renderPlayIdleToolbar(): void {
+		const runBtn = btn("\u25B6 Run");
+		runBtn.addEventListener("click", () => startInstance());
+		toolbarEl.appendChild(runBtn);
+
+		const stepBtn = btn("\u21A6 One Step", "bpmn-runner-btn--step");
+		stepBtn.addEventListener("click", () => startInstance(undefined, true));
+		toolbarEl.appendChild(stepBtn);
+
+		const exitBtn = btn("Exit", "bpmn-runner-btn--exit");
+		exitBtn.addEventListener("click", () => exitPlayMode());
+		toolbarEl.appendChild(exitBtn);
+	}
+
+	/** Play mode, running auto: Cancel + Exit. */
+	function renderPlayRunningAutoToolbar(): void {
+		const cancelBtn = btn("\u25A0 Cancel", "bpmn-runner-btn--stop");
+		cancelBtn.addEventListener("click", cleanup);
+		toolbarEl.appendChild(cancelBtn);
+
+		const exitBtn = btn("Exit", "bpmn-runner-btn--exit");
+		exitBtn.addEventListener("click", () => exitPlayMode());
+		toolbarEl.appendChild(exitBtn);
+	}
+
+	/** Play mode, running step: Next (or waiting) + Cancel + Exit. */
+	function renderPlayRunningStepToolbar(): void {
+		const isPending = stepQueue.length > 0;
+		const nextBtn = btn(
+			isPending ? "\u2192 Next" : "\u21A6 Step",
+			isPending ? "bpmn-runner-btn--step-pending" : "bpmn-runner-btn--step-waiting",
+		);
 		nextBtn.disabled = !isPending;
 		nextBtn.addEventListener("click", () => {
 			const next = stepQueue.shift();
@@ -242,133 +232,14 @@ export function createProcessRunnerPlugin(options: ProcessRunnerOptions): Canvas
 			}
 		});
 		toolbarEl.appendChild(nextBtn);
-	}
 
-	// ── Dropdown ───────────────────────────────────────────────────────────
+		const cancelBtn = btn("\u25A0 Cancel", "bpmn-runner-btn--stop");
+		cancelBtn.addEventListener("click", cleanup);
+		toolbarEl.appendChild(cancelBtn);
 
-	function showDropdown(parent: HTMLElement): void {
-		hideDropdown();
-
-		const theme = canvasApi?.getTheme() === "dark" ? "dark" : "light";
-
-		const dd = document.createElement("div");
-		dd.className = "bpmn-runner-dropdown";
-		if (theme === "dark") dd.dataset.theme = "dark";
-
-		const playItem = document.createElement("button");
-		playItem.className = "bpmn-runner-dropdown-item";
-		playItem.textContent = "\u25B6 Play";
-		playItem.addEventListener("click", () => {
-			hideDropdown();
-			startInstance();
-		});
-
-		const payloadItem = document.createElement("button");
-		payloadItem.className = "bpmn-runner-dropdown-item";
-		payloadItem.textContent = "\u25B6 Play with payload\u2026";
-		payloadItem.addEventListener("click", () => {
-			hideDropdown();
-			showPayloadModal();
-		});
-
-		dd.appendChild(playItem);
-		dd.appendChild(payloadItem);
-		parent.appendChild(dd);
-		dropdownEl = dd;
-
-		const onOutsideClick = (e: MouseEvent): void => {
-			const target = e.target;
-			if (target instanceof Node && !dd.contains(target) && !parent.contains(target)) {
-				hideDropdown();
-				document.removeEventListener("mousedown", onOutsideClick);
-			}
-		};
-		// Defer so the current click doesn't immediately close it
-		setTimeout(() => document.addEventListener("mousedown", onOutsideClick), 0);
-	}
-
-	function hideDropdown(): void {
-		dropdownEl?.remove();
-		dropdownEl = null;
-	}
-
-	// ── Payload modal ──────────────────────────────────────────────────────
-
-	function showPayloadModal(): void {
-		if (modalOverlayEl !== null) return;
-
-		const theme = canvasApi?.getTheme() === "dark" ? "dark" : "light";
-
-		const overlay = document.createElement("div");
-		overlay.className = "bpmn-runner-modal-overlay";
-
-		const modal = document.createElement("div");
-		modal.className = "bpmn-runner-modal";
-		if (theme === "dark") modal.dataset.theme = "dark";
-
-		const title = document.createElement("h3");
-		title.className = "bpmn-runner-modal-title";
-		title.textContent = "Execute with JSON Payload";
-
-		const textarea = document.createElement("textarea");
-		textarea.className = "bpmn-runner-modal-textarea";
-		textarea.placeholder = '{\n  "amount": 100\n}';
-
-		const errorEl = document.createElement("div");
-		errorEl.className = "bpmn-runner-modal-error";
-
-		const actions = document.createElement("div");
-		actions.className = "bpmn-runner-modal-actions";
-
-		const cancelBtn = document.createElement("button");
-		cancelBtn.className = "bpmn-runner-modal-btn bpmn-runner-modal-btn--cancel";
-		cancelBtn.textContent = "Cancel";
-		cancelBtn.addEventListener("click", closeModal);
-
-		const runBtn = document.createElement("button");
-		runBtn.className = "bpmn-runner-modal-btn bpmn-runner-modal-btn--run";
-		runBtn.textContent = "Run";
-		runBtn.addEventListener("click", () => {
-			const text = textarea.value.trim();
-			let vars: Record<string, unknown> = {};
-			if (text !== "") {
-				let parsed: unknown;
-				try {
-					parsed = JSON.parse(text);
-				} catch {
-					errorEl.textContent = "Invalid JSON.";
-					return;
-				}
-				if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
-					errorEl.textContent = "Payload must be a JSON object.";
-					return;
-				}
-				vars = parsed as Record<string, unknown>;
-			}
-			closeModal();
-			startInstance(vars);
-		});
-
-		actions.appendChild(cancelBtn);
-		actions.appendChild(runBtn);
-		modal.appendChild(title);
-		modal.appendChild(textarea);
-		modal.appendChild(errorEl);
-		modal.appendChild(actions);
-		overlay.appendChild(modal);
-
-		overlay.addEventListener("click", (e) => {
-			if (e.target === overlay) closeModal();
-		});
-
-		document.body.appendChild(overlay);
-		modalOverlayEl = overlay;
-		textarea.focus();
-	}
-
-	function closeModal(): void {
-		modalOverlayEl?.remove();
-		modalOverlayEl = null;
+		const exitBtn = btn("Exit", "bpmn-runner-btn--exit");
+		exitBtn.addEventListener("click", () => exitPlayMode());
+		toolbarEl.appendChild(exitBtn);
 	}
 
 	// ── CanvasPlugin ───────────────────────────────────────────────────────
@@ -376,20 +247,15 @@ export function createProcessRunnerPlugin(options: ProcessRunnerOptions): Canvas
 	return {
 		name: "process-runner",
 
+		/** The toolbar element. Place this in the tabs bar center slot; shows running controls during play mode. */
+		toolbar: toolbarEl,
+
+		/** Icon button for the HUD action bar. Pass to `initEditorHud` as `playButton`. */
+		playButton: playButtonEl,
+
 		install(api: CanvasApi) {
 			canvasApi = api;
 			injectProcessRunnerStyles();
-
-			// Ensure the container is positioned so the toolbar can be absolute
-			const cs = window.getComputedStyle(api.container);
-			if (cs.position === "static") {
-				api.container.style.position = "relative";
-			}
-
-			const bar = document.createElement("div");
-			bar.className = "bpmn-runner-toolbar";
-			api.container.appendChild(bar);
-			toolbarEl = bar;
 			updateToolbar();
 
 			unsubs.push(
@@ -408,10 +274,7 @@ export function createProcessRunnerPlugin(options: ProcessRunnerOptions): Canvas
 		uninstall() {
 			for (const off of unsubs) off();
 			cleanup();
-			toolbarEl?.remove();
-			toolbarEl = null;
-			hideDropdown();
-			closeModal();
+			toolbarEl.remove();
 			canvasApi = null;
 		},
 	};

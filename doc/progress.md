@@ -1,5 +1,45 @@
 # Progress
 
+## 2026-03-04 — Play controls positioned at bottom center (replace tool selector in play mode)
+
+Moved the process runner running controls out of the tabs center slot and into a floating panel at `bottom: 10px; left: 50%` — the same position as `#hud-bottom-center`. In play mode, `#hud-bottom-center` is hidden and the runner toolbar takes its place. On exit, positions are restored.
+
+- **`canvas-plugins/process-runner`**: Added `.bpmn-runner-toolbar--hud-bottom` CSS class (fixed position, bottom center, HUD-like background/border/blur).
+- **`apps/landing`**: Removed `centerSlot` from bridge options. Toolbar appended to `document.body` with the new class and `display:none`. `onEnterPlayMode`/`onExitPlayMode` toggle its visibility alongside `#hud-bottom-center`.
+
+## 2026-03-04 — Play button moved to HUD action bar
+
+Moved the play mode entry button from the tabs center slot into the HUD top-center action bar, matching the `optimizeButton`/`aiButton` pattern. The running controls (Run/Step/Cancel/Exit) remain in the tabs center slot and only appear when play mode is active.
+
+- **`canvas-plugins/process-runner`**: Exposed `playButton: HTMLButtonElement` with a play-triangle SVG icon. Removed `renderTriggerButton()` — the toolbar is now empty when not in play mode. `playButton` is hidden (via `display: none`) while play mode is active.
+- **`packages/editor`**: Added `playButton?: HTMLButtonElement | null` to `HudOptions`; wired in `initEditorHud` same as `optimizeButton` (sets `className = "hud-btn"`, appends with separator).
+- **`apps/landing`**: Passed `processRunnerPlugin.playButton` to `initEditorHud`.
+
+## 2026-03-04 — Play mode for process runner
+
+Introduced a modal play mode: a single **▶ Play** button sits in the tabs bar center slot. Clicking it enters play mode, hiding the tab groups, the bottom-center editing toolbar, and making the properties panel read-only. In play mode the buttons change to **▶ Run**, **⤆ One Step**, **■ Cancel**, and **Exit**. Clicking Exit restores everything.
+
+- **`canvas-plugins/process-runner`**: Added `onEnterPlayMode?` / `onExitPlayMode?` callbacks to `ProcessRunnerOptions`. Added `playModeActive` boolean state. Replaced the always-visible split-play + step toolbar with a two-phase design: trigger button (not in play mode) → full run controls + Exit (in play mode). Removed the dropdown and payload modal (dead code after the redesign). Added `.bpmn-runner-btn--exit` CSS class.
+- **`canvas-plugins/tabs`**: Added `setPlayMode(enabled: boolean)` to `TabsApi` interface and implementation — toggles `.bpmn-play-mode` class on the tab bar. Added CSS rule `.bpmn-tabs.bpmn-play-mode .bpmn-tab { display: none }` to hide tab groups in play mode.
+- **`apps/landing`**: Wired `onEnterPlayMode` / `onExitPlayMode` in the process runner options to hide/show `hud-bottom-center`, toggle `.bpmn-props-readonly` on the properties pane, and call `bridge.tabsPlugin.api.setPlayMode()`. Added `.bpmn-props-readonly` CSS rule to `style.css`.
+
+## 2026-03-04 — Process runner buttons integrated into tabs bar center; AI button removed from HUD
+
+Moved the process runner toolbar out of the canvas overlay and into the tabs bar center slot. Removed the AI Assistant button from the HUD action bar.
+
+- **`canvas-plugins/process-runner`**: `toolbarEl` is now created at construction time and exposed as `plugin.toolbar`. The dropdown uses `position:fixed` + `document.body` (so it escapes the tabs bar's `overflow-y:hidden`). `install()` no longer appends the toolbar — the caller is responsible for placement.
+- **`canvas-plugins/tabs`**: New `centerSlot?: HTMLElement` option on `TabsPluginOptions`. When provided, the element is wrapped in `.bpmn-tabs-center` (absolute-centered inside the tabs bar) and appended to the tab bar. New `.bpmn-tabs-center` CSS class handles the centering.
+- **`canvas-plugins/storage-tabs-bridge`**: `centerSlot` threaded through from `StorageTabsBridgeOptions` to the internal tabs plugin.
+- **`apps/landing`**: Process runner created before the bridge; its `.toolbar` element passed as `centerSlot`. `aiButton` removed from `initEditorHud`.
+
+## 2026-03-04 — Integrate token-highlight and process-runner into landing editor
+
+Wired `@bpmn-sdk/canvas-plugin-token-highlight` and `@bpmn-sdk/canvas-plugin-process-runner` into `apps/landing`.
+
+- Added `@bpmn-sdk/canvas-plugin-process-runner`, `@bpmn-sdk/canvas-plugin-token-highlight`, and `@bpmn-sdk/engine` to `apps/landing/package.json`
+- Created `tokenHighlightPlugin` and `processRunnerPlugin` (with a shared `Engine` instance) in `apps/landing/src/editor.ts` and registered both in the editor's plugins array
+- Fixed `EngineLike.deploy` in process-runner to accept `bpmn?: unknown` (optional) so the concrete `Engine` class is structurally compatible
+
 ## 2026-03-03 — `@bpmn-sdk/canvas-plugin-process-runner` (`canvas-plugins/process-runner`)
 
 New canvas plugin that embeds a process execution toolbar directly on the canvas, wiring `@bpmn-sdk/engine` and (optionally) `@bpmn-sdk/canvas-plugin-token-highlight` together.

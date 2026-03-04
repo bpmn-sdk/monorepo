@@ -3,15 +3,24 @@ const STYLE_ID = "bpmn-process-runner-v1";
 const CSS = `
 /* ── Toolbar ──────────────────────────────────────────────────────────── */
 .bpmn-runner-toolbar {
-  position: absolute;
-  top: 12px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 10;
   display: flex;
   gap: 6px;
   align-items: center;
-  pointer-events: all;
+}
+
+/* HUD bottom-center placement (used when toolbar replaces #hud-bottom-center) */
+.bpmn-runner-toolbar--hud-bottom {
+  position: fixed;
+  z-index: 100;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(22, 22, 30, 0.88);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 8px;
+  backdrop-filter: blur(12px);
+  padding: 4px;
+  gap: 4px;
 }
 
 /* ── Split play button ────────────────────────────────────────────────── */
@@ -90,11 +99,18 @@ const CSS = `
   border-radius: 6px;
 }
 
+/* Exit play mode */
+.bpmn-runner-btn--exit {
+  background: #374151;
+  border-radius: 6px;
+}
+.bpmn-runner-btn--exit:hover {
+  background: #4b5563;
+}
+
 /* ── Dropdown menu ────────────────────────────────────────────────────── */
 .bpmn-runner-dropdown {
-  position: absolute;
-  top: calc(100% + 4px);
-  left: 0;
+  position: fixed;
   background: #ffffff;
   border: 1px solid #e5e7eb;
   border-radius: 6px;
