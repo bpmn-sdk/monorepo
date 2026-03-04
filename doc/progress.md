@@ -1,5 +1,13 @@
 # Progress
 
+## 2026-03-04 — FEEL parser: report error for trailing unconsumed tokens
+
+`packages/feel/src/parser.ts` — the top-level `parseExpression` function previously silently ignored any tokens that remained after a successful parse. For example, `foo bar` would parse as the name `foo` with `bar` silently dropped, yielding no errors.
+
+Added a `checkDone()` method to the `Parser` class that pushes an `Unexpected token` error when unconsumed tokens remain. Called at the end of the module-level `parseExpression` function. This ensures that inputs like `foo bar`, `1 2`, `a + b c` all correctly report a parse error.
+
+This fixes FEEL validation in the config panel: when a FEEL-mode field contains text that isn't a valid complete expression (e.g. two unconnected identifiers), the field now shows as invalid. Regression tests added to `packages/feel/tests/parser.test.ts`.
+
 ## 2026-03-04 — Config panel: FEEL support for connector template fields
 
 `canvas-plugins/config-panel-bpmn/src/template-engine.ts` — `propToFieldSchema` now reads the `feel` property from `TemplateProperty`:
