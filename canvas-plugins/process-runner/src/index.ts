@@ -50,6 +50,8 @@ export interface ProcessRunnerOptions {
 
 // ── Internal state ──────────────────────────────────────────────────────────
 
+const AUTO_PLAY_DELAY_MS = 600;
+
 type RunMode = "idle" | "running-auto" | "running-step";
 
 // ── Plugin factory ──────────────────────────────────────────────────────────
@@ -67,6 +69,8 @@ export function createProcessRunnerPlugin(
 	let stopTrackHighlight: (() => void) | undefined;
 	let mode: RunMode = "idle";
 	let playModeActive = false;
+	/** The process ID of the currently displayed diagram. */
+	let currentProcessId: string | undefined;
 
 	/** Pending step resolvers — each represents a paused beforeComplete call. */
 	const stepQueue: Array<() => void> = [];
@@ -84,7 +88,7 @@ export function createProcessRunnerPlugin(
 	// ── Helpers ────────────────────────────────────────────────────────────
 
 	function getPrimaryProcessId(): string | undefined {
-		return engine.getDeployedProcesses()[0];
+		return currentProcessId;
 	}
 
 	/** Cancel running instance and reset run state. Stays in play mode. */
@@ -123,20 +127,17 @@ export function createProcessRunnerPlugin(
 		updateToolbar();
 
 		const beforeComplete = stepMode
-			? (elementId: string): Promise<void> => {
-					void elementId; // structural — elementId available for future use
-					return new Promise<void>((resolve) => {
+			? (_elementId: string): Promise<void> =>
+					new Promise<void>((resolve) => {
 						stepQueue.push(resolve);
 						updateToolbar();
+					})
+			: (_elementId: string): Promise<void> =>
+					new Promise<void>((resolve) => {
+						setTimeout(resolve, AUTO_PLAY_DELAY_MS);
 					});
-				}
-			: undefined;
 
-		const instance = engine.start(
-			processId,
-			vars,
-			beforeComplete !== undefined ? { beforeComplete } : undefined,
-		);
+		const instance = engine.start(processId, vars, { beforeComplete });
 		currentInstance = instance;
 
 		if (options.tokenHighlight !== undefined) {
@@ -258,15 +259,26 @@ export function createProcessRunnerPlugin(
 			injectProcessRunnerStyles();
 			updateToolbar();
 
+			type AnyOn = (event: string, handler: (arg: unknown) => void) => () => void;
+			const onAny = api.on as unknown as AnyOn;
+
 			unsubs.push(
 				api.on("diagram:load", (defs) => {
+					currentProcessId = defs.processes[0]?.id;
 					engine.deploy({ bpmn: defs });
 					if (currentInstance !== null) cleanup();
 					updateToolbar();
 				}),
 				api.on("diagram:clear", () => {
+					currentProcessId = undefined;
 					if (currentInstance !== null) cleanup();
 					updateToolbar();
+				}),
+				onAny("diagram:change", (defs: unknown) => {
+					const typed = defs as { processes?: Array<{ id: string }> };
+					currentProcessId = typed.processes?.[0]?.id;
+					engine.deploy({ bpmn: defs });
+					if (currentInstance !== null) cleanup();
 				}),
 			);
 		},

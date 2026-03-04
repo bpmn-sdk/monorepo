@@ -1,5 +1,30 @@
 # Progress
 
+## 2026-03-04 — Fix process runner using wrong process in multi-tab scenarios
+
+Root cause: `getPrimaryProcessId()` returned `engine.getDeployedProcesses()[0]`, which is the insertion-order first process in the engine's Map. When multiple diagrams are deployed (one per tab), the engine accumulates all process IDs. `[0]` always returned the first-ever deployed process (the initial SAMPLE_XML "proc"), not the currently displayed diagram's process. This caused the engine to run a stale/wrong process: events were emitted for old element IDs, the gateway logic evaluated old flows, and highlights only appeared on elements whose IDs happened to match the old process.
+
+Fix: track `currentProcessId` directly from the `defs` passed to `diagram:load` and `diagram:change` events (extracted as `defs.processes[0]?.id`). `getPrimaryProcessId()` now returns this variable instead of calling `engine.getDeployedProcesses()[0]`.
+
+- **`canvas-plugins/process-runner/src/index.ts`**: Added `currentProcessId` state variable. Updated `diagram:load`, `diagram:clear`, and `diagram:change` handlers to maintain it. `getPrimaryProcessId()` now returns `currentProcessId`.
+
+## 2026-03-04 — Fix token highlighting and step count for edited diagrams
+
+Root cause: both the engine and the token-highlight plugin only reacted to `diagram:load` but not `diagram:change`. When a user edited a diagram after loading (adding/removing elements), the engine continued running the stale deployment with old element IDs. This caused start/end events (whose IDs stayed the same) to be highlighted but new service tasks (with fresh IDs) to be invisible, and the step count to reflect the old process structure instead of the new one.
+
+Fix: added `diagram:change` listeners (via `(api.on as unknown as AnyOn)`) to both plugins so they stay in sync with every edit.
+
+- **`canvas-plugins/token-highlight/src/index.ts`**: Re-indexes flows on `diagram:change` so edge highlighting stays correct after edits.
+- **`canvas-plugins/process-runner/src/index.ts`**: Redeploys the engine on `diagram:change` so subsequent runs execute the current process definition with the current element IDs.
+
+## 2026-03-04 — Fix process runner: token highlighting now works for both auto-play and step modes
+
+Root cause: `instance.start()` fired all element events synchronously before `engine.start()` returned, so no `onChange` listeners were attached yet. Fixed by deferring activation via `Promise.resolve().then(...)`. Added a 600ms `beforeComplete` delay for auto-play mode so each active element is visible before the token advances.
+
+- **`packages/engine/src/instance.ts`**: `start()` now defers activation via `void Promise.resolve().then(...)`. `activate()` already guards `if (this._state !== "active") return` so cancelled instances are safe.
+- **`packages/engine/tests/engine.test.ts`**: All tests updated to be `async` with `await settle()` (macrotask drain) after `engine.start()`. Added `settle()` helper: `new Promise<void>(r => setTimeout(r, 0))`.
+- **`canvas-plugins/process-runner/src/index.ts`**: Auto-play mode now passes a `beforeComplete` hook with a 600ms delay, making each active element visible in the token highlight before the token moves on. Step mode still uses the queue-based pause.
+
 ## 2026-03-04 — Play controls positioned at bottom center (replace tool selector in play mode)
 
 Moved the process runner running controls out of the tabs center slot and into a floating panel at `bottom: 10px; left: 50%` — the same position as `#hud-bottom-center`. In play mode, `#hud-bottom-center` is hidden and the runner toolbar takes its place. On exit, positions are restored.

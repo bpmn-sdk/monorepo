@@ -57,7 +57,7 @@ export function createTokenHighlightPlugin(): CanvasPlugin & { api: TokenHighlig
 	const activeIds = new Set<string>();
 	/** Element IDs that a token has already passed through. */
 	const visitedIds = new Set<string>();
-	/** flowId → { sourceRef, targetRef } — populated from diagram:load. */
+	/** flowId → { sourceRef, targetRef } — populated from diagram:load/change. */
 	const flowIndex = new Map<string, { sourceRef: string; targetRef: string }>();
 
 	const unsubs: Array<() => void> = [];
@@ -189,6 +189,9 @@ export function createTokenHighlightPlugin(): CanvasPlugin & { api: TokenHighlig
 			canvasApi = canvasApiArg;
 			injectTokenHighlightStyles();
 
+			type AnyOn = (event: string, handler: (arg: unknown) => void) => () => void;
+			const onAny = canvasApiArg.on as unknown as AnyOn;
+
 			unsubs.push(
 				canvasApiArg.on("diagram:load", (defs: BpmnDefinitions) => {
 					indexFlows(defs);
@@ -197,6 +200,9 @@ export function createTokenHighlightPlugin(): CanvasPlugin & { api: TokenHighlig
 				canvasApiArg.on("diagram:clear", () => {
 					flowIndex.clear();
 					api.clear();
+				}),
+				onAny("diagram:change", (defs: unknown) => {
+					indexFlows(defs as BpmnDefinitions);
 				}),
 			);
 		},

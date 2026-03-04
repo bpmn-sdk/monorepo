@@ -153,9 +153,12 @@ export class ProcessInstance {
 		const starts = [...ctx.elements.values()].filter(
 			(el) => el.type === "startEvent" && el.incoming.length === 0,
 		);
-		for (const s of starts) {
-			void this.activate(s.id, this.rootScopeId, undefined);
-		}
+		// Defer activation so callers can attach onChange listeners before events fire.
+		void Promise.resolve().then(() => {
+			for (const s of starts) {
+				void this.activate(s.id, this.rootScopeId, undefined);
+			}
+		});
 	}
 
 	/** Deliver a message to a waiting element. */
