@@ -56,6 +56,7 @@ export class OAuth2Provider implements AuthProvider {
 	#clientSecret: string;
 	#tokenUrl: string;
 	#scope?: string;
+	#audience?: string;
 	/** In-memory token for the current process. */
 	#memoryToken: string | null = null;
 	#memoryExpiresAt = 0;
@@ -71,6 +72,7 @@ export class OAuth2Provider implements AuthProvider {
 		clientSecret: string,
 		tokenUrl: string,
 		scope?: string,
+		audience?: string,
 		store?: TokenStore,
 		onRefresh?: () => void,
 	) {
@@ -78,8 +80,9 @@ export class OAuth2Provider implements AuthProvider {
 		this.#clientSecret = clientSecret;
 		this.#tokenUrl = tokenUrl;
 		this.#scope = scope;
+		this.#audience = audience;
 		this.#store = store ?? resolveTokenStore(undefined); // default: FileTokenStore
-		this.#cacheKey = buildTokenCacheKey(clientId, tokenUrl, scope);
+		this.#cacheKey = buildTokenCacheKey(clientId, tokenUrl, scope, audience);
 		this.#onRefresh = onRefresh;
 	}
 
@@ -129,6 +132,7 @@ export class OAuth2Provider implements AuthProvider {
 			client_secret: this.#clientSecret,
 		});
 		if (this.#scope) params.set("scope", this.#scope);
+		if (this.#audience) params.set("audience", this.#audience);
 
 		const response = await fetch(this.#tokenUrl, {
 			method: "POST",
@@ -178,6 +182,7 @@ export function createAuthProvider(
 				config.clientSecret,
 				config.tokenUrl,
 				config.scope,
+				config.audience,
 				store,
 				onRefresh,
 			);

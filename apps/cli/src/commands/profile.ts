@@ -46,6 +46,12 @@ const AUTH_FLAGS: FlagSpec[] = [
 		type: "string",
 		placeholder: "URL",
 	},
+	{
+		name: "audience",
+		description: "OAuth2 audience (auth-type=oauth2, default: zeebe.camunda.io)",
+		type: "string",
+		placeholder: "AUDIENCE",
+	},
 	{ name: "username", description: "Basic auth username", type: "string", placeholder: "USER" },
 	{ name: "password", description: "Basic auth password", type: "string", placeholder: "PASS" },
 ];
@@ -87,6 +93,7 @@ function configFromCloudEnv(env: Record<string, string>): CamundaClientInput {
 	const clientId = env.CAMUNDA_CLIENT_ID ?? env.ZEEBE_CLIENT_ID ?? "";
 	const clientSecret = env.CAMUNDA_CLIENT_SECRET ?? env.ZEEBE_CLIENT_SECRET ?? "";
 	const tokenUrl = env.CAMUNDA_OAUTH_URL ?? env.ZEEBE_AUTHORIZATION_SERVER_URL ?? "";
+	const audience = env.CAMUNDA_TOKEN_AUDIENCE ?? "zeebe.camunda.io";
 
 	if (!clientId || !clientSecret || !tokenUrl) {
 		throw new Error(
@@ -97,7 +104,7 @@ function configFromCloudEnv(env: Record<string, string>): CamundaClientInput {
 		);
 	}
 
-	return { baseUrl, auth: { type: "oauth2", clientId, clientSecret, tokenUrl } };
+	return { baseUrl, auth: { type: "oauth2", clientId, clientSecret, tokenUrl, audience } };
 }
 
 /** Read all of stdin as a string. */
@@ -132,7 +139,8 @@ function buildAuth(flags: Record<string, string | boolean | number>): AuthConfig
 					"--client-id, --client-secret, and --token-url are required for --auth-type oauth2",
 				);
 			}
-			return { type: "oauth2", clientId, clientSecret, tokenUrl };
+			const audience = (flags.audience as string | undefined) ?? "zeebe.camunda.io";
+			return { type: "oauth2", clientId, clientSecret, tokenUrl, audience };
 		}
 		case "basic": {
 			const username = flags.username as string | undefined;
@@ -278,8 +286,7 @@ export const profileGroup: CommandGroup = {
 				if (!name) throw new Error("Missing required argument: <name>");
 				const filePath = ctx.positional[1];
 				if (!filePath) throw new Error("Missing required argument: <file>");
-				const content =
-					filePath === "-" ? await readStdin() : readFileSync(filePath, "utf8");
+				const content = filePath === "-" ? await readStdin() : readFileSync(filePath, "utf8");
 				const env = parseEnvFile(content);
 				const config = configFromCloudEnv(env);
 				saveProfile(name, config);

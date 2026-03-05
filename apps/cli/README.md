@@ -44,6 +44,26 @@ casen profile create prod \
 
 The first profile created becomes the active profile automatically.
 
+**Import from a Camunda Cloud credentials file**
+
+When you create a client in Camunda Cloud, you can download a credentials file containing `export KEY='VALUE'` declarations. Import it directly:
+
+```bash
+casen profile import prod ./camunda-credentials.sh
+
+# or pipe via stdin
+cat camunda-credentials.sh | casen profile import prod -
+```
+
+The file must contain at least:
+
+| Variable | Fallback |
+|----------|----------|
+| `ZEEBE_REST_ADDRESS` | _(required)_ |
+| `CAMUNDA_CLIENT_ID` | `ZEEBE_CLIENT_ID` |
+| `CAMUNDA_CLIENT_SECRET` | `ZEEBE_CLIENT_SECRET` |
+| `CAMUNDA_OAUTH_URL` | `ZEEBE_AUTHORIZATION_SERVER_URL` |
+
 **2. Run a command**
 
 ```bash

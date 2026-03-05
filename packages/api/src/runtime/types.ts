@@ -90,6 +90,8 @@ export type AuthConfig =
 			/** Token endpoint URL. */
 			tokenUrl: string;
 			scope?: string;
+			/** OAuth2 audience parameter. Required by Camunda Cloud (default: "zeebe.camunda.io"). */
+			audience?: string;
 			/**
 			 * Persistent token cache configuration.
 			 * Enabled by default — tokens survive process restarts.

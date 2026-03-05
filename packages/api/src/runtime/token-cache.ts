@@ -25,8 +25,16 @@ export function defaultTokenCachePath(): string {
  * Incorporates clientId, tokenUrl, and optional scope to support
  * multiple clients/clusters from a single cache file.
  */
-export function buildTokenCacheKey(clientId: string, tokenUrl: string, scope?: string): string {
-	return scope ? `${clientId}@${tokenUrl}:${scope}` : `${clientId}@${tokenUrl}`;
+export function buildTokenCacheKey(
+	clientId: string,
+	tokenUrl: string,
+	scope?: string,
+	audience?: string,
+): string {
+	let key = `${clientId}@${tokenUrl}`;
+	if (scope) key += `:${scope}`;
+	if (audience) key += `#${audience}`;
+	return key;
 }
 
 // ─── Implementations ──────────────────────────────────────────────────────────
