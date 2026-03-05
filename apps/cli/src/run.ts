@@ -5,6 +5,7 @@ import { getRuntimeCompletions } from "./completion.js";
 import { printCommandHelp, printGlobalHelp, printGroupHelp, printVersion } from "./help.js";
 import { createOutputWriter } from "./output.js";
 import { runProfileManager } from "./profile-tui.js";
+import { runGroupTui, runMainTui } from "./tui.js";
 import type { OutputFormat, RunContext } from "./types.js";
 
 // ─── Error display ────────────────────────────────────────────────────────────
@@ -46,9 +47,13 @@ export async function run(argv: string[]): Promise<void> {
 	const outputFormat = (flags.output ?? flags.o ?? "table") as OutputFormat;
 	const profileName = (flags.profile as string | undefined) ?? (flags.p as string | undefined);
 
-	// ── Top-level help (no group specified) ───────────────────────────────────
-	if (positional.length === 0 || (wantHelp && positional.length === 0)) {
-		printGlobalHelp(commandGroups, colors);
+	// ── Top-level: main menu TUI or help ─────────────────────────────────────
+	if (positional.length === 0) {
+		if (wantHelp) {
+			printGlobalHelp(commandGroups, colors);
+		} else {
+			await runMainTui(commandGroups, () => Promise.resolve(createClientFromProfile(profileName)));
+		}
 		return;
 	}
 
@@ -65,9 +70,17 @@ export async function run(argv: string[]): Promise<void> {
 		return;
 	}
 
-	// ── Profile TUI (no subcommand, no --help) ───────────────────────────────
-	if (positional.length === 1 && group.name === "profile" && !wantHelp) {
-		await runProfileManager();
+	// ── TUI (no subcommand, no --help) ───────────────────────────────────────
+	if (positional.length === 1 && !wantHelp) {
+		if (group.name === "profile") {
+			await runProfileManager();
+		} else if (group.name !== "completion") {
+			await runGroupTui(group, commandGroups, () =>
+				Promise.resolve(createClientFromProfile(profileName)),
+			);
+		} else {
+			printGroupHelp(group, colors);
+		}
 		return;
 	}
 
