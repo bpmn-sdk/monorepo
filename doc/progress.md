@@ -1,5 +1,16 @@
 # Progress
 
+## 2026-03-05 — New package: @bpmn-sdk/ascii
+
+Added `packages/ascii` — a zero-dependency BPMN ASCII art renderer.
+
+- **`renderBpmnAscii(xml, options?): string`** — parses BPMN XML, runs the Sugiyama layout engine, and renders the process as a Unicode box-drawing diagram.
+- Uses the same `layoutProcess()` engine as `@bpmn-sdk/canvas`; element layer/position data drives fixed-cell ASCII placement.
+- **Element shapes**: tasks → square box `┌──┐│└──┘` with `[svc]`/`[usr]`/`[scr]` type tags; events/gateways → rounded box `╭──╮│╰──╯` with Unicode markers (`○ ● × + ◇`).
+- **Edge routing**: orthogonal lines with box-drawing corners (`┐ └ ┌ ┘`); T-junctions merged with `mergeBoxChars()` (`┤ ├ ┬ ┴ ┼`); backward/loop edges routed above the diagram at row 0.
+- **`RenderOptions.title`**: process name header above diagram (default), `false` to suppress, or a custom string.
+- 23 tests covering grid merge logic, element markers, edge routing, and complex parallel/gateway diagrams.
+
 ## 2026-03-05 — Core: fix joining gateway auto-connect after branch()
 
 Fixed a bug in `ProcessBuilder` where calling `.parallelGateway("join")` (or any element) after `.branch()` calls without explicit `.connectTo()` produced a join gateway with no incoming flows from the branches.
