@@ -611,19 +611,14 @@ async function runAnimLoop(
 			continue;
 		}
 
-		// Reset previous bar, start filling current bar
-		const prevIdx = (idx - 1 + barFills.length) % barFills.length;
-		const prevFill = barFills[prevIdx];
-		const currFill = barFills[idx];
-
-		if (prevFill) {
-			prevFill.style.transition = "none";
-			prevFill.style.width = "0%";
+		// Reset all fills, then animate only the current one
+		for (const fill of barFills) {
+			fill.style.transition = "none";
+			fill.style.width = "0%";
 		}
+		const currFill = barFills[idx];
 		if (currFill) {
-			currFill.style.transition = "none";
-			currFill.style.width = "0%";
-			currFill.getBoundingClientRect();
+			currFill.getBoundingClientRect(); // force reflow so transition triggers
 			currFill.style.transition = `width ${computeExampleDuration(example)}ms linear`;
 			currFill.style.width = "100%";
 		}
