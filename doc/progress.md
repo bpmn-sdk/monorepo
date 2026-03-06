@@ -1,5 +1,18 @@
 # Progress
 
+## 2026-03-06 — landing: migrate to Astro, deploy to Cloudflare Pages
+
+- Replaced Vite + plain HTML with Astro 5 static site generator
+- Removed `base: "/monorepo/"` — site now served from root `/`
+- Pages: `src/pages/index.astro` (landing) + `src/pages/editor.astro` (editor)
+- Scripts moved to `src/scripts/`, CSS to `src/styles/global.css`
+- `{}` in code example blocks handled via Astro `set:html` directive
+- Astro `build.format: "file"` → generates `/index.html` + `/editor.html` (no trailing-slash dirs)
+- Added `**/.astro/**` to Biome ignore (Astro's generated type files)
+- Added `astro: "^5"` + `@astrojs/check: "^0.9"` to root devDependencies
+- GitHub Actions deploy workflow switched from GitHub Pages to Cloudflare Pages (wrangler v4)
+- `wrangler: "^4"` added to root devDependencies; action uses project-installed wrangler
+
 ## 2026-03-05 — packages/api: Camunda v2 REST API SDK
 
 New package `@bpmn-sdk/api` — auto-generated TypeScript SDK for the Camunda 8 Orchestration Cluster REST API (v2).
