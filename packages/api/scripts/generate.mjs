@@ -24,6 +24,9 @@ const BASE_URL =
 
 const ENTRY_FILE = "rest-api.yaml";
 
+const ADMIN_ENTRY_FILE = "admin-api.json";
+const ADMIN_SWAGGER_URL = "https://console.cloud.camunda.io/customer-api/openapi/swagger.json";
+
 // ─── YAML PARSER ──────────────────────────────────────────────────────────────
 
 /**
@@ -783,9 +786,9 @@ function resolveParameters(rawParams, currentFile, allFiles) {
  * Build a flat list of all operations by reading unresolved files so that
  * schema $refs are preserved as type names.
  */
-function collectOperations(allFiles) {
+function collectOperations(allFiles, entryFile = ENTRY_FILE) {
 	const operations = [];
-	const entry = allFiles.get(ENTRY_FILE);
+	const entry = allFiles.get(entryFile);
 	const paths = entry?.paths ?? {};
 
 	for (const [path, pathItemRaw] of Object.entries(paths)) {
@@ -924,7 +927,7 @@ function safePropName(name) {
 	return name;
 }
 
-function schemaToTs(schema, schemas, depth = 0, seen = new Set()) {
+function schemaToTs(schema, schemas, depth = 0, seen = new Set(), prefixTypes = false) {
 	if (!schema || typeof schema !== "object") return "unknown";
 
 	// Handle circular refs
@@ -934,19 +937,21 @@ function schemaToTs(schema, schemas, depth = 0, seen = new Set()) {
 
 	// $ref (shouldn't appear after resolution, but just in case)
 	if ("$ref" in schema && typeof schema.$ref === "string") {
-		const name = schema.$ref.split("/").pop();
-		return name ?? "unknown";
+		const name = schema.$ref.split("/").pop() ?? "unknown";
+		// Skip invalid TypeScript identifier names
+		if (!/^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(name)) return "unknown";
+		return prefixTypes ? `Types.${name}` : name;
 	}
 
 	// allOf — merge/intersection
 	if (schema.allOf && Array.isArray(schema.allOf)) {
-		const parts = schema.allOf.map((s) => schemaToTs(s, schemas, depth, seen));
+		const parts = schema.allOf.map((s) => schemaToTs(s, schemas, depth, seen, prefixTypes));
 		const unique = [...new Set(parts.filter((p) => p !== "unknown"))];
 		if (unique.length === 0) return "unknown";
 		if (unique.length === 1) return unique[0];
 		// If all are objects, produce merged object type
 		if (unique.every((p) => p.startsWith("{"))) {
-			return mergeObjectTypes(schema.allOf, schemas, depth, seen);
+			return mergeObjectTypes(schema.allOf, schemas, depth, seen, prefixTypes);
 		}
 		return unique.join(" & ");
 	}
@@ -954,7 +959,7 @@ function schemaToTs(schema, schemas, depth = 0, seen = new Set()) {
 	// oneOf / anyOf — union
 	for (const key of ["oneOf", "anyOf"]) {
 		if (schema[key] && Array.isArray(schema[key])) {
-			const parts = schema[key].map((s) => schemaToTs(s, schemas, depth, seen));
+			const parts = schema[key].map((s) => schemaToTs(s, schemas, depth, seen, prefixTypes));
 			const unique = [...new Set(parts)];
 			if (unique.length === 1) return unique[0];
 			return unique.join(" | ");
@@ -972,7 +977,9 @@ function schemaToTs(schema, schemas, depth = 0, seen = new Set()) {
 
 	// type: array
 	if (schema.type === "array") {
-		const items = schema.items ? schemaToTs(schema.items, schemas, depth, seen) : "unknown";
+		const items = schema.items
+			? schemaToTs(schema.items, schemas, depth, seen, prefixTypes)
+			: "unknown";
 		return `Array<${items}>${nullSuffix}`;
 	}
 
@@ -984,7 +991,7 @@ function schemaToTs(schema, schemas, depth = 0, seen = new Set()) {
 
 		for (const [propName, propSchema] of Object.entries(props)) {
 			const isRequired = required.has(propName);
-			const tsType = schemaToTs(propSchema, schemas, depth + 1, seen);
+			const tsType = schemaToTs(propSchema, schemas, depth + 1, seen, prefixTypes);
 			const desc = propSchema?.description;
 			if (desc) lines.push(`  /** ${desc.replace(/\*\//g, "*")} */`);
 			lines.push(`  ${safePropName(propName)}${isRequired ? "" : "?"}: ${tsType};`);
@@ -994,7 +1001,13 @@ function schemaToTs(schema, schemas, depth = 0, seen = new Set()) {
 		if (schema.additionalProperties === true) {
 			lines.push("  [key: string]: unknown;");
 		} else if (schema.additionalProperties && typeof schema.additionalProperties === "object") {
-			const valType = schemaToTs(schema.additionalProperties, schemas, depth + 1, seen);
+			const valType = schemaToTs(
+				schema.additionalProperties,
+				schemas,
+				depth + 1,
+				seen,
+				prefixTypes,
+			);
 			lines.push(`  [key: string]: ${valType};`);
 		}
 
@@ -1028,7 +1041,7 @@ function schemaToTs(schema, schemas, depth = 0, seen = new Set()) {
 	return `unknown${nullSuffix}`;
 }
 
-function mergeObjectTypes(schemas, allSchemas, depth, seen) {
+function mergeObjectTypes(schemas, allSchemas, depth, seen, prefixTypes = false) {
 	const lines = [];
 	for (const s of schemas) {
 		if (!s || typeof s !== "object") continue;
@@ -1036,7 +1049,7 @@ function mergeObjectTypes(schemas, allSchemas, depth, seen) {
 		const required = new Set(Array.isArray(s.required) ? s.required : []);
 		for (const [propName, propSchema] of Object.entries(props)) {
 			const isRequired = required.has(propName);
-			const tsType = schemaToTs(propSchema, allSchemas, depth + 1, seen);
+			const tsType = schemaToTs(propSchema, allSchemas, depth + 1, seen, prefixTypes);
 			lines.push(`  ${safePropName(propName)}${isRequired ? "" : "?"}: ${tsType};`);
 		}
 	}
@@ -1052,6 +1065,8 @@ function generateTypes(schemas) {
 
 	for (const [name, schema] of schemas) {
 		if (!schema || typeof schema !== "object") continue;
+		// Skip schema names that are not valid TypeScript identifiers (e.g. "Foo.BAR")
+		if (!/^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(name)) continue;
 		const desc = schema.description;
 		if (desc) {
 			lines.push(`/** ${desc.replace(/\*\//g, "*").replace(/\n/g, "\n * ")} */`);
@@ -1110,10 +1125,10 @@ function schemaToTsRef(schema) {
 		return `Array<${items}>`;
 	}
 	if (schema.allOf || schema.oneOf || schema.anyOf || schema.enum) {
-		return schemaToTs(schema, new Map(), 0, new Set());
+		return schemaToTs(schema, new Map(), 0, new Set(), true);
 	}
 	if (schema.type === "object" || schema.properties) {
-		return schemaToTs(schema, new Map(), 0, new Set());
+		return schemaToTs(schema, new Map(), 0, new Set(), true);
 	}
 	switch (schema.type) {
 		case "string":
@@ -1226,7 +1241,12 @@ function buildMethodBody(op) {
 	return lines.join("\n");
 }
 
-function generateResources(operations, allTags) {
+function generateResources(
+	operations,
+	allTags,
+	clientName = "CamundaClient",
+	typesImport = "./types.js",
+) {
 	// Group operations by first tag
 	const byTag = new Map();
 	for (const op of operations) {
@@ -1242,7 +1262,7 @@ function generateResources(operations, allTags) {
 		'import type { CamundaClientInput } from "../runtime/types.js";',
 		'import { CamundaBaseClient } from "../runtime/client.js";',
 		'import { ResourceBase } from "../runtime/client.js";',
-		'import type * as Types from "./types.js";',
+		`import type * as Types from "${typesImport}";`,
 		"",
 	];
 
@@ -1284,21 +1304,14 @@ function generateResources(operations, allTags) {
 		lines.push("");
 	}
 
-	// Generate CamundaClient class
+	// Generate client class
+	const isAdmin = clientName === "AdminApiClient";
 	lines.push("/**");
-	lines.push(" * Camunda Orchestration Cluster API client.");
-	lines.push(" *");
-	lines.push(" * @example");
-	lines.push(" * ```typescript");
-	lines.push(" * const client = new CamundaClient({");
-	lines.push(' *   baseUrl: "http://localhost:8080/v2",');
-	lines.push(' *   auth: { type: "bearer", token: "my-token" },');
-	lines.push(" * });");
-	lines.push(" *");
-	lines.push(" * const instances = await client.processInstances.search({});");
-	lines.push(" * ```");
+	lines.push(
+		isAdmin ? " * Camunda Admin API client." : " * Camunda Orchestration Cluster API client.",
+	);
 	lines.push(" */");
-	lines.push("export class CamundaClient extends CamundaBaseClient {");
+	lines.push(`export class ${clientName} extends CamundaBaseClient {`);
 
 	// Resource properties (declarations)
 	for (const { tag, className, propertyName } of resourceClasses) {
@@ -1470,8 +1483,17 @@ function deriveColumns(responseSchema, schemas) {
 	return columns.slice(0, 7);
 }
 
-/** Generate the full contents of apps/cli/src/generated/commands.ts. */
-function generateCliCommandsContent(operations, schemas, tagDescriptions) {
+/** Generate the full contents of apps/cli/src/generated/commands.ts (or admin-commands.ts). */
+function generateCliCommandsContent(
+	operations,
+	schemas,
+	tagDescriptions,
+	{
+		getClientMethod = "getClient",
+		sharedImportPath = "../commands/shared.js",
+		exportName = "generatedCommandGroups",
+	} = {},
+) {
 	const byTag = new Map();
 	for (const op of operations) {
 		const tag = op.tags[0] ?? "Default";
@@ -1494,7 +1516,7 @@ function generateCliCommandsContent(operations, schemas, tagDescriptions) {
 		"  makeUpdateCmd,",
 		"  makeDeleteCmd,",
 		"  parseJson,",
-		'} from "../commands/shared.js";',
+		`} from "${sharedImportPath}";`,
 		"",
 	];
 
@@ -1575,9 +1597,13 @@ function generateCliCommandsContent(operations, schemas, tagDescriptions) {
 				if (cmdName !== "update") lines.push(`      name: ${JSON.stringify(cmdName)},`);
 				lines.push(`      description: ${JSON.stringify(desc)},`);
 				lines.push(`      argName: "${keyParam}",`);
-				lines.push(
-					`      update: (client, key, body) => client.${clientProp}.${methodName}(key, body as never),`,
-				);
+				if (op.requestBodySchema) {
+					lines.push(
+						`      update: (client, key, body) => client.${clientProp}.${methodName}(key, body as never),`,
+					);
+				} else {
+					lines.push(`      update: (client, key) => client.${clientProp}.${methodName}(key),`);
+				}
 				lines.push("    }),");
 			} else if (cmdType === "delete") {
 				lines.push("    makeDeleteCmd({");
@@ -1622,7 +1648,7 @@ function generateCliCommandsContent(operations, schemas, tagDescriptions) {
 						'        const body = parseJson(ctx.flags.data as string | undefined, "data");',
 					);
 				}
-				lines.push("        const client = await ctx.getClient();");
+				lines.push(`        const client = await ctx.${getClientMethod}();`);
 				const callArgs = [
 					...pathParams.map((p) => p.name),
 					...(hasBody ? ["body as never"] : []),
@@ -1646,7 +1672,7 @@ function generateCliCommandsContent(operations, schemas, tagDescriptions) {
 		lines.push("");
 	}
 
-	lines.push("export const generatedCommandGroups: CommandGroup[] = [");
+	lines.push(`export const ${exportName}: CommandGroup[] = [`);
 	for (const varName of groupVarNames) {
 		lines.push(`  ${varName},`);
 	}
@@ -1792,9 +1818,9 @@ function generateCliDocumentationContent(operations, tagDescriptions) {
 
 // ─── MAIN ─────────────────────────────────────────────────────────────────────
 
-async function main() {
-	console.log("Camunda API Generator");
-	console.log("=====================");
+async function generateC8() {
+	console.log("Camunda C8 API Generator");
+	console.log("========================");
 
 	// Ensure directories exist
 	await mkdir(SWAGGER_DIR, { recursive: true });
@@ -1809,7 +1835,6 @@ async function main() {
 	// 2. Collect schemas from all files, resolving refs with correct file context
 	console.log("\n2. Collecting and resolving schemas...");
 	const rawSchemas = collectSchemas(allFiles);
-	// Resolve refs within each schema using the schema's source file as context
 	const schemas = new Map();
 	for (const [name, { schema, sourceFile }] of rawSchemas) {
 		schemas.set(name, resolveRefs(schema, sourceFile, allFiles));
@@ -1821,26 +1846,24 @@ async function main() {
 	const operations = collectOperations(allFiles);
 	console.log(`   Found ${operations.length} operations.`);
 
-	// 5. Generate types
-	console.log("\n5. Generating types...");
+	// 4. Generate types
+	console.log("\n4. Generating types...");
 	const typesContent = generateTypes(schemas);
-	const typesPath = join(GENERATED_DIR, "types.ts");
-	await writeFile(typesPath, typesContent, "utf8");
+	await writeFile(join(GENERATED_DIR, "types.ts"), typesContent, "utf8");
 	console.log("   Written: src/generated/types.ts");
 
-	// 6. Generate resources
-	console.log("\n6. Generating resources...");
+	// 5. Generate resources
+	console.log("\n5. Generating resources...");
 	const entryDoc = allFiles.get(ENTRY_FILE);
 	const allTags = Array.isArray(entryDoc?.tags)
 		? entryDoc.tags.map((t) => t?.name ?? "").filter(Boolean)
 		: [];
 	const resourcesContent = generateResources(operations, allTags);
-	const resourcesPath = join(GENERATED_DIR, "resources.ts");
-	await writeFile(resourcesPath, resourcesContent, "utf8");
+	await writeFile(join(GENERATED_DIR, "resources.ts"), resourcesContent, "utf8");
 	console.log("   Written: src/generated/resources.ts");
 
-	// 7. Generate CLI commands
-	console.log("\n7. Generating CLI commands...");
+	// 6. Generate CLI commands
+	console.log("\n6. Generating CLI commands...");
 	await mkdir(CLI_GENERATED_DIR, { recursive: true });
 	const tagDescriptions = {};
 	if (Array.isArray(entryDoc?.tags)) {
@@ -1858,6 +1881,115 @@ async function main() {
 	console.log("   Written: apps/cli/DOCUMENTATION.md");
 
 	console.log("\nDone.");
+}
+
+async function generateAdmin() {
+	console.log("Camunda Admin API Generator");
+	console.log("===========================");
+
+	await mkdir(SWAGGER_DIR, { recursive: true });
+	await mkdir(GENERATED_DIR, { recursive: true });
+
+	// 1. Download (or refresh) the single JSON swagger file
+	console.log("\n1. Downloading Admin API swagger...");
+	const dest = join(SWAGGER_DIR, ADMIN_ENTRY_FILE);
+	const force = process.argv.includes("--force");
+	let jsonText;
+	if (!force && (await fileExists(dest))) {
+		jsonText = await readFile(dest, "utf8");
+		console.log("   Using cached admin-api.json");
+	} else {
+		console.log(`   Downloading from ${ADMIN_SWAGGER_URL}...`);
+		const response = await fetch(ADMIN_SWAGGER_URL);
+		if (!response.ok) {
+			throw new Error(
+				`Failed to download Admin API swagger: ${response.status} ${response.statusText}`,
+			);
+		}
+		jsonText = await response.text();
+		await writeFile(dest, jsonText, "utf8");
+		console.log("   Downloaded and saved to swagger/admin-api.json");
+	}
+
+	const parsed = JSON.parse(jsonText);
+
+	// Derive tags from the first path segment for operations without tags
+	for (const [path, pathItem] of Object.entries(parsed.paths ?? {})) {
+		const firstSegment = path.split("/").filter(Boolean)[0] ?? "default";
+		const tag = firstSegment.charAt(0).toUpperCase() + firstSegment.slice(1);
+		for (const method of ["get", "post", "put", "patch", "delete"]) {
+			if (pathItem[method] && !pathItem[method].tags) {
+				pathItem[method].tags = [tag];
+			}
+		}
+	}
+
+	const allFiles = new Map([[ADMIN_ENTRY_FILE, parsed]]);
+
+	// 2. Collect and resolve schemas
+	console.log("\n2. Collecting and resolving schemas...");
+	const rawSchemas = collectSchemas(allFiles);
+	const schemas = new Map();
+	for (const [name, { schema, sourceFile }] of rawSchemas) {
+		schemas.set(name, resolveRefs(schema, sourceFile, allFiles));
+	}
+	console.log(`   Found ${schemas.size} schemas.`);
+
+	// 3. Collect operations
+	console.log("\n3. Collecting operations...");
+	const operations = collectOperations(allFiles, ADMIN_ENTRY_FILE);
+	console.log(`   Found ${operations.length} operations.`);
+
+	// 4. Generate admin types
+	console.log("\n4. Generating admin types...");
+	const typesContent = generateTypes(schemas);
+	await writeFile(join(GENERATED_DIR, "admin-types.ts"), typesContent, "utf8");
+	console.log("   Written: src/generated/admin-types.ts");
+
+	// 5. Generate admin resources
+	console.log("\n5. Generating admin resources...");
+	const entryDoc = allFiles.get(ADMIN_ENTRY_FILE);
+	const allTags = Array.isArray(entryDoc?.tags)
+		? entryDoc.tags.map((t) => t?.name ?? "").filter(Boolean)
+		: [];
+	const resourcesContent = generateResources(
+		operations,
+		allTags,
+		"AdminApiClient",
+		"./admin-types.js",
+	);
+	await writeFile(join(GENERATED_DIR, "admin-resources.ts"), resourcesContent, "utf8");
+	console.log("   Written: src/generated/admin-resources.ts");
+
+	// 6. Generate CLI commands
+	console.log("\n6. Generating Admin CLI commands...");
+	await mkdir(CLI_GENERATED_DIR, { recursive: true });
+	const tagDescriptions = {};
+	if (Array.isArray(entryDoc?.tags)) {
+		for (const t of entryDoc.tags) {
+			if (t?.name) tagDescriptions[t.name] = t.description || t.name;
+		}
+	}
+	const cliContent = generateCliCommandsContent(operations, schemas, tagDescriptions, {
+		getClientMethod: "getAdminClient",
+		sharedImportPath: "../commands/admin-shared.js",
+		exportName: "adminCommandGroups",
+	});
+	await writeFile(join(CLI_GENERATED_DIR, "admin-commands.ts"), cliContent, "utf8");
+	console.log("   Written: apps/cli/src/generated/admin-commands.ts");
+
+	console.log("\nDone.");
+}
+
+async function main() {
+	const api = process.argv.includes("--api")
+		? process.argv[process.argv.indexOf("--api") + 1]
+		: "c8";
+	if (api === "admin") {
+		await generateAdmin();
+	} else {
+		await generateC8();
+	}
 }
 
 main().catch((err) => {

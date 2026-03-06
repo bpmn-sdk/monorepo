@@ -1,4 +1,4 @@
-import type { CamundaClient } from "@bpmn-sdk/api";
+import type { AdminApiClient, CamundaClient } from "@bpmn-sdk/api";
 import type {
 	ColumnDef,
 	Command,
@@ -85,6 +85,7 @@ interface TuiState {
 	groups: CommandGroup[];
 	stack: Screen[];
 	getClient: () => Promise<CamundaClient>;
+	getAdminClient: () => Promise<AdminApiClient>;
 	quitting: boolean;
 }
 
@@ -180,6 +181,7 @@ function buildContext(
 	fields: FieldState[],
 	writer: OutputWriter,
 	getClient: () => Promise<CamundaClient>,
+	getAdminClient: () => Promise<AdminApiClient>,
 ): RunContext {
 	const positional: string[] = [];
 	const flags: Record<string, string | boolean | number> = {};
@@ -197,7 +199,7 @@ function buildContext(
 			}
 		}
 	}
-	return { positional, flags, output: writer, getClient };
+	return { positional, flags, output: writer, getClient, getAdminClient };
 }
 
 // ─── Table helpers ────────────────────────────────────────────────────────────
@@ -610,7 +612,13 @@ async function executeCommand(
 	render(state);
 
 	const { writer, get } = makeCapturingWriter();
-	const ctx = buildContext(screen.cmd, screen.fields, writer, state.getClient);
+	const ctx = buildContext(
+		screen.cmd,
+		screen.fields,
+		writer,
+		state.getClient,
+		state.getAdminClient,
+	);
 	try {
 		await screen.cmd.run(ctx);
 		state.stack.push({
@@ -918,11 +926,13 @@ async function startTui(state: TuiState): Promise<void> {
 export async function runMainTui(
 	groups: CommandGroup[],
 	getClient: () => Promise<CamundaClient>,
+	getAdminClient?: () => Promise<AdminApiClient>,
 ): Promise<void> {
 	return startTui({
 		groups,
 		stack: [{ kind: "main", cursor: 0, scroll: 0 }],
 		getClient,
+		getAdminClient: getAdminClient ?? (() => Promise.reject(new Error("No admin client"))),
 		quitting: false,
 	});
 }
@@ -935,6 +945,7 @@ export async function runGroupTui(
 	group: CommandGroup,
 	groups: CommandGroup[],
 	getClient: () => Promise<CamundaClient>,
+	getAdminClient?: () => Promise<AdminApiClient>,
 ): Promise<void> {
 	const cursor = groups.findIndex((g) => g.name === group.name);
 	return startTui({
@@ -944,6 +955,7 @@ export async function runGroupTui(
 			{ kind: "commands", group, cursor: 0 },
 		],
 		getClient,
+		getAdminClient: getAdminClient ?? (() => Promise.reject(new Error("No admin client"))),
 		quitting: false,
 	});
 }

@@ -14,7 +14,8 @@
 	"files": ["dist"],
 	"scripts": {
 		"generate": "node scripts/generate.mjs",
-		"build": "node scripts/generate.mjs && tsc",
+		"generate:admin": "node scripts/generate.mjs --api admin",
+		"build": "node scripts/generate.mjs && node scripts/generate.mjs --api admin && tsc",
 		"typecheck": "tsc --noEmit",
 		"check": "biome check .",
 		"test": "vitest run"

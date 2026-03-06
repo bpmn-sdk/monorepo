@@ -10,7 +10,16 @@ import {
 	saveProfile,
 	useProfile,
 } from "../profile.js";
+import type { ApiType } from "../profile.js";
 import type { CommandGroup, FlagSpec } from "../types.js";
+
+const API_TYPE_FLAG: FlagSpec = {
+	name: "api-type",
+	description: "API type: c8 (default) or admin",
+	type: "string",
+	default: "c8",
+	placeholder: "TYPE",
+};
 
 const AUTH_FLAGS: FlagSpec[] = [
 	{
@@ -77,6 +86,36 @@ function parseEnvFile(content: string): Record<string, string> {
 		result[key] = value;
 	}
 	return result;
+}
+
+/** Detect the API type from a parsed env map. Returns "admin" if Console vars present, else "c8". */
+function detectApiType(env: Record<string, string>): ApiType {
+	return env.CAMUNDA_CONSOLE_CLIENT_ID || env.CAMUNDA_CONSOLE_BASE_URL ? "admin" : "c8";
+}
+
+/** Build a CamundaClientInput from a Camunda Console (Admin API) env map. */
+function configFromConsoleEnv(env: Record<string, string>): CamundaClientInput {
+	const baseUrl = env.CAMUNDA_CONSOLE_BASE_URL;
+	if (!baseUrl) {
+		throw new Error(
+			"CAMUNDA_CONSOLE_BASE_URL not found in credentials file. " +
+				"Make sure you are using a Camunda Console credentials export.",
+		);
+	}
+
+	const clientId = env.CAMUNDA_CONSOLE_CLIENT_ID ?? "";
+	const clientSecret = env.CAMUNDA_CONSOLE_CLIENT_SECRET ?? "";
+	const tokenUrl = env.CAMUNDA_OAUTH_URL ?? "";
+	const audience = env.CAMUNDA_CONSOLE_OAUTH_AUDIENCE ?? "";
+
+	if (!clientId || !clientSecret || !tokenUrl) {
+		throw new Error(
+			"Missing required credentials. Expected: " +
+				"CAMUNDA_CONSOLE_CLIENT_ID, CAMUNDA_CONSOLE_CLIENT_SECRET, CAMUNDA_OAUTH_URL.",
+		);
+	}
+
+	return { baseUrl, auth: { type: "oauth2", clientId, clientSecret, tokenUrl, audience } };
 }
 
 /** Build a CamundaClientInput from a parsed Camunda Cloud credentials env map. */
@@ -164,7 +203,7 @@ export const profileGroup: CommandGroup = {
 			name: "create",
 			description: "Create or update a profile",
 			args: [{ name: "name", description: "Profile name", required: true }],
-			flags: AUTH_FLAGS,
+			flags: [API_TYPE_FLAG, ...AUTH_FLAGS],
 			examples: [
 				{
 					description: "Bearer token profile",
@@ -176,6 +215,11 @@ export const profileGroup: CommandGroup = {
 					command:
 						"casen profile create prod --base-url https://cluster.camunda.io/v2 --auth-type oauth2 --client-id id --client-secret secret --token-url https://login.cloud.camunda.io/oauth/token",
 				},
+				{
+					description: "Admin API profile",
+					command:
+						"casen profile create admin-prod --api-type admin --base-url https://api.cloud.camunda.io --auth-type oauth2 --client-id id --client-secret secret --token-url https://login.cloud.camunda.io/oauth/token",
+				},
 			],
 			async run(ctx) {
 				const name = ctx.positional[0];
@@ -183,9 +227,11 @@ export const profileGroup: CommandGroup = {
 				const baseUrl = ctx.flags["base-url"] as string | undefined;
 				if (!baseUrl) throw new Error("--base-url is required");
 				const auth = buildAuth(ctx.flags);
+				const rawApiType = (ctx.flags["api-type"] as string | undefined) ?? "c8";
+				const apiType: ApiType = rawApiType === "admin" ? "admin" : "c8";
 				const config: CamundaClientInput = { baseUrl, auth };
-				saveProfile(name, config);
-				ctx.output.ok(`Profile "${name}" saved (${getConfigFilePath()})`);
+				saveProfile(name, config, apiType);
+				ctx.output.ok(`Profile "${name}" saved [${apiType}] (${getConfigFilePath()})`);
 			},
 		},
 		{
@@ -205,6 +251,7 @@ export const profileGroup: CommandGroup = {
 						items: profiles.map((p) => ({
 							active: p.name === active ? "●" : " ",
 							name: p.name,
+							apiType: p.apiType,
 							baseUrl: p.config.baseUrl ?? "(from env/file)",
 							authType: (p.config.auth as { type?: string } | undefined)?.type ?? "—",
 						})),
@@ -212,6 +259,7 @@ export const profileGroup: CommandGroup = {
 					[
 						{ key: "active", header: " " },
 						{ key: "name", header: "NAME" },
+						{ key: "apiType", header: "API" },
 						{ key: "baseUrl", header: "BASE URL", maxWidth: 50 },
 						{ key: "authType", header: "AUTH TYPE" },
 					],
@@ -262,7 +310,8 @@ export const profileGroup: CommandGroup = {
 		},
 		{
 			name: "import",
-			description: "Import a profile from a Camunda Cloud credentials file",
+			description:
+				"Import a profile from a Camunda Cloud or Console credentials file (auto-detected)",
 			args: [
 				{ name: "name", description: "Profile name", required: true },
 				{
@@ -273,8 +322,12 @@ export const profileGroup: CommandGroup = {
 			],
 			examples: [
 				{
-					description: "Import from credentials file",
+					description: "Import C8 credentials",
 					command: "casen profile import prod ./camunda-credentials.sh",
+				},
+				{
+					description: "Import Admin API credentials",
+					command: "casen profile import admin ./console-credentials.sh",
 				},
 				{
 					description: "Import from stdin",
@@ -288,9 +341,10 @@ export const profileGroup: CommandGroup = {
 				if (!filePath) throw new Error("Missing required argument: <file>");
 				const content = filePath === "-" ? await readStdin() : readFileSync(filePath, "utf8");
 				const env = parseEnvFile(content);
-				const config = configFromCloudEnv(env);
-				saveProfile(name, config);
-				ctx.output.ok(`Profile "${name}" imported (${getConfigFilePath()})`);
+				const apiType = detectApiType(env);
+				const config = apiType === "admin" ? configFromConsoleEnv(env) : configFromCloudEnv(env);
+				saveProfile(name, config, apiType);
+				ctx.output.ok(`Profile "${name}" imported [${apiType}] (${getConfigFilePath()})`);
 				ctx.output.info(`baseUrl: ${config.baseUrl ?? ""}`);
 			},
 		},

@@ -1,4 +1,4 @@
-import type { CamundaClient } from "@bpmn-sdk/api";
+import type { AdminApiClient, CamundaClient } from "@bpmn-sdk/api";
 
 // ─── Output ───────────────────────────────────────────────────────────────────
 
@@ -64,8 +64,10 @@ export interface RunContext {
 	positional: string[];
 	flags: ParsedFlags;
 	output: OutputWriter;
-	/** Lazily creates a CamundaClient from the active profile. */
+	/** Lazily creates a CamundaClient (C8 API) from the active profile. */
 	getClient(): Promise<CamundaClient>;
+	/** Lazily creates an AdminApiClient from the active profile. */
+	getAdminClient(): Promise<AdminApiClient>;
 }
 
 export type ParsedFlags = Record<string, string | boolean | number>;
