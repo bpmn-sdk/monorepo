@@ -1,5 +1,19 @@
 # Progress
 
+## 2026-03-06 — docs: new documentation site (apps/docs)
+
+- Created `apps/docs` — a separate Astro Starlight documentation site
+- **Framework**: Astro Starlight 0.32 (official Astro docs theme) — sidebar, search, dark/light mode, MDX, zero external JS beyond Pagefind
+- **Custom theme**: purple accent matching landing page, warm dark background
+- **Content** (15 pages):
+  - Getting Started: Installation, Quick Start, Core Concepts
+  - Guides: Building Processes, Gateways & Branching, Simulation, Camunda 8 Deployment, AI Integration
+  - Packages: @bpmn-sdk/core, engine, api, canvas, editor
+  - CLI: casen reference
+- **Deployment**: `.github/workflows/deploy-docs.yml` deploys to Cloudflare Pages (`bpmn-sdk-docs` project) on push to main
+- **Root scripts**: `pnpm docs:dev`, `pnpm docs:build`
+- Used `glob` loader (instead of `docsLoader`) due to Astro 5 content layer requiring explicit `.md` + `.mdx` discovery
+
 ## 2026-03-06 — landing: AI-readable content (llms.txt / llms-full.txt)
 
 - Added `/llms.txt` — compact LLM index per llmstxt.org spec: H1 project name, blockquote summary, package list with descriptions, links (editor, GitHub, npm, llms-full.txt)

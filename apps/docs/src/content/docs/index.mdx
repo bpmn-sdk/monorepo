@@ -1,0 +1,61 @@
+---
+title: BPMN SDK
+description: TypeScript SDK for generating, editing, and executing BPMN 2.0 diagrams programmatically.
+template: splash
+hero:
+  tagline: Generate, edit, and execute BPMN 2.0 diagrams with TypeScript. Built for AI agents, automation platforms, and Camunda 8 deployments.
+  actions:
+    - text: Get Started
+      link: /getting-started/installation/
+      icon: right-arrow
+      variant: primary
+    - text: View on GitHub
+      link: https://github.com/bpmn-sdk/monorepo
+      icon: external
+      variant: minimal
+---
+
+import { CardGrid, Card } from "@astrojs/starlight/components";
+
+## What is BPMN SDK?
+
+BPMN SDK is an open-source TypeScript monorepo for working with BPMN 2.0 processes entirely in code.
+Instead of hand-writing hundreds of lines of XML, you call a fluent TypeScript API and get back valid,
+auto-laid-out BPMN ready to deploy to Camunda 8.
+
+<CardGrid stagger>
+  <Card title="Fluent Builder" icon="pencil">
+    Chain `.startEvent().serviceTask().exclusiveGateway()` calls to build any process shape without
+    touching XML.
+  </Card>
+  <Card title="Auto-Layout" icon="setting">
+    Sugiyama algorithm produces clean, readable diagrams — no manual coordinate math.
+  </Card>
+  <Card title="AI-Native" icon="rocket">
+    Compact intermediate format fits an entire diagram in a single LLM prompt. Agents generate and
+    modify processes without seeing raw XML.
+  </Card>
+  <Card title="Simulation Engine" icon="puzzle">
+    Deploy and run processes locally in the browser or Node.js. Service tasks, gateways, timers,
+    DMN evaluation.
+  </Card>
+  <Card title="Camunda 8 Ready" icon="approve-check">
+    Native Zeebe task definitions, IO mappings, connectors, and forms. Full REST API client with 180
+    typed methods.
+  </Card>
+  <Card title="Zero Runtime Deps" icon="star">
+    Core packages have no transitive runtime dependencies. ESM-only, tree-shakeable, runs in
+    browsers, Node.js, Deno, Bun, and edge runtimes.
+  </Card>
+</CardGrid>
+
+## Packages
+
+| Package | Description |
+|---|---|
+| [`@bpmn-sdk/core`](/packages/core/) | Fluent process builder, parser/serializer, auto-layout, AI-compact format |
+| [`@bpmn-sdk/engine`](/packages/engine/) | Zero-dep BPMN simulation engine (browser + Node.js) |
+| [`@bpmn-sdk/api`](/packages/api/) | Camunda 8 REST API client — 180 typed methods |
+| [`@bpmn-sdk/canvas`](/packages/canvas/) | SVG BPMN viewer with pan/zoom, dark/light theme |
+| [`@bpmn-sdk/editor`](/packages/editor/) | Full BPMN editor — canvas + properties panel + AI bridge |
+| [`casen` (CLI)](/cli/casen/) | Interactive TUI for managing Camunda 8 from the terminal |

@@ -1,0 +1,42 @@
+/* ── Brand accent: match landing page purple ─────────────────────────────── */
+
+:root {
+	--sl-color-accent-low: oklch(25% 0.08 280);
+	--sl-color-accent: oklch(60% 0.18 280);
+	--sl-color-accent-high: oklch(80% 0.15 280);
+
+	/* Slightly warmer dark background */
+	--sl-color-bg: oklch(10% 0.01 280);
+	--sl-color-bg-nav: oklch(12% 0.015 280);
+	--sl-color-bg-sidebar: oklch(11% 0.01 280);
+}
+
+:root[data-theme="light"] {
+	--sl-color-accent-low: oklch(92% 0.05 280);
+	--sl-color-accent: oklch(48% 0.2 280);
+	--sl-color-accent-high: oklch(30% 0.18 280);
+}
+
+/* ── Logo SVG inherits text color ────────────────────────────────────────── */
+
+.site-title svg {
+	color: var(--sl-color-accent-high);
+}
+
+/* ── Code blocks: slightly tighter ──────────────────────────────────────── */
+
+.expressive-code .frame {
+	border-radius: 8px;
+}
+
+/* ── Nav link active indicator ───────────────────────────────────────────── */
+
+[data-current-page] .large {
+	color: var(--sl-color-accent-high) !important;
+}
+
+/* ── Smooth scroll ────────────────────────────────────────────────────────── */
+
+html {
+	scroll-behavior: smooth;
+}
