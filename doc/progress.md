@@ -1,5 +1,54 @@
 # Progress
 
+## 2026-03-06 — docs: new documentation site (apps/docs)
+
+- Created `apps/docs` — a separate Astro Starlight documentation site
+- **Framework**: Astro Starlight 0.32 (official Astro docs theme) — sidebar, search, dark/light mode, MDX, zero external JS beyond Pagefind
+- **Custom theme**: purple accent matching landing page, warm dark background
+- **Content** (15 pages):
+  - Getting Started: Installation, Quick Start, Core Concepts
+  - Guides: Building Processes, Gateways & Branching, Simulation, Camunda 8 Deployment, AI Integration
+  - Packages: @bpmn-sdk/core, engine, api, canvas, editor
+  - CLI: casen reference
+- **Deployment**: `.github/workflows/deploy-docs.yml` deploys to Cloudflare Pages (`bpmn-sdk-docs` project) on push to main
+- **Root scripts**: `pnpm docs:dev`, `pnpm docs:build`
+- Used `glob` loader (instead of `docsLoader`) due to Astro 5 content layer requiring explicit `.md` + `.mdx` discovery
+
+## 2026-03-06 — landing: AI-readable content (llms.txt / llms-full.txt)
+
+- Added `/llms.txt` — compact LLM index per llmstxt.org spec: H1 project name, blockquote summary, package list with descriptions, links (editor, GitHub, npm, llms-full.txt)
+- Added `/llms-full.txt` — full self-contained content: all features, real code examples (TypeScript, not HTML-encoded), API coverage, CLI usage, getting started steps
+- Both served as Astro static API routes (`src/pages/llms.txt.ts`, `src/pages/llms-full.txt.ts`) with `Content-Type: text/plain`
+- Adopted by Anthropic, Stripe, Cloudflare, Cursor, Perplexity — growing standard for AI crawlers at inference time
+
+## 2026-03-06 — landing: UX polish — before/after slider, CLI animation, syntax colors
+
+- **Before/after slider** replaces side-by-side compare panels: both panels absolutely fill the container, `clip-path: inset(...)` controlled by `--split` CSS variable, draggable knob with pointer capture; responsive height
+- **CLI animation improvements**: cursor ↓ key uses `transition: "instant"` (no fade — just the highlighted row swaps), enter key flashes selected row (`.cli-row-pressed`) before fading to new screen
+- **Syntax highlighting**: added `.api-code-body .kw/.str/.fn/.comment` tokens (API section was unstyled)
+- **Responsive**: compare section stacks at 900px/600px; API/CLI two-column collapses to single column
+
+## 2026-03-06 — landing: API SDK + CLI sections with terminal animation
+
+- Added `#api` section showcasing `@bpmn-sdk/api` with a code panel (CamundaClient usage), 4 stat tiles (180 methods, 30+ classes, 3 auth modes, retry), and feature chips
+- Added `#cli` section showcasing `casen` CLI with feature list cards and an animated terminal window
+- Created `apps/landing/src/scripts/cli-anim.ts` — IntersectionObserver-triggered terminal animation cycling 6 frames (shell → main menu → navigate → process commands → list form → results table)
+- CSS: terminal window styles (`.tl`, `.ti`, `.tb`, `.td`, `.tc`, `.tp`, `.tcur`, `.cli-key-badge`), API section styles, responsive grid collapses at 900px
+- Nav links added for `#api` and `#cli`
+
+## 2026-03-06 — landing: migrate to Astro, deploy to Cloudflare Pages
+
+- Replaced Vite + plain HTML with Astro 5 static site generator
+- Removed `base: "/monorepo/"` — site now served from root `/`
+- Pages: `src/pages/index.astro` (landing) + `src/pages/editor.astro` (editor)
+- Scripts moved to `src/scripts/`, CSS to `src/styles/global.css`
+- `{}` in code example blocks handled via Astro `set:html` directive
+- Astro `build.format: "file"` → generates `/index.html` + `/editor.html` (no trailing-slash dirs)
+- Added `**/.astro/**` to Biome ignore (Astro's generated type files)
+- Added `astro: "^5"` + `@astrojs/check: "^0.9"` to root devDependencies
+- GitHub Actions deploy workflow switched from GitHub Pages to Cloudflare Pages (wrangler v4)
+- `wrangler: "^4"` added to root devDependencies; action uses project-installed wrangler
+
 ## 2026-03-06 — Admin API (SaaS): packages/api + apps/cli
 
 Added Camunda Admin API (SaaS Console) support alongside the existing C8 REST API.
@@ -51,6 +100,43 @@ New package `@bpmn-sdk/api` — auto-generated TypeScript SDK for the Camunda 8 
 - Error hierarchy: `CamundaError` → `CamundaHttpError` → `CamundaValidationError`, `CamundaAuthError`, `CamundaForbiddenError`, `CamundaNotFoundError`, `CamundaConflictError`, `CamundaRateLimitError`, `CamundaServerError`, `CamundaNetworkError`, `CamundaTimeoutError`
 
 **Tests**: 25 unit tests covering events, cache (with fake timers), retry logic, and error building.
+
+## 2026-03-05 — New package: @bpmn-sdk/ascii
+
+Added `packages/ascii` — a zero-dependency BPMN ASCII art renderer.
+
+- **`renderBpmnAscii(xml, options?): string`** — parses BPMN XML, runs the Sugiyama layout engine, and renders the process as a Unicode box-drawing diagram.
+- Uses the same `layoutProcess()` engine as `@bpmn-sdk/canvas`; element layer/position data drives fixed-cell ASCII placement.
+- **Element shapes**: tasks → square box `┌──┐│└──┘` with `[svc]`/`[usr]`/`[scr]` type tags; events/gateways → rounded box `╭──╮│╰──╯` with Unicode markers (`○ ● × + ◇`).
+- **Edge routing**: orthogonal lines with box-drawing corners (`┐ └ ┌ ┘`); T-junctions merged with `mergeBoxChars()` (`┤ ├ ┬ ┴ ┼`); backward/loop edges routed above the diagram at row 0.
+- **`RenderOptions.title`**: process name header above diagram (default), `false` to suppress, or a custom string.
+- 23 tests covering grid merge logic, element markers, edge routing, and complex parallel/gateway diagrams.
+
+## 2026-03-05 — Core: fix joining gateway auto-connect after branch()
+
+Fixed a bug in `ProcessBuilder` where calling `.parallelGateway("join")` (or any element) after `.branch()` calls without explicit `.connectTo()` produced a join gateway with no incoming flows from the branches.
+
+- **Root cause** — `branch()` set `this.lastNodeId = undefined` after merging branch elements, so `addFlowElement()` skipped creating the incoming sequence flow to the join element.
+- **Fix** — `ProcessBuilder` now tracks "open branch ends" (`openBranchEnds: string[]`). When a branch doesn't call `.connectTo()` and its last element is not an end event, its terminal node ID is pushed to `openBranchEnds`. The next `addFlowElement()` call auto-creates sequence flows from all open branch ends to the new element, then clears the list.
+- End-event branches are excluded (those are intentional dead-ends, e.g. early-error branches).
+- `BranchBuilder` gains `_connected: boolean` flag (set by `connectTo()`) and `_lastNodeId` getter to support this tracking.
+- Added regression test: "auto-connects branch ends to join gateway without explicit connectTo()".
+
+## 2026-03-05 — Landing page: 5 cycling animation examples + zoom fix
+
+- **5 cycling animation examples** — replaced the single `order-validation` sequence with 5 distinct examples that cycle one after another: `order-validation.ts` (linear), `approval-flow.ts` (exclusive gateway with branches), `ai-support-agent.ts` (ad-hoc subprocess with LLM think/act/observe loop), `order-fulfillment.ts` (parallel gateway with 3 branches), `payment-processing.ts` (linear with payment steps). Each example shows 2 diagram snapshots building the process progressively.
+- **Zoom fix** — first diagram shown in each example always has ≥2 nodes (start event + at least one task), preventing a single start event from filling the entire canvas. `maxZoom: 1.4` in the neon plugin clamps overly-zoomed small diagrams.
+- **Dynamic filename** — code panel topbar filename (`id="anim-filename"`) updates between examples via JS.
+- **`AnimExample` type** — new `{ filename: string; stages: AnimStage[] }` structure replaces flat `AnimStage[]`; loop uses modulo index to cycle through examples indefinitely.
+
+## 2026-03-05 — Landing page: animated "See it in action" + neon on all diagrams
+
+Enhanced the landing page with two improvements:
+
+- **Neon theme on all diagrams** — `createNeonThemePlugin()` is now applied to every `BpmnCanvas` instance on the landing page (hero + animated demo), giving consistent neon glow, teal edges, and the skeleton loader transition.
+- **Animated "See it in action" section** — replaced the static tab-based example code/diagram panels with a looping animation: TypeScript code builds line-by-line on the left (slide-in animation with blinking teal cursor), and the BPMN diagram on the right updates live via `BpmnCanvas` destroy/recreate with the neon plugin handling the fade-in. Five stages reveal the `order-validation` process incrementally (import → startEvent → serviceTask → serviceTask+endEvent → build+export). Triggered by `IntersectionObserver` on first scroll-into-view; respects `prefers-reduced-motion`.
+- Removed: static example tabs (simple/gateway/parallel/ai-agent) and all related JS/CSS (`renderDiagram`, `setupTabs`, `setupOutputTabs`, `populateXmlPanels`, `.ex-code`, `.example-tabs`, `.output-view`, etc.).
+- Added: `.anim-demo`, `.anim-code-panel`, `.anim-diagram-panel`, `.anim-cursor`, `.anim-live-badge` styles; `buildAnimStages`, `appendAnimLine`, `updateAnimDiagram`, `runAnimCycle`, `runAnimLoop`, `setupAnimation` functions.
 
 ## 2026-03-04 — Landing hero: live BPMN diagram with neon theme
 

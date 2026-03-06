@@ -28,7 +28,8 @@
 			".swarm",
 			"**/templates/generated.ts",
 			"**/src-tauri/**",
-			"**/src/generated/**",
+		"**/.astro/**",
+			"**/src/generated/**"
 			"**/swagger/**"
 		]
 	}
