@@ -2757,16 +2757,6 @@ export class VariableResource extends ResourceBase {
 
 /**
  * Camunda Orchestration Cluster API client.
- *
- * @example
- * ```typescript
- * const client = new CamundaClient({
- *   baseUrl: "http://localhost:8080/v2",
- *   auth: { type: "bearer", token: "my-token" },
- * });
- *
- * const instances = await client.processInstances.search({});
- * ```
  */
 export class CamundaClient extends CamundaBaseClient {
   /** Audit Log operations */

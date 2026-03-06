@@ -1,5 +1,5 @@
 import { parseArgs } from "./args.js";
-import { createClientFromProfile } from "./client.js";
+import { createAdminClientFromProfile, createClientFromProfile } from "./client.js";
 import { commandGroups } from "./commands/index.js";
 import { getRuntimeCompletions } from "./completion.js";
 import { printCommandHelp, printGlobalHelp, printGroupHelp, printVersion } from "./help.js";
@@ -52,10 +52,17 @@ export async function run(argv: string[]): Promise<void> {
 		if (wantHelp) {
 			printGlobalHelp(commandGroups, colors);
 		} else {
-			await runMainTui(commandGroups, () => Promise.resolve(createClientFromProfile(profileName)));
+			await runMainTui(
+				commandGroups,
+				() => Promise.resolve(createClientFromProfile(profileName)),
+				() => Promise.resolve(createAdminClientFromProfile(profileName)),
+			);
 		}
 		return;
 	}
+
+	const getClient = () => Promise.resolve(createClientFromProfile(profileName));
+	const getAdminClient = () => Promise.resolve(createAdminClientFromProfile(profileName));
 
 	// ── Find group ────────────────────────────────────────────────────────────
 	const groupToken = positional[0] ?? "";
@@ -75,9 +82,7 @@ export async function run(argv: string[]): Promise<void> {
 		if (group.name === "profile") {
 			await runProfileManager();
 		} else if (group.name !== "completion") {
-			await runGroupTui(group, commandGroups, () =>
-				Promise.resolve(createClientFromProfile(profileName)),
-			);
+			await runGroupTui(group, commandGroups, getClient, getAdminClient);
 		} else {
 			printGroupHelp(group, colors);
 		}
@@ -115,7 +120,8 @@ export async function run(argv: string[]): Promise<void> {
 		positional: positional.slice(2),
 		flags,
 		output,
-		getClient: () => Promise.resolve(createClientFromProfile(profileName)),
+		getClient,
+		getAdminClient,
 	};
 
 	try {
