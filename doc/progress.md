@@ -1,5 +1,12 @@
 # Progress
 
+## 2026-03-06 — landing: AI-readable content (llms.txt / llms-full.txt)
+
+- Added `/llms.txt` — compact LLM index per llmstxt.org spec: H1 project name, blockquote summary, package list with descriptions, links (editor, GitHub, npm, llms-full.txt)
+- Added `/llms-full.txt` — full self-contained content: all features, real code examples (TypeScript, not HTML-encoded), API coverage, CLI usage, getting started steps
+- Both served as Astro static API routes (`src/pages/llms.txt.ts`, `src/pages/llms-full.txt.ts`) with `Content-Type: text/plain`
+- Adopted by Anthropic, Stripe, Cloudflare, Cursor, Perplexity — growing standard for AI crawlers at inference time
+
 ## 2026-03-06 — landing: UX polish — before/after slider, CLI animation, syntax colors
 
 - **Before/after slider** replaces side-by-side compare panels: both panels absolutely fill the container, `clip-path: inset(...)` controlled by `--split` CSS variable, draggable knob with pointer capture; responsive height

@@ -1,76 +1,11 @@
 ---
 import "../styles/global.css";
+import { CODE_HTML } from "../data/content";
 
-const withSdkCode = `<span class="kw">import</span> { Bpmn } <span class="kw">from</span> <span class="str">"@bpmn-sdk/core"</span>;
-
-<span class="kw">const</span> xml = Bpmn.export(
-  Bpmn.createProcess(<span class="str">"my-flow"</span>) <span class="comment">// fluent API</span>
-    .startEvent(<span class="str">"start"</span>)        <span class="comment">// trigger</span>
-    .serviceTask(<span class="str">"task"</span>, {
-      name: <span class="str">"Do Something"</span>,
-      taskType: <span class="str">"my-worker"</span>,    <span class="comment">// Zeebe type</span>
-    })
-    .endEvent(<span class="str">"end"</span>)
-    .withAutoLayout()            <span class="comment">// Sugiyama</span>
-    .build()
-);
-
-<span class="comment">// ✓ Valid BPMN 2.0 XML</span>
-<span class="comment">// ✓ Auto-layout applied</span>
-<span class="comment">// ✓ Zeebe extensions set</span>`;
-
-const createProcessCode = `<span class="kw">import</span> { Bpmn } <span class="kw">from</span> <span class="str">"@bpmn-sdk/core"</span>;
-
-<span class="kw">const</span> xml = Bpmn.export(
-  Bpmn.createProcess(<span class="str">"hello"</span>)
-    .startEvent(<span class="str">"start"</span>)
-    .serviceTask(<span class="str">"task"</span>, {
-      name: <span class="str">"Hello World"</span>,
-      taskType: <span class="str">"greet"</span>,
-    })
-    .endEvent(<span class="str">"end"</span>)
-    .withAutoLayout()
-    .build()
-);`;
-
-const deployRunCode = `<span class="kw">import</span> { Engine } <span class="kw">from</span> <span class="str">"@bpmn-sdk/engine"</span>;
-
-<span class="kw">const</span> engine = <span class="kw">new</span> Engine();
-<span class="kw">await</span> engine.deploy({ bpmn: xml });
-
-engine.registerJobWorker(
-  <span class="str">"greet"</span>,
-  <span class="kw">async</span> (job) => {
-    console.log(<span class="str">"Hello!"</span>);
-    <span class="kw">await</span> job.complete();
-  }
-);
-engine.start(<span class="str">"hello"</span>);`;
-
-const apiCode = `<span class="kw">import</span> { CamundaClient } <span class="kw">from</span> <span class="str">"@bpmn-sdk/api"</span>;
-
-<span class="kw">const</span> client = <span class="kw">new</span> CamundaClient({
-  baseUrl: <span class="str">"https://api.cloud.camunda.io"</span>,
-  auth: {
-    type: <span class="str">"oauth2"</span>,
-    clientId:     process.env.<span class="fn">CAMUNDA_CLIENT_ID</span>,
-    clientSecret: process.env.<span class="fn">CAMUNDA_CLIENT_SECRET</span>,
-    audience:     process.env.<span class="fn">CAMUNDA_AUDIENCE</span>,
-  },
-});
-
-<span class="comment">// Deploy a process definition</span>
-<span class="kw">await</span> client.process.<span class="fn">deploy</span>({ resources: [{ content: xml }] });
-
-<span class="comment">// Start a new instance</span>
-<span class="kw">const</span> instance = <span class="kw">await</span> client.process.<span class="fn">startInstance</span>({
-  bpmnProcessId: <span class="str">"my-flow"</span>,
-  variables: { orderId: <span class="str">"ord-123"</span> },
-});
-
-<span class="comment">// React to lifecycle events</span>
-client.<span class="fn">on</span>(<span class="str">"request"</span>, (e) => console.log(e.method, e.url));
-client.<span class="fn">on</span>(<span class="str">"error"</span>,   (e) => metrics.<span class="fn">inc</span>(<span class="str">"api.error"</span>));`;
+const withSdkCode = CODE_HTML.withSdk;
+const createProcessCode = CODE_HTML.createProcess;
+const deployRunCode = CODE_HTML.deployRun;
+const apiCode = CODE_HTML.apiClient;
 ---
 
 <!DOCTYPE html>
