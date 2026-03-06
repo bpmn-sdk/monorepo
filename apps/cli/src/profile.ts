@@ -5,8 +5,11 @@ import type { CamundaClientInput } from "@bpmn-sdk/api";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+export type ApiType = "c8" | "admin";
+
 export interface Profile {
 	name: string;
+	apiType: ApiType;
 	config: CamundaClientInput;
 	createdAt: string | null;
 }
@@ -14,7 +17,7 @@ export interface Profile {
 interface ConfigStore {
 	profiles: Record<string, CamundaClientInput>;
 	active: string | null;
-	meta: Record<string, { createdAt: string }>;
+	meta: Record<string, { createdAt: string; apiType?: ApiType }>;
 }
 
 // ─── Config directory ─────────────────────────────────────────────────────────
@@ -55,6 +58,7 @@ export function listProfiles(): Profile[] {
 	const store = readStore();
 	return Object.entries(store.profiles).map(([name, config]) => ({
 		name,
+		apiType: store.meta[name]?.apiType ?? "c8",
 		config,
 		createdAt: store.meta[name]?.createdAt ?? null,
 	}));
@@ -64,7 +68,12 @@ export function getProfile(name: string): Profile | undefined {
 	const store = readStore();
 	const config = store.profiles[name];
 	if (!config) return undefined;
-	return { name, config, createdAt: store.meta[name]?.createdAt ?? null };
+	return {
+		name,
+		apiType: store.meta[name]?.apiType ?? "c8",
+		config,
+		createdAt: store.meta[name]?.createdAt ?? null,
+	};
 }
 
 export function getActiveProfile(): Profile | undefined {
@@ -77,10 +86,18 @@ export function getActiveName(): string | null {
 	return readStore().active;
 }
 
-export function saveProfile(name: string, config: CamundaClientInput): void {
+export function saveProfile(
+	name: string,
+	config: CamundaClientInput,
+	apiType: ApiType = "c8",
+): void {
 	const store = readStore();
 	store.profiles[name] = config;
-	if (!store.meta[name]) store.meta[name] = { createdAt: new Date().toISOString() };
+	if (!store.meta[name]) {
+		store.meta[name] = { createdAt: new Date().toISOString(), apiType };
+	} else {
+		store.meta[name].apiType = apiType;
+	}
 	// Auto-activate if this is the first profile
 	if (store.active === null) store.active = name;
 	writeStore(store);

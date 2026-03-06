@@ -45,6 +45,7 @@ function fit(s: string, n: number): string {
 
 interface Row {
 	name: string;
+	apiType: string;
 	url: string;
 	authType: string;
 	createdAt: string;
@@ -64,6 +65,7 @@ function loadRows(): { rows: Row[]; activeName: string | null } {
 	const activeName = getActiveName();
 	const rows = profiles.map((p) => ({
 		name: p.name,
+		apiType: p.apiType,
 		url: (p.config.baseUrl ?? "") as string,
 		authType: (p.config.auth as { type?: string } | undefined)?.type ?? "—",
 		createdAt: p.createdAt ? p.createdAt.slice(0, 10) : "—",
@@ -78,7 +80,7 @@ function render(state: State): void {
 
 	const termCols = process.stdout.columns ?? 80;
 	// Fixed cols: 2 indent + 3 chk + 1 sp + 1 active + 1 sp + 16 name + 1 sp + 8 auth + 1 sp + 10 date = 44
-	const urlWidth = Math.max(16, termCols - 46);
+	const urlWidth = Math.max(16, termCols - 53);
 
 	const out: string[] = [];
 
@@ -96,7 +98,7 @@ function render(state: State): void {
 		// Header
 		const hdr =
 			`  ${dim("   ")} ${dim(" ")} ${dim(fit("NAME", 16))} ` +
-			`${dim(fit("BASE URL", urlWidth))} ${dim(fit("AUTH", 8))} ${dim("CREATED")}`;
+			`${dim(fit("API", 6))} ${dim(fit("BASE URL", urlWidth))} ${dim(fit("AUTH", 8))} ${dim("CREATED")}`;
 		out.push(hdr);
 		out.push(dim(`  ${"─".repeat(termCols - 4)}`));
 
@@ -110,12 +112,13 @@ function render(state: State): void {
 			const chk = isSel ? green("[✓]") : dim("[ ]");
 			const act = isActive ? green("●") : " ";
 			const name = fit(row.name, 16);
+			const api = fit(row.apiType, 6);
 			const url = fit(row.url, urlWidth);
 			const auth = fit(row.authType, 8);
 			const date = row.createdAt;
 
 			// Build the line without leading spaces so inverse spans full width
-			const content = `  ${chk} ${act} ${name} ${url} ${auth} ${date}`;
+			const content = `  ${chk} ${act} ${name} ${api} ${url} ${auth} ${date}`;
 
 			// Pad to terminal width so inverse video fills the row
 			const visible = vlen(content);

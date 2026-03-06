@@ -49,6 +49,36 @@
 - GitHub Actions deploy workflow switched from GitHub Pages to Cloudflare Pages (wrangler v4)
 - `wrangler: "^4"` added to root devDependencies; action uses project-installed wrangler
 
+## 2026-03-06 — Admin API (SaaS): packages/api + apps/cli
+
+Added Camunda Admin API (SaaS Console) support alongside the existing C8 REST API.
+
+**Code generation** (`packages/api/scripts/generate.mjs`):
+- Downloads `swagger/admin-api.json` from `https://console.cloud.camunda.io/customer-api/openapi/swagger.json`
+- Admin API has no operation tags — generator derives tags from first URL path segment (`/clusters/…` → `Clusters`, `/members/…` → `Members`, etc.)
+- Generates `src/generated/admin-types.ts` — all Admin API TypeScript types (`MetaDto`, `Member`, `Cluster`, `ClusterClient`, `BackupDto`, etc.)
+- Generates `src/generated/admin-resources.ts` — `MetaResource`, `MembersResource`, `ClustersResource`, `ActivityResource` classes + `AdminApiClient extends CamundaBaseClient`
+- Added `--api c8|admin` flag to select which swagger to generate; `build` runs both generators
+- Fixed inline `$ref` schemas in resource files to get `Types.` namespace prefix via `prefixTypes` parameter on `schemaToTs()`
+- Skips invalid TypeScript identifier schema names (`OrganizationRole.ADMIN`, `Record_string.never_`)
+- Fixed `makeUpdateCmd` to omit body parameter for PUT methods with no request body schema
+
+**API package** (`packages/api`):
+- `AdminApiClient` and all Admin API types exported from `@bpmn-sdk/api`
+- `new pnpm run generate:admin` script added
+
+**CLI** (`apps/cli`):
+- `apps/cli/src/generated/admin-commands.ts` — 4 command groups: `meta`, `members`, `clusters`, `activity`
+- `apps/cli/src/commands/admin-shared.ts` — mirror of `shared.ts` typed for `AdminApiClient`; all actions use `ctx.getAdminClient()`
+- `RunContext` extended with `getAdminClient(): Promise<AdminApiClient>`
+- `createAdminClientFromProfile()` added to `client.ts`
+- `profile.ts` — `Profile` now includes `apiType: "c8" | "admin"`; `saveProfile()` accepts `apiType` parameter
+- `profile create` accepts `--api-type c8|admin` flag
+- `profile import` auto-detects Admin credentials files by presence of `CAMUNDA_CONSOLE_CLIENT_ID` / `CAMUNDA_CONSOLE_BASE_URL`; separate `configFromConsoleEnv()` parser for Admin env vars (`CAMUNDA_CONSOLE_CLIENT_ID`, `CAMUNDA_CONSOLE_CLIENT_SECRET`, `CAMUNDA_OAUTH_URL`, `CAMUNDA_CONSOLE_BASE_URL`, `CAMUNDA_CONSOLE_OAUTH_AUDIENCE`)
+- `profile list` TUI shows `apiType` column
+- `tui.ts` / `profile-tui.ts` updated to carry `getAdminClient` through TUI state
+- `biome.json` ignores `**/swagger/**` to prevent linting downloaded swagger files
+
 ## 2026-03-05 — packages/api: Camunda v2 REST API SDK
 
 New package `@bpmn-sdk/api` — auto-generated TypeScript SDK for the Camunda 8 Orchestration Cluster REST API (v2).

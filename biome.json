@@ -30,6 +30,7 @@
 			"**/src-tauri/**",
 		"**/.astro/**",
 			"**/src/generated/**"
+			"**/swagger/**"
 		]
 	}
 }

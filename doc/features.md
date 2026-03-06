@@ -1,5 +1,18 @@
 # Features
 
+## Camunda Admin API (SaaS) SDK + CLI (2026-03-06) — `packages/api`, `apps/cli`
+
+Full support for the Camunda Console Admin API alongside the existing C8 REST API.
+
+- **`AdminApiClient`** — generated from the SaaS Console swagger (`console.cloud.camunda.io`), same runtime as `CamundaClient` (OAuth2, retry, cache, typed events). Exported from `@bpmn-sdk/api`.
+- **Admin API resources**: `MetaResource`, `MembersResource`, `ClustersResource`, `ActivityResource` — typed methods for every Admin API endpoint.
+- **CLI command groups**: `casen meta`, `casen members`, `casen clusters`, `casen activity` — full list/get/create/delete/update support mirroring the C8 command structure.
+- **Per-profile `apiType`**: each saved profile is tagged as `"c8"` (default) or `"admin"`. The CLI routes `getClient()` vs `getAdminClient()` accordingly.
+- **`profile create --api-type admin`**: explicitly set the API type when creating a profile.
+- **Auto-detect on `profile import`**: credentials files containing `CAMUNDA_CONSOLE_CLIENT_ID` or `CAMUNDA_CONSOLE_BASE_URL` are automatically classified as Admin API profiles; all others remain C8.
+- **Admin env vars**: `CAMUNDA_CONSOLE_CLIENT_ID`, `CAMUNDA_CONSOLE_CLIENT_SECRET`, `CAMUNDA_OAUTH_URL`, `CAMUNDA_CONSOLE_BASE_URL`, `CAMUNDA_CONSOLE_OAUTH_AUDIENCE`.
+- **Code generation**: `pnpm run generate:admin` in `packages/api`; tag derivation from URL path segments handles the tagless Admin API swagger.
+
 ## Process Runner Canvas Plugin (2026-03-03) — `canvas-plugins/process-runner`
 
 Interactive BPMN execution toolbar embedded directly on the canvas.
