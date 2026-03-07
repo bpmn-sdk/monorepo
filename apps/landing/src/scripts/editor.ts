@@ -1,4 +1,5 @@
 import { createAiBridgePlugin } from "@bpmn-sdk/canvas-plugin-ai-bridge";
+import { createAsciiViewPlugin } from "@bpmn-sdk/canvas-plugin-ascii-view";
 import { createCommandPalettePlugin } from "@bpmn-sdk/canvas-plugin-command-palette";
 import { createCommandPaletteEditorPlugin } from "@bpmn-sdk/canvas-plugin-command-palette-editor";
 import { createConfigPanelPlugin } from "@bpmn-sdk/canvas-plugin-config-panel";
@@ -234,6 +235,13 @@ const optimizePlugin = createOptimizePlugin({
 	openTab: (xml, name) => bridge.tabsPlugin.api.openTab({ type: "bpmn", xml, name }),
 });
 
+const asciiViewPlugin = createAsciiViewPlugin({
+	getXml: () => {
+		const defs = editorRef?.getDefinitions();
+		return defs ? Bpmn.export(defs) : null;
+	},
+});
+
 const aiBridgePlugin = createAiBridgePlugin({
 	getDefinitions: () => editorRef?.getDefinitions() ?? null,
 	loadXml: (xml) => {
@@ -338,4 +346,5 @@ initEditorHud(editor, {
 	rawModeButton: bridge.tabsPlugin.api.rawModeButton,
 	optimizeButton: optimizePlugin.button,
 	playButton: processRunnerPlugin.playButton,
+	asciiButton: asciiViewPlugin.button,
 });
