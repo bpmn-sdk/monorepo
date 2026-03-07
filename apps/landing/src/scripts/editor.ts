@@ -1,3 +1,4 @@
+import type { CanvasApi, CanvasPlugin } from "@bpmn-sdk/canvas";
 import { createAiBridgePlugin } from "@bpmn-sdk/canvas-plugin-ai-bridge";
 import { createAsciiViewPlugin } from "@bpmn-sdk/canvas-plugin-ascii-view";
 import { createCommandPalettePlugin } from "@bpmn-sdk/canvas-plugin-command-palette";
@@ -20,6 +21,7 @@ import { BpmnEditor, createSideDock, initEditorHud } from "@bpmn-sdk/editor";
 import type { Tool } from "@bpmn-sdk/editor";
 import { Engine } from "@bpmn-sdk/engine";
 import { makeExamples } from "./examples.js";
+import { savePng, saveSvg } from "./export.js";
 
 const LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
   <rect width="24" height="24" rx="4" fill="#0062ff"/>
@@ -32,6 +34,18 @@ const LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
 
 const IMPORT_ICON =
 	'<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v8M5 5l3-3 3 3"/><path d="M2 13h12"/></svg>';
+
+const EXPORT_ICON =
+	'<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 10V2M5 7l3 3 3-3"/><path d="M2 13h12"/></svg>';
+
+// Captures the CanvasApi once installed so export callbacks can use it.
+let _exportApi: CanvasApi | null = null;
+const exportCapturePlugin: CanvasPlugin = {
+	name: "export-capture",
+	install(api) {
+		_exportApi = api;
+	},
+};
 
 // ── Setup ──────────────────────────────────────────────────────────────────────
 
@@ -102,6 +116,28 @@ const mainMenuPlugin = createMainMenuPlugin({
 			label: "Import files\u2026",
 			icon: IMPORT_ICON,
 			onClick: () => bridge.tabsPlugin.api.openFilePicker(),
+		},
+		{
+			type: "drill",
+			label: "Export\u2026",
+			icon: EXPORT_ICON,
+			items: () => {
+				const name = currentFileName?.replace(/\.bpmn$/, "") ?? "diagram";
+				return [
+					{
+						label: "Save as SVG",
+						onClick: () => {
+							if (_exportApi) saveSvg(_exportApi, name);
+						},
+					},
+					{
+						label: "Save as PNG",
+						onClick: () => {
+							if (_exportApi) savePng(_exportApi, name);
+						},
+					},
+				];
+			},
 		},
 		{
 			label: "FEEL Playground",
@@ -291,6 +327,7 @@ const editor = new BpmnEditor({
 	fit: "center",
 	plugins: [
 		mainMenuPlugin,
+		exportCapturePlugin,
 		createZoomControlsPlugin(),
 		createWatermarkPlugin({
 			links: [{ label: "Github", url: "https://github.com/bpmn-sdk/monorepo" }],
