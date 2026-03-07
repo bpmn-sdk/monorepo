@@ -1,5 +1,13 @@
 # Progress
 
+## 2026-03-07 — landing: full-page aurora background (fixed/sticky)
+
+- Moved `.aurora`, `.dots`, `.grain` from inside `.hero` to direct children of `<body>` (above all sections)
+- Changed all three from `position: absolute` to `position: fixed; z-index: -1` — they now cover the entire viewport and stay in place while the user scrolls, giving every section the same ambient glow
+- Moved `background: var(--bg)` from `body` to `html` so the dark base sits below the fixed layer; `body` is now `background: transparent` so the aurora shines through all sections
+- Removed `overflow: hidden` from `.hero` (was preventing orb overflow from showing; no longer needed since aurora lives outside)
+- Removed solid `background: oklch(7% 0.02 270)` from `.compare-section` (it was the only section with a solid fill that would have blocked the aurora)
+
 ## 2026-03-07 — landing: compare slider touch conflict fix (mobile)
 
 - Root cause identified: `.cmp-code { overflow: auto }` creates a child scroll container; mobile browsers give it precedence over the ancestor's `touch-action: pan-y` rule, so horizontal touch drags scroll the code block rather than moving the slider divider — `setPointerCapture` on `pointerdown` is already too late to stop the native scroll
