@@ -56,6 +56,25 @@ const resolver = new InMemoryFileResolver();
 
 let editorRef: BpmnEditor | null = null;
 let currentFileName: string | null = null;
+let hudRef: {
+	setActive(active: boolean): void;
+	showOnboarding(): void;
+	hideOnboarding(): void;
+} | null = null;
+
+/** Returns true when the XML is a freshly-created empty diagram (only a start event). */
+function isNewEmptyDiagram(xml: string): boolean {
+	return (
+		!xml.includes("sequenceFlow") &&
+		!xml.includes("endEvent") &&
+		!xml.includes(":task") &&
+		!xml.includes(":gateway") &&
+		!xml.includes("subProcess") &&
+		!xml.includes("callActivity") &&
+		!xml.includes("intermediateThrowEvent") &&
+		!xml.includes("intermediateCatchEvent")
+	);
+}
 
 const BPMN_ONLY_HUD = ["hud-top-center", "hud-bottom-left", "hud-bottom-center"];
 
@@ -226,19 +245,32 @@ const bridge = createStorageTabsBridge({
 	palette,
 	enableFileImport: true,
 	sideDock: dock,
+	onNewDiagram: () => {
+		bridge.tabsPlugin.api.openTab({ type: "bpmn", xml: Bpmn.makeEmpty(), name: "New Diagram" });
+	},
 	onWelcomeShow: () => {
 		setHudVisible(false);
+		hudRef?.setActive(false);
 		dock.setHistoryTabEnabled(false);
 	},
 	onTabActivate(id, config) {
 		const isBpmn = config.type === "bpmn";
+		const showOnboard = isBpmn && !!config.xml && isNewEmptyDiagram(config.xml);
 		setHudVisible(true);
-		if (isBpmn && config.xml) {
+		hudRef?.setActive(isBpmn);
+		if (isBpmn && config.xml && !showOnboard) {
 			editorRef?.load(config.xml);
 		}
 		for (const hudId of BPMN_ONLY_HUD) {
 			const el = document.getElementById(hudId);
 			if (el) el.style.display = isBpmn ? "" : "none";
+		}
+		// showOnboarding/hideOnboarding must come AFTER the BPMN_ONLY_HUD loop
+		// because that loop resets display on the bottom toolbar.
+		if (showOnboard) {
+			hudRef?.showOnboarding();
+		} else {
+			hudRef?.hideOnboarding();
 		}
 		if (!isBpmn) {
 			editorRef?.setSelection([]);
@@ -368,7 +400,7 @@ editorOn("diagram:change", () => {
 	}, 600);
 });
 
-initEditorHud(editor, {
+hudRef = initEditorHud(editor, {
 	openProcess: (processId) => bridge.tabsPlugin.api.navigateToProcess(processId),
 	getAvailableProcesses: () => bridge.tabsPlugin.api.getAvailableProcesses(),
 	createProcess: (name, onCreated) => {
@@ -384,4 +416,15 @@ initEditorHud(editor, {
 	optimizeButton: optimizePlugin.button,
 	playButton: processRunnerPlugin.playButton,
 	asciiButton: asciiViewPlugin.button,
+	onStartFromScratch: () => {
+		editorRef?.load(Bpmn.makeEmpty());
+	},
+	onGenerateExample: () => {
+		editorRef?.load(Bpmn.SAMPLE_XML);
+	},
+	onAskAi: () => {
+		if (dock.collapsed) dock.expand();
+		dock.switchTab("ai");
+		aiBridgePlugin.openPanel();
+	},
 });
