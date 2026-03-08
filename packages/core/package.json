@@ -1,6 +1,6 @@
 {
-	"name": "@bpmn-sdk/engine",
-	"version": "0.1.0",
+	"name": "@bpmn-sdk/core",
+	"version": "0.0.1",
 	"type": "module",
 	"main": "./dist/index.js",
 	"types": "./dist/index.d.ts",
@@ -14,11 +14,8 @@
 	"scripts": {
 		"build": "tsc",
 		"typecheck": "tsc --noEmit",
-		"test": "vitest run",
-		"check": "biome check ."
+		"check": "biome check .",
+		"test": "vitest run"
 	},
-	"dependencies": {
-		"@bpmn-sdk/core": "workspace:*",
-		"@bpmn-sdk/feel": "workspace:*"
-	}
+	"dependencies": {}
 }

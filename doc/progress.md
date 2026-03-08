@@ -1,5 +1,36 @@
 # Progress
 
+## 2026-03-08 — prepare `apps/ai-server` for npm publishing
+
+- Removed `"private": true`; added `"description"`, `"bin"`, `"files"`, `"engines"`, `"publishConfig"` fields
+- `bin` entries: `bpmn-ai-server` → `dist/index.js`, `bpmn-mcp` → `dist/mcp-server.js`
+- Added shebangs (`#!/usr/bin/env node`) to `src/index.ts` and `src/mcp-server.ts`; tsc preserves them in `dist/`
+- `"files": ["dist/**/*.js"]` — excludes source maps and `.d.ts` (pure server, not a library)
+- Unpacked size: 55.6 kB (13.7 kB gzipped), 8 files
+
+## 2026-03-08 — reduce npm package sizes across all published packages
+
+- Added `"files": ["dist/**/*.js", "dist/**/*.d.ts"]` to `api`, `ascii`, `canvas`, `core`, `editor`, `engine`, `feel`, `plugins` — excludes `.js.map`/`.d.ts.map` source maps (37–52% reduction each)
+- `apps/cli`: `"files": ["dist/**/*.js"]` — no `.d.ts` (pure CLI); size: 429.7 kB → 212.4 kB
+
+## 2026-03-08 — rename `packages/bpmn-sdk` → `packages/core`
+
+- Renamed directory to match the package name (`@bpmn-sdk/core`)
+- Updated references: root `tsconfig.json`, `packages/editor/tsconfig.json`, `apps/ai-server-rs/build.rs`, `apps/landing/src/data/content.ts`, `PUBLISHING.md`
+- `pnpm-lock.yaml` regenerated automatically by `pnpm install`
+- All 50 turbo tasks pass after the rename
+
+## 2026-03-08 — consolidate all canvas plugins into `packages/plugins`
+
+- Merged all 22 packages from `canvas-plugins/*` into a single `packages/plugins` package (`@bpmn-sdk/plugins`)
+- Each plugin is a subdirectory under `src/` with its own `index.ts`; all tests live under `tests/<plugin>/`
+- Package exposes 22 subpath exports (`@bpmn-sdk/plugins/minimap`, `@bpmn-sdk/plugins/tabs`, etc.) enabling tree-shaking per import
+- Updated all inter-plugin imports to relative paths within the unified package
+- Updated `apps/landing` and `apps/desktop` to import from `@bpmn-sdk/plugins/*`; simplified their `package.json` from 15+ plugin deps to one `@bpmn-sdk/plugins` dep
+- Removed `canvas-plugins/*` from `pnpm-workspace.yaml`
+- Added `DOM.Iterable` to the tsconfig lib (needed when compiling all plugins together)
+- All 94 tests pass; full turbo pipeline (50 tasks) passes
+
 ## 2026-03-07 — landing: full-page aurora background (fixed/sticky)
 
 - Moved `.aurora`, `.dots`, `.grain` from inside `.hero` to direct children of `<body>` (above all sections)

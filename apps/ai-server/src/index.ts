@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import http from "node:http";
 import { tmpdir } from "node:os";
