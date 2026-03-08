@@ -152,8 +152,6 @@ importers:
         specifier: workspace:*
         version: link:../feel
 
-  packages/engine-ts: {}
-
   packages/feel: {}
 
   packages/plugins:

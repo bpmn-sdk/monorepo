@@ -1,5 +1,18 @@
 # Progress
 
+## 2026-03-08 — prepare `apps/ai-server` for npm publishing
+
+- Removed `"private": true`; added `"description"`, `"bin"`, `"files"`, `"engines"`, `"publishConfig"` fields
+- `bin` entries: `bpmn-ai-server` → `dist/index.js`, `bpmn-mcp` → `dist/mcp-server.js`
+- Added shebangs (`#!/usr/bin/env node`) to `src/index.ts` and `src/mcp-server.ts`; tsc preserves them in `dist/`
+- `"files": ["dist/**/*.js"]` — excludes source maps and `.d.ts` (pure server, not a library)
+- Unpacked size: 55.6 kB (13.7 kB gzipped), 8 files
+
+## 2026-03-08 — reduce npm package sizes across all published packages
+
+- Added `"files": ["dist/**/*.js", "dist/**/*.d.ts"]` to `api`, `ascii`, `canvas`, `core`, `editor`, `engine`, `feel`, `plugins` — excludes `.js.map`/`.d.ts.map` source maps (37–52% reduction each)
+- `apps/cli`: `"files": ["dist/**/*.js"]` — no `.d.ts` (pure CLI); size: 429.7 kB → 212.4 kB
+
 ## 2026-03-08 — rename `packages/bpmn-sdk` → `packages/core`
 
 - Renamed directory to match the package name (`@bpmn-sdk/core`)

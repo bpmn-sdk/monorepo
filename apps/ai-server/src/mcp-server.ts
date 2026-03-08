@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 /**
  * Minimal stdio MCP server for BPMN diagram editing.
  * Zero external dependencies — pure Node.js built-ins + @bpmn-sdk/core (workspace package).
