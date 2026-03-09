@@ -155,6 +155,23 @@ const mainMenuPlugin = createMainMenuPlugin({
 							if (_exportApi) savePng(_exportApi, name)
 						},
 					},
+					{
+						label: "Export BPMN\u2026",
+						onClick: () => {
+							const allTabs = bridge.tabsPlugin.api.getAllTabContent()
+							const tab =
+								allTabs.find((t) => t.type === "bpmn" && t.name === currentFileName) ??
+								allTabs.find((t) => t.type === "bpmn")
+							if (!tab) return
+							const blob = new Blob([tab.content], { type: "application/xml" })
+							const url = URL.createObjectURL(blob)
+							const a = document.createElement("a")
+							a.href = url
+							a.download = currentFileName ?? `${name}.bpmn`
+							a.click()
+							URL.revokeObjectURL(url)
+						},
+					},
 				]
 			},
 		},
@@ -252,6 +269,29 @@ const bridge = createStorageTabsBridge({
 		setHudVisible(false)
 		hudRef?.setActive(false)
 		dock.setHistoryTabEnabled(false)
+	},
+	onRawModeChange: (active) => {
+		// Top-center toolbar: disable all buttons while in raw mode
+		const topCenter = document.getElementById("hud-top-center")
+		if (topCenter) {
+			for (const btn of topCenter.querySelectorAll<HTMLButtonElement>("button")) {
+				btn.disabled = active
+			}
+		}
+		// Bottom-center toolbar: hide while in raw mode
+		const bottomCenter = document.getElementById("hud-bottom-center")
+		if (bottomCenter)
+			bottomCenter.style.display = active ? "none" : currentFileName !== null ? "" : "none"
+		// Side dock: collapse and lock while in raw mode
+		if (active) {
+			dock.collapse()
+			dock.el.style.pointerEvents = "none"
+			dock.el.style.opacity = "0.4"
+		} else {
+			dock.expand()
+			dock.el.style.pointerEvents = ""
+			dock.el.style.opacity = ""
+		}
 	},
 	onTabActivate(id, config) {
 		const isBpmn = config.type === "bpmn"

@@ -17,6 +17,7 @@ interface PanelOptions {
 	getDefinitions(): BpmnDefinitions | null
 	loadXml(xml: string): void
 	getCurrentContext?(): { projectId: string; fileId: string } | null
+	getTheme?(): "dark" | "light"
 }
 
 interface ChatMessage {
@@ -540,7 +541,7 @@ export function createAiPanel(options: PanelOptions): {
 				xml: directXml,
 				grid: false,
 				fit: "contain",
-				theme: "auto",
+				theme: options.getTheme?.() ?? "dark",
 			})
 			_previewCanvases.push(canvas)
 			msgEl.append(previewEl)

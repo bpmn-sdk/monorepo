@@ -108,6 +108,11 @@ export interface TabsPluginOptions {
 	 */
 	onTabChange?: (tabId: string, config: TabConfig) => void
 	/**
+	 * Called when raw source view mode is toggled on or off.
+	 * Use this to disable editing UI (toolbar buttons, sidebar) while raw mode is active.
+	 */
+	onRawModeChange?: (active: boolean) => void
+	/**
 	 * When true, the plugin handles file import automatically:
 	 * - Creates a hidden `<input type="file">` for the "Import files" welcome screen button
 	 * - Adds drag-and-drop support to the canvas container
@@ -1283,6 +1288,20 @@ export function createTabsPlugin(options: TabsPluginOptions = {}): CanvasPlugin 
 			rawPaneEl.className = "bpmn-raw-pane"
 			rawPaneEl.dataset.theme = theme
 			rawPaneEl.style.display = "none"
+			const rawCopyBtn = document.createElement("button")
+			rawCopyBtn.type = "button"
+			rawCopyBtn.className = "bpmn-raw-copy-btn"
+			rawCopyBtn.textContent = "Copy"
+			rawCopyBtn.addEventListener("click", () => {
+				const text = rawPreEl?.textContent ?? ""
+				void navigator.clipboard.writeText(text).then(() => {
+					rawCopyBtn.textContent = "Copied!"
+					setTimeout(() => {
+						rawCopyBtn.textContent = "Copy"
+					}, 1500)
+				})
+			})
+			rawPaneEl.appendChild(rawCopyBtn)
 			rawPreEl = document.createElement("pre")
 			rawPreEl.className = "bpmn-raw-content"
 			rawPaneEl.appendChild(rawPreEl)
@@ -1302,6 +1321,7 @@ export function createTabsPlugin(options: TabsPluginOptions = {}): CanvasPlugin 
 				}
 				updateRawPane()
 				updateRawModeBtn()
+				options.onRawModeChange?.(isRawMode)
 			})
 
 			// Create body-level dropdown for groups with multiple files
@@ -1350,9 +1370,11 @@ export function createTabsPlugin(options: TabsPluginOptions = {}): CanvasPlugin 
 				container.addEventListener("drop", dndDropHandler)
 			}
 
-			// Subscribe to diagram:change to keep BPMN tab XML and process maps up to date
+			// Subscribe to diagram:change and diagram:load to keep BPMN tab XML in sync.
+			// diagram:load fires when XML is programmatically loaded (e.g. AI apply, history restore).
+			// diagram:change fires on every user edit.
 			const anyOn = cApi.on.bind(cApi) as unknown as AnyOn
-			offDiagramChange = anyOn("diagram:change", (rawDefs) => {
+			function onDiagramUpdate(rawDefs: unknown): void {
 				if (!activeId) return
 				const activeTab = tabs.find((t) => t.id === activeId)
 				if (!activeTab || activeTab.config.type !== "bpmn") return
@@ -1365,7 +1387,9 @@ export function createTabsPlugin(options: TabsPluginOptions = {}): CanvasPlugin 
 				trackBpmnProcesses(activeId, xml)
 				// Keep raw pane in sync
 				if (isRawMode) updateRawPane()
-			})
+			}
+			offDiagramChange = anyOn("diagram:change", onDiagramUpdate)
+			anyOn("diagram:load", onDiagramUpdate)
 
 			// Listen for theme changes (canvas toggles data-theme="dark"; absence means light)
 			const observer = new MutationObserver(() => {

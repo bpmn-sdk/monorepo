@@ -241,15 +241,18 @@ export function createStoragePlugin(
 				options.mainMenu.api.setDynamicItems(buildDynamicItems)
 			})
 
-			// Subscribe to diagram:change for auto-save
+			// Subscribe to diagram:change and diagram:load for auto-save.
+			// diagram:load fires when XML is programmatically loaded (e.g. AI apply, history restore).
 			const anyOn = canvasApi.on.bind(canvasApi) as unknown as AnyOn
-			offDiagramChange = anyOn("diagram:change", (rawDefs) => {
+			function onDiagramUpdate(rawDefs: unknown): void {
 				const currentId = storageApi.getCurrentFileId()
 				if (!currentId) return
 				const defs = rawDefs as BpmnDefinitions
 				const xml = Bpmn.export(defs)
 				storageApi.scheduleSave(currentId, xml)
-			})
+			}
+			offDiagramChange = anyOn("diagram:change", onDiagramUpdate)
+			anyOn("diagram:load", onDiagramUpdate)
 		},
 
 		uninstall() {

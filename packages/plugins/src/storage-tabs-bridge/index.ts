@@ -80,6 +80,11 @@ export interface StorageTabsBridgeOptions {
 	 * Passed through to the tabs plugin's `centerSlot` option.
 	 */
 	centerSlot?: HTMLElement
+	/**
+	 * Called when raw source view mode is toggled on or off.
+	 * Use this to disable editing UI (toolbar buttons, sidebar) while raw mode is active.
+	 */
+	onRawModeChange?: (active: boolean) => void
 }
 
 // ── Result ────────────────────────────────────────────────────────────────────
@@ -185,6 +190,7 @@ export function createStorageTabsBridge(
 		},
 		enableFileImport: options.enableFileImport,
 		centerSlot: options.centerSlot,
+		onRawModeChange: options.onRawModeChange,
 		onTabActivate(id, config) {
 			// Update storage current-file pointer
 			storageRef?.api.setCurrentFileId(tabIdToStorageFileId.get(id) ?? null)

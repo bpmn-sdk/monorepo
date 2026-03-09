@@ -53,6 +53,8 @@ export interface AiBridgePluginOptions {
 	container?: HTMLElement
 	/** Called when the button is clicked in docked mode. */
 	onOpen?: () => void
+	/** Returns the current editor theme — used to match the diagram preview color scheme. */
+	getTheme?(): "dark" | "light"
 }
 
 const AI_ICON = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6"/><path d="M5.5 6.5C5.5 5.4 6.4 4.5 7.5 4.5h1C9.6 4.5 10.5 5.4 10.5 6.5S9.6 8.5 8.5 8.5H8V10"/><circle cx="8" cy="12" r="0.5" fill="currentColor" stroke="none"/></svg>`
@@ -78,6 +80,7 @@ export function createAiBridgePlugin(options: AiBridgePluginOptions): {
 	let panelInstance: ReturnType<typeof createAiPanel> | null = null
 	let panelOpen = false
 	let _pendingContext: NodeContext | null = null
+	let _canvasApi: { getTheme(): "dark" | "light" | "auto" } | null = null
 
 	function getOrCreatePanel(): ReturnType<typeof createAiPanel> {
 		if (!panelInstance) {
@@ -86,6 +89,14 @@ export function createAiBridgePlugin(options: AiBridgePluginOptions): {
 				getDefinitions: options.getDefinitions,
 				loadXml: options.loadXml,
 				getCurrentContext: options.getCurrentContext,
+				getTheme: options.getTheme
+					? options.getTheme
+					: _canvasApi
+						? () => {
+								const t = _canvasApi?.getTheme()
+								return t === "light" ? "light" : "dark"
+							}
+						: undefined,
 			})
 			if (_pendingContext !== null) {
 				panelInstance.setContext(_pendingContext)
@@ -135,6 +146,7 @@ export function createAiBridgePlugin(options: AiBridgePluginOptions): {
 	}
 
 	function install(api: unknown): void {
+		_canvasApi = api as { getTheme(): "dark" | "light" | "auto" }
 		type AnyOn = (event: string, handler: (...args: unknown[]) => void) => () => void
 		const on = (api as { on: AnyOn }).on.bind(api as { on: AnyOn })
 		on("editor:select", (rawIds) => {
