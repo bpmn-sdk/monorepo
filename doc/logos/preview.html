@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>BPMN SDK Logo Proposals</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #0a0a14;
+    color: rgba(255,255,255,0.85);
+    font-family: system-ui, -apple-system, sans-serif;
+    padding: 48px 32px;
+  }
+  h1 { font-size: 20px; font-weight: 700; margin-bottom: 8px; color: #fff; }
+  .subtitle { font-size: 13px; color: rgba(255,255,255,0.4); margin-bottom: 48px; }
+
+  .proposals { display: flex; flex-direction: column; gap: 56px; }
+
+  .proposal { }
+  .proposal-header { display: flex; align-items: baseline; gap: 16px; margin-bottom: 20px; }
+  .proposal-num { font-size: 11px; font-weight: 700; color: #4d8af0; letter-spacing: 0.1em; text-transform: uppercase; }
+  .proposal-name { font-size: 17px; font-weight: 700; color: #fff; }
+  .proposal-desc { font-size: 13px; color: rgba(255,255,255,0.45); margin-top: 2px; }
+
+  .sizes {
+    display: flex;
+    align-items: flex-end;
+    gap: 32px;
+    flex-wrap: wrap;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 12px;
+    padding: 28px 32px;
+  }
+  .size-item { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+  .size-label { font-size: 11px; color: rgba(255,255,255,0.3); }
+  img { display: block; image-rendering: pixelated; }
+
+  .divider { border: none; border-top: 1px solid rgba(255,255,255,0.06); margin: 0; }
+
+  /* Light background preview */
+  .on-light {
+    background: #f0f0f5;
+    border-radius: 8px;
+    padding: 12px;
+    display: flex;
+    gap: 16px;
+    align-items: center;
+  }
+  .on-light span { font-size: 11px; color: #666; }
+
+  .size-group { display: flex; flex-direction: column; gap: 16px; }
+</style>
+</head>
+<body>
+
+<h1>BPMN SDK — Logo Proposals</h1>
+<p class="subtitle">5 concepts · 2 colors · SVG · scales from 16px favicon to large display</p>
+
+<div class="proposals">
+
+  <!-- ── 1: Fork ── -->
+  <div class="proposal">
+    <div class="proposal-header">
+      <span class="proposal-num">01</span>
+      <div>
+        <div class="proposal-name">Fork</div>
+        <div class="proposal-desc">One input node branches into two outputs — the BPMN parallel/exclusive gateway split. Y-shape reads clearly at any size.</div>
+      </div>
+    </div>
+    <div class="sizes">
+      <div class="size-item">
+        <img src="logo-1-fork.svg" width="16" height="16" alt="">
+        <span class="size-label">16px</span>
+      </div>
+      <div class="size-item">
+        <img src="logo-1-fork.svg" width="32" height="32" alt="">
+        <span class="size-label">32px</span>
+      </div>
+      <div class="size-item">
+        <img src="logo-1-fork.svg" width="64" height="64" alt="">
+        <span class="size-label">64px</span>
+      </div>
+      <div class="size-item">
+        <img src="logo-1-fork.svg" width="128" height="128" alt="">
+        <span class="size-label">128px</span>
+      </div>
+      <div class="size-item">
+        <img src="logo-1-fork.svg" width="200" height="200" alt="">
+        <span class="size-label">200px</span>
+      </div>
+      <div class="size-item">
+        <div class="on-light">
+          <img src="logo-1-fork.svg" width="48" height="48" alt="">
+          <span>on light bg</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 2: Gateway ── -->
+  <div class="proposal">
+    <div class="proposal-header">
+      <span class="proposal-num">02</span>
+      <div>
+        <div class="proposal-name">Gateway</div>
+        <div class="proposal-desc">Filled diamond with inner plus — the BPMN gateway symbol. The diamond is unique to BPMN and instantly recognizable. Inner cross references the parallel gateway variant.</div>
+      </div>
+    </div>
+    <div class="sizes">
+      <div class="size-item">
+        <img src="logo-2-gateway.svg" width="16" height="16" alt="">
+        <span class="size-label">16px</span>
+      </div>
+      <div class="size-item">
+        <img src="logo-2-gateway.svg" width="32" height="32" alt="">
+        <span class="size-label">32px</span>
+      </div>
+      <div class="size-item">
+        <img src="logo-2-gateway.svg" width="64" height="64" alt="">
+        <span class="size-label">64px</span>
+      </div>
+      <div class="size-item">
+        <img src="logo-2-gateway.svg" width="128" height="128" alt="">
+        <span class="size-label">128px</span>
+      </div>
+      <div class="size-item">
+        <img src="logo-2-gateway.svg" width="200" height="200" alt="">
+        <span class="size-label">200px</span>
+      </div>
+      <div class="size-item">
+        <div class="on-light">
+          <img src="logo-2-gateway.svg" width="48" height="48" alt="">
+          <span>on light bg</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 3: Bracket ── -->
+  <div class="proposal">
+    <div class="proposal-header">
+      <span class="proposal-num">03</span>
+      <div>
+        <div class="proposal-name">Bracket  [ ● ]</div>
+        <div class="proposal-desc">A BPMN event node enclosed in square brackets. Brackets = SDK / typed code; circle = process node. "The SDK wraps your process."</div>
+      </div>
+    </div>
+    <div class="sizes">
+      <div class="size-item">
+        <img src="logo-3-bracket.svg" width="16" height="16" alt="">
+        <span class="size-label">16px</span>
+      </div>
+      <div class="size-item">
+        <img src="logo-3-bracket.svg" width="32" height="32" alt="">
+        <span class="size-label">32px</span>
+      </div>
+      <div class="size-item">
+        <img src="logo-3-bracket.svg" width="64" height="64" alt="">
+        <span class="size-label">64px</span>
+      </div>
+      <div class="size-item">
+        <img src="logo-3-bracket.svg" width="128" height="128" alt="">
+        <span class="size-label">128px</span>
+      </div>
+      <div class="size-item">
+        <img src="logo-3-bracket.svg" width="200" height="200" alt="">
+        <span class="size-label">200px</span>
+      </div>
+      <div class="size-item">
+        <div class="on-light">
+          <img src="logo-3-bracket.svg" width="48" height="48" alt="">
+          <span>on light bg</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 4: Cycle ── -->
+  <div class="proposal">
+    <div class="proposal-header">
+      <span class="proposal-num">04</span>
+      <div>
+        <div class="proposal-name">Cycle</div>
+        <div class="proposal-desc">270° arc with a token dot and arrowhead. Directly references the BPMN token execution model — a token traveling through a cyclic process. Dynamic and motion-forward.</div>
+      </div>
+    </div>
+    <div class="sizes">
+      <div class="size-item">
+        <img src="logo-4-cycle.svg" width="16" height="16" alt="">
+        <span class="size-label">16px</span>
+      </div>
+      <div class="size-item">
+        <img src="logo-4-cycle.svg" width="32" height="32" alt="">
+        <span class="size-label">32px</span>
+      </div>
+      <div class="size-item">
+        <img src="logo-4-cycle.svg" width="64" height="64" alt="">
+        <span class="size-label">64px</span>
+      </div>
+      <div class="size-item">
+        <img src="logo-4-cycle.svg" width="128" height="128" alt="">
+        <span class="size-label">128px</span>
+      </div>
+      <div class="size-item">
+        <img src="logo-4-cycle.svg" width="200" height="200" alt="">
+        <span class="size-label">200px</span>
+      </div>
+      <div class="size-item">
+        <div class="on-light">
+          <img src="logo-4-cycle.svg" width="48" height="48" alt="">
+          <span>on light bg</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 5: Angle ── -->
+  <div class="proposal">
+    <div class="proposal-header">
+      <span class="proposal-num">05</span>
+      <div>
+        <div class="proposal-name">Angle  &lt; ● &gt;</div>
+        <div class="proposal-desc">A process node between angle brackets. Angle brackets = generics / typed SDK; circle = BPMN node. Reads as "a typed, SDK-managed process node." Clean and geometric.</div>
+      </div>
+    </div>
+    <div class="sizes">
+      <div class="size-item">
+        <img src="logo-5-angle.svg" width="16" height="16" alt="">
+        <span class="size-label">16px</span>
+      </div>
+      <div class="size-item">
+        <img src="logo-5-angle.svg" width="32" height="32" alt="">
+        <span class="size-label">32px</span>
+      </div>
+      <div class="size-item">
+        <img src="logo-5-angle.svg" width="64" height="64" alt="">
+        <span class="size-label">64px</span>
+      </div>
+      <div class="size-item">
+        <img src="logo-5-angle.svg" width="128" height="128" alt="">
+        <span class="size-label">128px</span>
+      </div>
+      <div class="size-item">
+        <img src="logo-5-angle.svg" width="200" height="200" alt="">
+        <span class="size-label">200px</span>
+      </div>
+      <div class="size-item">
+        <div class="on-light">
+          <img src="logo-5-angle.svg" width="48" height="48" alt="">
+          <span>on light bg</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>
