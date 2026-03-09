@@ -593,6 +593,28 @@ export const TABS_CSS = `
 
 .bpmn-raw-pane[data-theme="light"] { --raw-bg: #f8f9fa; }
 
+.bpmn-raw-copy-btn {
+  position: absolute;
+  top: 10px;
+  right: 14px;
+  z-index: 1;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  background: rgba(255,255,255,0.1);
+  color: var(--raw-fg, #cdd6f4);
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 4px;
+  cursor: pointer;
+}
+.bpmn-raw-copy-btn:hover { background: rgba(255,255,255,0.18); }
+.bpmn-raw-pane[data-theme="light"] .bpmn-raw-copy-btn {
+  background: rgba(0,0,0,0.06);
+  color: #374151;
+  border-color: rgba(0,0,0,0.15);
+}
+.bpmn-raw-pane[data-theme="light"] .bpmn-raw-copy-btn:hover { background: rgba(0,0,0,0.12); }
+
 .bpmn-raw-content {
   margin: 0;
   padding: 16px 20px;
@@ -602,18 +624,19 @@ export const TABS_CSS = `
   color: var(--raw-fg, #cdd6f4);
   white-space: pre;
   tab-size: 2;
+  user-select: text;
 }
 
 .bpmn-raw-pane[data-theme="light"] .bpmn-raw-content { --raw-fg: #374151; }
 
-`.trim();
+`.trim()
 
-const STYLE_ID = "bpmn-sdk-tabs-css";
+const STYLE_ID = "bpmn-sdk-tabs-css"
 
 export function injectTabsStyles(): void {
-	if (document.getElementById(STYLE_ID)) return;
-	const style = document.createElement("style");
-	style.id = STYLE_ID;
-	style.textContent = TABS_CSS;
-	document.head.appendChild(style);
+	if (document.getElementById(STYLE_ID)) return
+	const style = document.createElement("style")
+	style.id = STYLE_ID
+	style.textContent = TABS_CSS
+	document.head.appendChild(style)
 }

@@ -1,5 +1,70 @@
 # Progress
 
+## 2026-03-09 — editor + plugins: BPMN element docs sidebar tab
+
+- **`packages/plugins/src/element-docs/`** — New `element-docs` plugin (`@bpmn-sdk/plugins/element-docs`):
+  - `content.ts`: Comprehensive docs for 40+ BPMN elements across 8 categories (Start Events, End Events, Intermediate Events, Boundary Events, Tasks, Sub-Processes, Gateways, Connectors). Each entry has a title, subtitle, and markdown body covering _what it is_, _when to use_, _Camunda notes_, and _best practices_.
+  - `index.ts`: Plugin UI — searchable index view with category groups + detail view with inline SVG shape icons, fully rendered markdown (headings, bold/italic, code blocks, tables, blockquotes, bullet/numbered lists). Selecting a canvas element auto-navigates to its doc. Supports dark/light themes.
+- **`packages/editor/src/dock.ts`**: Added "Docs" tab and `docsPane` to `SideDock`. Updated `switchTab` union to include `"docs"`. Added `setDocsTabClickHandler`. Exported `docsPane` from the returned object.
+- **`packages/editor/src/hud.ts`**: Removed external links section (bpmn.io, Camunda docs, OMG Spec) from the empty-state onboarding overlay.
+- **`apps/landing/src/scripts/editor.ts`**: Wired up `createElementDocsPlugin` into `dock.docsPane`; added to editor plugins array.
+- **`packages/plugins/package.json`**: Added `./element-docs` subpath export.
+
+## 2026-03-09 — layout + optimizer + AI: vertical centering, gateway insertion, auto-fix
+
+- **Layout** (`packages/core/src/layout/layout-engine.ts`): Added Phase 4h — re-run `alignBaselinePath` after `resolveLayerOverlaps`. Overlap resolution can push baseline nodes off-center when they share a layer with branch nodes; the second pass re-anchors them.
+- **Optimizer fix** (`packages/core/src/bpmn/optimize/flow.ts`): `flow/multi-incoming-task` `applyFix` now also adds a DI shape and edge for the inserted exclusive gateway, positioned just before the target element, so the output XML renders correctly without a full re-layout.
+- **AI server** (`apps/ai-server/src/index.ts`): All actions that receive a diagram now auto-apply every fixable `optimize()` finding (errors first, then warnings, then info) before writing the input file for the AI. The AI receives a structurally clean diagram and for the "improve" action only sees the remaining non-auto-fixable issues.
+
+## 2026-03-09 — core + AI: Camunda BPMN best-practice rules and naming conventions
+
+- **New linter category `"naming"`** (`packages/core/src/bpmn/optimize/naming.ts`): based on [Camunda BPMN best practices](https://docs.camunda.io/docs/components/best-practices/modeling/naming-bpmn-elements/):
+  - `naming/unlabeled-task` (warning) — task/activity without a name
+  - `naming/unlabeled-subprocess` (info) — sub-process without a name
+  - `naming/unlabeled-start-event` (info) — start event without a name
+  - `naming/unlabeled-end-event` (info) — end event without a name
+  - `naming/split-gateway-no-label` (warning) — XOR/inclusive split gateway without a name
+  - `naming/gateway-not-a-question` (info) — split gateway name doesn't end with "?"
+  - `naming/missing-flow-condition` (warning) — outgoing flow from split gateway has no condition label
+  - `naming/join-gateway-labeled` (info) — join-only gateway has a label (should be unlabeled)
+- **New flow rules** (`packages/core/src/bpmn/optimize/flow.ts`):
+  - `flow/no-start-event` (error) — process has no start event
+  - `flow/mixed-gateway` (warning) — gateway acts as both join AND split (2+ incoming AND 2+ outgoing)
+- **AI system prompt** (`apps/ai-server/src/prompt.ts`): added comprehensive "CAMUNDA BPMN BEST PRACTICES" section covering task/event/gateway naming conventions, structural rules (separate split/join, no mixed gateways, happy path on center line), and flow quality rules. Also improved `buildMcpImprovePrompt` with naming best-practice instructions.
+- **Tests**: 15 new tests in `optimize.test.ts` covering all new rules.
+
+## 2026-03-09 — core: layout positioning fix for join gateways with back-edge loops
+
+- **Root cause**: join gateways (1 real outgoing flow) that are the target of a back edge (e.g. the merge point of a loop like `upload_docs` ← `request_resubmit`) had the reversed back-edge added as an extra DAG successor, making them look like split gateways. This caused `findBaselinePath` to terminate early, `distributeSplitBranches` to distribute wrong branches, and `alignSplitJoinPairs`/`ensureEarlyReturnOffBaseline` to misalign gateways.
+- **Fix** (`packages/core/src/layout/coordinates.ts`):
+  - Added `BackEdge` import and three helpers: `buildBackEdgeOriginals`, `getTrueSuccessors` (filters reversed back-edge successors), `countForwardReachable` (used by improved `findContinuationSuccessor`).
+  - All public coordinate functions (`alignSplitJoinPairs`, `findBaselinePath`/`alignBaselinePath`, `ensureEarlyReturnOffBaseline`, `distributeSplitBranches`) now accept an optional `backEdges: BackEdge[]` parameter and use `getTrueSuccessors` instead of `dag.successors` when deciding split vs. join status for gateways.
+  - `findBaselinePath`: when a gateway has 1 true forward successor (join gateway), treats it as a passthrough and continues baseline traversal through it.
+  - `findContinuationSuccessor`: falls back to `countForwardReachable` depth heuristic when no gateway-type successor exists — picks the deeper (non-stub) branch, avoiding loop-back dead-ends.
+- `layout-engine.ts`: passes `backEdges` to all four affected coordinate functions.
+- **Test** (`tests/layout.test.ts`): new "Join gateway with back-edge loop" suite verifying start→collect→joinGw→upload→verify→end all share the same baseline Y, with retry off-baseline. Updated one existing test whose old assertion expected the baseline to stop at a split when a better behavior (follow deepest path) is now implemented.
+
+## 2026-03-09 — core: gateway size fix (36×36 → 50×50)
+
+- **Gateway sizes** (`packages/core/src/layout/types.ts`): `ELEMENT_SIZES` for `exclusiveGateway`, `parallelGateway`, `inclusiveGateway`, `eventBasedGateway` changed from 36×36 to 50×50, matching the editor canvas which places gateways at 50×50.
+- Updated `builder-layout-integration.test.ts` gateway size assertions from 36→50.
+- All 230 tests pass.
+
+## 2026-03-09 — core: layout back-edge alignment fix + flow/multi-incoming-task linter rule
+
+- **Layout fix** (`packages/core/src/layout/coordinates.ts`): `alignBranchBaselines` backward walk no longer stops early on non-gateway nodes with multiple successors (back-edge reversal artifact) — breaks only when the predecessor is a gateway type. Forward walk uses `unique-predecessor` successor heuristic for non-gateway nodes with multiple outgoing edges. `findBaselinePath` applies the same heuristic: non-gateway nodes with multiple successors follow the unique-predecessor continuation instead of the gateway-split path, fixing misalignment between `task_collect_docs` and downstream sequential tasks in loops.
+- **Linter rule** (`packages/core/src/bpmn/optimize/flow.ts`): new `flow/multi-incoming-task` finding detects non-gateway, non-startEvent elements with more than 1 incoming sequence flow. Severity: error. Auto-fix inserts an exclusive gateway before the element and redirects all incoming flows through it.
+- Tests: 3 new optimize tests (reports finding for task, not for gateway, applyFix rewires correctly) and 1 new layout test (back-edge loop alignment).
+
+## 2026-03-09 — ai-bridge: diagram preview in chat + auto-approve tool calls
+
+- Added `--dangerously-skip-permissions` to claude CLI invocation in `adapters/claude.ts` — eliminates approval prompts during AI tool execution
+- Added BPMN canvas preview in AI chat messages when a diagram is returned by the AI — uses `BpmnCanvas` (read-only, fit-to-contain, 200px height) rendered inside `.ai-msg-preview` container
+- Preview renders above the existing "Apply to diagram" button so the user can inspect the result before applying
+- Preview canvases are properly destroyed when the conversation is cleared
+- Added `.ai-msg-preview` CSS (dark + light theme variants) to `css.ts`
+- Applied no-semicolons Biome rule across the entire monorepo and fixed JSON formatting issues in all `package.json` `files` arrays
+
 ## 2026-03-08 — editor: new-diagram onboarding overlay (full redesign)
 
 - Onboarding overlay completely replaces previous empty-state card
