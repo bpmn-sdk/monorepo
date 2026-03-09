@@ -1,5 +1,5 @@
 import type { BpmnElementType, BpmnFlowElement } from "../bpmn/bpmn-model.js"
-import type { DirectedGraph } from "./graph.js"
+import type { BackEdge, DirectedGraph } from "./graph.js"
 import type { Bounds, LayoutNode } from "./types.js"
 import { ELEMENT_SIZES, GRID_CELL_HEIGHT, GRID_CELL_WIDTH } from "./types.js"
 
@@ -231,6 +231,43 @@ const GATEWAY_TYPE_SET: ReadonlySet<string> = new Set([
 	"eventBasedGateway",
 ])
 
+/** Build a set of "sourceRef->targetRef" strings from original back edges. */
+function buildBackEdgeOriginals(backEdges: BackEdge[]): Set<string> {
+	const s = new Set<string>()
+	for (const be of backEdges) {
+		s.add(`${be.sourceRef}->${be.targetRef}`)
+	}
+	return s
+}
+
+/**
+ * Get the "true" forward successors of a node in the DAG,
+ * excluding successors that were added by reversing back edges.
+ * A DAG edge (node→s) is a reversed back edge if the original back edge was (s→node).
+ */
+function getTrueSuccessors(
+	nodeId: string,
+	dag: DirectedGraph,
+	backEdgeOriginals: Set<string>,
+): string[] {
+	return (dag.successors.get(nodeId) ?? []).filter((s) => !backEdgeOriginals.has(`${s}->${nodeId}`))
+}
+
+/** Count total forward-reachable nodes from startId in the DAG. */
+function countForwardReachable(startId: string, dag: DirectedGraph): number {
+	const seen = new Set<string>()
+	const queue = [startId]
+	while (queue.length > 0) {
+		const id = queue.shift()
+		if (!id || seen.has(id)) continue
+		seen.add(id)
+		for (const s of dag.successors.get(id) ?? []) {
+			queue.push(s)
+		}
+	}
+	return seen.size
+}
+
 /**
  * Align nodes in linear sequences to a common y-baseline.
  * A "linear" node has ≤1 predecessor and ≤1 successor, and is not a gateway.
@@ -308,7 +345,12 @@ export function alignBranchBaselines(layoutNodes: LayoutNode[], dag: DirectedGra
  * A split gateway fans out to multiple successors; the corresponding join gateway
  * is the nearest downstream gateway where all branches reconverge.
  */
-export function alignSplitJoinPairs(layoutNodes: LayoutNode[], dag: DirectedGraph): void {
+export function alignSplitJoinPairs(
+	layoutNodes: LayoutNode[],
+	dag: DirectedGraph,
+	backEdges: BackEdge[] = [],
+): void {
+	const backEdgeOriginals = buildBackEdgeOriginals(backEdges)
 	const nodeMap = new Map<string, LayoutNode>()
 	for (const n of layoutNodes) {
 		nodeMap.set(n.id, n)
@@ -316,8 +358,9 @@ export function alignSplitJoinPairs(layoutNodes: LayoutNode[], dag: DirectedGrap
 
 	for (const n of layoutNodes) {
 		if (!GATEWAY_TYPE_SET.has(n.type)) continue
-		const succs = dag.successors.get(n.id) ?? []
-		if (succs.length < 2) continue
+		// Use true successors (exclude reversed back-edge successors) to detect real splits
+		const trueSuccs = getTrueSuccessors(n.id, dag, backEdgeOriginals)
+		if (trueSuccs.length < 2) continue
 
 		// This is a split gateway — find its merge partner
 		const joinId = findJoinGateway(n.id, dag, nodeMap)
@@ -399,7 +442,12 @@ function findJoinGateway(
  * The baseline is the split gateway's center-y. If the shortest branch sits on the baseline,
  * swap it with a longer branch.
  */
-export function ensureEarlyReturnOffBaseline(layoutNodes: LayoutNode[], dag: DirectedGraph): void {
+export function ensureEarlyReturnOffBaseline(
+	layoutNodes: LayoutNode[],
+	dag: DirectedGraph,
+	backEdges: BackEdge[] = [],
+): void {
+	const backEdgeOriginals = buildBackEdgeOriginals(backEdges)
 	const nodeMap = new Map<string, LayoutNode>()
 	for (const n of layoutNodes) {
 		nodeMap.set(n.id, n)
@@ -407,14 +455,15 @@ export function ensureEarlyReturnOffBaseline(layoutNodes: LayoutNode[], dag: Dir
 
 	for (const n of layoutNodes) {
 		if (!GATEWAY_TYPE_SET.has(n.type)) continue
-		const succs = dag.successors.get(n.id) ?? []
-		if (succs.length < 2) continue
+		// Only process true split gateways (not join gateways with reversed back edges)
+		const trueSuccs = getTrueSuccessors(n.id, dag, backEdgeOriginals)
+		if (trueSuccs.length < 2) continue
 
 		const joinId = findJoinGateway(n.id, dag, nodeMap)
 
 		// Measure branch length (number of nodes from split successor to join)
 		const branchLengths = new Map<string, number>()
-		for (const startId of succs) {
+		for (const startId of trueSuccs) {
 			let length = 0
 			let currentId: string | undefined = startId
 			const seen = new Set<string>()
@@ -438,7 +487,7 @@ export function ensureEarlyReturnOffBaseline(layoutNodes: LayoutNode[], dag: Dir
 		const earlyReturnOnBaseline: string[] = []
 		let longestOffBaseline: string | undefined
 
-		for (const startId of succs) {
+		for (const startId of trueSuccs) {
 			const branchNode = nodeMap.get(startId)
 			if (!branchNode) continue
 			const branchCenterY = branchNode.bounds.y + branchNode.bounds.height / 2
@@ -468,7 +517,12 @@ export function ensureEarlyReturnOffBaseline(layoutNodes: LayoutNode[], dag: Dir
  * At split gateways, jumps directly to the corresponding join gateway.
  * Returns the ordered list of node IDs on the baseline.
  */
-export function findBaselinePath(layoutNodes: LayoutNode[], dag: DirectedGraph): string[] {
+export function findBaselinePath(
+	layoutNodes: LayoutNode[],
+	dag: DirectedGraph,
+	backEdges: BackEdge[] = [],
+): string[] {
+	const backEdgeOriginals = buildBackEdgeOriginals(backEdges)
 	const nodeMap = new Map<string, LayoutNode>()
 	for (const n of layoutNodes) {
 		nodeMap.set(n.id, n)
@@ -510,12 +564,21 @@ export function findBaselinePath(layoutNodes: LayoutNode[], dag: DirectedGraph):
 		} else {
 			const currentNode = nodeMap.get(currentId)
 			if (currentNode && GATEWAY_TYPE_SET.has(currentNode.type)) {
-				// Gateway split: find join and jump to it
-				const joinId = findJoinGateway(currentId, dag, nodeMap)
-				if (joinId) {
-					currentId = joinId
+				// Check true successors (excluding reversed back-edge stubs)
+				const trueSuccs = getTrueSuccessors(currentId, dag, backEdgeOriginals)
+				if (trueSuccs.length === 1) {
+					// Join gateway (e.g. loop merge): only 1 real forward successor → treat as passthrough
+					currentId = trueSuccs[0]
+				} else if (trueSuccs.length >= 2) {
+					// True split gateway: find join and jump to it
+					const joinId = findJoinGateway(currentId, dag, nodeMap)
+					if (joinId) {
+						currentId = joinId
+					} else {
+						currentId = findContinuationSuccessor(trueSuccs, dag, nodeMap, visited)
+					}
 				} else {
-					currentId = findContinuationSuccessor(succs, dag, nodeMap, visited)
+					break
 				}
 			} else {
 				// Non-gateway with multiple successors (back-edge reversal artifact).
@@ -532,30 +595,48 @@ export function findBaselinePath(layoutNodes: LayoutNode[], dag: DirectedGraph):
 
 /**
  * Among split-gateway successors, find the one that continues the main flow.
- * Only follows a successor that is itself a gateway (continuation point).
- * Returns undefined if no successor is a gateway (all branches are dead-ends).
+ * Prefers gateway-type successors (merge points), then falls back to the
+ * successor with the most forward-reachable nodes (deepest path).
+ * Loop-back stubs are dead-ends in the DAG and will have fewest reachable nodes.
  */
 function findContinuationSuccessor(
 	succs: string[],
-	_dag: DirectedGraph,
+	dag: DirectedGraph,
 	nodeMap: Map<string, LayoutNode>,
-	_visited: ReadonlySet<string>,
+	visited: ReadonlySet<string>,
 ): string | undefined {
+	// Prefer gateway-type successors (likely the merge/join point)
 	for (const s of succs) {
 		const node = nodeMap.get(s)
 		if (node && GATEWAY_TYPE_SET.has(node.type)) {
 			return s
 		}
 	}
-	return undefined
+	// Fall back: pick the successor with the most forward-reachable nodes.
+	// Loop-back stubs (reversed back edges) are DAG dead-ends with 0–1 reachable nodes.
+	let bestId: string | undefined
+	let bestDepth = -1
+	for (const s of succs) {
+		if (visited.has(s)) continue
+		const depth = countForwardReachable(s, dag)
+		if (depth > bestDepth) {
+			bestDepth = depth
+			bestId = s
+		}
+	}
+	return bestId
 }
 
 /**
  * Align all nodes on the baseline path to the same center-Y.
  * Uses the first node's (start event) center-Y as the baseline.
  */
-export function alignBaselinePath(layoutNodes: LayoutNode[], dag: DirectedGraph): void {
-	const baselinePath = findBaselinePath(layoutNodes, dag)
+export function alignBaselinePath(
+	layoutNodes: LayoutNode[],
+	dag: DirectedGraph,
+	backEdges: BackEdge[] = [],
+): void {
+	const baselinePath = findBaselinePath(layoutNodes, dag, backEdges)
 	if (baselinePath.length === 0) return
 
 	const nodeMap = new Map<string, LayoutNode>()
@@ -587,16 +668,21 @@ export function alignBaselinePath(layoutNodes: LayoutNode[], dag: DirectedGraph)
  * Pass 1: multi-branch gateways (2+) — symmetric distribution.
  * Pass 2: single-branch gateways — placed one full grid row away, with peer-aware gap enforcement.
  */
-export function distributeSplitBranches(layoutNodes: LayoutNode[], dag: DirectedGraph): void {
+export function distributeSplitBranches(
+	layoutNodes: LayoutNode[],
+	dag: DirectedGraph,
+	backEdges: BackEdge[] = [],
+): void {
+	const backEdgeOriginals = buildBackEdgeOriginals(backEdges)
 	const nodeMap = new Map<string, LayoutNode>()
 	for (const n of layoutNodes) {
 		nodeMap.set(n.id, n)
 	}
 
-	const baselinePath = findBaselinePath(layoutNodes, dag)
+	const baselinePath = findBaselinePath(layoutNodes, dag, backEdges)
 	const baselineSet = new Set(baselinePath)
 
-	// Collect split gateways with their non-baseline branch info
+	// Collect true split gateways with their non-baseline branch info
 	const splitGateways: {
 		node: LayoutNode
 		succs: string[]
@@ -606,16 +692,17 @@ export function distributeSplitBranches(layoutNodes: LayoutNode[], dag: Directed
 
 	for (const n of layoutNodes) {
 		if (!GATEWAY_TYPE_SET.has(n.type)) continue
-		const succs = dag.successors.get(n.id) ?? []
-		if (succs.length < 2) continue
+		// Only process true split gateways (not join gateways with reversed back edges)
+		const trueSuccs = getTrueSuccessors(n.id, dag, backEdgeOriginals)
+		if (trueSuccs.length < 2) continue
 
 		const joinId = findJoinGateway(n.id, dag, nodeMap)
 		const branchStarts: string[] = []
-		for (const s of succs) {
+		for (const s of trueSuccs) {
 			if (!baselineSet.has(s)) branchStarts.push(s)
 		}
 		if (branchStarts.length === 0) continue
-		splitGateways.push({ node: n, succs, branchStarts, joinId })
+		splitGateways.push({ node: n, succs: trueSuccs, branchStarts, joinId })
 	}
 
 	// Pass 1: multi-branch gateways (distribute symmetrically)

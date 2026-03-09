@@ -70,16 +70,16 @@ export function layoutFlowNodes(
 	alignBranchBaselines(layoutNodes, dag)
 
 	// Phase 4c: Align split/join gateway pairs to same y-coordinate
-	alignSplitJoinPairs(layoutNodes, dag)
+	alignSplitJoinPairs(layoutNodes, dag, backEdges)
 
 	// Phase 4d: Align all baseline-path nodes to the same center-Y
-	alignBaselinePath(layoutNodes, dag)
+	alignBaselinePath(layoutNodes, dag, backEdges)
 
 	// Phase 4e: Ensure early-return branches are never on the baseline
-	ensureEarlyReturnOffBaseline(layoutNodes, dag)
+	ensureEarlyReturnOffBaseline(layoutNodes, dag, backEdges)
 
 	// Phase 4f: Distribute split gateway branches symmetrically
-	distributeSplitBranches(layoutNodes, dag)
+	distributeSplitBranches(layoutNodes, dag, backEdges)
 
 	// Phase 4g: Resolve any layer overlaps from redistribution
 	resolveLayerOverlaps(layoutNodes)

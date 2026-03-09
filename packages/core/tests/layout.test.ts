@@ -1264,7 +1264,7 @@ describe("Baseline path detection", () => {
 		expect(baseline).not.toContain("t4")
 	})
 
-	it("stops at split without a gateway successor or join", () => {
+	it("follows deepest-path branch when split has no gateway successor or join", () => {
 		const elements = [node("s", "startEvent"), node("gw", "exclusiveGateway"), node("a"), node("b")]
 		const flows = [flow("f1", "s", "gw"), flow("f2", "gw", "a"), flow("f3", "gw", "b")]
 		const graph = buildGraph(elements, flows)
@@ -1276,8 +1276,8 @@ describe("Baseline path detection", () => {
 		const layoutNodes = assignCoordinates(orderedLayers, nodeIndex)
 
 		const baseline = findBaselinePath(layoutNodes, dag)
-		// No gateway successor and no join → baseline stops at split
-		expect(baseline).toEqual(["s", "gw"])
+		// No gateway successor and no join → picks first branch (both have equal depth)
+		expect(baseline).toEqual(["s", "gw", "a"])
 	})
 
 	it("follows the gateway successor when one branch is a dead-end", () => {
@@ -1398,6 +1398,62 @@ describe("Baseline Y-alignment", () => {
 
 		// At least one branch should be off the baseline
 		expect(Math.abs(aCenterY - gw1CenterY) > 10 || Math.abs(bCenterY - gw1CenterY) > 10).toBe(true)
+	})
+})
+
+describe("Join gateway with back-edge loop", () => {
+	it("treats a join gateway as a baseline passthrough when it has a reversed back-edge successor", () => {
+		// Pattern: start → collect → joinGw → upload → verify → end
+		// Loop: verify → retry → joinGw (back edge)
+		// joinGw has 2 DAG successors after reversal (upload + retry), but only 1 true forward: upload
+		// All of start, collect, joinGw, upload, verify, end should be on the same baseline Y
+		const process = proc(
+			"p1",
+			[
+				{ ...node("start", "startEvent"), outgoing: ["f1"] },
+				{ ...node("collect"), incoming: ["f1"], outgoing: ["f2"] },
+				{
+					...node("joinGw", "exclusiveGateway"),
+					incoming: ["f2", "fLoop"],
+					outgoing: ["f3"],
+				},
+				{ ...node("upload"), incoming: ["f3"], outgoing: ["f4"] },
+				{ ...node("verify"), incoming: ["f4"], outgoing: ["f5", "f6"] },
+				{ ...node("retry"), incoming: ["f6"], outgoing: ["fLoop"] },
+				{ ...node("end", "endEvent"), incoming: ["f5"] },
+			],
+			[
+				flow("f1", "start", "collect"),
+				flow("f2", "collect", "joinGw"),
+				flow("f3", "joinGw", "upload"),
+				flow("f4", "upload", "verify"),
+				flow("f5", "verify", "end"),
+				flow("f6", "verify", "retry"),
+				flow("fLoop", "retry", "joinGw"), // back edge
+			],
+		)
+
+		const result = layoutProcess(process)
+		const nodeMap = new Map(result.nodes.map((n) => [n.id, n]))
+
+		const baselineIds = ["start", "collect", "joinGw", "upload", "verify", "end"]
+		const centerYs = baselineIds.map((id) => {
+			const n = nodeMap.get(id)
+			if (!n) throw new Error(`Node ${id} not found`)
+			return n.bounds.y + n.bounds.height / 2
+		})
+
+		// All baseline nodes must share the same center-Y
+		const baselineY = centerYs[0] ?? 0
+		for (const cy of centerYs) {
+			expect(Math.abs(cy - baselineY)).toBeLessThan(1)
+		}
+
+		// The retry node should be off the baseline
+		const retryNode = nodeMap.get("retry")
+		if (!retryNode) throw new Error("retry not found")
+		const retryCenterY = retryNode.bounds.y + retryNode.bounds.height / 2
+		expect(Math.abs(retryCenterY - baselineY)).toBeGreaterThan(10)
 	})
 })
 

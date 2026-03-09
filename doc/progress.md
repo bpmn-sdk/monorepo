@@ -1,5 +1,22 @@
 # Progress
 
+## 2026-03-09 — core: layout positioning fix for join gateways with back-edge loops
+
+- **Root cause**: join gateways (1 real outgoing flow) that are the target of a back edge (e.g. the merge point of a loop like `upload_docs` ← `request_resubmit`) had the reversed back-edge added as an extra DAG successor, making them look like split gateways. This caused `findBaselinePath` to terminate early, `distributeSplitBranches` to distribute wrong branches, and `alignSplitJoinPairs`/`ensureEarlyReturnOffBaseline` to misalign gateways.
+- **Fix** (`packages/core/src/layout/coordinates.ts`):
+  - Added `BackEdge` import and three helpers: `buildBackEdgeOriginals`, `getTrueSuccessors` (filters reversed back-edge successors), `countForwardReachable` (used by improved `findContinuationSuccessor`).
+  - All public coordinate functions (`alignSplitJoinPairs`, `findBaselinePath`/`alignBaselinePath`, `ensureEarlyReturnOffBaseline`, `distributeSplitBranches`) now accept an optional `backEdges: BackEdge[]` parameter and use `getTrueSuccessors` instead of `dag.successors` when deciding split vs. join status for gateways.
+  - `findBaselinePath`: when a gateway has 1 true forward successor (join gateway), treats it as a passthrough and continues baseline traversal through it.
+  - `findContinuationSuccessor`: falls back to `countForwardReachable` depth heuristic when no gateway-type successor exists — picks the deeper (non-stub) branch, avoiding loop-back dead-ends.
+- `layout-engine.ts`: passes `backEdges` to all four affected coordinate functions.
+- **Test** (`tests/layout.test.ts`): new "Join gateway with back-edge loop" suite verifying start→collect→joinGw→upload→verify→end all share the same baseline Y, with retry off-baseline. Updated one existing test whose old assertion expected the baseline to stop at a split when a better behavior (follow deepest path) is now implemented.
+
+## 2026-03-09 — core: gateway size fix (36×36 → 50×50)
+
+- **Gateway sizes** (`packages/core/src/layout/types.ts`): `ELEMENT_SIZES` for `exclusiveGateway`, `parallelGateway`, `inclusiveGateway`, `eventBasedGateway` changed from 36×36 to 50×50, matching the editor canvas which places gateways at 50×50.
+- Updated `builder-layout-integration.test.ts` gateway size assertions from 36→50.
+- All 230 tests pass.
+
 ## 2026-03-09 — core: layout back-edge alignment fix + flow/multi-incoming-task linter rule
 
 - **Layout fix** (`packages/core/src/layout/coordinates.ts`): `alignBranchBaselines` backward walk no longer stops early on non-gateway nodes with multiple successors (back-edge reversal artifact) — breaks only when the predecessor is a gateway type. Forward walk uses `unique-predecessor` successor heuristic for non-gateway nodes with multiple outgoing edges. `findBaselinePath` applies the same heuristic: non-gateway nodes with multiple successors follow the unique-predecessor continuation instead of the gateway-split path, fixing misalignment between `task_collect_docs` and downstream sequential tasks in loops.
