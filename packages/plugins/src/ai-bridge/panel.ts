@@ -402,9 +402,10 @@ export function createAiPanel(options: PanelOptions): {
 	function showNotRunning(): void {
 		statusBar.className = "ai-panel-status ai-panel-status-err"
 		statusEl.textContent = "AI server not running. Start with:"
-		statusBar.querySelector("code")?.remove()
+		for (const el of Array.from(statusBar.querySelectorAll("code"))) el.remove()
 		const code = document.createElement("code")
-		code.textContent = "pnpm ai-server"
+		code.textContent = "pnpx @bpmn-sdk/ai-server"
+		code.title = "or: npx @bpmn-sdk/ai-server"
 		statusBar.append(code)
 	}
 

@@ -262,6 +262,10 @@ export function injectAiBridgeStyles(): void {
 [data-bpmn-hud-theme="light"] .ai-panel-header { border-bottom-color: rgba(0,0,0,0.08); }
 [data-bpmn-hud-theme="light"] .ai-panel-title { color: rgba(0,0,0,0.88); }
 [data-bpmn-hud-theme="light"] .ai-panel-status { border-bottom-color: rgba(0,0,0,0.06); }
+[data-bpmn-hud-theme="light"] .ai-panel-status-err { color: rgba(180,40,20,0.9); }
+[data-bpmn-hud-theme="light"] .ai-panel-status-err code {
+  background: rgba(0,0,0,0.06); color: rgba(0,0,0,0.8);
+}
 [data-bpmn-hud-theme="light"] .ai-msg-user {
   background: rgba(0,80,200,0.1); border-color: rgba(0,80,200,0.2);
 }

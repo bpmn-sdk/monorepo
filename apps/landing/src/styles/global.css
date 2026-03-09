@@ -16,6 +16,7 @@
 :root {
 	--bg: oklch(5% 0.025 270);
 	--bg-card: oklch(9% 0.025 270);
+	--surface: oklch(9% 0.025 270);
 	--bg-code: oklch(7% 0.025 270);
 	--border: oklch(15% 0.03 270);
 	--text: oklch(88% 0.02 270);
@@ -1418,7 +1419,6 @@ a:hover {
 /* ── API Section ─────────────────────────────────────────────────── */
 .api-section {
 	padding: 120px 0;
-	border-top: 1px solid var(--border);
 }
 
 .api-layout {
@@ -1492,7 +1492,6 @@ a:hover {
 /* ── CLI Section ─────────────────────────────────────────────────── */
 .cli-section {
 	padding: 120px 0;
-	border-top: 1px solid var(--border);
 }
 
 .cli-layout {
