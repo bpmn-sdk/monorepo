@@ -212,6 +212,8 @@ export type {
 export type { Bounds, LayoutEdge, LayoutNode, LayoutResult, Waypoint } from "./layout/index.js"
 export { ELEMENT_SIZES } from "./layout/index.js"
 export { compactify, expand } from "./bpmn/compact.js"
+export { exportSvg } from "./bpmn/svg.js"
+export type { SvgExportOptions } from "./bpmn/svg.js"
 export type {
 	CompactDiagram,
 	CompactElement,

@@ -1,5 +1,24 @@
 # Progress
 
+## 2026-03-10 — editor11: exportSvg() in @bpmn-sdk/core
+
+### `packages/core/src/bpmn/svg.ts` (new)
+- `exportSvg(defs, options?)` — generates a self-contained SVG string from a `BpmnDefinitions` object (must include DI position data, i.e. produced by `.withAutoLayout().build()` or parsed from BPMN XML).
+- Pure string generation, zero external dependencies, works in every environment (Node.js, browsers, Deno, Bun, edge runtimes).
+- Renders all element types: events (start/end/intermediate/boundary with event definition markers), tasks (with type-specific icons: service, user, script, send, receive, businessRule, manual), gateways (exclusive/parallel/inclusive/eventBased/complex with markers), sub-processes (expand marker + adHoc tilde), call activities, pools, lanes, text annotations, sequence flow edges (with arrow markers, rounded bezier paths, default-flow slash), message flows (dashed), associations (dashed, no arrow), edge labels.
+- `SvgExportOptions.theme?: "light" | "dark"` — light by default. Both themes use the same concrete colors as `@bpmn-sdk/canvas`.
+- `SvgExportOptions.padding?: number` — padding around diagram content, default 20px.
+- Icon groups use scoped `<style>` elements (class names `.bi/.bis/.gm/.gms`) so icons render correctly in all SVG viewers without relying on external CSS.
+- `esc()` escapes `& < > "` in all text content.
+
+### `packages/core/src/index.ts`
+- Exports `exportSvg` and `SvgExportOptions`.
+
+### `packages/core/tests/svg.test.ts` (new)
+- 12 tests covering: valid SVG output, viewBox presence, label rendering, theme colors, custom padding, defs/arrow marker, edge paths, empty DI handling, determinism, gateway types, task icon types.
+
+---
+
 ## 2026-03-10 — editor11: Landing page accessibility fixes
 
 ### `apps/landing/src/pages/index.astro`
