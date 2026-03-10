@@ -6,6 +6,7 @@ import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { Bpmn, expand, optimize } from "@bpmn-sdk/core"
 import type { CompactDiagram } from "@bpmn-sdk/core"
+import { createClientFromProfile } from "@bpmn-sdk/profiles"
 import {
 	getActiveName,
 	getActiveProfile,
@@ -312,6 +313,132 @@ const server = http.createServer(async (req, res) => {
 		}))
 		res.writeHead(200, { "Content-Type": "application/json" })
 		res.end(JSON.stringify(payload))
+		return
+	}
+
+	// ── GET /operate/stream — SSE polling stream for monitoring data ───────────
+	if (url.pathname === "/operate/stream" && req.method === "GET") {
+		const topicParam = url.searchParams.get("topic") ?? "dashboard"
+		const profileParam =
+			(req.headers["x-profile"] as string | undefined) ??
+			url.searchParams.get("profile") ??
+			undefined
+		const intervalMs = Math.max(5_000, Number(url.searchParams.get("interval") ?? "30000"))
+
+		const activeProfile = profileParam ? getProfile(profileParam) : getActiveProfile()
+		if (!activeProfile?.config.baseUrl) {
+			res.writeHead(401, { "Content-Type": "application/json" })
+			res.end(JSON.stringify({ error: "No active profile" }))
+			return
+		}
+
+		const client = createClientFromProfile(profileParam)
+
+		// The generated TS types only declare `page` on search results; the runtime
+		// response also contains `items`. Cast results through SearchResult<T>.
+		type SearchResult<T> = { page: { totalItems: number }; items: T[] }
+		function items<T>(result: unknown): T[] {
+			return ((result as SearchResult<T>).items ?? []) as T[]
+		}
+		function total(result: unknown): number {
+			return (result as SearchResult<unknown>).page?.totalItems ?? 0
+		}
+
+		// The query types also don't declare `filter` in TS, but the API accepts it.
+		type AnyQuery = Record<string, unknown>
+
+		res.writeHead(200, {
+			"Content-Type": "text/event-stream",
+			"Cache-Control": "no-cache",
+			Connection: "keep-alive",
+		})
+
+		function send(payload: unknown): void {
+			res.write(`data: ${JSON.stringify({ type: "data", topic: topicParam, payload })}\n\n`)
+		}
+
+		async function poll(): Promise<void> {
+			try {
+				switch (topicParam) {
+					case "dashboard": {
+						const [inst, inc, jobs, tasks, defs] = await Promise.all([
+							client.processInstance.searchProcessInstances({
+								filter: { state: "ACTIVE" },
+							} as AnyQuery),
+							client.incident.searchIncidents({ filter: { state: "ACTIVE" } } as AnyQuery),
+							client.job.searchJobs({ filter: { state: "CREATED" } } as AnyQuery),
+							client.userTask.searchUserTasks({ filter: { state: "CREATED" } } as AnyQuery),
+							client.processDefinition.searchProcessDefinitions({}),
+						])
+						send({
+							activeInstances: inst.page.totalItems,
+							openIncidents: inc.page.totalItems,
+							activeJobs: jobs.page.totalItems,
+							pendingTasks: tasks.page.totalItems,
+							definitions: defs.page.totalItems,
+						})
+						break
+					}
+					case "definitions": {
+						const result = await client.processDefinition.searchProcessDefinitions({})
+						send({ items: items(result) })
+						break
+					}
+					case "instances": {
+						const stateFilter = url.searchParams.get("state")
+						const pdKey = url.searchParams.get("processDefinitionKey")
+						const filter: AnyQuery = {}
+						if (stateFilter) filter.state = stateFilter
+						if (pdKey) filter.processDefinitionKey = pdKey
+						const result = await client.processInstance.searchProcessInstances({
+							filter,
+						} as AnyQuery)
+						send({ items: items(result), total: total(result) })
+						break
+					}
+					case "incidents": {
+						const piKey = url.searchParams.get("processInstanceKey")
+						const filter: AnyQuery = {}
+						if (piKey) filter.processInstanceKey = piKey
+						const result = await client.incident.searchIncidents({ filter } as AnyQuery)
+						send({ items: items(result), total: total(result) })
+						break
+					}
+					case "jobs": {
+						const result = await client.job.searchJobs({})
+						send({ items: items(result), total: total(result) })
+						break
+					}
+					case "tasks": {
+						const result = await client.userTask.searchUserTasks({})
+						send({ items: items(result), total: total(result) })
+						break
+					}
+					default:
+						res.write(
+							`data: ${JSON.stringify({ type: "error", message: `Unknown topic: ${topicParam}` })}\n\n`,
+						)
+				}
+			} catch (err) {
+				res.write(`data: ${JSON.stringify({ type: "error", message: String(err) })}\n\n`)
+			}
+		}
+
+		await poll()
+		const timer = setInterval(() => {
+			void poll()
+		}, intervalMs)
+		const keepalive = setInterval(() => {
+			res.write(`data: ${JSON.stringify({ type: "keepalive" })}\n\n`)
+		}, 25_000)
+
+		req.on("close", () => {
+			clearInterval(timer)
+			clearInterval(keepalive)
+			console.log(`[operate/stream] client disconnected (topic: ${topicParam})`)
+		})
+
+		console.log(`[operate/stream] connected (topic: ${topicParam}, interval: ${intervalMs}ms)`)
 		return
 	}
 

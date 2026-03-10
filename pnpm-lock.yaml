@@ -111,6 +111,9 @@ importers:
       '@bpmn-sdk/engine':
         specifier: workspace:*
         version: link:../../packages/engine
+      '@bpmn-sdk/operate':
+        specifier: workspace:*
+        version: link:../../packages/operate
       '@bpmn-sdk/plugins':
         specifier: workspace:*
         version: link:../../packages/plugins
@@ -162,6 +165,21 @@ importers:
         version: link:../feel
 
   packages/feel: {}
+
+  packages/operate:
+    dependencies:
+      '@bpmn-sdk/api':
+        specifier: workspace:*
+        version: link:../api
+      '@bpmn-sdk/canvas':
+        specifier: workspace:*
+        version: link:../canvas
+      '@bpmn-sdk/core':
+        specifier: workspace:*
+        version: link:../core
+      '@bpmn-sdk/plugins':
+        specifier: workspace:*
+        version: link:../plugins
 
   packages/plugins:
     dependencies:

@@ -41,6 +41,11 @@ function footer(currentPkg) {
 		{ name: "@bpmn-sdk/plugins", desc: "22 composable canvas plugins" },
 		{ name: "@bpmn-sdk/api", desc: "Camunda 8 REST API TypeScript client" },
 		{ name: "@bpmn-sdk/ascii", desc: "Render BPMN diagrams as Unicode ASCII art" },
+		{
+			name: "@bpmn-sdk/profiles",
+			desc: "Shared auth, profile storage, and client factories for CLI & proxy",
+		},
+		{ name: "@bpmn-sdk/operate", desc: "Monitoring & operations frontend for Camunda clusters" },
 	].filter((p) => p.name !== currentPkg)
 
 	const rows = packages
@@ -610,7 +615,8 @@ interface ParseResult {
 	// ── plugins ───────────────────────────────────────────────────────────────
 	"packages/plugins": {
 		name: "@bpmn-sdk/plugins",
-		description: "22 composable canvas plugins — minimap, AI chat, process simulation, storage, and more",
+		description:
+			"22 composable canvas plugins — minimap, AI chat, process simulation, storage, and more",
 		content: `## Overview
 
 \`@bpmn-sdk/plugins\` is a single package containing 22 ready-made \`CanvasPlugin\` add-ons for \`@bpmn-sdk/canvas\` and \`@bpmn-sdk/editor\`. Each plugin is imported individually via subpath exports so you only bundle what you use.
@@ -860,7 +866,8 @@ try {
 	// ── ascii ─────────────────────────────────────────────────────────────────
 	"packages/ascii": {
 		name: "@bpmn-sdk/ascii",
-		description: "Render BPMN diagrams as Unicode box-drawing ASCII art — perfect for terminals and docs",
+		description:
+			"Render BPMN diagrams as Unicode box-drawing ASCII art — perfect for terminals and docs",
 		content: `## Overview
 
 \`@bpmn-sdk/ascii\` converts BPMN 2.0 diagrams into Unicode box-drawing text art. It uses the same Sugiyama layout engine as the visual renderer, so the spatial flow of the diagram is preserved.
@@ -918,6 +925,224 @@ function renderBpmnAscii(xml: string, options?: RenderOptions): string
 interface RenderOptions {
   title?: boolean     // Show process name as header. Default: false
   showTypes?: boolean // Include element type in boxes. Default: false
+}
+\`\`\`
+`,
+	},
+
+	// ── profiles ──────────────────────────────────────────────────────────────
+	"packages/profiles": {
+		name: "@bpmn-sdk/profiles",
+		description:
+			"Shared auth, profile storage, and client factories for the BPMN SDK CLI and proxy server",
+		content: `## Overview
+
+\`@bpmn-sdk/profiles\` is the shared layer that connects the \`casen\` CLI with the local proxy server. It handles profile CRUD (read/write to \`~/.config/casen/config.json\`), creates typed \`CamundaClient\` instances from stored profiles, and resolves Authorization headers for any supported auth type.
+
+You do not need this package if you are connecting directly to Camunda using \`@bpmn-sdk/api\`. It is intended for tooling that needs to share authentication state with the CLI.
+
+## Features
+
+- **Profile CRUD** — list, get, save, delete, and activate named profiles stored in \`~/.config/casen/config.json\`
+- **Client factory** — \`createClientFromProfile(name?)\` creates a ready-to-use \`CamundaClient\` from the active or named profile
+- **Auth header resolution** — \`getAuthHeader(config)\` returns the correct \`Authorization\` header string for Bearer, Basic, and OAuth2 auth types
+- **OAuth2 token caching** — tokens are cached in memory and refreshed 60 seconds before expiry; no extra files written
+- **XDG-aware** — profile file path resolves to the correct platform directory (Linux XDG, macOS, Windows AppData)
+- **Zero UI dependencies** — no TUI or CLI dependencies; plain Node.js
+
+## Installation
+
+\`\`\`sh
+npm install @bpmn-sdk/profiles
+\`\`\`
+
+## Quick Start
+
+### Create a \`CamundaClient\` from the active profile
+
+\`\`\`typescript
+import { createClientFromProfile } from "@bpmn-sdk/profiles"
+
+// Uses the currently active profile from ~/.config/casen/config.json
+const client = createClientFromProfile()
+
+const instances = await client.processInstance.searchProcessInstances({})
+console.log(instances.page.totalItems)
+\`\`\`
+
+### Use a named profile
+
+\`\`\`typescript
+const client = createClientFromProfile("production")
+\`\`\`
+
+### Resolve an auth header directly
+
+\`\`\`typescript
+import { getActiveProfile, getAuthHeader } from "@bpmn-sdk/profiles"
+
+const profile = getActiveProfile()
+if (profile) {
+  const header = await getAuthHeader(profile.config)
+  // "Bearer eyJ..." or "Basic dXNlcjpwYXNz" or ""
+}
+\`\`\`
+
+### Manage profiles programmatically
+
+\`\`\`typescript
+import { listProfiles, saveProfile, useProfile, deleteProfile } from "@bpmn-sdk/profiles"
+
+// List all profiles
+const profiles = listProfiles()
+
+// Save a new profile
+saveProfile({
+  name: "local",
+  apiType: "self-managed",
+  config: {
+    baseUrl: "http://localhost:8080/v2",
+    auth: { type: "basic", username: "admin", password: "admin" },
+  },
+})
+
+// Activate a profile
+useProfile("local")
+
+// Delete a profile
+deleteProfile("old-profile")
+\`\`\`
+
+## API Reference
+
+### Profile Management
+
+| Export | Description |
+|--------|-------------|
+| \`listProfiles()\` | Returns all stored profiles |
+| \`getProfile(name)\` | Returns a profile by name, or \`undefined\` |
+| \`getActiveProfile()\` | Returns the currently active profile |
+| \`getActiveName()\` | Returns the active profile name |
+| \`saveProfile(profile)\` | Create or update a profile |
+| \`deleteProfile(name)\` | Remove a profile |
+| \`useProfile(name)\` | Set the active profile |
+| \`getConfigFilePath()\` | Returns the full path to the config file |
+
+### Client Factories
+
+| Export | Description |
+|--------|-------------|
+| \`createClientFromProfile(name?)\` | \`CamundaClient\` from the active or named profile |
+| \`createAdminClientFromProfile(name?)\` | \`AdminApiClient\` from the active or named profile |
+
+### Auth
+
+| Export | Description |
+|--------|-------------|
+| \`getAuthHeader(config)\` | Resolves an \`Authorization\` header string for any auth type |
+`,
+	},
+
+	// ── operate ───────────────────────────────────────────────────────────────
+	"packages/operate": {
+		name: "@bpmn-sdk/operate",
+		description:
+			"Monitoring and operations frontend for Camunda 8 clusters — real-time SSE, zero dependencies",
+		content: `## Overview
+
+\`@bpmn-sdk/operate\` is a zero-dependency monitoring and operations frontend for Camunda 8. Mount it into any HTML element to get a full process monitoring UI — live dashboard, instance browser, incident management, job queue, and user tasks.
+
+It pairs with the \`@bpmn-sdk/proxy\` local server, which polls the Camunda REST API server-side and pushes updates via **Server-Sent Events**. The frontend stays clean with no polling timers.
+
+A **mock mode** (\`mock: true\`) ships fixture data without any running proxy or cluster — useful for demos and local development.
+
+## Features
+
+- **Dashboard** — real-time stats: active instances, open incidents, active jobs, pending tasks
+- **Process Definitions** — deployed process list with name, version, and tenant
+- **Process Instances** — paginated list with state filter (Active / Completed / Terminated)
+- **Instance Detail** — BPMN canvas via \`@bpmn-sdk/canvas\` with live token-highlight overlay; active elements glow amber, visited elements show green tint
+- **Incidents** — error type, message, process, and resolution state
+- **Jobs** — job type, worker, retries, state, error message
+- **User Tasks** — name, assignee, state, due date, priority
+- **Profile switcher** — header dropdown populated from the proxy \`/profiles\` endpoint; switches reconnect all SSE streams
+- **Mock/demo mode** — fully self-contained fixture data, no cluster required
+- **SSE architecture** — proxy polls server-side; frontend opens one \`EventSource\` per view, gets pushed updates
+- **Hash router** — \`#/\`, \`#/instances\`, \`#/instances/:key\`, \`#/definitions\`, etc.
+- **Themeable** — light / dark / auto via CSS custom properties; \`--op-*\` variables
+
+## Installation
+
+\`\`\`sh
+npm install @bpmn-sdk/operate @bpmn-sdk/proxy
+\`\`\`
+
+## Quick Start
+
+### Demo mode (no cluster needed)
+
+\`\`\`typescript
+import { createOperate } from "@bpmn-sdk/operate"
+
+createOperate({
+  container: document.getElementById("app")!,
+  mock: true,
+  theme: "auto",
+})
+\`\`\`
+
+### Connected to a real Camunda cluster via proxy
+
+\`\`\`typescript
+import { createOperate } from "@bpmn-sdk/operate"
+
+createOperate({
+  container: document.getElementById("app")!,
+  proxyUrl: "http://localhost:3033",   // default
+  profile: "production",               // optional, uses active profile if omitted
+  pollInterval: 15_000,                // ms between server-side polls (default: 30 000)
+  theme: "dark",
+})
+\`\`\`
+
+The proxy must be running (\`pnpm proxy\`) and have at least one profile configured via the \`casen\` CLI.
+
+## How it works
+
+\`\`\`
+Browser  ──── EventSource ────▶  @bpmn-sdk/proxy  ──── CamundaClient ────▶  Camunda cluster
+         ◀─── SSE events ──────  (polls on interval, pushes results)
+\`\`\`
+
+1. Each view opens an SSE connection to \`/operate/stream?topic=<view>&interval=<ms>\`.
+2. The proxy creates a \`CamundaClient\` using the configured profile's auth credentials.
+3. On each polling tick, the proxy fetches the relevant Camunda data and emits a \`{ type: "data", payload }\` SSE event.
+4. The store updates and the view re-renders.
+
+## API Reference
+
+### \`createOperate(options)\`
+
+\`\`\`typescript
+interface OperateOptions {
+  container: HTMLElement
+  proxyUrl?: string        // default: "http://localhost:3033"
+  profile?: string         // profile name; uses active profile if omitted
+  theme?: "light" | "dark" | "auto"  // default: "auto"
+  pollInterval?: number    // ms between polls; default: 30 000
+  mock?: boolean           // use built-in fixture data; default: false
+}
+\`\`\`
+
+Returns an \`OperateApi\`:
+
+\`\`\`typescript
+interface OperateApi {
+  el: HTMLElement
+  setProfile(name: string | null): void
+  setTheme(theme: "light" | "dark" | "auto"): void
+  navigate(path: string): void  // e.g. "/instances/123456789"
+  destroy(): void
 }
 \`\`\`
 `,

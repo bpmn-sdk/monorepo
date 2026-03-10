@@ -1,5 +1,30 @@
 # Progress
 
+## 2026-03-10 — editor11: packages/operate — monitoring frontend
+
+### `packages/operate` (new package — `@bpmn-sdk/operate`)
+- Zero-dependency monitoring and operations frontend library (same pattern as `packages/editor`).
+- `createOperate(options)` factory — mounts a full monitoring UI into any container element.
+- **6 views**: Dashboard, Processes (definitions), Instances, Incidents, Jobs, User Tasks.
+- **Instance detail view**: BPMN canvas via `@bpmn-sdk/canvas` with token-highlight overlay (`@bpmn-sdk/plugins/token-highlight`) showing active/visited elements. Sidebar tabs: Variables, Incidents.
+- **SSE-based data**: stores open `EventSource` connections to proxy `/operate/stream?topic=...`; proxy polls Camunda on server-side and pushes JSON events. No client-side timers.
+- **Mock/demo mode**: `mock: true` option feeds fixture data via simulated streams — no proxy required. Used in landing page demo.
+- **Profile picker**: header dropdown calls `GET /profiles`, switches active profile; all streams reconnect.
+- **Hash router**: minimal in-package router (`#/`, `#/instances/:key`, etc.).
+- **CSS injection**: `injectOperateStyles()` — self-contained dark/light theme via CSS vars.
+
+### `apps/proxy` — operate SSE endpoint
+- Added `GET /operate/stream?topic=...` endpoint.
+- Topics: `dashboard`, `definitions`, `instances`, `incidents`, `jobs`, `tasks`.
+- Uses `createClientFromProfile()` server-side; polls Camunda at configurable interval (default 30s, min 5s).
+- Sends `{ type: "data", topic, payload }` SSE events; keepalive every 25s.
+- Cleans up timers on client disconnect.
+
+### `apps/landing` — Operate demo page
+- New `/operate` page (`operate.astro`) — full-screen operate UI in mock mode.
+- Added `@bpmn-sdk/operate: workspace:*` dependency.
+- Added "Operate" nav link from main landing page.
+
 ## 2026-03-10 — editor11: packages/profiles + proxy rename
 
 ### `packages/profiles` (new package — `@bpmn-sdk/profiles`)

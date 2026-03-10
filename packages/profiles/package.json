@@ -23,6 +23,7 @@
 	"dependencies": {
 		"@bpmn-sdk/api": "workspace:*"
 	},
+	"keywords": ["bpmn", "camunda", "profiles", "authentication", "oauth2", "cli", "typescript"],
 	"publishConfig": {
 		"access": "public"
 	},

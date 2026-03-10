@@ -1,0 +1,45 @@
+{
+	"name": "@bpmn-sdk/operate",
+	"version": "0.0.1",
+	"description": "Monitoring and operations frontend for Camunda 8 clusters — real-time SSE, zero dependencies",
+	"type": "module",
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js"
+		}
+	},
+	"files": ["dist/**/*.js", "dist/**/*.d.ts"],
+	"scripts": {
+		"build": "tsc",
+		"typecheck": "tsc --noEmit",
+		"check": "biome check ."
+	},
+	"dependencies": {
+		"@bpmn-sdk/api": "workspace:*",
+		"@bpmn-sdk/canvas": "workspace:*",
+		"@bpmn-sdk/core": "workspace:*",
+		"@bpmn-sdk/plugins": "workspace:*"
+	},
+	"keywords": [
+		"bpmn",
+		"camunda",
+		"operate",
+		"monitoring",
+		"operations",
+		"workflow",
+		"process-instances",
+		"incidents",
+		"typescript"
+	],
+	"license": "MIT",
+	"publishConfig": {
+		"access": "public"
+	},
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/bpmn-sdk/monorepo"
+	}
+}

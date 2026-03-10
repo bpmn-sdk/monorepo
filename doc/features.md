@@ -1,5 +1,21 @@
 # Features
 
+## Monitoring & Operations frontend (2026-03-10) — `packages/operate`
+
+- **`@bpmn-sdk/operate`**: Zero-dependency monitoring frontend. `createOperate({ container, mock?, proxyUrl?, profile?, theme? })` mounts full monitoring UI.
+- **Dashboard**: Stats cards for active instances, open incidents, active jobs, pending tasks, deployed processes. Clickable cards navigate to respective views.
+- **Processes view**: Table of deployed process definitions with name, ID, version, tag, tenant.
+- **Instances view**: Paginated table with state filter bar (All / Active / Completed / Terminated). Incident warning indicator per row.
+- **Instance detail**: BPMN canvas rendering with token-highlight (active = amber glow, visited = green tint, edge animations). Sidebar tabs: Variables, Incidents.
+- **Incidents view**: Table with error type, message, process, instance, state, age.
+- **Jobs view**: Table with type, worker, retries, state, error message.
+- **User Tasks view**: Table with name, assignee, process, state, due date, priority.
+- **Profile picker**: Header dropdown populated from `GET /profiles`; switching reconnects all SSE streams.
+- **Mock/demo mode**: Self-contained fixture data, no proxy needed. Used at `/operate` on landing page.
+- **SSE architecture**: proxy polls Camunda server-side, pushes events to frontend — clean frontend, no polling timers client-side.
+
+
+
 ## Landing page DMN/Form examples and live playground (2026-03-10) — `apps/landing`
 
 - **DMN & Forms section**: New landing page section with 3-tab showcase — DMN decision table builder, Camunda Form scaffold, and a full BPMN process referencing both (userTask → formId, businessRuleTask → decisionId).

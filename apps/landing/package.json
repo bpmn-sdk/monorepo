@@ -12,9 +12,10 @@
 	},
 	"dependencies": {
 		"@bpmn-sdk/canvas": "workspace:*",
-		"@bpmn-sdk/plugins": "workspace:*",
 		"@bpmn-sdk/core": "workspace:*",
 		"@bpmn-sdk/editor": "workspace:*",
-		"@bpmn-sdk/engine": "workspace:*"
+		"@bpmn-sdk/engine": "workspace:*",
+		"@bpmn-sdk/operate": "workspace:*",
+		"@bpmn-sdk/plugins": "workspace:*"
 	}
 }
