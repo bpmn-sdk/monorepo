@@ -1,5 +1,5 @@
+import { createAdminClientFromProfile, createClientFromProfile } from "@bpmn-sdk/profiles"
 import { parseArgs } from "./args.js"
-import { createAdminClientFromProfile, createClientFromProfile } from "./client.js"
 import { commandGroups } from "./commands/index.js"
 import { getRuntimeCompletions } from "./completion.js"
 import { printCommandHelp, printGlobalHelp, printGroupHelp, printVersion } from "./help.js"

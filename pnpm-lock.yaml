@@ -51,17 +51,14 @@ importers:
         specifier: ^4
         version: 4.71.0
 
-  apps/ai-server:
-    dependencies:
-      '@bpmn-sdk/core':
-        specifier: workspace:*
-        version: link:../../packages/core
-
   apps/cli:
     dependencies:
       '@bpmn-sdk/api':
         specifier: workspace:*
         version: link:../../packages/api
+      '@bpmn-sdk/profiles':
+        specifier: workspace:*
+        version: link:../../packages/profiles
 
   apps/desktop:
     dependencies:
@@ -118,6 +115,18 @@ importers:
         specifier: workspace:*
         version: link:../../packages/plugins
 
+  apps/proxy:
+    dependencies:
+      '@bpmn-sdk/api':
+        specifier: workspace:*
+        version: link:../../packages/api
+      '@bpmn-sdk/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@bpmn-sdk/profiles':
+        specifier: workspace:*
+        version: link:../../packages/profiles
+
   packages/api: {}
 
   packages/ascii:
@@ -171,6 +180,12 @@ importers:
       '@bpmn-sdk/feel':
         specifier: workspace:*
         version: link:../feel
+
+  packages/profiles:
+    dependencies:
+      '@bpmn-sdk/api':
+        specifier: workspace:*
+        version: link:../api
 
 packages:
 

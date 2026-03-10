@@ -1,4 +1,4 @@
-import { deleteProfile, getActiveName, listProfiles, useProfile } from "./profile.js"
+import { deleteProfile, getActiveName, listProfiles, useProfile } from "@bpmn-sdk/profiles"
 
 // ─── ANSI helpers ─────────────────────────────────────────────────────────────
 

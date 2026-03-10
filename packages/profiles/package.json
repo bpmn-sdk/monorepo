@@ -1,0 +1,33 @@
+{
+	"name": "@bpmn-sdk/profiles",
+	"version": "0.0.1",
+	"description": "Shared profile storage and auth client factory for @bpmn-sdk CLI and proxy server",
+	"type": "module",
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"import": "./dist/index.js",
+			"types": "./dist/index.d.ts"
+		}
+	},
+	"files": ["dist/**/*.js", "dist/**/*.d.ts"],
+	"engines": {
+		"node": ">=20"
+	},
+	"scripts": {
+		"build": "tsc",
+		"typecheck": "tsc --noEmit",
+		"check": "biome check ."
+	},
+	"dependencies": {
+		"@bpmn-sdk/api": "workspace:*"
+	},
+	"publishConfig": {
+		"access": "public"
+	},
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/bpmn-sdk/monorepo"
+	}
+}

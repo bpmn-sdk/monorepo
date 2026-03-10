@@ -1,5 +1,38 @@
 # Progress
 
+## 2026-03-10 — editor11: packages/profiles + proxy rename
+
+### `packages/profiles` (new package — `@bpmn-sdk/profiles`)
+- Moved `profile.ts` and `client.ts` from `apps/cli/src/` into this new shared package.
+- Added `src/token.ts`: `getAuthHeader(config): Promise<string>` — returns Authorization header for any auth type; OAuth2 tokens cached in-memory with automatic 60-second pre-expiry refresh.
+- Added `src/index.ts` re-exporting all public symbols.
+- `tsconfig.json` emits declarations (`declaration: true`) so downstream consumers get types.
+
+### `apps/ai-server` → `apps/proxy` (`@bpmn-sdk/proxy`)
+- Renamed directory and package name.
+- Added `@bpmn-sdk/api` and `@bpmn-sdk/profiles` as dependencies.
+- Added `GET /profiles` endpoint — returns all CLI profiles (name, active flag, apiType, baseUrl, authType).
+- Added `ALL /api/*` transparent proxy endpoint — reads `X-Profile` header or active profile, fetches auth token via `getAuthHeader`, forwards raw HTTP to `profile.baseUrl/*`, returns upstream response.
+- All existing AI bridge endpoints (`GET /status`, `POST /chat`) unchanged.
+
+### `apps/ai-server-rs` → `apps/proxy-rs`
+- Renamed directory and Cargo package name (`bpmn-ai-server` → `bpmn-proxy`).
+- Updated `build.rs`: pnpm filter `@bpmn-sdk/proxy`, source path `apps/proxy/dist/bridge.bundle.js`.
+- Updated `src/main.rs` and `src/mcp_main.rs`: `bpmn_ai_server::*` → `bpmn_proxy::*`.
+
+### `apps/cli`
+- Removed `src/profile.ts` and `src/client.ts` (moved to `packages/profiles`).
+- Added `@bpmn-sdk/profiles: workspace:*` dependency.
+- Updated all import sites: `profile-tui.ts`, `run.ts`, `commands/profile.ts`.
+
+### Supporting files
+- `apps/desktop/package.json`: `tauri:build` script path `ai-server-rs` → `proxy-rs`.
+- `apps/desktop/src-tauri/tauri.conf.json`: resource paths `ai-server-rs` → `proxy-rs`.
+- Root `package.json`: scripts `ai-server` → `proxy`, `ai-server-rs` → `proxy-rs`, `ai-server-rs:build` → `proxy-rs:build`.
+- `biome.json`: ignore pattern `apps/ai-server-rs/target/**` → `apps/proxy-rs/target/**`.
+
+---
+
 ## 2026-03-10 — editor11: Landing page SDK feature highlights
 
 ### `apps/landing/src/data/content.ts`
