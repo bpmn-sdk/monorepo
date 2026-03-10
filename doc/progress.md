@@ -1,5 +1,24 @@
 # Progress
 
+## 2026-03-10 — editor11: AI chat companion file generation
+
+After the AI generates and applies a BPMN diagram, the chat panel now detects referenced DMN decision tables (`businessRuleTask` with `decisionId`) and Forms (`userTask` with `formId`) and offers to scaffold and create those files as companions in the current project.
+
+### `packages/plugins/src/ai-bridge/panel.ts`
+- `showCompanionOffer(msgEl, xml, createFn)` — parses applied XML, extracts `decisionId`/`formId` references via `compactify`, and renders a UI block listing each referenced file with a "Create" button.
+- Each DMN button generates a scaffolded decision table via `Dmn.createDecisionTable(decisionId).name(...).build()` + `Dmn.export`.
+- Each Form button generates a minimal form via `Form.makeEmpty(formId)` + `Form.export`.
+- Appended to the message element after successful apply.
+
+### `packages/plugins/src/ai-bridge/index.ts`
+- `AiBridgePluginOptions.createCompanionFile?(name, type, content): Promise<void>` — new optional callback; passed through to `createAiPanel`.
+
+### `packages/plugins/src/ai-bridge/css.ts`
+- New styles: `.ai-companion-offer`, `.ai-companion-title`, `.ai-companion-row`, `.ai-companion-create` with dark and light theme variants.
+
+### `apps/landing/src/scripts/editor.ts`
+- Wires `createCompanionFile`: looks up current file's `workspaceId` via `getFiles(projectId)`, then calls `storagePlugin.api.createFile(...)` + `openFile(file.id)` to persist and open the companion. Falls back to opening an unsaved tab if no storage context.
+
 ## 2026-03-10 — editor11: DMN/Form layout, compact format, and MCP server multi-type support
 
 Extended `@bpmn-sdk/core` and the MCP server to fully support DMN and Form files alongside BPMN, with the same builder/export/layout pattern.

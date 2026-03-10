@@ -55,6 +55,11 @@ export interface AiBridgePluginOptions {
 	onOpen?: () => void
 	/** Returns the current editor theme — used to match the diagram preview color scheme. */
 	getTheme?(): "dark" | "light"
+	/**
+	 * Called when the user requests creation of a companion DMN or Form file.
+	 * Receives a suggested file name, file type, and the serialized content.
+	 */
+	createCompanionFile?(name: string, type: "dmn" | "form", content: string): Promise<void>
 }
 
 const AI_ICON = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6"/><path d="M5.5 6.5C5.5 5.4 6.4 4.5 7.5 4.5h1C9.6 4.5 10.5 5.4 10.5 6.5S9.6 8.5 8.5 8.5H8V10"/><circle cx="8" cy="12" r="0.5" fill="currentColor" stroke="none"/></svg>`
@@ -89,6 +94,7 @@ export function createAiBridgePlugin(options: AiBridgePluginOptions): {
 				getDefinitions: options.getDefinitions,
 				loadXml: options.loadXml,
 				getCurrentContext: options.getCurrentContext,
+				createCompanionFile: options.createCompanionFile,
 				getTheme: options.getTheme
 					? options.getTheme
 					: _canvasApi

@@ -1,5 +1,5 @@
 import type { CanvasApi, CanvasPlugin } from "@bpmn-sdk/canvas"
-import { Bpmn, Dmn } from "@bpmn-sdk/core"
+import { Bpmn, Dmn, Form } from "@bpmn-sdk/core"
 import { BpmnEditor, createSideDock, initEditorHud } from "@bpmn-sdk/editor"
 import type { Tool } from "@bpmn-sdk/editor"
 import { Engine } from "@bpmn-sdk/engine"
@@ -359,6 +359,33 @@ const aiBridgePlugin = createAiBridgePlugin({
 	onOpen: () => {
 		if (dock.collapsed) dock.expand()
 		dock.switchTab("ai")
+	},
+	createCompanionFile: async (name, type, content) => {
+		const ctx = bridge.storagePlugin.api.getCurrentContext()
+		if (ctx) {
+			// Find workspaceId from the current file's record
+			const files = await bridge.storagePlugin.api.getFiles(ctx.projectId)
+			const currentFile = files.find((f) => f.id === ctx.fileId)
+			if (currentFile) {
+				const file = await bridge.storagePlugin.api.createFile(
+					ctx.projectId,
+					currentFile.workspaceId,
+					name,
+					type,
+					content,
+				)
+				await bridge.storagePlugin.api.openFile(file.id)
+				return
+			}
+		}
+		// No storage context (or file lookup failed) — open as an unsaved tab
+		if (type === "dmn") {
+			const defs = Dmn.parse(content)
+			bridge.tabsPlugin.api.openTab({ type: "dmn", defs, name })
+		} else {
+			const form = Form.parse(content)
+			bridge.tabsPlugin.api.openTab({ type: "form", form, name })
+		}
 	},
 })
 
