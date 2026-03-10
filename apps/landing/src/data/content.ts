@@ -21,7 +21,10 @@ export const PACKAGES = [
 		description:
 			"Fluent process builder, BPMN 2.0 parser/serializer, DMN support, " +
 			"AI-compact format (compactify/expand), auto-layout (Sugiyama algorithm), " +
-			"SVG export (zero deps, all runtimes)",
+			"SVG export (zero deps, all runtimes). " +
+			"Includes 22 TypeScript type guard predicates (isBpmnServiceTask, isBpmnGateway…), " +
+			"typed error classes (ParseError, ValidationError — instanceof-catchable), " +
+			"and element lookup utilities (findElement, getZeebeExtensions, etc.)",
 	},
 	{
 		name: "@bpmn-sdk/engine",
@@ -65,6 +68,10 @@ export const FEATURES = [
 	"Camunda 8 ready: native Zeebe task definitions, IO mappings, connectors, forms",
 	"Roundtrip fidelity: parse → modify → export without data loss",
 	"SVG export: generate diagram images from BpmnDefinitions — zero deps, works in Node.js, browser, Deno, Bun",
+	"Type guards: 22 predicates (isBpmnServiceTask, isBpmnGateway…) narrow BpmnFlowElement unions at compile time",
+	"Typed errors: ParseError and ValidationError extend a common BpmnSdkError base — all instanceof-catchable with error codes",
+	"Element lookup utilities: findElement, findProcess, getZeebeExtensions and friends traverse parsed diagrams",
+	"Full JSDoc coverage: @param, @returns, @throws, @example on every public API",
 	"Simulation engine: deploy and run processes locally, register job workers, evaluate DMN",
 	"REST API client: full Camunda 8 Orchestration Cluster API coverage",
 	"CLI: arrow-key TUI, connection profiles, tabular results",
@@ -214,6 +221,33 @@ const form = Form.makeEmpty("ApplicationForm");
 
 const json = Form.export(form); // ✓ valid Camunda form JSON`,
 
+	typeGuards: `\
+import {
+  Bpmn, findElement, getZeebeExtensions,
+  isBpmnServiceTask, isBpmnGateway,
+  ParseError,
+} from "@bpmn-sdk/core";
+
+try {
+  const defs = Bpmn.parse(xml); // throws ParseError if invalid
+
+  const el = findElement(defs, "task1");
+  if (isBpmnServiceTask(el)) {
+    // el is BpmnServiceTask ✓ — no cast needed
+    const ext = getZeebeExtensions(el.extensionElements);
+    console.log(ext.taskDefinition?.type); // "my-worker"
+  }
+
+  if (isBpmnGateway(el)) {
+    console.log("gateway:", el.type); // narrowed to gateway types
+  }
+} catch (err) {
+  if (err instanceof ParseError) {
+    // Typed, instanceof-catchable ✓
+    console.error(err.code, err.message);
+  }
+}`,
+
 	bpmnWithCompanions: `\
 import { Bpmn } from "@bpmn-sdk/core";
 
@@ -360,6 +394,32 @@ client.<span class="fn">on</span>(<span class="str">"error"</span>,   (e) => met
 <span class="comment">// { type: "submit",    label: "Submit Application" }</span>
 
 <span class="kw">const</span> json = Form.<span class="fn">export</span>(form); <span class="comment">// ✓ valid Camunda form JSON</span>`,
+
+	typeGuards: `<span class="kw">import</span> {
+  Bpmn, findElement, getZeebeExtensions,
+  isBpmnServiceTask, isBpmnGateway,
+  ParseError,
+} <span class="kw">from</span> <span class="str">"@bpmn-sdk/core"</span>;
+
+<span class="kw">try</span> {
+  <span class="kw">const</span> defs = Bpmn.<span class="fn">parse</span>(xml); <span class="comment">// throws ParseError if invalid</span>
+
+  <span class="kw">const</span> el = <span class="fn">findElement</span>(defs, <span class="str">"task1"</span>);
+  <span class="kw">if</span> (<span class="fn">isBpmnServiceTask</span>(el)) {
+    <span class="comment">// el is BpmnServiceTask ✓ — no cast needed</span>
+    <span class="kw">const</span> ext = <span class="fn">getZeebeExtensions</span>(el.extensionElements);
+    console.log(ext.taskDefinition?.type); <span class="comment">// "my-worker"</span>
+  }
+
+  <span class="kw">if</span> (<span class="fn">isBpmnGateway</span>(el)) {
+    console.log(<span class="str">"gateway:"</span>, el.type); <span class="comment">// narrowed to gateway types</span>
+  }
+} <span class="kw">catch</span> (err) {
+  <span class="kw">if</span> (err <span class="kw">instanceof</span> ParseError) {
+    <span class="comment">// Typed, instanceof-catchable ✓</span>
+    console.error(err.code, err.message);
+  }
+}`,
 
 	bpmnWithCompanions: `<span class="kw">import</span> { Bpmn } <span class="kw">from</span> <span class="str">"@bpmn-sdk/core"</span>;
 

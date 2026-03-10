@@ -2179,6 +2179,101 @@ a:hover {
 	}
 }
 
+/* ── SDK Developer Experience Section ───────────────────────────── */
+.sdk-dx-section {
+	padding: 120px 0;
+}
+
+.sdk-dx-layout {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 64px;
+	align-items: start;
+	margin-top: 56px;
+}
+
+.sdk-dx-features {
+	display: flex;
+	flex-direction: column;
+	gap: 32px;
+}
+
+.sdk-dx-item {
+	display: flex;
+	gap: 16px;
+	align-items: flex-start;
+}
+
+.sdk-dx-bullet {
+	flex-shrink: 0;
+	width: 32px;
+	height: 32px;
+	border-radius: 8px;
+	background: oklch(55% 0.28 280 / 0.12);
+	border: 1px solid oklch(55% 0.28 280 / 0.25);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	color: var(--accent-bright);
+	margin-top: 2px;
+}
+
+.sdk-dx-item h3 {
+	font-size: 15px;
+	font-weight: 600;
+	margin: 0 0 6px;
+	color: var(--text);
+}
+
+.sdk-dx-item p {
+	font-size: 13.5px;
+	color: var(--text-muted);
+	line-height: 1.6;
+	margin: 0;
+}
+
+.sdk-dx-code-panel {
+	background: var(--surface);
+	border: 1px solid var(--border);
+	border-radius: 12px;
+	overflow: hidden;
+	position: sticky;
+	top: 80px;
+}
+
+.sdk-dx-code-body {
+	padding: 20px 24px;
+	overflow-x: auto;
+}
+
+.sdk-dx-code-body pre {
+	margin: 0;
+	font-size: 12.5px;
+	line-height: 1.65;
+}
+
+.sdk-dx-code-body .kw {
+	color: #c792ea;
+}
+.sdk-dx-code-body .str {
+	color: #c3e88d;
+}
+.sdk-dx-code-body .fn {
+	color: var(--accent-bright);
+}
+.sdk-dx-code-body .comment {
+	color: #546e7a;
+}
+
+@media (max-width: 900px) {
+	.sdk-dx-layout {
+		grid-template-columns: 1fr;
+	}
+	.sdk-dx-code-panel {
+		position: static;
+	}
+}
+
 /* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
 	*,

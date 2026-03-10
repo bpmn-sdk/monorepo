@@ -9,6 +9,7 @@ const apiCode = CODE_HTML.apiClient
 const dmnTableCode = CODE_HTML.dmnTable
 const formExampleCode = CODE_HTML.formExample
 const bpmnWithCompanionsCode = CODE_HTML.bpmnWithCompanions
+const typeGuardsCode = CODE_HTML.typeGuards
 ---
 
 <!DOCTYPE html>
@@ -171,7 +172,12 @@ const bpmnWithCompanionsCode = CODE_HTML.bpmnWithCompanions
             <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
           </div>
           <h3>Type-Safe</h3>
-          <p>Strict TypeScript throughout. Every element, attribute, and Zeebe extension is fully typed. Invalid processes fail at compile time.</p>
+          <p>Strict TypeScript throughout. 22 type guard predicates narrow the <code>BpmnFlowElement</code> union. Typed errors are <code>instanceof</code>-catchable.</p>
+          <div class="bcard-chips">
+            <span class="dmn-chip">22 type guards</span>
+            <span class="dmn-chip">ParseError / ValidationError</span>
+            <span class="dmn-chip">findElement / getZeebeExtensions</span>
+          </div>
         </div>
 
         <!-- Wide: Roundtrip -->
@@ -200,6 +206,68 @@ const bpmnWithCompanionsCode = CODE_HTML.bpmnWithCompanions
           <div>
             <h3>Camunda&nbsp;8 Ready</h3>
             <p>Native Zeebe task definitions, IO mappings, connectors, forms, and modeler templates. Deploy directly to Camunda Cloud.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── SDK Developer Experience ────────────────────────────────────────── -->
+  <section class="sdk-dx-section">
+    <div class="section-wrap">
+      <div class="section-eyebrow">SDK Quality</div>
+      <h2 class="section-h2">TypeScript-first,<br>from top to bottom</h2>
+      <div class="sdk-dx-layout">
+        <!-- Left: feature list -->
+        <div class="sdk-dx-features">
+          <div class="sdk-dx-item">
+            <div class="sdk-dx-bullet" aria-hidden="true">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            </div>
+            <div>
+              <h3>22 Type Guard Predicates</h3>
+              <p>Narrow <code>BpmnFlowElement</code> to a specific type without casting. One predicate per BPMN element type — <code>isBpmnServiceTask</code>, <code>isBpmnParallelGateway</code>, <code>isBpmnBoundaryEvent</code>, and group guards like <code>isBpmnGateway</code>, <code>isBpmnActivity</code>, <code>isBpmnEvent</code>.</p>
+            </div>
+          </div>
+          <div class="sdk-dx-item">
+            <div class="sdk-dx-bullet" aria-hidden="true">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            </div>
+            <div>
+              <h3>Typed Error Classes</h3>
+              <p><code>ParseError</code> (malformed XML) and <code>ValidationError</code> (builder rule violations) both extend <code>BpmnSdkError</code>. Every error carries a machine-readable <code>code</code> string — no string matching on <code>err.message</code>.</p>
+            </div>
+          </div>
+          <div class="sdk-dx-item">
+            <div class="sdk-dx-bullet" aria-hidden="true">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            </div>
+            <div>
+              <h3>Element Lookup Utilities</h3>
+              <p><code>findElement</code>, <code>findProcess</code>, <code>findSequenceFlow</code>, <code>getAllElements</code>, and <code>getZeebeExtensions</code> give you a clean query layer over the parsed model — no manual array traversal.</p>
+            </div>
+          </div>
+          <div class="sdk-dx-item">
+            <div class="sdk-dx-bullet" aria-hidden="true">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+            </div>
+            <div>
+              <h3>Full JSDoc Coverage</h3>
+              <p>Every public API has <code>@param</code>, <code>@returns</code>, <code>@throws</code>, and <code>@example</code> documentation. Hover any function in your IDE and get complete usage guidance inline.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right: code panel -->
+        <div class="sdk-dx-code-panel">
+          <div class="diagram-topbar">
+            <span class="tb-dot tb-red"></span>
+            <span class="tb-dot tb-yellow"></span>
+            <span class="tb-dot tb-green"></span>
+            <span class="tb-title">type-guards.ts</span>
+          </div>
+          <div class="sdk-dx-code-body">
+            <pre><code set:html={typeGuardsCode}></code></pre>
           </div>
         </div>
       </div>

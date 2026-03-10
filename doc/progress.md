@@ -1,5 +1,21 @@
 # Progress
 
+## 2026-03-10 — editor11: Landing page SDK feature highlights
+
+### `apps/landing/src/data/content.ts`
+- Updated `PACKAGES[0].description` for `@bpmn-sdk/core` to mention type guards, typed errors, and lookup utilities.
+- Added 4 new `FEATURES` bullets: type guards, typed errors, element lookup utilities, full JSDoc coverage.
+- Added `typeGuards` code example (plain + HTML-highlighted) demonstrating `isBpmnServiceTask`, `findElement`, `getZeebeExtensions`, and `instanceof ParseError` pattern.
+
+### `apps/landing/src/pages/index.astro`
+- Expanded "Type-Safe" bento card to include chips: "22 type guards", "ParseError / ValidationError", "findElement / getZeebeExtensions".
+- Added new "SDK Developer Experience" section between the bento and code comparison, with a four-item feature list and a sticky code panel showing the type guard + error handling pattern.
+
+### `apps/landing/src/styles/global.css`
+- Added `.sdk-dx-section`, `.sdk-dx-layout`, `.sdk-dx-features`, `.sdk-dx-item`, `.sdk-dx-bullet`, `.sdk-dx-code-panel`, `.sdk-dx-code-body` styles including responsive breakpoint.
+
+---
+
 ## 2026-03-10 — editor11: @bpmn-sdk/core SDK improvements
 
 ### `packages/core/src/errors.ts` (new)
