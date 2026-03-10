@@ -1,13 +1,18 @@
 #!/usr/bin/env node
 /**
- * Minimal stdio MCP server for BPMN diagram editing.
+ * Minimal stdio MCP server for BPMN/DMN/Form editing.
  * Zero external dependencies — pure Node.js built-ins + @bpmn-sdk/core (workspace package).
  *
- * State is stored as BpmnDefinitions (BPMN XML) so core builder APIs (e.g. restConnector)
- * produce the correct zeebe:ioMapping extension structure — not the lossy CompactDiagram format.
+ * State is stored as the native model (BpmnDefinitions, DmnDefinitions, or FormDefinition)
+ * so core builder APIs produce the correct structure.
  *
  * Usage:
- *   node dist/mcp-server.js [--input <diagram.bpmn>] [--output <result.bpmn>]
+ *   node dist/mcp-server.js [--input <file>] [--output <file>]
+ *
+ * File type is detected from input file content:
+ *   - DMN XML  → DmnDefinitions
+ *   - Form JSON → FormDefinition
+ *   - BPMN XML  → BpmnDefinitions (default)
  */
 
 import { readFileSync, writeFileSync } from "node:fs"
@@ -24,11 +29,21 @@ import {
 	type CompactDiagram,
 	type CompactElement,
 	type CompactFlow,
+	Dmn,
+	type DmnDefinitions,
+	Form,
+	type FormDefinition,
 	type RestConnectorConfig,
 	compactify,
+	compactifyDmn,
+	compactifyForm,
 	expand,
+	expandDmn,
+	expandForm,
+	layoutDmn,
 	layoutProcess,
 } from "@bpmn-sdk/core"
+import type { CompactDmn, CompactForm } from "@bpmn-sdk/core"
 
 // ── CLI args ──────────────────────────────────────────────────────────────────
 
@@ -42,18 +57,46 @@ const outputFile = getArg("--output")
 
 // ── State ─────────────────────────────────────────────────────────────────────
 
-let state: BpmnDefinitions = Bpmn.parse(Bpmn.makeEmpty("Process_1", "New Process"))
+type McpState =
+	| { kind: "bpmn"; data: BpmnDefinitions }
+	| { kind: "dmn"; data: DmnDefinitions }
+	| { kind: "form"; data: FormDefinition }
+
+function detectStateKind(content: string): "bpmn" | "dmn" | "form" {
+	const trimmed = content.trimStart()
+	if (trimmed.startsWith("{") || trimmed.startsWith("[")) return "form"
+	if (
+		trimmed.includes("https://www.omg.org/spec/DMN") ||
+		(trimmed.includes("<definitions") && trimmed.includes("decision"))
+	)
+		return "dmn"
+	return "bpmn"
+}
+
+let state: McpState = {
+	kind: "bpmn",
+	data: Bpmn.parse(Bpmn.makeEmpty("Process_1", "New Process")),
+}
 
 if (inputFile) {
 	try {
-		// Input is BPMN XML written by index.ts (expand + Bpmn.export)
-		state = Bpmn.parse(readFileSync(inputFile, "utf8"))
+		const content = readFileSync(inputFile, "utf8")
+		const kind = detectStateKind(content)
+		if (kind === "dmn") {
+			state = { kind: "dmn", data: Dmn.parse(content) }
+		} else if (kind === "form") {
+			state = { kind: "form", data: Form.parse(content) }
+		} else {
+			state = { kind: "bpmn", data: Bpmn.parse(content) }
+		}
 	} catch {
-		/* start with empty diagram if file is unreadable */
+		/* start with empty BPMN diagram if file is unreadable */
 	}
 }
 
-function buildDiagram(proc: BpmnProcess): BpmnDiagram {
+// ── BPMN helpers ──────────────────────────────────────────────────────────────
+
+function buildBpmnDiagram(proc: BpmnProcess): BpmnDiagram {
 	const layout = layoutProcess(proc)
 	const shapes: BpmnDiShape[] = layout.nodes.map((n) => ({
 		id: `${n.id}_di`,
@@ -82,8 +125,15 @@ function buildDiagram(proc: BpmnProcess): BpmnDiagram {
 
 function saveState(): void {
 	if (!outputFile) return
-	state.diagrams = state.processes.map((proc) => buildDiagram(proc))
-	writeFileSync(outputFile, Bpmn.export(state))
+	if (state.kind === "bpmn") {
+		state.data.diagrams = state.data.processes.map((proc) => buildBpmnDiagram(proc))
+		writeFileSync(outputFile, Bpmn.export(state.data))
+	} else if (state.kind === "dmn") {
+		const laid = layoutDmn(state.data)
+		writeFileSync(outputFile, Dmn.export(laid))
+	} else {
+		writeFileSync(outputFile, Form.export(state.data))
+	}
 }
 
 function recomputeIncomingOutgoing(proc: BpmnProcess): void {
@@ -102,11 +152,13 @@ function recomputeIncomingOutgoing(proc: BpmnProcess): void {
 }
 
 function findProcess(processId: string): BpmnProcess | undefined {
-	return state.processes.find((p) => p.id === processId)
+	if (state.kind !== "bpmn") return undefined
+	return state.data.processes.find((p) => p.id === processId)
 }
 
 function ensureProcess(processId: string): BpmnProcess {
-	let proc = state.processes.find((p) => p.id === processId)
+	if (state.kind !== "bpmn") throw new Error("Current file is not a BPMN diagram")
+	let proc = state.data.processes.find((p) => p.id === processId)
 	if (!proc) {
 		proc = {
 			id: processId,
@@ -118,15 +170,12 @@ function ensureProcess(processId: string): BpmnProcess {
 			associations: [],
 			unknownAttributes: {},
 		}
-		state.processes.push(proc)
+		state.data.processes.push(proc)
 	}
 	return proc
 }
 
 // ── Tool definitions ──────────────────────────────────────────────────────────
-//
-// IMPORTANT: add_http_call is listed FIRST (after get_diagram) so the LLM
-// encounters it before add_elements and uses it for any HTTP/REST task.
 
 const ELEMENT_SCHEMA = {
 	type: "object",
@@ -180,73 +229,66 @@ const FLOW_SCHEMA = {
 	required: ["id", "from", "to"],
 }
 
-const TOOLS = [
+const COMPOSE_TOOL = {
+	name: "compose_diagram",
+	description:
+		"Run a JavaScript snippet to make complex multi-step changes in a single call.\n" +
+		"Prefer this over multiple separate tool calls when building from scratch or doing batch edits.\n" +
+		"\n" +
+		"BPMN Bridge API:\n" +
+		"  Bridge.mcpGetDiagram() → CompactDiagram JSON\n" +
+		"  Bridge.mcpAddElements(processId, elementsJson, flowsJson) → result\n" +
+		"  Bridge.mcpRemoveElements(processId, elementIdsJson, flowIdsJson) → result\n" +
+		"  Bridge.mcpUpdateElement(processId, elementId, changesJson) → result\n" +
+		"  Bridge.mcpSetCondition(processId, flowId, conditionJson) → result\n" +
+		"  Bridge.mcpReplaceDiagram(compactJson) → result\n" +
+		"  Bridge.mcpAddHttpCall(processId, configJson) → result\n" +
+		"  Bridge.mcpExportXml() → XML string\n" +
+		"\n" +
+		"DMN Bridge API:\n" +
+		"  Bridge.mcpGetDiagram() → CompactDmn JSON\n" +
+		"  Bridge.mcpReplaceDiagram(compactDmnJson) → result\n" +
+		"  Bridge.mcpExportXml() → DMN XML string\n" +
+		"\n" +
+		"Form Bridge API:\n" +
+		"  Bridge.mcpGetDiagram() → CompactForm JSON\n" +
+		"  Bridge.mcpReplaceDiagram(compactFormJson) → result\n" +
+		"  Bridge.mcpExportXml() → Form JSON string\n" +
+		"\n" +
+		"Use `return` to return the final result string.",
+	inputSchema: {
+		type: "object",
+		properties: {
+			code: { type: "string", description: "JavaScript snippet to run against the Bridge API" },
+		},
+		required: ["code"],
+	},
+}
+
+const BPMN_TOOLS = [
 	{
 		name: "get_diagram",
-		description: "Return the current BPMN diagram. Call this first before making any changes.",
+		description:
+			"Return the current BPMN diagram as a compact JSON. Call this first before making any changes.",
 		inputSchema: { type: "object", properties: {} },
 	},
-	{
-		name: "compose_diagram",
-		description:
-			"Run a JavaScript snippet to make complex multi-step diagram changes in a single call.\n" +
-			"Prefer this over multiple separate tool calls when building a process from scratch,\n" +
-			"doing batch edits, or applying conditional logic.\n" +
-			"\n" +
-			"Bridge API (all JSON args are strings — use JSON.stringify/JSON.parse):\n" +
-			"  Bridge.mcpGetDiagram() → CompactDiagram JSON string\n" +
-			"  Bridge.mcpAddElements(processId, elementsJson, flowsJson) → result string\n" +
-			"  Bridge.mcpRemoveElements(processId, elementIdsJson, flowIdsJson) → result string\n" +
-			"  Bridge.mcpUpdateElement(processId, elementId, changesJson) → result string\n" +
-			"  Bridge.mcpSetCondition(processId, flowId, conditionJson) → result string\n" +
-			"  Bridge.mcpReplaceDiagram(compactJson) → result string\n" +
-			"  Bridge.mcpAddHttpCall(processId, configJson) → result string\n" +
-			"    configJson fields: {id, name, method, url, headers?, body?, resultVariable?}\n" +
-			"  Bridge.mcpExportXml() → BPMN XML string\n" +
-			"\n" +
-			"Use `return` to return the final result string.\n" +
-			"Example: const d=JSON.parse(Bridge.mcpGetDiagram()); " +
-			"Bridge.mcpAddElements(d.processes[0].id, JSON.stringify([{id:'t1',type:'serviceTask',name:'Do Work'}]), JSON.stringify([{id:'f1',from:'start',to:'t1'}])); " +
-			"return 'done';",
-		inputSchema: {
-			type: "object",
-			properties: {
-				code: { type: "string", description: "JavaScript snippet to run against the Bridge API" },
-			},
-			required: ["code"],
-		},
-	},
+	COMPOSE_TOOL,
 	{
 		name: "add_http_call",
 		description:
 			"⚠️ ALWAYS use this tool — not add_elements — for any HTTP/REST API call, webhook, or external service integration.\n" +
-			"Adds a Camunda HTTP connector service task (jobType: io.camunda:http-json:1) with the correct zeebe:ioMapping inputs.\n" +
-			"Use your knowledge of the target API to provide a real endpoint URL, not a placeholder.",
+			"Adds a Camunda HTTP connector service task (jobType: io.camunda:http-json:1) with the correct zeebe:ioMapping inputs.",
 		inputSchema: {
 			type: "object",
 			properties: {
 				processId: { type: "string" },
-				id: { type: "string", description: "Unique element ID" },
-				name: { type: "string", description: "Task display name" },
-				url: {
-					type: "string",
-					description:
-						"Full API endpoint URL. Use your knowledge — e.g. https://api.github.com/repos/{owner}/{repo}/issues for GitHub.",
-				},
+				id: { type: "string" },
+				name: { type: "string" },
+				url: { type: "string" },
 				method: { type: "string", enum: ["GET", "POST", "PUT", "PATCH", "DELETE"] },
-				headers: {
-					type: "string",
-					description:
-						'Optional JSON string of HTTP headers, e.g. {"Authorization":"Bearer {{token}}","Accept":"application/json"}',
-				},
-				body: {
-					type: "string",
-					description: "Optional FEEL expression for the request body (POST/PUT/PATCH)",
-				},
-				resultVariable: {
-					type: "string",
-					description: "Optional process variable name to store the HTTP response",
-				},
+				headers: { type: "string" },
+				body: { type: "string" },
+				resultVariable: { type: "string" },
 			},
 			required: ["processId", "id", "name", "url", "method"],
 		},
@@ -255,30 +297,20 @@ const TOOLS = [
 		name: "add_elements",
 		description:
 			"Add BPMN elements (tasks, events, gateways) and/or sequence flows to a process.\n" +
-			"⚠️ NOT for HTTP/REST API calls — use add_http_call for those.\n" +
-			"Creates the process if it does not exist.",
+			"⚠️ NOT for HTTP/REST API calls — use add_http_call for those.",
 		inputSchema: {
 			type: "object",
 			properties: {
-				processId: { type: "string", description: "Target process ID" },
-				elements: {
-					type: "array",
-					items: ELEMENT_SCHEMA,
-					description: "BPMN elements to add",
-				},
-				flows: {
-					type: "array",
-					items: FLOW_SCHEMA,
-					description: "Sequence flows to add",
-				},
+				processId: { type: "string" },
+				elements: { type: "array", items: ELEMENT_SCHEMA },
+				flows: { type: "array", items: FLOW_SCHEMA },
 			},
 			required: ["processId"],
 		},
 	},
 	{
 		name: "remove_elements",
-		description:
-			"Remove BPMN elements and/or sequence flows. Removing an element also removes its connecting flows.",
+		description: "Remove BPMN elements and/or sequence flows.",
 		inputSchema: {
 			type: "object",
 			properties: {
@@ -299,9 +331,7 @@ const TOOLS = [
 				elementId: { type: "string" },
 				changes: {
 					type: "object",
-					properties: { name: { type: "string", description: "New display name" } },
-					description:
-						"Fields to update — only name is supported; use remove + add for structural changes",
+					properties: { name: { type: "string" } },
 				},
 			},
 			required: ["processId", "elementId", "changes"],
@@ -315,22 +345,21 @@ const TOOLS = [
 			properties: {
 				processId: { type: "string" },
 				flowId: { type: "string" },
-				condition: { description: "FEEL expression string, or null to remove the condition" },
+				condition: { description: "FEEL expression string, or null to remove" },
 			},
 			required: ["processId", "flowId", "condition"],
 		},
 	},
 	{
 		name: "replace_diagram",
-		description:
-			"Replace the entire diagram. Use only when creating a new diagram from scratch or doing a full structural rewrite.",
+		description: "Replace the entire BPMN diagram. Use only when creating from scratch.",
 		inputSchema: {
 			type: "object",
 			properties: {
 				diagram: {
 					type: "object",
 					description:
-						"Complete diagram object: { id, processes: [{ id, name?, elements: [...], flows: [...] }] }",
+						"CompactDiagram: { id, processes: [{ id, name?, elements: [...], flows: [...] }] }",
 				},
 			},
 			required: ["diagram"],
@@ -338,20 +367,79 @@ const TOOLS = [
 	},
 ]
 
+const DMN_TOOLS = [
+	{
+		name: "get_diagram",
+		description:
+			"Return the current DMN diagram as a compact JSON. Call this first before making any changes.",
+		inputSchema: { type: "object", properties: {} },
+	},
+	COMPOSE_TOOL,
+	{
+		name: "replace_diagram",
+		description:
+			"Replace the entire DMN diagram. Use when creating from scratch or doing a full rewrite.",
+		inputSchema: {
+			type: "object",
+			properties: {
+				diagram: {
+					type: "object",
+					description:
+						"CompactDmn: { id, name, decisions: [{ id, name?, inputs, outputs, rules, requires? }], inputData: [...] }",
+				},
+			},
+			required: ["diagram"],
+		},
+	},
+]
+
+const FORM_TOOLS = [
+	{
+		name: "get_diagram",
+		description:
+			"Return the current form as a compact JSON. Call this first before making any changes.",
+		inputSchema: { type: "object", properties: {} },
+	},
+	COMPOSE_TOOL,
+	{
+		name: "replace_diagram",
+		description: "Replace the entire form. Use when creating from scratch or doing a full rewrite.",
+		inputSchema: {
+			type: "object",
+			properties: {
+				diagram: {
+					type: "object",
+					description:
+						"CompactForm: { id, fields: [{ type, id, label?, key?, required?, values?, fields? }] }",
+				},
+			},
+			required: ["diagram"],
+		},
+	},
+]
+
+function getTools(): typeof BPMN_TOOLS {
+	if (state.kind === "dmn") return DMN_TOOLS
+	if (state.kind === "form") return FORM_TOOLS
+	return BPMN_TOOLS
+}
+
 // ── Tool execution ────────────────────────────────────────────────────────────
 
 function callTool(name: string, args: Record<string, unknown>): string {
 	process.stderr.write(`[mcp] tool: ${name} args: ${JSON.stringify(args)}\n`)
 	switch (name) {
-		case "get_diagram":
-			return JSON.stringify(compactify(state), null, 2)
+		case "get_diagram": {
+			if (state.kind === "dmn") return JSON.stringify(compactifyDmn(state.data), null, 2)
+			if (state.kind === "form") return JSON.stringify(compactifyForm(state.data), null, 2)
+			return JSON.stringify(compactify(state.data), null, 2)
+		}
 
 		case "add_elements": {
 			const proc = ensureProcess(args.processId as string)
 			const elements = (args.elements as CompactElement[] | undefined) ?? []
 			const flows = (args.flows as CompactFlow[] | undefined) ?? []
 
-			// Use expand() to create properly structured BpmnFlowElement objects
 			const miniCompact: CompactDiagram = {
 				id: "__temp__",
 				processes: [{ id: proc.id, elements, flows }],
@@ -434,9 +522,6 @@ function callTool(name: string, args: Record<string, unknown>): string {
 			if (args.body) config.body = args.body as string
 			if (args.resultVariable) config.resultVariable = args.resultVariable as string
 
-			// Use ProcessBuilder.restConnector() to create the correct zeebe:ioMapping structure.
-			// This is essential: compact.ts creates zeebe:taskHeaders, but the Camunda HTTP
-			// connector reads from zeebe:ioMapping inputs — these are completely different.
 			const tempDefs = Bpmn.createProcess("__temp__")
 				.restConnector(args.id as string, config)
 				.build()
@@ -454,52 +539,23 @@ function callTool(name: string, args: Record<string, unknown>): string {
 		}
 
 		case "replace_diagram": {
-			state = expand(args.diagram as CompactDiagram)
+			const raw = args.diagram as unknown
+			if (state.kind === "dmn") {
+				state = { kind: "dmn", data: expandDmn(raw as CompactDmn) }
+			} else if (state.kind === "form") {
+				state = { kind: "form", data: expandForm(raw as CompactForm) }
+			} else {
+				state = { kind: "bpmn", data: expand(raw as CompactDiagram) }
+			}
 			saveState()
 			return "Diagram replaced."
 		}
 
 		case "compose_diagram": {
 			const code = args.code as string
-			// Build a Bridge object that mirrors bridge.ts Bridge API, delegating to callTool.
-			// Runs in a vm context: no fs, no net, no process — only Bridge and ECMAScript builtins.
-			const bridge = {
-				mcpGetDiagram: () => callTool("get_diagram", {}),
-				mcpAddElements: (processId: string, elementsJson: string, flowsJson: string) =>
-					callTool("add_elements", {
-						processId,
-						elements: JSON.parse(elementsJson),
-						flows: JSON.parse(flowsJson),
-					}),
-				mcpRemoveElements: (processId: string, elementIdsJson: string, flowIdsJson: string) =>
-					callTool("remove_elements", {
-						processId,
-						elementIds: JSON.parse(elementIdsJson),
-						flowIds: JSON.parse(flowIdsJson),
-					}),
-				mcpUpdateElement: (processId: string, elementId: string, changesJson: string) =>
-					callTool("update_element", {
-						processId,
-						elementId,
-						changes: JSON.parse(changesJson),
-					}),
-				mcpSetCondition: (processId: string, flowId: string, conditionJson: string) =>
-					callTool("set_condition", {
-						processId,
-						flowId,
-						condition: JSON.parse(conditionJson),
-					}),
-				mcpReplaceDiagram: (compactJson: string) =>
-					callTool("replace_diagram", { diagram: JSON.parse(compactJson) }),
-				mcpAddHttpCall: (processId: string, configJson: string) => {
-					const cfg = JSON.parse(configJson) as Record<string, unknown>
-					return callTool("add_http_call", { processId, ...cfg })
-				},
-				mcpExportXml: () => {
-					state.diagrams = state.processes.map((proc) => buildDiagram(proc))
-					return Bpmn.export(state)
-				},
-			}
+
+			// Build Bridge object that mirrors bridge.ts API, extended for DMN/Form types.
+			const bridge = buildBridge()
 			const ctx = vm.createContext({ Bridge: bridge })
 			try {
 				const result = vm.runInContext(`(function(){\n${code}\n})()`, ctx, { timeout: 5000 })
@@ -513,6 +569,59 @@ function callTool(name: string, args: Record<string, unknown>): string {
 
 		default:
 			throw new Error(`Unknown tool: ${name}`)
+	}
+}
+
+function buildBridge(): Record<string, unknown> {
+	const base = {
+		mcpGetDiagram: () => callTool("get_diagram", {}),
+		mcpReplaceDiagram: (compactJson: string) =>
+			callTool("replace_diagram", { diagram: JSON.parse(compactJson) }),
+		mcpExportXml: () => {
+			if (state.kind === "dmn") {
+				return Dmn.export(layoutDmn(state.data))
+			}
+			if (state.kind === "form") {
+				return Form.export(state.data)
+			}
+			state.data.diagrams = state.data.processes.map((proc) => buildBpmnDiagram(proc))
+			return Bpmn.export(state.data)
+		},
+	}
+
+	if (state.kind !== "bpmn") return base
+
+	// BPMN-specific methods
+	return {
+		...base,
+		mcpAddElements: (processId: string, elementsJson: string, flowsJson: string) =>
+			callTool("add_elements", {
+				processId,
+				elements: JSON.parse(elementsJson),
+				flows: JSON.parse(flowsJson),
+			}),
+		mcpRemoveElements: (processId: string, elementIdsJson: string, flowIdsJson: string) =>
+			callTool("remove_elements", {
+				processId,
+				elementIds: JSON.parse(elementIdsJson),
+				flowIds: JSON.parse(flowIdsJson),
+			}),
+		mcpUpdateElement: (processId: string, elementId: string, changesJson: string) =>
+			callTool("update_element", {
+				processId,
+				elementId,
+				changes: JSON.parse(changesJson),
+			}),
+		mcpSetCondition: (processId: string, flowId: string, conditionJson: string) =>
+			callTool("set_condition", {
+				processId,
+				flowId,
+				condition: JSON.parse(conditionJson),
+			}),
+		mcpAddHttpCall: (processId: string, configJson: string) => {
+			const cfg = JSON.parse(configJson) as Record<string, unknown>
+			return callTool("add_http_call", { processId, ...cfg })
+		},
 	}
 }
 
@@ -562,7 +671,7 @@ rl.on("line", (line) => {
 				break
 
 			case "tools/list":
-				result = { tools: TOOLS }
+				result = { tools: getTools() }
 				break
 
 			case "tools/call": {

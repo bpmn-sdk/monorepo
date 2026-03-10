@@ -97,8 +97,18 @@ export type {
 	ZeebeCalledDecision,
 } from "./bpmn/zeebe-extensions.js"
 export { zeebeExtensionsToXmlElements } from "./bpmn/zeebe-extensions.js"
-export { Dmn } from "./dmn/index.js"
-export { Form } from "./form/index.js"
+export { Dmn, layoutDmn, benchmarkDmnLayout, compactifyDmn, expandDmn } from "./dmn/index.js"
+export type {
+	DmnBenchmarkResult,
+	DmnElementPosition,
+	CompactDmn,
+	CompactDmnDecision,
+	CompactDmnInput,
+	CompactDmnOutput,
+	CompactDmnRule,
+} from "./dmn/index.js"
+export { Form, compactifyForm, expandForm } from "./form/index.js"
+export type { CompactForm, CompactFormField } from "./form/index.js"
 export { FormBuilder, GroupBuilder } from "./form/form-builder.js"
 export type {
 	TextFieldOptions,

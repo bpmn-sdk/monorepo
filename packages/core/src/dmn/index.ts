@@ -1,7 +1,20 @@
+import { compactifyDmn, expandDmn } from "./compact.js"
 import { DecisionTableBuilder } from "./dmn-builder.js"
+import { layoutDmn } from "./dmn-layout.js"
 import type { DmnDefinitions } from "./dmn-model.js"
 import { parseDmn } from "./dmn-parser.js"
 import { serializeDmn } from "./dmn-serializer.js"
+
+export { layoutDmn, benchmarkDmnLayout } from "./dmn-layout.js"
+export type { DmnBenchmarkResult, DmnElementPosition } from "./dmn-layout.js"
+export { compactifyDmn, expandDmn } from "./compact.js"
+export type {
+	CompactDmn,
+	CompactDmnDecision,
+	CompactDmnInput,
+	CompactDmnOutput,
+	CompactDmnRule,
+} from "./compact.js"
 
 /** Entry point for DMN decision table operations. */
 export const Dmn = {
@@ -35,5 +48,20 @@ export const Dmn = {
     </decisionTable>
   </decision>
 </definitions>`)
+	},
+
+	/** Auto-layout a DMN definitions object, assigning DMNDI positions. */
+	layout(definitions: DmnDefinitions): DmnDefinitions {
+		return layoutDmn(definitions)
+	},
+
+	/** Convert a DmnDefinitions to a token-efficient compact representation. */
+	compactify(definitions: DmnDefinitions): ReturnType<typeof compactifyDmn> {
+		return compactifyDmn(definitions)
+	},
+
+	/** Convert a compact DMN representation back to DmnDefinitions with auto-layout. */
+	expand(compact: Parameters<typeof expandDmn>[0]): DmnDefinitions {
+		return expandDmn(compact)
 	},
 } as const

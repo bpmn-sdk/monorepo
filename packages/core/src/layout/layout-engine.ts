@@ -98,6 +98,10 @@ export function layoutFlowNodes(
 	// After subprocess expansion, push nodes that now overlap with expanded containers
 	resolveSubProcessOverlaps(layoutNodes)
 
+	// Phase 5b: Resolve Y-direction overlaps caused by subprocess expansion.
+	// Expanded subprocesses grow in-place and can overlap same-layer siblings.
+	resolveLayerOverlaps(layoutNodes)
+
 	// Phase 6: Edge routing (uses original back-edges for routing, not reversed)
 	const nodeMap = new Map<string, LayoutNode>()
 	for (const node of layoutNodes) {

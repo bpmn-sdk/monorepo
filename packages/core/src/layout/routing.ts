@@ -432,8 +432,11 @@ function placeEdgeLabels(edges: LayoutEdge[], nodeMap: Map<string, LayoutNode>):
 		// Fallback: slide along segment to find clear space
 		if (!placed) {
 			const fallback = slideLabelAlongSegment(segStart, segEnd, labelWidth, labelHeight, occupied)
-			edge.labelBounds = fallback
-			occupied.push(fallback)
+			if (fallback) {
+				edge.labelBounds = fallback
+				occupied.push(fallback)
+			}
+			// If no clear position exists, leave labelBounds undefined (text preserved in edge.label)
 		}
 	}
 }
@@ -501,7 +504,7 @@ function slideLabelAlongSegment(
 	labelWidth: number,
 	labelHeight: number,
 	occupied: Bounds[],
-): Bounds {
+): Bounds | undefined {
 	const isHorizontal = Math.abs(segEnd.y - segStart.y) < 1
 
 	for (let step = 0; step <= LABEL_SLIDE_STEPS; step++) {
@@ -528,13 +531,6 @@ function slideLabelAlongSegment(
 		}
 	}
 
-	// Absolute fallback: original midpoint placement
-	const mx = (segStart.x + segEnd.x) / 2
-	const my = (segStart.y + segEnd.y) / 2
-	return {
-		x: mx - labelWidth / 2,
-		y: my - labelHeight - LABEL_VERTICAL_OFFSET,
-		width: labelWidth,
-		height: labelHeight,
-	}
+	// No clear position found — skip label placement rather than forcing an overlap
+	return undefined
 }

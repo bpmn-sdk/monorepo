@@ -1,5 +1,65 @@
 # Progress
 
+## 2026-03-10 — editor11: DMN/Form layout, compact format, and MCP server multi-type support
+
+Extended `@bpmn-sdk/core` and the MCP server to fully support DMN and Form files alongside BPMN, with the same builder/export/layout pattern.
+
+### `packages/core/src/dmn/dmn-layout.ts` (new)
+- `layoutDmn(defs: DmnDefinitions): DmnDefinitions` — auto-assigns DMNDI positions to all DRG elements using a left-to-right layered layout based on the requirement DAG. Element sizes: decision=180×80, inputData=125×45, knowledgeSource=100×63, BKM=160×80.
+- `benchmarkDmnLayout(xml, fileName): DmnBenchmarkResult` — compares auto-layout vs reference DMNDI positions.
+
+### `packages/core/src/dmn/compact.ts` (new)
+- `CompactDmn` / `CompactDmnDecision` / `CompactDmnInput` / `CompactDmnOutput` / `CompactDmnRule` — token-efficient types for AI use.
+- `compactifyDmn(defs): CompactDmn` — converts DmnDefinitions to compact representation.
+- `expandDmn(compact): DmnDefinitions` — restores full DmnDefinitions with auto-layout applied.
+
+### `packages/core/src/form/compact.ts` (new)
+- `CompactForm` / `CompactFormField` — token-efficient form representation.
+- `compactifyForm(def): CompactForm` — converts FormDefinition to compact representation.
+- `expandForm(compact): FormDefinition` — restores full FormDefinition.
+
+### `packages/core/src/dmn/index.ts` (updated)
+- Exports `layoutDmn`, `benchmarkDmnLayout`, `compactifyDmn`, `expandDmn` and all new types.
+- `Dmn.layout()`, `Dmn.compactify()`, `Dmn.expand()` added to namespace.
+
+### `packages/core/src/form/index.ts` (updated)
+- Exports `compactifyForm`, `expandForm` and new types.
+- `Form.makeEmpty(id?)`, `Form.compactify()`, `Form.expand()` added to namespace.
+
+### `packages/core/src/index.ts` (updated)
+- All new DMN/Form functions and types exported from main entry point.
+
+### `apps/ai-server/src/mcp-server.ts` (updated)
+- State is now a discriminated union: `{ kind: "bpmn" | "dmn" | "form"; data: ... }`.
+- `detectStateKind(content)` detects file type from content (JSON → form, DMN namespace → dmn, else bpmn).
+- `getTools()` returns type-specific tool set (BPMN/DMN/Form).
+- `saveState()` dispatches on state kind (Bpmn.export / Dmn.export+layoutDmn / Form.export).
+- `compose_diagram` Bridge API extends for DMN/Form types with `mcpGetDiagram`, `mcpReplaceDiagram`, `mcpExportXml`.
+
+### `scripts/bench-layout.mjs` (updated)
+- Now discovers and processes `.bpmn`, `.dmn`, and `.form` files.
+- DMN: calls `benchmarkDmnLayout`, reports avg/p90/max distance per DRG element.
+- Form: parse → compact → expand round-trip validation.
+- Summary sections per file type with per-file deviation tables.
+
+### Tests (new)
+- `packages/core/tests/dmn-layout.test.ts` — 8 tests covering layoutDmn, compactifyDmn, expandDmn.
+- `packages/core/tests/form-compact.test.ts` — 6 tests covering Form.makeEmpty, compactifyForm, expandForm.
+
+### Results
+- All 48 monorepo tasks pass (build/typecheck/check/test).
+- Bench script: 32 BPMN + 1 DMN + 3 Form files all process without errors.
+
+## 2026-03-10 — editor11: fix auto-layout overlaps and bypass-pattern baseline tracking
+
+Benchmarked auto-layout against 32 BPMN sample files. Fixed three classes of issues:
+
+- **`packages/core/src/layout/coordinates.ts`**: Fixed `findBaselinePath` to detect bypass edges (split gateway directly connected to join gateway). Previously the baseline jumped to the join, leaving task nodes off-baseline (140px offset). Now the baseline follows the task-bearing branch instead, keeping tasks flat on the main horizontal row. Also capped gateway/event label width to `GRID_CELL_WIDTH` (130px) to prevent wide labels from overlapping adjacent elements.
+- **`packages/core/src/layout/coordinates.ts`**: Fixed `resolveLayerOverlaps` to account for below-element labels (gateway/event labels) when computing minimum spacing between same-layer elements. Previously labels of one element could overlap the next element's body.
+- **`packages/core/src/layout/routing.ts`**: Changed `slideLabelAlongSegment` to return `Bounds | undefined` instead of always returning a position; removed forced fallback that placed edge labels at midpoints regardless of collision.
+- **`packages/core/src/layout/layout-engine.ts`**: Added `resolveLayerOverlaps` pass after subprocess expansion to handle Y-direction overlaps caused by sub-processes growing to fit their children.
+- Results: all 32 benchmark files process without overlap errors; zero order violations across 270 elements.
+
 ## 2026-03-10 — editor11: improve auto-layout compactness to match bpmn.io reference layouts
 
 Benchmarked auto-layout against hand-crafted reference BPMN diagrams using the new `benchmarkLayout` / `compareLayouts` functions. Root cause: `GRID_CELL_WIDTH=200` produced 200px center-to-center spacing vs the ~130px used by bpmn.io — 51% too wide.
