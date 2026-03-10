@@ -1,5 +1,59 @@
 # Progress
 
+## 2026-03-10 — editor11: Editor UX/UI improvements
+
+### `packages/editor/src/state-machine.ts`
+- Rubber-band selection now works without holding Shift — plain drag on canvas activates selection box.
+
+### `packages/editor/src/editor.ts`
+- Added public `editLabel(id)` method for programmatic label editing.
+
+### `packages/editor/src/icons.ts`
+- Added `search` and `keyboard` SVG icon strings.
+
+### `packages/editor/src/css.ts`
+- Added CSS for: top-toolbar overflow guard, simulation active banner, context menu, element search bar, keyboard shortcuts modal.
+
+### `packages/editor/src/hud.ts`
+- Context menu (right-click) on canvas elements: Edit label, Duplicate, Delete.
+- Delete + Duplicate buttons added to mini floating ctx-toolbar.
+- More menu entries: Find element (Ctrl+F), Optimize diagram, ASCII view, Keyboard shortcuts.
+- Element search bar (Ctrl+F): filters flowElements by name, highlights matches.
+- Keyboard shortcuts modal (Ctrl+Shift+?): lists all editor shortcuts.
+- Simulation active banner (amber, fixed-position) with "Exit simulation" button.
+- `onGatewayEdgeCreated?` callback — fires when edge is drawn from a gateway element.
+- `onExitSimulation?` callback — fires when user clicks "Exit simulation" banner.
+- Inline `required: true` enforced for service task `taskType` via config-panel-bpmn schema.
+- Added `setSimulationActive(active: boolean)` to returned API.
+
+### `packages/plugins/src/process-runner/index.ts`
+- Exposed `exitPlayMode()` on the returned plugin object (public API).
+
+### `packages/plugins/src/config-panel-bpmn/index.ts`
+- Added `required: true` to `taskType` field in `GENERIC_SERVICE_TASK_SCHEMA` for inline validation.
+
+### `apps/landing/src/scripts/editor.ts`
+- Wired `onGatewayEdgeCreated` to expand dock and switch to Properties tab.
+- Wired `onExitSimulation` to call `processRunnerPlugin.exitPlayMode()`.
+- Wired `setSimulationActive(true/false)` on enter/exit play mode.
+
+---
+
+## 2026-03-10 — editor11: Landing page SVG export feature
+
+### `apps/landing/src/data/content.ts`
+- Added "SVG export" to `FEATURES` array.
+- Updated `CODE.createProcess` and `CODE_HTML.createProcess` to show `exportSvg(defs)` usage alongside `Bpmn.export(defs)`.
+- Updated `PACKAGES[0].description` to include "SVG export (zero deps, all runtimes)".
+
+### `apps/landing/src/pages/index.astro`
+- Added "Sugiyama algorithm" and "SVG export" chips to the Auto-Layout bento card.
+
+### `apps/landing/src/styles/global.css`
+- Added `.bcard-chips` flex layout for chips within bento cards.
+
+---
+
 ## 2026-03-10 — editor11: exportSvg() in @bpmn-sdk/core
 
 ### `packages/core/src/bpmn/svg.ts` (new)

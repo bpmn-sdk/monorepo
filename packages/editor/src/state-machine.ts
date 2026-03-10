@@ -516,6 +516,20 @@ export class EditorStateMachine {
 				break
 			}
 
+			case "pointing-canvas": {
+				// Transition to rubber-band when drag threshold exceeded (no Shift required)
+				const dist = screenDist(e.clientX, e.clientY, sub.screenX, sub.screenY)
+				if (dist > DRAG_THRESHOLD) {
+					this._cb.lockViewport(true)
+					this._mode = {
+						mode: "select",
+						sub: { name: "rubber-band", origin: sub.origin, current: diag },
+					}
+					this._cb.previewRubberBand(sub.origin, diag)
+				}
+				break
+			}
+
 			default:
 				break
 		}

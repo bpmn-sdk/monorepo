@@ -59,6 +59,7 @@ let hudRef: {
 	setActive(active: boolean): void
 	showOnboarding(): void
 	hideOnboarding(): void
+	setSimulationActive(active: boolean): void
 } | null = null
 
 /** Returns true when the XML is a freshly-created empty diagram (only a start event). */
@@ -235,6 +236,7 @@ const processRunnerPlugin = createProcessRunnerPlugin({
 		processRunnerPlugin.toolbar.style.display = ""
 		dock.propertiesPane.classList.add("bpmn-props-readonly")
 		bridge.tabsPlugin.api.setPlayMode(true)
+		hudRef?.setSimulationActive(true)
 	},
 	onExitPlayMode() {
 		const el = document.getElementById("hud-bottom-center")
@@ -242,6 +244,7 @@ const processRunnerPlugin = createProcessRunnerPlugin({
 		processRunnerPlugin.toolbar.style.display = "none"
 		dock.propertiesPane.classList.remove("bpmn-props-readonly")
 		bridge.tabsPlugin.api.setPlayMode(false)
+		hudRef?.setSimulationActive(false)
 	},
 	getProjectId: () => bridge.storagePlugin.api.getCurrentContext()?.projectId ?? null,
 })
@@ -499,5 +502,13 @@ hudRef = initEditorHud(editor, {
 		if (dock.collapsed) dock.expand()
 		dock.switchTab("ai")
 		aiBridgePlugin.openPanel()
+	},
+	onGatewayEdgeCreated: () => {
+		// Expand dock and switch to properties so user can set condition immediately
+		if (dock.collapsed) dock.expand()
+		dock.switchTab("properties")
+	},
+	onExitSimulation: () => {
+		processRunnerPlugin.exitPlayMode()
 	},
 })

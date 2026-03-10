@@ -1331,6 +1331,11 @@ export class BpmnEditor {
 		this._executeCommand((d) => updateLabelPosition(d, shapeId, labelBounds))
 	}
 
+	/** Starts inline label editing for the element with the given id. */
+	editLabel(id: string): void {
+		this._startLabelEdit(id)
+	}
+
 	/** Copies then pastes the current selection with a small offset. */
 	duplicate(): void {
 		this._doCopy()

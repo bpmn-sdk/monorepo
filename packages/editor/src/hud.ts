@@ -125,12 +125,51 @@ export interface HudOptions {
 	 * the new-diagram overlay.
 	 */
 	onAskAi?: () => void
+	/**
+	 * Called when a new sequence flow is created from an exclusive or inclusive
+	 * gateway. Use to focus the condition expression field in the properties panel.
+	 */
+	onGatewayEdgeCreated?: (edgeId: string) => void
+	/**
+	 * Called when the user clicks "Exit" in the simulation active banner.
+	 */
+	onExitSimulation?: () => void
 }
+
+const GATEWAY_TYPES = new Set([
+	"exclusiveGateway",
+	"inclusiveGateway",
+	"parallelGateway",
+	"eventBasedGateway",
+	"complexGateway",
+])
+
+const SHORTCUTS: ReadonlyArray<[string, string]> = [
+	["Ctrl+Z", "Undo"],
+	["Ctrl+Y / Ctrl+Shift+Z", "Redo"],
+	["Ctrl+D", "Duplicate"],
+	["Delete / Backspace", "Delete selected"],
+	["Ctrl+A", "Select all"],
+	["Ctrl+C", "Copy"],
+	["Ctrl+V", "Paste"],
+	["Ctrl+F", "Find element"],
+	["Ctrl+K", "Command palette"],
+	["Ctrl+E", "File switcher"],
+	["H", "Hand tool"],
+	["V", "Select tool"],
+	["Escape", "Deselect / cancel"],
+	["Double-click", "Edit label"],
+]
 
 export function initEditorHud(
 	editor: BpmnEditor,
 	options: HudOptions = {},
-): { setActive(active: boolean): void; showOnboarding(): void; hideOnboarding(): void } {
+): {
+	setActive(active: boolean): void
+	showOnboarding(): void
+	hideOnboarding(): void
+	setSimulationActive(active: boolean): void
+} {
 	injectHudStyles()
 
 	// ── Create and inject HUD DOM ──────────────────────────────────────────────
@@ -261,6 +300,70 @@ export function initEditorHud(
 	refMenuEl.id = "ref-menu"
 	refMenuEl.className = "dropdown"
 
+	// Simulation active banner
+	const simBannerEl = document.createElement("div")
+	simBannerEl.id = "bpmn-sim-banner"
+	simBannerEl.className = "hidden"
+	const simBannerText = document.createElement("span")
+	simBannerText.textContent = "Simulation active — editing is disabled"
+	const simBannerExit = document.createElement("button")
+	simBannerExit.id = "bpmn-sim-banner-exit"
+	simBannerExit.textContent = "Exit simulation"
+	simBannerExit.addEventListener("click", () => options.onExitSimulation?.())
+	simBannerEl.append(simBannerText, simBannerExit)
+
+	// Right-click context menu
+	const ctxMenuEl = document.createElement("div")
+	ctxMenuEl.id = "bpmn-ctx-menu"
+	ctxMenuEl.className = "dropdown"
+
+	// Element search bar
+	const searchBarEl = document.createElement("div")
+	searchBarEl.id = "bpmn-search-bar"
+	searchBarEl.className = "hidden"
+	const searchInput = document.createElement("input")
+	searchInput.id = "bpmn-search-input"
+	searchInput.type = "text"
+	searchInput.placeholder = "Search elements…"
+	searchInput.setAttribute("aria-label", "Search diagram elements")
+	const searchCount = document.createElement("span")
+	searchCount.id = "bpmn-search-count"
+	const searchClose = document.createElement("button")
+	searchClose.id = "bpmn-search-close"
+	searchClose.textContent = "×"
+	searchClose.title = "Close search (Escape)"
+	searchBarEl.append(searchInput, searchCount, searchClose)
+
+	// Keyboard shortcuts modal
+	const shortcutsModal = document.createElement("div")
+	shortcutsModal.id = "bpmn-shortcuts-modal"
+	shortcutsModal.className = "hidden"
+	const shortcutsInner = document.createElement("div")
+	shortcutsInner.id = "bpmn-shortcuts-inner"
+	const shortcutsTitle = document.createElement("h3")
+	shortcutsTitle.textContent = "Keyboard shortcuts"
+	shortcutsInner.appendChild(shortcutsTitle)
+	for (const [key, desc] of SHORTCUTS) {
+		const row = document.createElement("div")
+		row.className = "bpmn-sc-row"
+		const descEl = document.createElement("span")
+		descEl.textContent = desc
+		const keyEl = document.createElement("kbd")
+		keyEl.className = "bpmn-sc-key"
+		keyEl.textContent = key
+		row.append(descEl, keyEl)
+		shortcutsInner.appendChild(row)
+	}
+	const shortcutsClose = document.createElement("button")
+	shortcutsClose.id = "bpmn-shortcuts-close"
+	shortcutsClose.textContent = "Close"
+	shortcutsClose.addEventListener("click", () => shortcutsModal.classList.add("hidden"))
+	shortcutsModal.addEventListener("click", (e) => {
+		if (e.target === shortcutsModal) shortcutsModal.classList.add("hidden")
+	})
+	shortcutsInner.appendChild(shortcutsClose)
+	shortcutsModal.appendChild(shortcutsInner)
+
 	document.body.append(
 		hudTopCenter,
 		hudBottomLeft,
@@ -271,6 +374,10 @@ export function initEditorHud(
 		moreMenuEl,
 		labelPosMenuEl,
 		refMenuEl,
+		ctxMenuEl,
+		simBannerEl,
+		searchBarEl,
+		shortcutsModal,
 	)
 
 	// ── Theme ──────────────────────────────────────────────────────────────────
@@ -741,7 +848,43 @@ export function initEditorHud(
 					closeAllDropdowns()
 				},
 			],
+			[
+				"Find element…",
+				IC.search,
+				() => {
+					closeAllDropdowns()
+					openSearch()
+				},
+			],
 		]
+		if (options.optimizeButton) {
+			items.push([
+				"Optimize diagram",
+				IC.dots,
+				() => {
+					closeAllDropdowns()
+					options.optimizeButton?.click()
+				},
+			])
+		}
+		if (options.asciiButton) {
+			items.push([
+				"ASCII view",
+				IC.dots,
+				() => {
+					closeAllDropdowns()
+					options.asciiButton?.click()
+				},
+			])
+		}
+		items.push([
+			"Keyboard shortcuts…",
+			IC.keyboard,
+			() => {
+				closeAllDropdowns()
+				shortcutsModal.classList.remove("hidden")
+			},
+		])
 		for (const [label, icon, action] of items) {
 			const btn = document.createElement("button")
 			btn.className = "drop-item"
@@ -813,6 +956,33 @@ export function initEditorHud(
 		ctxToolbar.innerHTML = ""
 		const isAnnotation = sourceType === "textAnnotation"
 		const canAddElements = !isAnnotation && sourceType !== "endEvent"
+
+		// Delete and Duplicate buttons always present
+		const dupBtn = document.createElement("button")
+		dupBtn.className = "hud-btn"
+		dupBtn.innerHTML = IC.duplicate
+		dupBtn.title = "Duplicate (Ctrl+D)"
+		dupBtn.addEventListener("click", () => {
+			editor.duplicate()
+			hideCtxToolbar()
+		})
+		ctxToolbar.appendChild(dupBtn)
+
+		const delBtn = document.createElement("button")
+		delBtn.className = "hud-btn"
+		delBtn.innerHTML = IC.trash
+		delBtn.title = "Delete (Del)"
+		delBtn.addEventListener("click", () => {
+			editor.deleteSelected()
+			hideCtxToolbar()
+		})
+		ctxToolbar.appendChild(delBtn)
+
+		if (canAddElements) {
+			const sep = document.createElement("div")
+			sep.className = "hud-sep"
+			ctxToolbar.appendChild(sep)
+		}
 
 		if (canAddElements) {
 			const arrowBtn = document.createElement("button")
@@ -1483,9 +1653,14 @@ export function initEditorHud(
 		if (!active) hideOnboarding()
 	}
 
+	function setSimulationActive(active: boolean): void {
+		simBannerEl.classList.toggle("hidden", !active)
+	}
+
 	// ── Editor event subscriptions ─────────────────────────────────────────────
 
 	editor.on("editor:select", (ids: string[]) => {
+		const prevSourceId = ctxSourceId
 		selectedIds = ids
 		updateActionBar()
 
@@ -1498,6 +1673,15 @@ export function initEditorHud(
 			const elemType = editor.getElementType(id)
 			if (elemType) {
 				showCtxToolbar(id, elemType)
+				// When a sequence flow is selected and the previous source was a gateway,
+				// notify the caller to focus the condition expression field.
+				if (
+					elemType === "sequenceFlow" &&
+					prevSourceId &&
+					GATEWAY_TYPES.has(editor.getElementType(prevSourceId) ?? "")
+				) {
+					options.onGatewayEdgeCreated?.(id)
+				}
 			} else {
 				hideCtxToolbar()
 			}
@@ -1544,12 +1728,140 @@ export function initEditorHud(
 		}
 	})
 
-	// ── Keyboard shortcut: Ctrl+D to duplicate ─────────────────────────────────
+	// ── Right-click context menu ────────────────────────────────────────────────
+
+	editor.container.addEventListener("contextmenu", (e) => {
+		e.preventDefault()
+		const id = selectedIds[0]
+		if (!id) return
+		const elemType = editor.getElementType(id)
+		if (!elemType) return
+
+		ctxMenuEl.innerHTML = ""
+
+		if (elemType !== "sequenceFlow") {
+			const editLabelBtn = document.createElement("button")
+			editLabelBtn.className = "drop-item"
+			editLabelBtn.innerHTML = `<span class="di-check"></span><span class="di-icon">${IC.labelPos}</span><span>Edit label</span>`
+			editLabelBtn.addEventListener("click", () => {
+				editor.editLabel(id)
+				closeAllDropdowns()
+			})
+			ctxMenuEl.appendChild(editLabelBtn)
+			const sep = document.createElement("div")
+			sep.className = "drop-sep"
+			ctxMenuEl.appendChild(sep)
+		}
+
+		const dupCtxBtn = document.createElement("button")
+		dupCtxBtn.className = "drop-item"
+		dupCtxBtn.innerHTML = `<span class="di-check"></span><span class="di-icon">${IC.duplicate}</span><span>Duplicate</span>`
+		dupCtxBtn.addEventListener("click", () => {
+			editor.duplicate()
+			closeAllDropdowns()
+		})
+		ctxMenuEl.appendChild(dupCtxBtn)
+
+		const delCtxBtn = document.createElement("button")
+		delCtxBtn.className = "drop-item"
+		delCtxBtn.innerHTML = `<span class="di-check"></span><span class="di-icon">${IC.trash}</span><span>Delete</span>`
+		delCtxBtn.addEventListener("click", () => {
+			editor.deleteSelected()
+			closeAllDropdowns()
+		})
+		ctxMenuEl.appendChild(delCtxBtn)
+
+		ctxMenuEl.style.top = `${e.clientY}px`
+		ctxMenuEl.style.left = `${e.clientX}px`
+		ctxMenuEl.style.right = "auto"
+		ctxMenuEl.style.bottom = "auto"
+		ctxMenuEl.classList.add("open")
+		openDropdown = ctxMenuEl
+	})
+
+	// ── Element search (Ctrl+F) ─────────────────────────────────────────────────
+
+	let searchMatches: string[] = []
+	let searchMatchIdx = 0
+
+	function openSearch(): void {
+		searchBarEl.classList.remove("hidden")
+		searchInput.value = ""
+		searchCount.textContent = ""
+		searchInput.focus()
+	}
+
+	function closeSearch(): void {
+		searchBarEl.classList.add("hidden")
+		searchInput.value = ""
+		searchCount.textContent = ""
+		searchMatches = []
+		searchMatchIdx = 0
+		editor.setSelection([])
+	}
+
+	function runSearch(): void {
+		const q = searchInput.value.trim().toLowerCase()
+		if (!q) {
+			searchCount.textContent = ""
+			searchMatches = []
+			editor.setSelection([])
+			return
+		}
+		const defs = editor.getDefinitions()
+		if (!defs) return
+		const ids: string[] = []
+		for (const proc of defs.processes) {
+			for (const el of proc.flowElements) {
+				if (el.name?.toLowerCase().includes(q)) ids.push(el.id)
+			}
+			for (const el of proc.textAnnotations) {
+				if (el.text?.toLowerCase().includes(q)) ids.push(el.id)
+			}
+		}
+		searchMatches = ids
+		searchMatchIdx = 0
+		searchCount.textContent =
+			ids.length > 0 ? `${ids.length} match${ids.length === 1 ? "" : "es"}` : "No matches"
+		if (ids.length > 0) {
+			const firstId = ids[0]
+			if (firstId) editor.setSelection([firstId])
+		} else {
+			editor.setSelection([])
+		}
+	}
+
+	searchInput.addEventListener("input", runSearch)
+	searchInput.addEventListener("keydown", (e) => {
+		if (e.key === "Escape") {
+			e.preventDefault()
+			closeSearch()
+		}
+		if (e.key === "Enter") {
+			e.preventDefault()
+			if (searchMatches.length > 0) {
+				searchMatchIdx = (searchMatchIdx + 1) % searchMatches.length
+				const nextId = searchMatches[searchMatchIdx]
+				if (nextId) editor.setSelection([nextId])
+			}
+		}
+	})
+	searchClose.addEventListener("click", closeSearch)
+
+	// ── Keyboard shortcut: Ctrl+D to duplicate, Ctrl+F to search ───────────────
 
 	document.addEventListener("keydown", (e) => {
 		if ((e.ctrlKey || e.metaKey) && e.key === "d") {
 			e.preventDefault()
 			editor.duplicate()
+		}
+		if ((e.ctrlKey || e.metaKey) && e.key === "f") {
+			e.preventDefault()
+			if (searchBarEl.classList.contains("hidden")) {
+				openSearch()
+			} else {
+				closeSearch()
+			}
 		}
 	})
 
@@ -1561,5 +1873,5 @@ export function initEditorHud(
 		}
 	})
 
-	return { setActive, showOnboarding, hideOnboarding }
+	return { setActive, showOnboarding, hideOnboarding, setSimulationActive }
 }

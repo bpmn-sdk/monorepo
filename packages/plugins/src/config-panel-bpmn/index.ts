@@ -204,6 +204,7 @@ const GENERIC_SERVICE_TASK_SCHEMA: PanelSchema = {
 					placeholder: "e.g. my-worker-type",
 					hint: "Zeebe job type string consumed by your worker.",
 					condition: IS_CUSTOM,
+					required: true,
 				},
 				{ key: "retries", label: "Retries", type: "text", placeholder: "3" },
 				{

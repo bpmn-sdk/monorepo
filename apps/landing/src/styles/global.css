@@ -817,6 +817,13 @@ a:hover {
 	line-height: 1.65;
 }
 
+.bcard-chips {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	margin-top: 10px;
+}
+
 .bcard-body {
 	flex: 1;
 }

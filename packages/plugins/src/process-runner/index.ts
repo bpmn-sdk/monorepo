@@ -125,7 +125,7 @@ const PLAY_ICON =
 
 export function createProcessRunnerPlugin(
 	options: ProcessRunnerOptions,
-): CanvasPlugin & { toolbar: HTMLDivElement; playButton: HTMLButtonElement } {
+): CanvasPlugin & { toolbar: HTMLDivElement; playButton: HTMLButtonElement; exitPlayMode(): void } {
 	const { engine } = options
 
 	let canvasApi: CanvasApi | null = null
@@ -627,6 +627,9 @@ export function createProcessRunnerPlugin(
 
 		/** Icon button for the HUD action bar. Pass to `initEditorHud` as `playButton`. */
 		playButton: playButtonEl,
+
+		/** Exits play mode and cancels any running instance. */
+		exitPlayMode,
 
 		install(api: CanvasApi) {
 			canvasApi = api

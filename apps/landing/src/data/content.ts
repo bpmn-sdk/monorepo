@@ -20,7 +20,8 @@ export const PACKAGES = [
 		url: `${SITE.github}/tree/main/packages/core`,
 		description:
 			"Fluent process builder, BPMN 2.0 parser/serializer, DMN support, " +
-			"AI-compact format (compactify/expand), auto-layout (Sugiyama algorithm)",
+			"AI-compact format (compactify/expand), auto-layout (Sugiyama algorithm), " +
+			"SVG export (zero deps, all runtimes)",
 	},
 	{
 		name: "@bpmn-sdk/engine",
@@ -63,6 +64,7 @@ export const FEATURES = [
 	"AI-native: compact intermediate format fits an entire diagram in a single LLM prompt",
 	"Camunda 8 ready: native Zeebe task definitions, IO mappings, connectors, forms",
 	"Roundtrip fidelity: parse → modify → export without data loss",
+	"SVG export: generate diagram images from BpmnDefinitions — zero deps, works in Node.js, browser, Deno, Bun",
 	"Simulation engine: deploy and run processes locally, register job workers, evaluate DMN",
 	"REST API client: full Camunda 8 Orchestration Cluster API coverage",
 	"CLI: arrow-key TUI, connection profiles, tabular results",
@@ -91,19 +93,20 @@ const xml = Bpmn.export(
 // ✓ Zeebe extensions set`,
 
 	createProcess: `\
-import { Bpmn } from "@bpmn-sdk/core";
+import { Bpmn, exportSvg } from "@bpmn-sdk/core";
 
-const xml = Bpmn.export(
-  Bpmn.createProcess("hello")
-    .startEvent("start")
-    .serviceTask("task", {
-      name: "Hello World",
-      taskType: "greet",
-    })
-    .endEvent("end")
-    .withAutoLayout()
-    .build()
-);`,
+const defs = Bpmn.createProcess("hello")
+  .startEvent("start")
+  .serviceTask("task", {
+    name: "Hello World",
+    taskType: "greet",
+  })
+  .endEvent("end")
+  .withAutoLayout()
+  .build();
+
+const xml = Bpmn.export(defs); // ✓ BPMN 2.0 XML
+const svg = exportSvg(defs);   // ✓ SVG image, zero deps`,
 
 	deployRun: `\
 import { Engine } from "@bpmn-sdk/engine";
@@ -275,19 +278,20 @@ export const CODE_HTML = {
 <span class="comment">// ✓ Auto-layout applied</span>
 <span class="comment">// ✓ Zeebe extensions set</span>`,
 
-	createProcess: `<span class="kw">import</span> { Bpmn } <span class="kw">from</span> <span class="str">"@bpmn-sdk/core"</span>;
+	createProcess: `<span class="kw">import</span> { Bpmn, exportSvg } <span class="kw">from</span> <span class="str">"@bpmn-sdk/core"</span>;
 
-<span class="kw">const</span> xml = Bpmn.export(
-  Bpmn.createProcess(<span class="str">"hello"</span>)
-    .startEvent(<span class="str">"start"</span>)
-    .serviceTask(<span class="str">"task"</span>, {
-      name: <span class="str">"Hello World"</span>,
-      taskType: <span class="str">"greet"</span>,
-    })
-    .endEvent(<span class="str">"end"</span>)
-    .withAutoLayout()
-    .build()
-);`,
+<span class="kw">const</span> defs = Bpmn.<span class="fn">createProcess</span>(<span class="str">"hello"</span>)
+  .<span class="fn">startEvent</span>(<span class="str">"start"</span>)
+  .<span class="fn">serviceTask</span>(<span class="str">"task"</span>, {
+    name: <span class="str">"Hello World"</span>,
+    taskType: <span class="str">"greet"</span>,
+  })
+  .<span class="fn">endEvent</span>(<span class="str">"end"</span>)
+  .<span class="fn">withAutoLayout</span>()
+  .<span class="fn">build</span>();
+
+<span class="kw">const</span> xml = Bpmn.<span class="fn">export</span>(defs); <span class="comment">// ✓ BPMN 2.0 XML</span>
+<span class="kw">const</span> svg = <span class="fn">exportSvg</span>(defs);   <span class="comment">// ✓ SVG image, zero deps</span>`,
 
 	deployRun: `<span class="kw">import</span> { Engine } <span class="kw">from</span> <span class="str">"@bpmn-sdk/engine"</span>;
 
