@@ -1,5 +1,23 @@
 # Progress
 
+## 2026-03-10 — editor11: Landing page accessibility fixes
+
+### `apps/landing/src/pages/index.astro`
+- Added `<main>` landmark wrapping all content sections (hero through playground), closing before footer.
+- Added `aria-label="Main navigation"` to `<nav>`.
+- Added `inert` attribute to `hero-diagram` and `anim-demo` (both already `aria-hidden`) so BpmnCanvas-rendered SVG elements inside cannot receive keyboard focus.
+- Added `aria-label="Playground code editor"` to `<textarea id="playground-code">`.
+- Changed CLI feature headings from `<h4>` to `<h3>` — they were skipping a level (`<h2>` → `<h4>`).
+- Changed inline `color:oklch(52% 0.06 280)` on 13px DMN section paragraphs to `color:var(--text-muted)` for sufficient contrast.
+
+### `apps/landing/src/styles/global.css`
+- `.cli-feature h4` → `.cli-feature h3` (matches heading change above).
+- `.pg-shortcut`: raised color from `oklch(45% 0.05 280)` to `oklch(62% 0.05 280)` — 45% failed WCAG AA at 11px.
+- `.cli-topbar-title`: raised color from `oklch(40% 0.02 270)` to `oklch(62% 0.02 270)` — 40% failed WCAG AA.
+- `.footer-dot`: changed from `var(--border)` (15% lightness) to `var(--text-muted)` (58% lightness) — border color was nearly invisible.
+
+---
+
 ## 2026-03-10 — editor11: Landing page syntax highlighting
 
 ### `apps/landing/src/styles/global.css`

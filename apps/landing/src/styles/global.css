@@ -1531,7 +1531,7 @@ a:hover {
 	flex: 1;
 	text-align: center;
 	font-size: 11px;
-	color: oklch(40% 0.02 270);
+	color: oklch(62% 0.02 270);
 }
 
 .cli-content {
@@ -1638,7 +1638,7 @@ a:hover {
 	margin-top: 2px;
 }
 
-.cli-feature h4 {
+.cli-feature h3 {
 	font-size: 14px;
 	font-weight: 600;
 	color: var(--text);
@@ -1676,7 +1676,7 @@ a:hover {
 }
 
 .footer-dot {
-	color: var(--border);
+	color: var(--text-muted);
 }
 
 .footer-license {
@@ -2046,7 +2046,7 @@ a:hover {
 
 .pg-shortcut {
 	font-size: 11px;
-	color: oklch(45% 0.05 280);
+	color: oklch(62% 0.05 280);
 }
 
 .pg-code-wrap {
