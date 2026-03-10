@@ -25,8 +25,8 @@ export const ELEMENT_SIZES: Record<string, { width: number; height: number }> = 
 }
 
 /** Virtual grid cell dimensions for element placement. */
-export const GRID_CELL_WIDTH = 200
-export const GRID_CELL_HEIGHT = 160
+export const GRID_CELL_WIDTH = 130
+export const GRID_CELL_HEIGHT = 140
 
 /** Minimum spacing between elements (derived from grid). */
 export const HORIZONTAL_SPACING = GRID_CELL_WIDTH - 100 // 100 = max element width

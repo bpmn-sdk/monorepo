@@ -88,6 +88,10 @@ export function layoutFlowNodes(
 	// baseline nodes off-center when they share a layer with branch nodes)
 	alignBaselinePath(layoutNodes, dag, backEdges)
 
+	// Phase 4i: Final overlap resolution — baseline re-alignment may pull a node back into
+	// an overlap that resolveLayerOverlaps already fixed; one more pass eliminates these.
+	resolveLayerOverlaps(layoutNodes)
+
 	// Phase 5: Sub-process layout — expand containers and lay out children
 	const childResults = layoutSubProcesses(layoutNodes, nodeIndex)
 

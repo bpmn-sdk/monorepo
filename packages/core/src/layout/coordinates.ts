@@ -160,10 +160,10 @@ function computeLabelBounds(node: BpmnFlowElement, bounds: Bounds): Bounds | und
 		case "parallelGateway":
 		case "inclusiveGateway":
 		case "eventBasedGateway":
-			// Labels at top-right of gateway diamond (avoids interfering with upward paths)
+			// Labels centered below gateway diamond (standard BPMN convention)
 			return {
-				x: bounds.x + bounds.width + 4,
-				y: bounds.y - labelHeight - 4,
+				x: bounds.x + bounds.width / 2 - labelWidth / 2,
+				y: bounds.y + bounds.height + 4,
 				width: labelWidth,
 				height: labelHeight,
 			}

@@ -1,4 +1,18 @@
 export { layoutProcess, layoutFlowNodes } from "./layout-engine.js"
+export {
+	benchmarkLayout,
+	compareLayouts,
+	formatBenchmarkResult,
+	generateAutoLayout,
+	parseReferenceLayout,
+} from "./bench.js"
+export type {
+	BenchmarkResult,
+	BoundingBox,
+	ElementComparison,
+	ElementPosition,
+	FlowOrderViolation,
+} from "./bench.js"
 export { assertNoOverlap } from "./overlap.js"
 export type { Bounds, LayoutEdge, LayoutNode, LayoutResult, Waypoint } from "./types.js"
 export {

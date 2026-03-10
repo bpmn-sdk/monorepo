@@ -1,5 +1,23 @@
 # Progress
 
+## 2026-03-10 — editor11: improve auto-layout compactness to match bpmn.io reference layouts
+
+Benchmarked auto-layout against hand-crafted reference BPMN diagrams using the new `benchmarkLayout` / `compareLayouts` functions. Root cause: `GRID_CELL_WIDTH=200` produced 200px center-to-center spacing vs the ~130px used by bpmn.io — 51% too wide.
+
+- **`packages/core/src/layout/types.ts`**: `GRID_CELL_WIDTH` 200→130 (matches bpmn.io reference center-to-center spacing), `GRID_CELL_HEIGHT` 160→140 (matches reference branch distribution of 140px between parallel branches).
+- **`packages/core/src/layout/coordinates.ts`**: Moved gateway label placement from top-right to centered-below the gateway diamond (standard BPMN convention; prevents label from overlapping the next layer's elements at tighter spacing).
+- **`packages/core/src/layout/layout-engine.ts`**: Added a final `resolveLayerOverlaps` pass after the second `alignBaselinePath` to eliminate edge-case overlaps when a baseline node shares a layer with distributed branch nodes.
+- Results: width ratio reduced from 1.51 → 1.0 (exact match), height ratio 1.0 for parallel diagrams, zero order violations.
+
+## 2026-03-10 — editor11: add auto-layout benchmark infrastructure
+
+Added benchmarking tools to measure auto-layout quality against reference BPMN diagrams:
+
+- **`packages/core/src/layout/bench.ts`** (new): `benchmarkLayout`, `parseReferenceLayout`, `generateAutoLayout`, `compareLayouts`, `formatBenchmarkResult` — full pipeline for comparing auto-generated vs reference DI positions.
+- **`packages/core/src/index.ts`**: Exported all bench functions and types.
+- **`scripts/bench-layout.mjs`** (new): CLI script — reads all `.bpmn` files from a folder, runs benchmarks, reports per-file metrics (avg/p90/max distance, width/height ratio, order violations, top deviating elements) plus aggregate summary.
+- **`bpmn-samples/order-process.bpmn`**, **`bpmn-samples/parallel-approval.bpmn`** (new): Reference BPMN files with hand-crafted layouts used as benchmark targets.
+
 ## 2026-03-10 — editor11: always re-validate all edges on element move
 
 Previously, the "neither endpoint moved" branch in `moveShapes` only checked whether a *moved* shape intersected the path — so pre-existing invalid paths (e.g. imported BPMN with bad waypoints) were left broken after moving an unrelated element.  Fix:

@@ -185,6 +185,20 @@ export type {
 	OptimizeOptions,
 } from "./bpmn/optimize/types.js"
 export { layoutProcess, layoutFlowNodes } from "./layout/index.js"
+export {
+	benchmarkLayout,
+	compareLayouts,
+	formatBenchmarkResult,
+	generateAutoLayout,
+	parseReferenceLayout,
+} from "./layout/index.js"
+export type {
+	BenchmarkResult,
+	BoundingBox,
+	ElementComparison,
+	ElementPosition,
+	FlowOrderViolation,
+} from "./layout/index.js"
 export type { Bounds, LayoutEdge, LayoutNode, LayoutResult, Waypoint } from "./layout/index.js"
 export { ELEMENT_SIZES } from "./layout/index.js"
 export { compactify, expand } from "./bpmn/compact.js"

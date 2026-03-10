@@ -1,5 +1,13 @@
 # Features
 
+## Auto-layout benchmark + compactness improvements (2026-03-10) — `packages/core`
+
+- **`benchmarkLayout` API**: full pipeline to compare auto-generated positions against reference BPMN DI data — `benchmarkLayout`, `parseReferenceLayout`, `generateAutoLayout`, `compareLayouts`, `formatBenchmarkResult` exported from `@bpmn-sdk/core`.
+- **Tighter spacing**: `GRID_CELL_WIDTH` reduced 200→130 (width ratio 1.51→1.0 vs bpmn.io reference), `GRID_CELL_HEIGHT` reduced 160→140 (140px parallel branch spacing matches bpmn.io).
+- **Gateway labels below**: gateway labels now render centered below the diamond (standard BPMN convention).
+- **`scripts/bench-layout.mjs`**: CLI benchmark script over any folder of `.bpmn` files; reports avg/p90/max distance, width/height ratio, order violations per file.
+- **Reference BPMN samples**: `bpmn-samples/order-process.bpmn`, `bpmn-samples/parallel-approval.bpmn`.
+
 ## Layout + optimizer improvements (2026-03-09) — `packages/core`
 
 - **Back-edge loop alignment**: `alignBranchBaselines` and `findBaselinePath` now correctly handle nodes with multiple successors caused by back-edge reversal, keeping sequential tasks on the main path aligned to the same center-y baseline.

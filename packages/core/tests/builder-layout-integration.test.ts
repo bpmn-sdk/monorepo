@@ -497,10 +497,10 @@ describe("Builder → auto-layout integration", () => {
 		const t1Shape = shapeFor(diagram.plane.shapes, "t1")
 		const t2Shape = shapeFor(diagram.plane.shapes, "t2")
 
-		// Branches should be vertically separated by at least 80px gap (grid cell 160 - element 80)
+		// Branches should be vertically separated by at least 60px gap (grid cell 140 - element 80)
 		const upper = t1Shape.bounds.y < t2Shape.bounds.y ? t1Shape : t2Shape
 		const lower = t1Shape.bounds.y < t2Shape.bounds.y ? t2Shape : t1Shape
 		const gap = lower.bounds.y - (upper.bounds.y + upper.bounds.height)
-		expect(gap).toBeGreaterThanOrEqual(79)
+		expect(gap).toBeGreaterThanOrEqual(59)
 	})
 })
