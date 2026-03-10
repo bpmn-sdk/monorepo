@@ -1,5 +1,5 @@
-use bpmn_ai_server::bridge::CoreBridge;
-use bpmn_ai_server::mcp_server;
+use bpmn_proxy::bridge::CoreBridge;
+use bpmn_proxy::mcp_server;
 
 fn get_arg(flag: &str) -> Option<String> {
     let args: Vec<String> = std::env::args().collect();

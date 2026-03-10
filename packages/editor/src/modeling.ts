@@ -13,7 +13,15 @@ import type {
 	DiColor,
 } from "@bpmn-sdk/core"
 import { BIOC_NS, COLOR_NS, writeDiColor } from "@bpmn-sdk/core"
-import { computeWaypoints, computeWaypointsWithPorts, portFromWaypoint } from "./geometry.js"
+import {
+	computeWaypoints,
+	computeWaypointsAvoiding,
+	computeWaypointsWithPorts,
+	portFromWaypoint,
+	routeEntersShape,
+	routeOrthogonal,
+	waypointsIntersectObstacles,
+} from "./geometry.js"
 import { genId } from "./id.js"
 import type { CreateShapeType, PortDir } from "./types.js"
 
@@ -691,58 +699,59 @@ export function moveShapes(
 	})
 
 	// Update edge waypoints
-	// - If both source and target are moving: translate all waypoints by a consistent delta
-	// - If only source is moving: translate first waypoint
-	// - If only target is moving: translate last waypoint
+	// After each move, ensure sequence flows:
+	//  1. Never pass behind/through other elements (obstacle avoidance)
+	//  2. Never share the same connection point on an element (port deconfliction)
 	const allFlows = new Map<string, BpmnSequenceFlow>()
 	collectAllSequenceFlows(process.flowElements, process.sequenceFlows, allFlows)
+
+	// Build a lookup of post-move shape bounds
+	const shapeBoundsMap = new Map<string, BpmnBounds>()
+	for (const s of newShapes) {
+		shapeBoundsMap.set(s.bpmnElement, s.bounds)
+	}
 
 	const newEdges = diagram.plane.edges.map((edge) => {
 		// Handle sequence flows (search all nesting levels)
 		const flow = allFlows.get(edge.bpmnElement)
 		if (flow) {
-			const srcMove = extendedMoveMap.get(flow.sourceRef)
-			const tgtMove = extendedMoveMap.get(flow.targetRef)
-
-			if (!srcMove && !tgtMove) return edge
 			if (edge.waypoints.length < 2) return edge
 
-			const newWps = [...edge.waypoints]
-			if (srcMove && tgtMove) {
-				// Both endpoints moving — translate all waypoints together
-				return {
-					...edge,
-					waypoints: newWps.map((wp) => ({ x: wp.x + srcMove.dx, y: wp.y + srcMove.dy })),
-				}
-			}
-			// Only one endpoint moves — preserve user-adjusted ports, recompute route
+			const srcMove = extendedMoveMap.get(flow.sourceRef)
+			const tgtMove = extendedMoveMap.get(flow.targetRef)
 			const srcShape = newShapes.find((s) => s.bpmnElement === flow.sourceRef)
 			const tgtShape = newShapes.find((s) => s.bpmnElement === flow.targetRef)
-			if (srcShape && tgtShape) {
-				const firstWp = newWps[0]
-				const lastWp = newWps[newWps.length - 1]
-				// Derive ports from pre-move bounds so user-adjusted exit/entry points are preserved
-				const srcOldBounds = srcMove
-					? {
-							...srcShape.bounds,
-							x: srcShape.bounds.x - srcMove.dx,
-							y: srcShape.bounds.y - srcMove.dy,
-						}
-					: srcShape.bounds
-				const tgtOldBounds = tgtMove
-					? {
-							...tgtShape.bounds,
-							x: tgtShape.bounds.x - tgtMove.dx,
-							y: tgtShape.bounds.y - tgtMove.dy,
-						}
-					: tgtShape.bounds
-				const srcPort = firstWp ? portFromWaypoint(firstWp, srcOldBounds) : "right"
-				const tgtPort = lastWp ? portFromWaypoint(lastWp, tgtOldBounds) : "left"
+			if (!srcShape || !tgtShape) return edge
+
+			// Obstacles = all shapes except this edge's source and target
+			const obstacles = newShapes
+				.filter((s) => s.bpmnElement !== flow.sourceRef && s.bpmnElement !== flow.targetRef)
+				.map((s) => s.bounds)
+
+			if (srcMove || tgtMove) {
+				// At least one endpoint moved — always re-route from port midpoints so that
+				// connection points are centered on the side and obstacles are avoided.
 				return {
 					...edge,
-					waypoints: computeWaypointsWithPorts(srcShape.bounds, srcPort, tgtShape.bounds, tgtPort),
+					waypoints: computeWaypointsAvoiding(srcShape.bounds, tgtShape.bounds, obstacles),
 				}
 			}
+
+			// Neither endpoint moves — validate the existing waypoints fully.
+			// This catches both: (a) a moved shape now blocking the path, and
+			// (b) pre-existing invalid paths loaded from XML that pass through
+			// a shape's interior.  Any invalid path is re-routed.
+			if (
+				waypointsIntersectObstacles(edge.waypoints, obstacles) ||
+				routeEntersShape(edge.waypoints, srcShape.bounds) ||
+				routeEntersShape(edge.waypoints, tgtShape.bounds)
+			) {
+				return {
+					...edge,
+					waypoints: computeWaypointsAvoiding(srcShape.bounds, tgtShape.bounds, obstacles),
+				}
+			}
+
 			return edge
 		}
 
@@ -769,16 +778,156 @@ export function moveShapes(
 		return edge
 	})
 
+	// Port deconfliction: spread edges that share the same connection point on a shape
+	const deconflictedEdges = deconflictPorts(newEdges, shapeBoundsMap, allFlows)
+
 	return {
 		...defs,
 		diagrams: [
 			{
 				...diagram,
-				plane: { ...diagram.plane, shapes: newShapes, edges: newEdges },
+				plane: { ...diagram.plane, shapes: newShapes, edges: deconflictedEdges },
 			},
 			...defs.diagrams.slice(1),
 		],
 	}
+}
+
+// ── Port deconfliction ────────────────────────────────────────────────────────
+
+/**
+ * Spreads edge connection points when multiple flows share the same port
+ * midpoint on a shape.  Groups edges by (shapeId, port-side) and offsets
+ * them evenly along that side so no two flows touch the exact same point.
+ */
+function deconflictPorts(
+	edges: BpmnDiEdge[],
+	shapeBoundsMap: Map<string, BpmnBounds>,
+	allFlows: Map<string, BpmnSequenceFlow>,
+): BpmnDiEdge[] {
+	type TermRef = { edgeIdx: number; isSource: boolean; port: PortDir }
+	const groups = new Map<string, TermRef[]>()
+
+	for (let i = 0; i < edges.length; i++) {
+		const edge = edges[i]
+		if (!edge || edge.waypoints.length < 2) continue
+		const flow = allFlows.get(edge.bpmnElement)
+		if (!flow) continue
+		const srcBounds = shapeBoundsMap.get(flow.sourceRef)
+		const tgtBounds = shapeBoundsMap.get(flow.targetRef)
+		if (!srcBounds || !tgtBounds) continue
+
+		const firstWp = edge.waypoints[0]
+		const lastWp = edge.waypoints[edge.waypoints.length - 1]
+		if (!firstWp || !lastWp) continue
+
+		const srcPort = portFromWaypoint(firstWp, srcBounds)
+		const tgtPort = portFromWaypoint(lastWp, tgtBounds)
+
+		const srcKey = `${flow.sourceRef}:${srcPort}`
+		const tgtKey = `${flow.targetRef}:${tgtPort}`
+
+		const sg = groups.get(srcKey) ?? []
+		sg.push({ edgeIdx: i, isSource: true, port: srcPort })
+		groups.set(srcKey, sg)
+
+		const tg = groups.get(tgtKey) ?? []
+		tg.push({ edgeIdx: i, isSource: false, port: tgtPort })
+		groups.set(tgtKey, tg)
+	}
+
+	// Compute spread waypoints for groups with collisions
+	const newSrcTerminals = new Map<number, BpmnWaypoint>()
+	const newSrcPorts = new Map<number, PortDir>()
+	const newTgtTerminals = new Map<number, BpmnWaypoint>()
+	const newTgtPorts = new Map<number, PortDir>()
+
+	for (const [key, group] of groups) {
+		if (group.length <= 1) continue
+		const colonIdx = key.indexOf(":")
+		const shapeId = key.slice(0, colonIdx)
+		const portStr = key.slice(colonIdx + 1)
+		if (portStr !== "top" && portStr !== "right" && portStr !== "bottom" && portStr !== "left")
+			continue
+		const port: PortDir = portStr
+		const bounds = shapeBoundsMap.get(shapeId)
+		if (!bounds) continue
+
+		const n = group.length
+		const isH = port === "left" || port === "right"
+		const available = isH ? bounds.height - 30 : bounds.width - 30
+		const spacing = Math.min(25, available / Math.max(n - 1, 1))
+
+		for (let i = 0; i < n; i++) {
+			const term = group[i]
+			if (!term) continue
+			const offset = (i - (n - 1) / 2) * spacing
+			let newPt: BpmnWaypoint
+			if (port === "right") {
+				newPt = { x: bounds.x + bounds.width, y: bounds.y + bounds.height / 2 + offset }
+			} else if (port === "left") {
+				newPt = { x: bounds.x, y: bounds.y + bounds.height / 2 + offset }
+			} else if (port === "bottom") {
+				newPt = { x: bounds.x + bounds.width / 2 + offset, y: bounds.y + bounds.height }
+			} else {
+				newPt = { x: bounds.x + bounds.width / 2 + offset, y: bounds.y }
+			}
+
+			if (term.isSource) {
+				newSrcTerminals.set(term.edgeIdx, newPt)
+				newSrcPorts.set(term.edgeIdx, port)
+			} else {
+				newTgtTerminals.set(term.edgeIdx, newPt)
+				newTgtPorts.set(term.edgeIdx, port)
+			}
+		}
+	}
+
+	if (newSrcTerminals.size === 0 && newTgtTerminals.size === 0) return edges
+
+	const result = [...edges]
+	for (let i = 0; i < result.length; i++) {
+		const newSrcPt = newSrcTerminals.get(i)
+		const newTgtPt = newTgtTerminals.get(i)
+		if (!newSrcPt && !newTgtPt) continue
+
+		const edge = result[i]
+		if (!edge || edge.waypoints.length < 2) continue
+		const flow = allFlows.get(edge.bpmnElement)
+		if (!flow) continue
+		const srcBounds = shapeBoundsMap.get(flow.sourceRef)
+		const tgtBounds = shapeBoundsMap.get(flow.targetRef)
+		if (!srcBounds || !tgtBounds) continue
+
+		const firstWp = edge.waypoints[0]
+		const lastWp = edge.waypoints[edge.waypoints.length - 1]
+		if (!firstWp || !lastWp) continue
+
+		const srcPt = newSrcPt ?? firstWp
+		const tgtPt = newTgtPt ?? lastWp
+		const srcPort = newSrcPorts.get(i) ?? portFromWaypoint(srcPt, srcBounds)
+		const tgtPort = newTgtPorts.get(i) ?? portFromWaypoint(tgtPt, tgtBounds)
+
+		// Compute obstacles for this edge (all shapes except its src and tgt)
+		const obstacles: BpmnBounds[] = []
+		for (const [shapeId, bounds] of shapeBoundsMap) {
+			if (shapeId !== flow.sourceRef && shapeId !== flow.targetRef) {
+				obstacles.push(bounds)
+			}
+		}
+
+		const candidate = routeOrthogonal(srcPt, srcPort, tgtPt, tgtPort)
+		// If the spread route passes through an obstacle, fall back to the obstacle-avoiding
+		// route (which exits from the port midpoint, but never goes behind an element).
+		result[i] = {
+			...edge,
+			waypoints: waypointsIntersectObstacles(candidate, obstacles)
+				? computeWaypointsAvoiding(srcBounds, tgtBounds, obstacles)
+				: candidate,
+		}
+	}
+
+	return result
 }
 
 // ── Resize shape ──────────────────────────────────────────────────────────────

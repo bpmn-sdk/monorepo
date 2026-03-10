@@ -1,3 +1,42 @@
+export { BpmnSdkError, ParseError, ValidationError } from "./errors.js"
+export type { ErrorCode } from "./errors.js"
+export {
+	isBpmnActivity,
+	isBpmnAdHocSubProcess,
+	isBpmnBoundaryEvent,
+	isBpmnBusinessRuleTask,
+	isBpmnCallActivity,
+	isBpmnComplexGateway,
+	isBpmnEndEvent,
+	isBpmnEvent,
+	isBpmnEventBasedGateway,
+	isBpmnEventSubProcess,
+	isBpmnExclusiveGateway,
+	isBpmnGateway,
+	isBpmnInclusiveGateway,
+	isBpmnIntermediateCatchEvent,
+	isBpmnIntermediateThrowEvent,
+	isBpmnManualTask,
+	isBpmnParallelGateway,
+	isBpmnReceiveTask,
+	isBpmnScriptTask,
+	isBpmnSendTask,
+	isBpmnServiceTask,
+	isBpmnStartEvent,
+	isBpmnSubProcess,
+	isBpmnTask,
+	isBpmnTransaction,
+	isBpmnUserTask,
+} from "./bpmn/type-guards.js"
+export {
+	findElement,
+	findElementInProcess,
+	findProcess,
+	findSequenceFlow,
+	getAllElements,
+	getElementType,
+	getZeebeExtensions,
+} from "./bpmn/utils.js"
 export { Bpmn, SAMPLE_BPMN_XML } from "./bpmn/index.js"
 export type {
 	ProcessBuilder,
@@ -97,8 +136,18 @@ export type {
 	ZeebeCalledDecision,
 } from "./bpmn/zeebe-extensions.js"
 export { zeebeExtensionsToXmlElements } from "./bpmn/zeebe-extensions.js"
-export { Dmn } from "./dmn/index.js"
-export { Form } from "./form/index.js"
+export { Dmn, layoutDmn, benchmarkDmnLayout, compactifyDmn, expandDmn } from "./dmn/index.js"
+export type {
+	DmnBenchmarkResult,
+	DmnElementPosition,
+	CompactDmn,
+	CompactDmnDecision,
+	CompactDmnInput,
+	CompactDmnOutput,
+	CompactDmnRule,
+} from "./dmn/index.js"
+export { Form, compactifyForm, expandForm } from "./form/index.js"
+export type { CompactForm, CompactFormField } from "./form/index.js"
 export { FormBuilder, GroupBuilder } from "./form/form-builder.js"
 export type {
 	TextFieldOptions,
@@ -185,9 +234,25 @@ export type {
 	OptimizeOptions,
 } from "./bpmn/optimize/types.js"
 export { layoutProcess, layoutFlowNodes } from "./layout/index.js"
+export {
+	benchmarkLayout,
+	compareLayouts,
+	formatBenchmarkResult,
+	generateAutoLayout,
+	parseReferenceLayout,
+} from "./layout/index.js"
+export type {
+	BenchmarkResult,
+	BoundingBox,
+	ElementComparison,
+	ElementPosition,
+	FlowOrderViolation,
+} from "./layout/index.js"
 export type { Bounds, LayoutEdge, LayoutNode, LayoutResult, Waypoint } from "./layout/index.js"
 export { ELEMENT_SIZES } from "./layout/index.js"
 export { compactify, expand } from "./bpmn/compact.js"
+export { exportSvg } from "./bpmn/svg.js"
+export type { SvgExportOptions } from "./bpmn/svg.js"
 export type {
 	CompactDiagram,
 	CompactElement,

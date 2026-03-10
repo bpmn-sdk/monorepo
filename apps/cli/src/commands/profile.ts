@@ -9,8 +9,8 @@ import {
 	listProfiles,
 	saveProfile,
 	useProfile,
-} from "../profile.js"
-import type { ApiType } from "../profile.js"
+} from "@bpmn-sdk/profiles"
+import type { ApiType } from "@bpmn-sdk/profiles"
 import type { CommandGroup, FlagSpec } from "../types.js"
 
 const API_TYPE_FLAG: FlagSpec = {

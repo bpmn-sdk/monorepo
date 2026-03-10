@@ -249,9 +249,9 @@ describe("Coordinate assignment", () => {
 		expect(taskNode).toBeDefined()
 		if (!startNode || !taskNode) return
 
-		// Task should be at least 80px (HORIZONTAL_SPACING) after start's right edge
+		// Task should be at least HORIZONTAL_SPACING (30px) after start's right edge
 		const startRight = startNode.bounds.x + startNode.bounds.width
-		expect(taskNode.bounds.x).toBeGreaterThanOrEqual(startRight + 80 - 1)
+		expect(taskNode.bounds.x).toBeGreaterThanOrEqual(startRight + 30 - 1)
 	})
 
 	it("ensures vertical spacing between nodes in the same layer", () => {
@@ -755,9 +755,9 @@ describe("Layout engine (integration)", () => {
 		expect(startNode.labelBounds).toBeDefined()
 		expect(startNode.labelBounds?.y).toBeGreaterThan(startNode.bounds.y + startNode.bounds.height)
 
-		// Gateway label should be above the element
+		// Gateway label should be below the element
 		expect(gwNode.labelBounds).toBeDefined()
-		expect(gwNode.labelBounds?.y).toBeLessThan(gwNode.bounds.y)
+		expect(gwNode.labelBounds?.y).toBeGreaterThan(gwNode.bounds.y + gwNode.bounds.height)
 	})
 
 	it("lays out a sub-process expanded with children inside", () => {
@@ -805,6 +805,57 @@ describe("Layout engine (integration)", () => {
 		const result = layoutProcess(process)
 		expect(result.nodes).toHaveLength(2)
 		expect(() => assertNoOverlap(result)).not.toThrow()
+	})
+
+	it("does not throw overlap when subprocess children shift with container after Y-normalization", () => {
+		// Regression: resolveLayerOverlaps normalizes negative Y coordinates on layoutNodes
+		// (e.g. when a tall expanded subprocess grows upward past y=0). Previously the
+		// subprocess container was shifted but its children were not, causing assertNoOverlap
+		// to report element "agent-loop" overlaps with element "think".
+		const subproc = node("agent-loop", "adHocSubProcess") as BpmnFlowElement & {
+			flowElements: BpmnFlowElement[]
+			sequenceFlows: BpmnSequenceFlow[]
+		}
+		subproc.flowElements = [
+			node("think", "serviceTask"),
+			node("act", "serviceTask"),
+			node("observe", "serviceTask"),
+		]
+		subproc.sequenceFlows = []
+
+		const process = proc(
+			"ai-support-agent",
+			[
+				node("start", "startEvent"),
+				node("classify", "serviceTask"),
+				subproc,
+				node("end", "endEvent"),
+			],
+			[
+				flow("f1", "start", "classify"),
+				flow("f2", "classify", "agent-loop"),
+				flow("f3", "agent-loop", "end"),
+			],
+		)
+
+		expect(() => layoutProcess(process)).not.toThrow()
+		const result = layoutProcess(process)
+		expect(() => assertNoOverlap(result)).not.toThrow()
+
+		// Children must be inside the container
+		const container = result.nodes.find((n) => n.id === "agent-loop")
+		const think = result.nodes.find((n) => n.id === "think")
+		expect(container).toBeDefined()
+		expect(think).toBeDefined()
+		if (!container || !think) return
+		expect(think.bounds.x).toBeGreaterThanOrEqual(container.bounds.x)
+		expect(think.bounds.y).toBeGreaterThanOrEqual(container.bounds.y)
+		expect(think.bounds.x + think.bounds.width).toBeLessThanOrEqual(
+			container.bounds.x + container.bounds.width,
+		)
+		expect(think.bounds.y + think.bounds.height).toBeLessThanOrEqual(
+			container.bounds.y + container.bounds.height,
+		)
 	})
 })
 
@@ -1100,7 +1151,7 @@ describe("resolveTargetPort", () => {
 })
 
 describe("Grid-based coordinate system", () => {
-	it("places elements centered in 200×160 grid cells", () => {
+	it("places elements centered in 130×140 grid cells", () => {
 		const flowNodes = [
 			node("start", "startEvent"),
 			node("task", "serviceTask"),
@@ -1111,10 +1162,10 @@ describe("Grid-based coordinate system", () => {
 
 		const result = assignCoordinates(orderedLayers, nodeIndex)
 
-		// Each element should be centered within its grid cell (200×160)
+		// Each element should be centered within its grid cell (130×140)
 		for (const n of result) {
-			const cellX = n.layer * 200
-			const centerX = cellX + 100
+			const cellX = n.layer * 130
+			const centerX = cellX + 65
 			const nodeCenterX = n.bounds.x + n.bounds.width / 2
 			expect(nodeCenterX).toBeCloseTo(centerX, 0)
 		}
@@ -1132,11 +1183,11 @@ describe("Grid-based coordinate system", () => {
 		expect(nodeB).toBeDefined()
 		if (!nodeA || !nodeB) return
 
-		// Layer 0 starts at x=0, layer 1 at x=200 (grid cell width)
-		expect(nodeB.bounds.x - nodeA.bounds.x).toBe(200)
+		// Layer 0 starts at x=0, layer 1 at x=130 (grid cell width)
+		expect(nodeB.bounds.x - nodeA.bounds.x).toBe(130)
 	})
 
-	it("grid spacing between nodes in same layer is 160px cell height", () => {
+	it("grid spacing between nodes in same layer is 140px cell height", () => {
 		const flowNodes = [node("a", "serviceTask"), node("b", "serviceTask")]
 		const nodeIndex = new Map(flowNodes.map((n) => [n.id, n]))
 		const orderedLayers = [["a", "b"]]
@@ -1148,10 +1199,10 @@ describe("Grid-based coordinate system", () => {
 		expect(nodeB).toBeDefined()
 		if (!nodeA || !nodeB) return
 
-		// Nodes should be in adjacent grid rows (160px apart center-to-center)
+		// Nodes should be in adjacent grid rows (140px apart center-to-center)
 		const centerA = nodeA.bounds.y + nodeA.bounds.height / 2
 		const centerB = nodeB.bounds.y + nodeB.bounds.height / 2
-		expect(Math.abs(centerB - centerA)).toBeCloseTo(160, 0)
+		expect(Math.abs(centerB - centerA)).toBeCloseTo(140, 0)
 	})
 })
 

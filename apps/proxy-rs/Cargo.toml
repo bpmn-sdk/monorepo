@@ -1,5 +1,5 @@
 [package]
-name = "bpmn-ai-server"
+name = "bpmn-proxy"
 version = "0.1.0"
 edition = "2021"
 

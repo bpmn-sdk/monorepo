@@ -85,6 +85,8 @@ interface RenderOptions {
 | [`@bpmn-sdk/feel`](https://www.npmjs.com/package/@bpmn-sdk/feel) | FEEL expression language parser & evaluator |
 | [`@bpmn-sdk/plugins`](https://www.npmjs.com/package/@bpmn-sdk/plugins) | 22 composable canvas plugins |
 | [`@bpmn-sdk/api`](https://www.npmjs.com/package/@bpmn-sdk/api) | Camunda 8 REST API TypeScript client |
+| [`@bpmn-sdk/profiles`](https://www.npmjs.com/package/@bpmn-sdk/profiles) | Shared auth, profile storage, and client factories for CLI & proxy |
+| [`@bpmn-sdk/operate`](https://www.npmjs.com/package/@bpmn-sdk/operate) | Monitoring & operations frontend for Camunda clusters |
 
 ## License
 

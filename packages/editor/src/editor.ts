@@ -299,6 +299,7 @@ export class BpmnEditor {
 	private _ghostSnapCenter: DiagPoint | null = null
 	private _createEdgeDropTarget: string | null = null
 	private _readOnly = false
+	private _isDragging = false
 	private _boundaryHostId: string | null = null
 	private _warningBanner: HTMLElement | null = null
 
@@ -726,6 +727,23 @@ export class BpmnEditor {
 		this._setSelection(this._shapes.map((s) => s.id))
 	}
 
+	paste(): void {
+		this._doPaste()
+	}
+
+	/** Pans the viewport to center on the element with the given id (preserves zoom). */
+	scrollToElement(id: string): void {
+		const shape = this._shapes.find((s) => s.id === id)
+		if (!shape) return
+		const { x, y, width, height } = shape.shape.bounds
+		const cx = x + width / 2
+		const cy = y + height / 2
+		const svgW = this._svg.clientWidth
+		const svgH = this._svg.clientHeight
+		const { scale } = this._viewport.state
+		this._viewport.set({ tx: svgW / 2 - cx * scale, ty: svgH / 2 - cy * scale, scale })
+	}
+
 	on<K extends keyof EditorEvents>(event: K, handler: EditorEvents[K]): () => void {
 		let set = this._listeners.get(event)
 		if (!set) {
@@ -871,6 +889,11 @@ export class BpmnEditor {
 	}
 
 	private _previewTranslate(dx: number, dy: number): void {
+		if (!this._isDragging) {
+			this._isDragging = true
+			this._overlay.setDragging(true)
+			this._emit("editor:drag", true)
+		}
 		const alignSnap = this._computeSnap(dx, dy)
 		const spacingResult = this._computeSpacingSnap(dx, dy)
 
@@ -913,6 +936,12 @@ export class BpmnEditor {
 			const { x, y } = shape.shape.bounds
 			shape.element.setAttribute("transform", `translate(${x} ${y})`)
 		}
+		if (this._isDragging) {
+			this._isDragging = false
+			this._overlay.setDragging(false)
+			this._overlay.setSelection(this._selectedIds, this._shapes, this._getResizableIds())
+			this._emit("editor:drag", false)
+		}
 	}
 
 	private _commitTranslate(dx: number, dy: number): void {
@@ -928,6 +957,11 @@ export class BpmnEditor {
 			this._executeCommand((d) => insertShapeOnEdge(moveShapes(d, moves), edgeDropId, shapeId))
 		} else {
 			this._executeCommand((d) => moveShapes(d, moves))
+		}
+		if (this._isDragging) {
+			this._isDragging = false
+			this._overlay.setDragging(false)
+			this._emit("editor:drag", false)
 		}
 	}
 
@@ -1312,6 +1346,11 @@ export class BpmnEditor {
 		if (!shape) return
 		const labelBounds = labelBoundsForPosition(shape.shape.bounds, position)
 		this._executeCommand((d) => updateLabelPosition(d, shapeId, labelBounds))
+	}
+
+	/** Starts inline label editing for the element with the given id. */
+	editLabel(id: string): void {
+		this._startLabelEdit(id)
 	}
 
 	/** Copies then pastes the current selection with a small offset. */

@@ -13,6 +13,8 @@ export const IC = {
 	duplicate: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><rect x="5.5" y="5.5" width="8" height="8" rx="1.5"/><path d="M4 10.5V3.5A1.5 1.5 0 0 1 5.5 2H12"/></svg>`,
 	dots: `<svg viewBox="0 0 16 16" fill="currentColor"><circle cx="3.5" cy="8" r="1.3"/><circle cx="8" cy="8" r="1.3"/><circle cx="12.5" cy="8" r="1.3"/></svg>`,
 	arrow: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="2" y1="8" x2="11" y2="8"/><polyline points="8,5 12,8 8,11"/></svg>`,
+	search: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="6.5" cy="6.5" r="4.5"/><line x1="10" y1="10" x2="14" y2="14"/></svg>`,
+	keyboard: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><rect x="1" y="4" width="14" height="8" rx="1.5"/><line x1="4" y1="7.5" x2="4" y2="7.5" stroke-width="2"/><line x1="7" y1="7.5" x2="7" y2="7.5" stroke-width="2"/><line x1="10" y1="7.5" x2="10" y2="7.5" stroke-width="2"/><line x1="4" y1="10" x2="12" y2="10"/></svg>`,
 	labelPos: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M3 4h10M8 4v7"/><line x1="2" y1="13" x2="14" y2="13" stroke-dasharray="2 2"/></svg>`,
 	zoomIn: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="8" y1="3" x2="8" y2="13"/><line x1="3" y1="8" x2="13" y2="8"/></svg>`,
 	zoomOut: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="3" y1="8" x2="13" y2="8"/></svg>`,

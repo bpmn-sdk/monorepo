@@ -1,5 +1,5 @@
 import { BpmnCanvas } from "@bpmn-sdk/canvas"
-import { Bpmn, compactify } from "@bpmn-sdk/core"
+import { Bpmn, Dmn, Form, compactify } from "@bpmn-sdk/core"
 import type { BpmnDefinitions } from "@bpmn-sdk/core"
 import { saveCheckpoint } from "../history/index.js"
 import { injectAiBridgeStyles } from "./css.js"
@@ -18,6 +18,8 @@ interface PanelOptions {
 	loadXml(xml: string): void
 	getCurrentContext?(): { projectId: string; fileId: string } | null
 	getTheme?(): "dark" | "light"
+	/** Called when the user requests creation of a companion DMN or Form file. */
+	createCompanionFile?(name: string, type: "dmn" | "form", content: string): Promise<void>
 }
 
 interface ChatMessage {
@@ -526,6 +528,98 @@ export function createAiPanel(options: PanelOptions): {
 		return msg
 	}
 
+	// ── Companion file detection ──────────────────────────────────────────────
+
+	function showCompanionOffer(
+		msgEl: HTMLElement,
+		xml: string,
+		createFn: (name: string, type: "dmn" | "form", content: string) => Promise<void>,
+	): void {
+		let defs: BpmnDefinitions
+		try {
+			defs = Bpmn.parse(xml)
+		} catch {
+			return
+		}
+		const compact = compactify(defs)
+
+		const dmnRefs: Array<{ decisionId: string; taskName?: string }> = []
+		const formRefs: Array<{ formId: string; taskName?: string }> = []
+		const seenDecisions = new Set<string>()
+		const seenForms = new Set<string>()
+
+		for (const proc of compact.processes) {
+			for (const el of proc.elements) {
+				if (el.decisionId && !seenDecisions.has(el.decisionId)) {
+					seenDecisions.add(el.decisionId)
+					dmnRefs.push({ decisionId: el.decisionId, taskName: el.name })
+				}
+				if (el.formId && !seenForms.has(el.formId)) {
+					seenForms.add(el.formId)
+					formRefs.push({ formId: el.formId, taskName: el.name })
+				}
+			}
+		}
+
+		if (dmnRefs.length === 0 && formRefs.length === 0) return
+
+		const offer = document.createElement("div")
+		offer.className = "ai-companion-offer"
+
+		const title = document.createElement("div")
+		title.className = "ai-companion-title"
+		title.textContent = "This diagram references external files:"
+		offer.append(title)
+
+		function makeRow(label: string, onCreate: () => Promise<void>): void {
+			const row = document.createElement("div")
+			row.className = "ai-companion-row"
+			const labelEl = document.createElement("span")
+			labelEl.textContent = label
+			const createBtn = document.createElement("button")
+			createBtn.className = "ai-companion-create"
+			createBtn.textContent = "Create"
+			createBtn.addEventListener("click", async () => {
+				createBtn.disabled = true
+				createBtn.textContent = "Creating…"
+				try {
+					await onCreate()
+					createBtn.textContent = "Created ✓"
+				} catch (err) {
+					createBtn.disabled = false
+					createBtn.textContent = `Failed: ${String(err)}`
+				}
+			})
+			row.append(labelEl, createBtn)
+			offer.append(row)
+		}
+
+		for (const ref of dmnRefs) {
+			const fileName = `${ref.decisionId}.dmn`
+			const label = ref.taskName ? `${ref.taskName} → ${fileName}` : fileName
+			makeRow(`📊 ${label}`, async () => {
+				const dmnDefs = Dmn.createDecisionTable(ref.decisionId)
+					.name(ref.taskName ?? ref.decisionId)
+					.build()
+				const content = Dmn.export(dmnDefs)
+				await createFn(fileName, "dmn", content)
+			})
+		}
+
+		for (const ref of formRefs) {
+			const fileName = `${ref.formId}.form`
+			const label = ref.taskName ? `${ref.taskName} → ${fileName}` : fileName
+			makeRow(`📝 ${label}`, async () => {
+				const formDef = Form.makeEmpty(ref.formId)
+				const content = Form.export(formDef)
+				await createFn(fileName, "form", content)
+			})
+		}
+
+		msgEl.append(offer)
+		messagesEl.scrollTop = messagesEl.scrollHeight
+	}
+
 	function finalizeAiMessage(msgEl: HTMLElement, fullText: string, directXml?: string): void {
 		msgEl.classList.remove("ai-msg-cursor")
 		while (msgEl.firstChild) msgEl.removeChild(msgEl.firstChild)
@@ -590,6 +684,10 @@ export function createAiPanel(options: PanelOptions): {
 					}
 					options.loadXml(directXml)
 					applyBtn.textContent = "Applied ✓"
+					// Detect companion file references and offer to create them
+					if (options.createCompanionFile) {
+						showCompanionOffer(msgEl, directXml, options.createCompanionFile)
+					}
 				} catch (err) {
 					applyBtn.disabled = false
 					applyBtn.textContent = `Apply failed: ${String(err)}`

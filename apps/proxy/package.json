@@ -1,20 +1,20 @@
 {
-	"name": "@bpmn-sdk/ai-server",
+	"name": "@bpmn-sdk/proxy",
 	"version": "0.0.4",
-	"description": "Local AI bridge server for @bpmn-sdk — HTTP SSE server and MCP server for BPMN diagram editing via Claude, Copilot, or Gemini",
+	"description": "Local proxy server for @bpmn-sdk — AI bridge (SSE/MCP) and Camunda API proxy using stored CLI profiles",
 	"type": "module",
 	"bin": {
 		"bpmn-ai-server": "./dist/index.js",
 		"bpmn-mcp": "./dist/mcp-server.js"
 	},
-	"files": [
-		"dist/**/*.js"
-	],
+	"files": ["dist/**/*.js"],
 	"engines": {
 		"node": ">=20"
 	},
 	"dependencies": {
-		"@bpmn-sdk/core": "workspace:*"
+		"@bpmn-sdk/api": "workspace:*",
+		"@bpmn-sdk/core": "workspace:*",
+		"@bpmn-sdk/profiles": "workspace:*"
 	},
 	"scripts": {
 		"start": "node dist/index.js",

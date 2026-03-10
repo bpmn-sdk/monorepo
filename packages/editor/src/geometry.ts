@@ -305,15 +305,16 @@ export function portFromWaypoint(wp: BpmnWaypoint, bounds: BpmnBounds): PortDir 
  * Computes orthogonal waypoints connecting two shapes via explicit exit/entry
  * ports.  All segments are horizontal or vertical.
  */
-export function computeWaypointsWithPorts(
-	src: BpmnBounds,
+/**
+ * Routes orthogonal waypoints between two explicit points given their exit/entry directions.
+ * All segments are horizontal or vertical.
+ */
+export function routeOrthogonal(
+	E: DiagPoint,
 	srcPort: PortDir,
-	tgt: BpmnBounds,
+	P: DiagPoint,
 	tgtPort: PortDir,
 ): BpmnWaypoint[] {
-	const E = portPoint(src, srcPort)
-	const P = portPoint(tgt, tgtPort)
-
 	if (Math.hypot(E.x - P.x, E.y - P.y) < 2) return [E, P]
 
 	const srcH = srcPort === "left" || srcPort === "right"
@@ -348,9 +349,16 @@ export function computeWaypointsWithPorts(
 	return [E, { x: E.x, y: P.y }, P]
 }
 
-// ── Obstacle-avoiding routing ─────────────────────────────────────────────────
+export function computeWaypointsWithPorts(
+	src: BpmnBounds,
+	srcPort: PortDir,
+	tgt: BpmnBounds,
+	tgtPort: PortDir,
+): BpmnWaypoint[] {
+	return routeOrthogonal(portPoint(src, srcPort), srcPort, portPoint(tgt, tgtPort), tgtPort)
+}
 
-const ALL_PORTS: PortDir[] = ["right", "bottom", "left", "top"]
+// ── Obstacle-avoiding routing ─────────────────────────────────────────────────
 
 function hSegIntersectsRect(x1: number, x2: number, y: number, r: BpmnBounds, m: number): boolean {
 	if (y <= r.y + m || y >= r.y + r.height - m) return false
@@ -362,7 +370,7 @@ function vSegIntersectsRect(y1: number, y2: number, x: number, r: BpmnBounds, m:
 	return Math.max(y1, y2) > r.y + m && Math.min(y1, y2) < r.y + r.height - m
 }
 
-function waypointsIntersectObstacles(wps: BpmnWaypoint[], obstacles: BpmnBounds[]): boolean {
+export function waypointsIntersectObstacles(wps: BpmnWaypoint[], obstacles: BpmnBounds[]): boolean {
 	const m = 2
 	for (let i = 0; i < wps.length - 1; i++) {
 		const a = wps[i]
@@ -380,25 +388,105 @@ function waypointsIntersectObstacles(wps: BpmnWaypoint[], obstacles: BpmnBounds[
 }
 
 /**
- * Computes waypoints between two shapes, routing around obstacle shapes.
- * Tries all 16 port combinations and picks the first that avoids obstacles.
- * Falls back to the default route if no clear path is found.
+ * Returns true if any intermediate waypoint (not the first or last) lies strictly
+ * inside the shape's bounding box.  This catches routes that enter the source or
+ * target shape's interior before reaching the connection point — a situation that
+ * waypointsIntersectObstacles cannot detect because src/tgt are excluded from the
+ * obstacles list.
+ */
+export function routeEntersShape(wps: BpmnWaypoint[], shape: BpmnBounds): boolean {
+	const m = 2
+	for (let i = 1; i < wps.length - 1; i++) {
+		const wp = wps[i]
+		if (!wp) continue
+		if (
+			wp.x > shape.x + m &&
+			wp.x < shape.x + shape.width - m &&
+			wp.y > shape.y + m &&
+			wp.y < shape.y + shape.height - m
+		)
+			return true
+	}
+	return false
+}
+
+// Port-pair iteration order for the 16-combo search.
+// Ordered to try the most visually natural routes first:
+//  1. Straight-through pairs (horizontal then vertical)
+//  2. L-route pairs
+//  3. U-route pairs (same-direction, widest detour)
+const PORT_PAIRS: [PortDir, PortDir][] = [
+	["right", "left"],
+	["left", "right"],
+	["bottom", "top"],
+	["top", "bottom"],
+	["right", "top"],
+	["right", "bottom"],
+	["left", "top"],
+	["left", "bottom"],
+	["bottom", "right"],
+	["bottom", "left"],
+	["top", "right"],
+	["top", "left"],
+	["right", "right"],
+	["left", "left"],
+	["bottom", "bottom"],
+	["top", "top"],
+]
+
+/**
+ * Computes waypoints between two shapes, routing around obstacle shapes and
+ * never passing through the source or target shape's own interior.
+ *
+ * Strategy:
+ *  1. Try the default (most natural) route.
+ *  2. Try all 16 port-pair combinations in natural-first order.
+ *  3. Try explicit bypass corridors above/below/left/right of each obstacle.
+ *  4. Fall back to the default route as an absolute last resort.
  */
 export function computeWaypointsAvoiding(
 	src: BpmnBounds,
 	tgt: BpmnBounds,
 	obstacles: BpmnBounds[],
 ): BpmnWaypoint[] {
-	const defaultWps = computeWaypoints(src, tgt)
-	if (obstacles.length === 0 || !waypointsIntersectObstacles(defaultWps, obstacles))
-		return defaultWps
+	// A route is invalid if it hits an external obstacle OR if it routes through
+	// the interior of the source or target shape itself.
+	const isBlocked = (wps: BpmnWaypoint[]): boolean =>
+		waypointsIntersectObstacles(wps, obstacles) ||
+		routeEntersShape(wps, src) ||
+		routeEntersShape(wps, tgt)
 
-	for (const srcPort of ALL_PORTS) {
-		for (const tgtPort of ALL_PORTS) {
-			const wps = computeWaypointsWithPorts(src, srcPort, tgt, tgtPort)
-			if (!waypointsIntersectObstacles(wps, obstacles)) return wps
+	const defaultWps = computeWaypoints(src, tgt)
+	if (!isBlocked(defaultWps)) return defaultWps
+
+	for (const [srcPort, tgtPort] of PORT_PAIRS) {
+		const wps = computeWaypointsWithPorts(src, srcPort, tgt, tgtPort)
+		if (!isBlocked(wps)) return wps
+	}
+
+	// All 16 midpoint combos failed — try explicit bypass corridors around each obstacle.
+	// The corridor route shape is: E → {E.x, bypassY} → {P.x, bypassY} → P  (Y bypasses)
+	//                          or: E → {bypassX, E.y} → {bypassX, P.y} → P  (X bypasses)
+	const PAD = 30
+	for (const obs of obstacles) {
+		for (const bypassY of [obs.y - PAD, obs.y + obs.height + PAD]) {
+			for (const [sp, tp] of PORT_PAIRS) {
+				const E = portPoint(src, sp)
+				const P = portPoint(tgt, tp)
+				const wps: BpmnWaypoint[] = [E, { x: E.x, y: bypassY }, { x: P.x, y: bypassY }, P]
+				if (!isBlocked(wps)) return wps
+			}
+		}
+		for (const bypassX of [obs.x - PAD, obs.x + obs.width + PAD]) {
+			for (const [sp, tp] of PORT_PAIRS) {
+				const E = portPoint(src, sp)
+				const P = portPoint(tgt, tp)
+				const wps: BpmnWaypoint[] = [E, { x: bypassX, y: E.y }, { x: bypassX, y: P.y }, P]
+				if (!isBlocked(wps)) return wps
+			}
 		}
 	}
+
 	return defaultWps
 }
 

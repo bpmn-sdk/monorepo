@@ -1,5 +1,438 @@
 # Progress
 
+## 2026-03-10 — editor11: packages/operate — monitoring frontend
+
+### `packages/operate` (new package — `@bpmn-sdk/operate`)
+- Zero-dependency monitoring and operations frontend library (same pattern as `packages/editor`).
+- `createOperate(options)` factory — mounts a full monitoring UI into any container element.
+- **6 views**: Dashboard, Processes (definitions), Instances, Incidents, Jobs, User Tasks.
+- **Instance detail view**: BPMN canvas via `@bpmn-sdk/canvas` with token-highlight overlay (`@bpmn-sdk/plugins/token-highlight`) showing active/visited elements. Sidebar tabs: Variables, Incidents.
+- **SSE-based data**: stores open `EventSource` connections to proxy `/operate/stream?topic=...`; proxy polls Camunda on server-side and pushes JSON events. No client-side timers.
+- **Mock/demo mode**: `mock: true` option feeds fixture data via simulated streams — no proxy required. Used in landing page demo.
+- **Profile picker**: header dropdown calls `GET /profiles`, switches active profile; all streams reconnect.
+- **Hash router**: minimal in-package router (`#/`, `#/instances/:key`, etc.).
+- **CSS injection**: `injectOperateStyles()` — self-contained dark/light theme via CSS vars.
+
+### `apps/proxy` — operate SSE endpoint
+- Added `GET /operate/stream?topic=...` endpoint.
+- Topics: `dashboard`, `definitions`, `instances`, `incidents`, `jobs`, `tasks`.
+- Uses `createClientFromProfile()` server-side; polls Camunda at configurable interval (default 30s, min 5s).
+- Sends `{ type: "data", topic, payload }` SSE events; keepalive every 25s.
+- Cleans up timers on client disconnect.
+
+### `apps/landing` — Operate demo page
+- New `/operate` page (`operate.astro`) — full-screen operate UI in mock mode.
+- Added `@bpmn-sdk/operate: workspace:*` dependency.
+- Added "Operate" nav link from main landing page.
+
+## 2026-03-10 — editor11: packages/profiles + proxy rename
+
+### `packages/profiles` (new package — `@bpmn-sdk/profiles`)
+- Moved `profile.ts` and `client.ts` from `apps/cli/src/` into this new shared package.
+- Added `src/token.ts`: `getAuthHeader(config): Promise<string>` — returns Authorization header for any auth type; OAuth2 tokens cached in-memory with automatic 60-second pre-expiry refresh.
+- Added `src/index.ts` re-exporting all public symbols.
+- `tsconfig.json` emits declarations (`declaration: true`) so downstream consumers get types.
+
+### `apps/ai-server` → `apps/proxy` (`@bpmn-sdk/proxy`)
+- Renamed directory and package name.
+- Added `@bpmn-sdk/api` and `@bpmn-sdk/profiles` as dependencies.
+- Added `GET /profiles` endpoint — returns all CLI profiles (name, active flag, apiType, baseUrl, authType).
+- Added `ALL /api/*` transparent proxy endpoint — reads `X-Profile` header or active profile, fetches auth token via `getAuthHeader`, forwards raw HTTP to `profile.baseUrl/*`, returns upstream response.
+- All existing AI bridge endpoints (`GET /status`, `POST /chat`) unchanged.
+
+### `apps/ai-server-rs` → `apps/proxy-rs`
+- Renamed directory and Cargo package name (`bpmn-ai-server` → `bpmn-proxy`).
+- Updated `build.rs`: pnpm filter `@bpmn-sdk/proxy`, source path `apps/proxy/dist/bridge.bundle.js`.
+- Updated `src/main.rs` and `src/mcp_main.rs`: `bpmn_ai_server::*` → `bpmn_proxy::*`.
+
+### `apps/cli`
+- Removed `src/profile.ts` and `src/client.ts` (moved to `packages/profiles`).
+- Added `@bpmn-sdk/profiles: workspace:*` dependency.
+- Updated all import sites: `profile-tui.ts`, `run.ts`, `commands/profile.ts`.
+
+### Supporting files
+- `apps/desktop/package.json`: `tauri:build` script path `ai-server-rs` → `proxy-rs`.
+- `apps/desktop/src-tauri/tauri.conf.json`: resource paths `ai-server-rs` → `proxy-rs`.
+- Root `package.json`: scripts `ai-server` → `proxy`, `ai-server-rs` → `proxy-rs`, `ai-server-rs:build` → `proxy-rs:build`.
+- `biome.json`: ignore pattern `apps/ai-server-rs/target/**` → `apps/proxy-rs/target/**`.
+
+---
+
+## 2026-03-10 — editor11: Landing page SDK feature highlights
+
+### `apps/landing/src/data/content.ts`
+- Updated `PACKAGES[0].description` for `@bpmn-sdk/core` to mention type guards, typed errors, and lookup utilities.
+- Added 4 new `FEATURES` bullets: type guards, typed errors, element lookup utilities, full JSDoc coverage.
+- Added `typeGuards` code example (plain + HTML-highlighted) demonstrating `isBpmnServiceTask`, `findElement`, `getZeebeExtensions`, and `instanceof ParseError` pattern.
+
+### `apps/landing/src/pages/index.astro`
+- Expanded "Type-Safe" bento card to include chips: "22 type guards", "ParseError / ValidationError", "findElement / getZeebeExtensions".
+- Added new "SDK Developer Experience" section between the bento and code comparison, with a four-item feature list and a sticky code panel showing the type guard + error handling pattern.
+
+### `apps/landing/src/styles/global.css`
+- Added `.sdk-dx-section`, `.sdk-dx-layout`, `.sdk-dx-features`, `.sdk-dx-item`, `.sdk-dx-bullet`, `.sdk-dx-code-panel`, `.sdk-dx-code-body` styles including responsive breakpoint.
+
+---
+
+## 2026-03-10 — editor11: @bpmn-sdk/core SDK improvements
+
+### `packages/core/src/errors.ts` (new)
+- Added typed error hierarchy: `BpmnSdkError` (base), `ParseError`, `ValidationError`.
+- Exported `ErrorCode` type (`"parse-error" | "validation-error"`).
+- Consumers can now `instanceof ParseError` / `instanceof ValidationError` to distinguish errors.
+
+### `packages/core/src/bpmn/type-guards.ts` (new)
+- Exported 22 type predicate functions for narrowing `BpmnFlowElement` discriminated union.
+- Group predicates: `isBpmnEvent`, `isBpmnActivity`, `isBpmnGateway`.
+- Specific predicates: `isBpmnServiceTask`, `isBpmnUserTask`, `isBpmnStartEvent`, `isBpmnExclusiveGateway`, etc.
+- All follow the pattern `(el: BpmnFlowElement): el is SpecificType`.
+
+### `packages/core/src/bpmn/utils.ts` (new)
+- Exported `findElement(defs, id)` — cross-process element lookup with sub-process recursion.
+- Exported `findElementInProcess(proc, id)` — single-process search.
+- Exported `findProcess(defs, id)` — find process by id.
+- Exported `findSequenceFlow(proc, id)` — find edge by id.
+- Exported `getElementType(defs, id)` — returns `BpmnElementType | "sequenceFlow" | undefined`.
+- Exported `getAllElements(defs)` — all top-level flow elements across all processes.
+- Exported `getZeebeExtensions(extensionElements)` — inverse of `zeebeExtensionsToXmlElements`; extracts task definition, IO mapping, task headers, properties, form definition, called decision.
+
+### `packages/core/src/bpmn/bpmn-model.ts`
+- Added JSDoc to all 30+ interface and type declarations: `BpmnDefinitions`, `BpmnProcess`, `BpmnFlowElement`, `BpmnSequenceFlow`, `BpmnElementType`, all event definition types, geometry types, DI types, root elements.
+
+### `packages/core/src/bpmn/bpmn-parser.ts`
+- `requiredAttr()` now throws `ParseError` instead of bare `Error`.
+
+### `packages/core/src/dmn/dmn-builder.ts`
+- `.rule()` now throws `ValidationError` (with `@throws` JSDoc) instead of bare `Error`.
+
+### `packages/core/src/bpmn/compact.ts`
+- Added detailed JSDoc with `@example` blocks to `compactify()` and `expand()`.
+- Added single-line JSDoc to `CompactDiagram`, `CompactProcess`, `CompactElement`, `CompactFlow`.
+
+### `packages/core/src/bpmn/index.ts`
+- Rewrote JSDoc for the `Bpmn` namespace object and all four methods (`createProcess`, `parse`, `export`, `makeEmpty`) with `@param`, `@returns`, `@throws`, and `@example` blocks.
+
+### `packages/core/src/index.ts`
+- Re-exported all new APIs: error classes, all type guards, all utility functions.
+
+---
+
+## 2026-03-10 — editor11: Editor UX/UI follow-up fixes
+
+### `packages/editor/src/editor.ts`
+- Added `paste()` public method (calls internal `_doPaste`).
+- Added `scrollToElement(id)` public method — pans viewport to center element at current zoom.
+
+### `packages/editor/src/hud.ts`
+- Context menu: viewport clamping via `requestAnimationFrame` — no more off-screen overflow at right/bottom edges.
+- Context menu: right-clicking empty canvas now shows "Select All" and "Paste" options.
+- Context menu: refactored into `makeCtxItem` helper and `openCtxMenu` helper.
+- Element search: shows "N of M" counter during Enter navigation (was showing total count only).
+- Element search: calls `editor.scrollToElement(id)` so canvas pans to matched element.
+- Keyboard shortcuts: added `Ctrl+Shift+?` handler to open the shortcuts modal.
+- Simulation banner: toggles `bpmn-sim-active` class on `document.body`.
+
+### `packages/editor/src/css.ts`
+- Added `body.bpmn-sim-active #hud-top-center { top: 36px }` — top toolbar shifts down when simulation banner is visible.
+
+---
+
+## 2026-03-10 — editor11: Editor UX/UI improvements
+
+### `packages/editor/src/state-machine.ts`
+- Rubber-band selection now works without holding Shift — plain drag on canvas activates selection box.
+
+### `packages/editor/src/editor.ts`
+- Added public `editLabel(id)` method for programmatic label editing.
+
+### `packages/editor/src/icons.ts`
+- Added `search` and `keyboard` SVG icon strings.
+
+### `packages/editor/src/css.ts`
+- Added CSS for: top-toolbar overflow guard, simulation active banner, context menu, element search bar, keyboard shortcuts modal.
+
+### `packages/editor/src/hud.ts`
+- Context menu (right-click) on canvas elements: Edit label, Duplicate, Delete.
+- Delete + Duplicate buttons added to mini floating ctx-toolbar.
+- More menu entries: Find element (Ctrl+F), Optimize diagram, ASCII view, Keyboard shortcuts.
+- Element search bar (Ctrl+F): filters flowElements by name, highlights matches.
+- Keyboard shortcuts modal (Ctrl+Shift+?): lists all editor shortcuts.
+- Simulation active banner (amber, fixed-position) with "Exit simulation" button.
+- `onGatewayEdgeCreated?` callback — fires when edge is drawn from a gateway element.
+- `onExitSimulation?` callback — fires when user clicks "Exit simulation" banner.
+- Inline `required: true` enforced for service task `taskType` via config-panel-bpmn schema.
+- Added `setSimulationActive(active: boolean)` to returned API.
+
+### `packages/plugins/src/process-runner/index.ts`
+- Exposed `exitPlayMode()` on the returned plugin object (public API).
+
+### `packages/plugins/src/config-panel-bpmn/index.ts`
+- Added `required: true` to `taskType` field in `GENERIC_SERVICE_TASK_SCHEMA` for inline validation.
+
+### `apps/landing/src/scripts/editor.ts`
+- Wired `onGatewayEdgeCreated` to expand dock and switch to Properties tab.
+- Wired `onExitSimulation` to call `processRunnerPlugin.exitPlayMode()`.
+- Wired `setSimulationActive(true/false)` on enter/exit play mode.
+
+---
+
+## 2026-03-10 — editor11: Landing page SVG export feature
+
+### `apps/landing/src/data/content.ts`
+- Added "SVG export" to `FEATURES` array.
+- Updated `CODE.createProcess` and `CODE_HTML.createProcess` to show `exportSvg(defs)` usage alongside `Bpmn.export(defs)`.
+- Updated `PACKAGES[0].description` to include "SVG export (zero deps, all runtimes)".
+
+### `apps/landing/src/pages/index.astro`
+- Added "Sugiyama algorithm" and "SVG export" chips to the Auto-Layout bento card.
+
+### `apps/landing/src/styles/global.css`
+- Added `.bcard-chips` flex layout for chips within bento cards.
+
+---
+
+## 2026-03-10 — editor11: exportSvg() in @bpmn-sdk/core
+
+### `packages/core/src/bpmn/svg.ts` (new)
+- `exportSvg(defs, options?)` — generates a self-contained SVG string from a `BpmnDefinitions` object (must include DI position data, i.e. produced by `.withAutoLayout().build()` or parsed from BPMN XML).
+- Pure string generation, zero external dependencies, works in every environment (Node.js, browsers, Deno, Bun, edge runtimes).
+- Renders all element types: events (start/end/intermediate/boundary with event definition markers), tasks (with type-specific icons: service, user, script, send, receive, businessRule, manual), gateways (exclusive/parallel/inclusive/eventBased/complex with markers), sub-processes (expand marker + adHoc tilde), call activities, pools, lanes, text annotations, sequence flow edges (with arrow markers, rounded bezier paths, default-flow slash), message flows (dashed), associations (dashed, no arrow), edge labels.
+- `SvgExportOptions.theme?: "light" | "dark"` — light by default. Both themes use the same concrete colors as `@bpmn-sdk/canvas`.
+- `SvgExportOptions.padding?: number` — padding around diagram content, default 20px.
+- Icon groups use scoped `<style>` elements (class names `.bi/.bis/.gm/.gms`) so icons render correctly in all SVG viewers without relying on external CSS.
+- `esc()` escapes `& < > "` in all text content.
+
+### `packages/core/src/index.ts`
+- Exports `exportSvg` and `SvgExportOptions`.
+
+### `packages/core/tests/svg.test.ts` (new)
+- 12 tests covering: valid SVG output, viewBox presence, label rendering, theme colors, custom padding, defs/arrow marker, edge paths, empty DI handling, determinism, gateway types, task icon types.
+
+---
+
+## 2026-03-10 — editor11: Landing page accessibility fixes
+
+### `apps/landing/src/pages/index.astro`
+- Added `<main>` landmark wrapping all content sections (hero through playground), closing before footer.
+- Added `aria-label="Main navigation"` to `<nav>`.
+- Added `inert` attribute to `hero-diagram` and `anim-demo` (both already `aria-hidden`) so BpmnCanvas-rendered SVG elements inside cannot receive keyboard focus.
+- Added `aria-label="Playground code editor"` to `<textarea id="playground-code">`.
+- Changed CLI feature headings from `<h4>` to `<h3>` — they were skipping a level (`<h2>` → `<h4>`).
+- Changed inline `color:oklch(52% 0.06 280)` on 13px DMN section paragraphs to `color:var(--text-muted)` for sufficient contrast.
+
+### `apps/landing/src/styles/global.css`
+- `.cli-feature h4` → `.cli-feature h3` (matches heading change above).
+- `.pg-shortcut`: raised color from `oklch(45% 0.05 280)` to `oklch(62% 0.05 280)` — 45% failed WCAG AA at 11px.
+- `.cli-topbar-title`: raised color from `oklch(40% 0.02 270)` to `oklch(62% 0.02 270)` — 40% failed WCAG AA.
+- `.footer-dot`: changed from `var(--border)` (15% lightness) to `var(--text-muted)` (58% lightness) — border color was nearly invisible.
+
+---
+
+## 2026-03-10 — editor11: Landing page syntax highlighting
+
+### `apps/landing/src/styles/global.css`
+- Added `.dmn-code-body .kw/.str/.fn/.comment` color rules (same palette as animated code blocks).
+- Changed `.playground-wrap { align-items: stretch }` so both panels fill equal height.
+- Added `.pg-code-wrap` (flex: 1, position: relative, overflow: hidden, min-height: 380px) — container for mirror-div highlighting.
+- Added `#pg-highlight` (position: absolute, inset: 0, pointer-events: none) with token color rules.
+- Updated `#playground-code` to `color: transparent; caret-color: var(--text); position: absolute; inset: 0; z-index: 1` so it overlays the highlight div.
+- Updated mobile media query to target `.pg-code-wrap` for min-height instead of `#playground-code`.
+
+### `apps/landing/src/pages/index.astro`
+- Wrapped `<textarea id="playground-code">` in `<div class="pg-code-wrap">` with sibling `<div id="pg-highlight" aria-hidden="true">` for mirror-div technique.
+
+### `apps/landing/src/scripts/playground.ts`
+- Added `esc()`, `isAlpha()`, `isAlphaNum()` helpers.
+- Added `tokenize(raw)` one-pass tokenizer: handles line comments, string literals (`"'``), keywords, and method calls (identifier followed by `(`).
+- Wired `highlight()` function (updates `#pg-highlight` innerHTML + syncs scroll) on `input` and `scroll` events, on initial load, and when example buttons are clicked.
+
+---
+
+## 2026-03-10 — editor11: Fix layout overlap crash for adHocSubProcess
+
+### `packages/core/src/layout/types.ts`
+- Added `parentX: number; parentY: number` to `SubProcessChildResult` to track subprocess position when children were translated.
+
+### `packages/core/src/layout/subprocess.ts`
+- Record `parentX`/`parentY` in each `SubProcessChildResult`.
+
+### `packages/core/src/layout/layout-engine.ts`
+- Added Phase 5c: `syncSubProcessChildren` — after `resolveLayerOverlaps` (which normalizes negative Y and may shift subprocess containers), shift their children by the same delta so they remain inside the container.
+- Root cause: `resolveLayerOverlaps` normalizes negative Y on `layoutNodes` (including expanded subprocess containers), but children are stored in `childResults` and are not shifted. `assertNoOverlap` then detects that children are outside their parent.
+
+### `packages/core/tests/layout.test.ts`
+- Added regression test: adHocSubProcess with 3 disconnected children after classify task; asserts `layoutProcess` does not throw and children are inside the container.
+
+---
+
+## 2026-03-10 — editor11: Landing page playground robustness fix
+
+### `apps/landing/src/scripts/playground.ts`
+- Wrapped `new BpmnCanvas()` in try/catch inside `run()` — render errors now show in `#playground-error` instead of propagating to module level and skipping example-button setup.
+
+---
+
+## 2026-03-10 — editor11: Landing page DMN/Form examples and live playground
+
+### `apps/landing/src/data/content.ts`
+- Added `CODE.dmnTable` — `Dmn.createDecisionTable()` example with inputs, outputs, and rules for a loan eligibility decision.
+- Added `CODE.formExample` — `Form.makeEmpty()` scaffold example with annotated field types.
+- Added `CODE.bpmnWithCompanions` — Full BPMN process showing `userTask` (formId) + `businessRuleTask` (decisionId + resultVariable) referencing companion files.
+- Added matching `CODE_HTML.*` highlighted versions for all three.
+
+### `apps/landing/src/pages/index.astro`
+- New **DMN & Forms** section (`#dmn-forms`): 3-tab switcher showing the DMN builder, Form scaffold, and BPMN-with-companions code examples. The BPMN tab includes a live rendered preview.
+- New **Playground** section (`#playground`): live textarea for writing `Bpmn`/`Dmn`/`Form` builder code. `Ctrl+Enter` runs and renders the resulting BPMN. 4 example presets.
+- Added nav links: DMN & Forms, Playground.
+
+### `apps/landing/src/scripts/playground.ts` (new)
+- `setupDmnTabs()` — wires the 3 tab buttons for the DMN/Forms section; lazily renders the BPMN preview on first activation.
+- `setupPlayground()` — initializes the live code playground: `new Function('Bpmn', 'Dmn', 'Form', code)` evaluation, `BpmnCanvas` rendering, error display, Tab-key indent, Ctrl+Enter shortcut, example preset buttons.
+- Both called at module load (top-level).
+
+### `apps/landing/src/styles/global.css`
+- Added styles for `.dmn-section`, `.dmn-tabs`, `.dmn-panel`, `.dmn-layout`, `.dmn-desc`, `.dmn-bpmn-preview`.
+- Added styles for `.playground-section`, `.playground-wrap`, `.pg-editor-panel`, `.pg-diagram-panel`, `#playground-code`, `#playground-error`, `.pg-example-btn`.
+
+## 2026-03-10 — editor11: AI chat companion file generation
+
+After the AI generates and applies a BPMN diagram, the chat panel now detects referenced DMN decision tables (`businessRuleTask` with `decisionId`) and Forms (`userTask` with `formId`) and offers to scaffold and create those files as companions in the current project.
+
+### `packages/plugins/src/ai-bridge/panel.ts`
+- `showCompanionOffer(msgEl, xml, createFn)` — parses applied XML, extracts `decisionId`/`formId` references via `compactify`, and renders a UI block listing each referenced file with a "Create" button.
+- Each DMN button generates a scaffolded decision table via `Dmn.createDecisionTable(decisionId).name(...).build()` + `Dmn.export`.
+- Each Form button generates a minimal form via `Form.makeEmpty(formId)` + `Form.export`.
+- Appended to the message element after successful apply.
+
+### `packages/plugins/src/ai-bridge/index.ts`
+- `AiBridgePluginOptions.createCompanionFile?(name, type, content): Promise<void>` — new optional callback; passed through to `createAiPanel`.
+
+### `packages/plugins/src/ai-bridge/css.ts`
+- New styles: `.ai-companion-offer`, `.ai-companion-title`, `.ai-companion-row`, `.ai-companion-create` with dark and light theme variants.
+
+### `apps/landing/src/scripts/editor.ts`
+- Wires `createCompanionFile`: looks up current file's `workspaceId` via `getFiles(projectId)`, then calls `storagePlugin.api.createFile(...)` + `openFile(file.id)` to persist and open the companion. Falls back to opening an unsaved tab if no storage context.
+
+## 2026-03-10 — editor11: DMN/Form layout, compact format, and MCP server multi-type support
+
+Extended `@bpmn-sdk/core` and the MCP server to fully support DMN and Form files alongside BPMN, with the same builder/export/layout pattern.
+
+### `packages/core/src/dmn/dmn-layout.ts` (new)
+- `layoutDmn(defs: DmnDefinitions): DmnDefinitions` — auto-assigns DMNDI positions to all DRG elements using a left-to-right layered layout based on the requirement DAG. Element sizes: decision=180×80, inputData=125×45, knowledgeSource=100×63, BKM=160×80.
+- `benchmarkDmnLayout(xml, fileName): DmnBenchmarkResult` — compares auto-layout vs reference DMNDI positions.
+
+### `packages/core/src/dmn/compact.ts` (new)
+- `CompactDmn` / `CompactDmnDecision` / `CompactDmnInput` / `CompactDmnOutput` / `CompactDmnRule` — token-efficient types for AI use.
+- `compactifyDmn(defs): CompactDmn` — converts DmnDefinitions to compact representation.
+- `expandDmn(compact): DmnDefinitions` — restores full DmnDefinitions with auto-layout applied.
+
+### `packages/core/src/form/compact.ts` (new)
+- `CompactForm` / `CompactFormField` — token-efficient form representation.
+- `compactifyForm(def): CompactForm` — converts FormDefinition to compact representation.
+- `expandForm(compact): FormDefinition` — restores full FormDefinition.
+
+### `packages/core/src/dmn/index.ts` (updated)
+- Exports `layoutDmn`, `benchmarkDmnLayout`, `compactifyDmn`, `expandDmn` and all new types.
+- `Dmn.layout()`, `Dmn.compactify()`, `Dmn.expand()` added to namespace.
+
+### `packages/core/src/form/index.ts` (updated)
+- Exports `compactifyForm`, `expandForm` and new types.
+- `Form.makeEmpty(id?)`, `Form.compactify()`, `Form.expand()` added to namespace.
+
+### `packages/core/src/index.ts` (updated)
+- All new DMN/Form functions and types exported from main entry point.
+
+### `apps/ai-server/src/mcp-server.ts` (updated)
+- State is now a discriminated union: `{ kind: "bpmn" | "dmn" | "form"; data: ... }`.
+- `detectStateKind(content)` detects file type from content (JSON → form, DMN namespace → dmn, else bpmn).
+- `getTools()` returns type-specific tool set (BPMN/DMN/Form).
+- `saveState()` dispatches on state kind (Bpmn.export / Dmn.export+layoutDmn / Form.export).
+- `compose_diagram` Bridge API extends for DMN/Form types with `mcpGetDiagram`, `mcpReplaceDiagram`, `mcpExportXml`.
+
+### `scripts/bench-layout.mjs` (updated)
+- Now discovers and processes `.bpmn`, `.dmn`, and `.form` files.
+- DMN: calls `benchmarkDmnLayout`, reports avg/p90/max distance per DRG element.
+- Form: parse → compact → expand round-trip validation.
+- Summary sections per file type with per-file deviation tables.
+
+### Tests (new)
+- `packages/core/tests/dmn-layout.test.ts` — 8 tests covering layoutDmn, compactifyDmn, expandDmn.
+- `packages/core/tests/form-compact.test.ts` — 6 tests covering Form.makeEmpty, compactifyForm, expandForm.
+
+### Results
+- All 48 monorepo tasks pass (build/typecheck/check/test).
+- Bench script: 32 BPMN + 1 DMN + 3 Form files all process without errors.
+
+## 2026-03-10 — editor11: fix auto-layout overlaps and bypass-pattern baseline tracking
+
+Benchmarked auto-layout against 32 BPMN sample files. Fixed three classes of issues:
+
+- **`packages/core/src/layout/coordinates.ts`**: Fixed `findBaselinePath` to detect bypass edges (split gateway directly connected to join gateway). Previously the baseline jumped to the join, leaving task nodes off-baseline (140px offset). Now the baseline follows the task-bearing branch instead, keeping tasks flat on the main horizontal row. Also capped gateway/event label width to `GRID_CELL_WIDTH` (130px) to prevent wide labels from overlapping adjacent elements.
+- **`packages/core/src/layout/coordinates.ts`**: Fixed `resolveLayerOverlaps` to account for below-element labels (gateway/event labels) when computing minimum spacing between same-layer elements. Previously labels of one element could overlap the next element's body.
+- **`packages/core/src/layout/routing.ts`**: Changed `slideLabelAlongSegment` to return `Bounds | undefined` instead of always returning a position; removed forced fallback that placed edge labels at midpoints regardless of collision.
+- **`packages/core/src/layout/layout-engine.ts`**: Added `resolveLayerOverlaps` pass after subprocess expansion to handle Y-direction overlaps caused by sub-processes growing to fit their children.
+- Results: all 32 benchmark files process without overlap errors; zero order violations across 270 elements.
+
+## 2026-03-10 — editor11: improve auto-layout compactness to match bpmn.io reference layouts
+
+Benchmarked auto-layout against hand-crafted reference BPMN diagrams using the new `benchmarkLayout` / `compareLayouts` functions. Root cause: `GRID_CELL_WIDTH=200` produced 200px center-to-center spacing vs the ~130px used by bpmn.io — 51% too wide.
+
+- **`packages/core/src/layout/types.ts`**: `GRID_CELL_WIDTH` 200→130 (matches bpmn.io reference center-to-center spacing), `GRID_CELL_HEIGHT` 160→140 (matches reference branch distribution of 140px between parallel branches).
+- **`packages/core/src/layout/coordinates.ts`**: Moved gateway label placement from top-right to centered-below the gateway diamond (standard BPMN convention; prevents label from overlapping the next layer's elements at tighter spacing).
+- **`packages/core/src/layout/layout-engine.ts`**: Added a final `resolveLayerOverlaps` pass after the second `alignBaselinePath` to eliminate edge-case overlaps when a baseline node shares a layer with distributed branch nodes.
+- Results: width ratio reduced from 1.51 → 1.0 (exact match), height ratio 1.0 for parallel diagrams, zero order violations.
+
+## 2026-03-10 — editor11: add auto-layout benchmark infrastructure
+
+Added benchmarking tools to measure auto-layout quality against reference BPMN diagrams:
+
+- **`packages/core/src/layout/bench.ts`** (new): `benchmarkLayout`, `parseReferenceLayout`, `generateAutoLayout`, `compareLayouts`, `formatBenchmarkResult` — full pipeline for comparing auto-generated vs reference DI positions.
+- **`packages/core/src/index.ts`**: Exported all bench functions and types.
+- **`scripts/bench-layout.mjs`** (new): CLI script — reads all `.bpmn` files from a folder, runs benchmarks, reports per-file metrics (avg/p90/max distance, width/height ratio, order violations, top deviating elements) plus aggregate summary.
+- **`bpmn-samples/order-process.bpmn`**, **`bpmn-samples/parallel-approval.bpmn`** (new): Reference BPMN files with hand-crafted layouts used as benchmark targets.
+
+## 2026-03-10 — editor11: always re-validate all edges on element move
+
+Previously, the "neither endpoint moved" branch in `moveShapes` only checked whether a *moved* shape intersected the path — so pre-existing invalid paths (e.g. imported BPMN with bad waypoints) were left broken after moving an unrelated element.  Fix:
+
+- **`packages/editor/src/geometry.ts`**: Exported `routeEntersShape` so modeling can reuse the same validity check.
+- **`packages/editor/src/modeling.ts`** `moveShapes`: Replaced the narrow "moved-obstacles-only" check with a full validity check — `waypointsIntersectObstacles(wps, allObstacles) || routeEntersShape(wps, srcBounds) || routeEntersShape(wps, tgtBounds)`.  Any edge whose existing waypoints fail this check (obstacle intersection *or* interior traversal of src/tgt) is now re-routed on every move, regardless of whether its endpoints moved.  Removed the now-unused `movingIds` set.
+
+## 2026-03-10 — editor11: fix sequence flow routing through target/source shape interior
+
+Root cause: `computeWaypointsAvoiding` excluded the source and target shapes from the obstacle list (correct — so their connection ports aren't flagged), but this meant a path that entered the target shape's interior before reaching the port went undetected.  Example: start event directly above a service task, default route bottom→left produced a vertical segment passing through the task before entering from the left.
+
+- **`packages/editor/src/geometry.ts`**: Added `routeEntersShape(wps, shape)` — returns true if any intermediate waypoint (not first/last) lies strictly inside the shape's bounding box. `computeWaypointsAvoiding` now uses `isBlocked = waypointsIntersectObstacles || routeEntersShape(wps, src) || routeEntersShape(wps, tgt)` to reject routes that enter either endpoint shape's interior.
+- **`packages/editor/src/geometry.ts`**: Replaced the `ALL_PORTS` double-loop with a prioritised `PORT_PAIRS` list that tries straight-through pairs (`right→left`, `bottom→top`, etc.) before L-routes and U-routes.  For the reported case, `bottom→top` is now tried 3rd and found clean, producing a visually natural downward arc instead of a wide U-route around the right side.
+
+## 2026-03-10 — editor11: further improved sequence flow routing (centering + obstacle-free guarantee)
+
+- **`packages/editor/src/geometry.ts`** `computeWaypointsAvoiding`: After all 16 port-midpoint combos fail, now tries explicit bypass corridors around each blocking obstacle (above/below at `obs.y ± 30`, left/right at `obs.x ± 30`), trying all 16 port combos for each corridor lane. This makes it extremely unlikely a route falls back to the obstacle-intersecting default.
+- **`packages/editor/src/modeling.ts`** `moveShapes`: Removed the "both endpoints move → translate" optimisation. All edges where at least one endpoint moved are now always re-routed via `computeWaypointsAvoiding`, so connection points are always at the side midpoint (centered) after every move.
+- **`packages/editor/src/modeling.ts`** `deconflictPorts`: After computing the spread route with `routeOrthogonal`, now validates it against per-edge obstacles. If the spread path would pass behind a shape, falls back to `computeWaypointsAvoiding` (obstacle-free, midpoint-centered) instead of using the broken path.
+
+## 2026-03-10 — editor11: improved sequence flow routing after element moves
+
+- **`packages/editor/src/geometry.ts`**: Extracted routing logic from `computeWaypointsWithPorts` into a new exported `routeOrthogonal(E, srcPort, P, tgtPort)` function (explicit point + direction routing). Exported `waypointsIntersectObstacles` for use in modeling. `computeWaypointsWithPorts` is now a thin wrapper over `routeOrthogonal`.
+- **`packages/editor/src/modeling.ts`**: Rewrote edge waypoint recomputation in `moveShapes` to enforce two invariants after any element move:
+  1. **Obstacle avoidance** — uses `computeWaypointsAvoiding` for all cases where at least one endpoint moved. When both endpoints move, translates the path first and only re-routes if the translated path intersects an obstacle. Also re-routes edges whose endpoints did *not* move but whose waypoints now pass through a moved shape.
+  2. **Port deconfliction** — new `deconflictPorts` post-pass groups all edges by `(shapeId, port-side)` and spreads connection points evenly along the side (25 px spacing) when multiple flows share the same midpoint, then re-routes each affected edge via `routeOrthogonal`.
+
+## 2026-03-10 — editor11: hide toolbars and selection border during element drag
+
+- **`packages/editor/src/types.ts`**: Added `"editor:drag": (dragging: boolean) => void` to `EditorEvents`.
+- **`packages/editor/src/overlay.ts`**: Added `setDragging(isDragging)` — hides/shows `_selectionG` (the blue selection border) during drag.
+- **`packages/editor/src/editor.ts`**: Added `_isDragging` flag. `_previewTranslate()` now fires `editor:drag true` and hides the selection overlay on first call. `_commitTranslate()` and `_cancelTranslate()` fire `editor:drag false` and restore the selection overlay after the move completes.
+- **`packages/editor/src/hud.ts`**: Added `dragActive` flag; subscribed to `"editor:drag"` to immediately hide cfg/ctx toolbars on drag start and reposition them on drag end. Guards added to `positionCfgToolbar()` and `positionCtxToolbar()` so the `diagram:change` handler cannot un-hide them mid-drag.
+
+## 2026-03-10 — editor11: logo, mobile CLI fix, npm metadata
+
+- **Logo — welcome screen** (`packages/plugins/src/tabs/tabs-plugin.ts`): Replaced the old horizontal BPMN process illustration with the new gateway diamond logo (matching the favicon). Updated icon CSS from 80×40px to 48×48px (`css.ts`).
+- **Logo — watermark** (`apps/landing/src/scripts/editor.ts`): Replaced the old blue-box BPMN diagram `LOGO_SVG` with the new gateway diamond (inlined `oklch` colors matching `logo-2-gateway.svg`).
+- **Mobile CLI fix** (`apps/landing/src/styles/global.css`): Added `min-width: 0` to `.cli-terminal-wrap` to prevent CSS Grid from blowing out the viewport width due to `white-space: pre` terminal content. Added `font-size: 10px` for `#cli-terminal` at `max-width: 600px` so the 54-char lines fit narrow screens.
+- **npm metadata** (all 8 `packages/*/package.json`): Added `description`, `keywords`, and `license: "MIT"` to prevent npm search from showing raw README HTML snippets.
+- **README links** (all 8 `packages/*/README.md`): Added `[Website](https://bpmnsdk.u11g.com)` link; updated docs URL to `https://bpmnsdkdocs.u11g.com`.
+
 ## 2026-03-09 — editor + plugins: BPMN element docs sidebar tab
 
 - **`packages/plugins/src/element-docs/`** — New `element-docs` plugin (`@bpmn-sdk/plugins/element-docs`):

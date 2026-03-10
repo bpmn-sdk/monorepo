@@ -1,5 +1,5 @@
 import type { CanvasApi, CanvasPlugin } from "@bpmn-sdk/canvas"
-import { Bpmn, Dmn } from "@bpmn-sdk/core"
+import { Bpmn, Dmn, Form } from "@bpmn-sdk/core"
 import { BpmnEditor, createSideDock, initEditorHud } from "@bpmn-sdk/editor"
 import type { Tool } from "@bpmn-sdk/editor"
 import { Engine } from "@bpmn-sdk/engine"
@@ -24,13 +24,11 @@ import { createZoomControlsPlugin } from "@bpmn-sdk/plugins/zoom-controls"
 import { makeExamples } from "./examples.js"
 import { savePng, saveSvg } from "./export.js"
 
-const LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-  <rect width="24" height="24" rx="4" fill="#0062ff"/>
-  <circle cx="5" cy="12" r="2.5" fill="none" stroke="white" stroke-width="1.5"/>
-  <line x1="7.5" y1="12" x2="9" y2="12" stroke="white" stroke-width="1.5"/>
-  <rect x="9" y="9.5" width="6" height="5" rx="1" fill="none" stroke="white" stroke-width="1.5"/>
-  <line x1="15" y1="12" x2="16.5" y2="12" stroke="white" stroke-width="1.5"/>
-  <circle cx="19" cy="12" r="2.5" fill="none" stroke="white" stroke-width="2.5"/>
+const LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <rect width="100" height="100" rx="22" fill="oklch(9% 0.025 270)"/>
+  <polygon points="50,10 90,50 50,90 10,50" fill="oklch(55% 0.22 280)"/>
+  <line x1="50" y1="27" x2="50" y2="73" stroke="oklch(9% 0.025 270)" stroke-width="7.5" stroke-linecap="round"/>
+  <line x1="27" y1="50" x2="73" y2="50" stroke="oklch(9% 0.025 270)" stroke-width="7.5" stroke-linecap="round"/>
 </svg>`
 
 const IMPORT_ICON =
@@ -61,6 +59,7 @@ let hudRef: {
 	setActive(active: boolean): void
 	showOnboarding(): void
 	hideOnboarding(): void
+	setSimulationActive(active: boolean): void
 } | null = null
 
 /** Returns true when the XML is a freshly-created empty diagram (only a start event). */
@@ -237,6 +236,7 @@ const processRunnerPlugin = createProcessRunnerPlugin({
 		processRunnerPlugin.toolbar.style.display = ""
 		dock.propertiesPane.classList.add("bpmn-props-readonly")
 		bridge.tabsPlugin.api.setPlayMode(true)
+		hudRef?.setSimulationActive(true)
 	},
 	onExitPlayMode() {
 		const el = document.getElementById("hud-bottom-center")
@@ -244,6 +244,7 @@ const processRunnerPlugin = createProcessRunnerPlugin({
 		processRunnerPlugin.toolbar.style.display = "none"
 		dock.propertiesPane.classList.remove("bpmn-props-readonly")
 		bridge.tabsPlugin.api.setPlayMode(false)
+		hudRef?.setSimulationActive(false)
 	},
 	getProjectId: () => bridge.storagePlugin.api.getCurrentContext()?.projectId ?? null,
 })
@@ -362,6 +363,33 @@ const aiBridgePlugin = createAiBridgePlugin({
 		if (dock.collapsed) dock.expand()
 		dock.switchTab("ai")
 	},
+	createCompanionFile: async (name, type, content) => {
+		const ctx = bridge.storagePlugin.api.getCurrentContext()
+		if (ctx) {
+			// Find workspaceId from the current file's record
+			const files = await bridge.storagePlugin.api.getFiles(ctx.projectId)
+			const currentFile = files.find((f) => f.id === ctx.fileId)
+			if (currentFile) {
+				const file = await bridge.storagePlugin.api.createFile(
+					ctx.projectId,
+					currentFile.workspaceId,
+					name,
+					type,
+					content,
+				)
+				await bridge.storagePlugin.api.openFile(file.id)
+				return
+			}
+		}
+		// No storage context (or file lookup failed) — open as an unsaved tab
+		if (type === "dmn") {
+			const defs = Dmn.parse(content)
+			bridge.tabsPlugin.api.openTab({ type: "dmn", defs, name })
+		} else {
+			const form = Form.parse(content)
+			bridge.tabsPlugin.api.openTab({ type: "form", form, name })
+		}
+	},
 })
 
 // Wire AI tab click to initialize+open the panel (it's lazily created on first use)
@@ -474,5 +502,13 @@ hudRef = initEditorHud(editor, {
 		if (dock.collapsed) dock.expand()
 		dock.switchTab("ai")
 		aiBridgePlugin.openPanel()
+	},
+	onGatewayEdgeCreated: () => {
+		// Expand dock and switch to properties so user can set condition immediately
+		if (dock.collapsed) dock.expand()
+		dock.switchTab("properties")
+	},
+	onExitSimulation: () => {
+		processRunnerPlugin.exitPlayMode()
 	},
 })

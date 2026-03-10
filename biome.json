@@ -31,7 +31,7 @@
 			"**/.astro/**",
 			"**/src/generated/**",
 			"**/swagger/**",
-			"apps/ai-server-rs/target/**"
+			"apps/proxy-rs/target/**"
 		]
 	}
 }

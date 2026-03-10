@@ -51,17 +51,14 @@ importers:
         specifier: ^4
         version: 4.71.0
 
-  apps/ai-server:
-    dependencies:
-      '@bpmn-sdk/core':
-        specifier: workspace:*
-        version: link:../../packages/core
-
   apps/cli:
     dependencies:
       '@bpmn-sdk/api':
         specifier: workspace:*
         version: link:../../packages/api
+      '@bpmn-sdk/profiles':
+        specifier: workspace:*
+        version: link:../../packages/profiles
 
   apps/desktop:
     dependencies:
@@ -114,9 +111,24 @@ importers:
       '@bpmn-sdk/engine':
         specifier: workspace:*
         version: link:../../packages/engine
+      '@bpmn-sdk/operate':
+        specifier: workspace:*
+        version: link:../../packages/operate
       '@bpmn-sdk/plugins':
         specifier: workspace:*
         version: link:../../packages/plugins
+
+  apps/proxy:
+    dependencies:
+      '@bpmn-sdk/api':
+        specifier: workspace:*
+        version: link:../../packages/api
+      '@bpmn-sdk/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@bpmn-sdk/profiles':
+        specifier: workspace:*
+        version: link:../../packages/profiles
 
   packages/api: {}
 
@@ -154,6 +166,21 @@ importers:
 
   packages/feel: {}
 
+  packages/operate:
+    dependencies:
+      '@bpmn-sdk/api':
+        specifier: workspace:*
+        version: link:../api
+      '@bpmn-sdk/canvas':
+        specifier: workspace:*
+        version: link:../canvas
+      '@bpmn-sdk/core':
+        specifier: workspace:*
+        version: link:../core
+      '@bpmn-sdk/plugins':
+        specifier: workspace:*
+        version: link:../plugins
+
   packages/plugins:
     dependencies:
       '@bpmn-sdk/ascii':
@@ -171,6 +198,12 @@ importers:
       '@bpmn-sdk/feel':
         specifier: workspace:*
         version: link:../feel
+
+  packages/profiles:
+    dependencies:
+      '@bpmn-sdk/api':
+        specifier: workspace:*
+        version: link:../api
 
 packages:
 

@@ -1,5 +1,49 @@
 # Features
 
+## Monitoring & Operations frontend (2026-03-10) — `packages/operate`
+
+- **`@bpmn-sdk/operate`**: Zero-dependency monitoring frontend. `createOperate({ container, mock?, proxyUrl?, profile?, theme? })` mounts full monitoring UI.
+- **Dashboard**: Stats cards for active instances, open incidents, active jobs, pending tasks, deployed processes. Clickable cards navigate to respective views.
+- **Processes view**: Table of deployed process definitions with name, ID, version, tag, tenant.
+- **Instances view**: Paginated table with state filter bar (All / Active / Completed / Terminated). Incident warning indicator per row.
+- **Instance detail**: BPMN canvas rendering with token-highlight (active = amber glow, visited = green tint, edge animations). Sidebar tabs: Variables, Incidents.
+- **Incidents view**: Table with error type, message, process, instance, state, age.
+- **Jobs view**: Table with type, worker, retries, state, error message.
+- **User Tasks view**: Table with name, assignee, process, state, due date, priority.
+- **Profile picker**: Header dropdown populated from `GET /profiles`; switching reconnects all SSE streams.
+- **Mock/demo mode**: Self-contained fixture data, no proxy needed. Used at `/operate` on landing page.
+- **SSE architecture**: proxy polls Camunda server-side, pushes events to frontend — clean frontend, no polling timers client-side.
+
+
+
+## Landing page DMN/Form examples and live playground (2026-03-10) — `apps/landing`
+
+- **DMN & Forms section**: New landing page section with 3-tab showcase — DMN decision table builder, Camunda Form scaffold, and a full BPMN process referencing both (userTask → formId, businessRuleTask → decisionId).
+- **Live playground**: New interactive section where visitors write `Bpmn` / `Dmn` / `Form` builder code in a textarea and see the rendered BPMN diagram update instantly. `Ctrl+Enter` to run. Tab key inserts spaces. 4 example presets (linear flow, approval flow, DMN+Form, parallel gateway). Renders via `BpmnCanvas`.
+- **AI companion file offer**: After applying an AI-generated BPMN with `businessRuleTask` or `userTask` references, the chat offers to scaffold the referenced DMN / Form files and open them as new tabs.
+
+## DMN/Form layout, compact format, and MCP multi-type support (2026-03-10) — `packages/core`, `apps/ai-server`
+
+- **DMN fluent builder**: `Dmn.createDecisionTable(id)` → `.name()` → `.input({ label, expression, typeRef })` → `.output({ label, name, typeRef })` → `.rule({ inputs, outputs })` → `.hitPolicy()` → `.build()`. Produces a `DmnDefinitions` object serializable via `Dmn.export(defs)`.
+- **DMN auto-layout**: `layoutDmn(defs)` assigns DMNDI positions to all DRG elements using a left-to-right layered layout based on the requirement DAG. Sizes: decision=180×80, inputData=125×45, knowledgeSource=100×63, BKM=160×80. Exposed as `Dmn.layout()`.
+- **DMN parse/export**: `Dmn.parse(xml)` → `DmnDefinitions`; `Dmn.export(defs)` → XML string. `Dmn.makeEmpty()` creates a minimal DmnDefinitions with one empty decision table.
+- **DMN benchmark**: `benchmarkDmnLayout(xml, fileName)` compares auto-layout vs reference DMNDI. Exported from `@bpmn-sdk/core`.
+- **DMN compact format**: `compactifyDmn(defs) → CompactDmn` / `expandDmn(compact) → DmnDefinitions` — token-efficient AI format. Exposed as `Dmn.compactify()` / `Dmn.expand()`.
+- **Form scaffold**: `Form.makeEmpty(id?)` creates a minimal `FormDefinition` (schemaVersion 16, submit button). Extend `components` array with typed field objects.
+- **Form compact format**: `compactifyForm(def) → CompactForm` / `expandForm(compact) → FormDefinition`. Exposed as `Form.compactify()` / `Form.expand()`.
+- **Form parse/export**: `Form.parse(json)` → `FormDefinition`; `Form.export(def)` → JSON string.
+- **BPMN cross-references**: `Bpmn.createProcess()` builder supports `userTask(id, { formId })` (links Camunda Form via zeebe:formDefinition) and `businessRuleTask(id, { decisionId, resultVariable })` (links DMN via zeebe:calledDecision).
+- **MCP server multi-type**: `mcp-server.ts` now detects file type from content (BPMN/DMN/Form), exposes type-appropriate tool sets, and saves in the correct format. `compose_diagram` Bridge API works for all three types.
+- **Bench script extended**: `scripts/bench-layout.mjs` processes `.bpmn`, `.dmn`, and `.form` files with type-specific reporting and summary.
+
+## Auto-layout benchmark + compactness improvements (2026-03-10) — `packages/core`
+
+- **`benchmarkLayout` API**: full pipeline to compare auto-generated positions against reference BPMN DI data — `benchmarkLayout`, `parseReferenceLayout`, `generateAutoLayout`, `compareLayouts`, `formatBenchmarkResult` exported from `@bpmn-sdk/core`.
+- **Tighter spacing**: `GRID_CELL_WIDTH` reduced 200→130 (width ratio 1.51→1.0 vs bpmn.io reference), `GRID_CELL_HEIGHT` reduced 160→140 (140px parallel branch spacing matches bpmn.io).
+- **Gateway labels below**: gateway labels now render centered below the diamond (standard BPMN convention).
+- **`scripts/bench-layout.mjs`**: CLI benchmark script over any folder of `.bpmn` files; reports avg/p90/max distance, width/height ratio, order violations per file.
+- **Reference BPMN samples**: `bpmn-samples/order-process.bpmn`, `bpmn-samples/parallel-approval.bpmn`.
+
 ## Layout + optimizer improvements (2026-03-09) — `packages/core`
 
 - **Back-edge loop alignment**: `alignBranchBaselines` and `findBaselinePath` now correctly handle nodes with multiple successors caused by back-edge reversal, keeping sequential tasks on the main path aligned to the same center-y baseline.

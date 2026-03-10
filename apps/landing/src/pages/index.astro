@@ -6,6 +6,10 @@ const withSdkCode = CODE_HTML.withSdk
 const createProcessCode = CODE_HTML.createProcess
 const deployRunCode = CODE_HTML.deployRun
 const apiCode = CODE_HTML.apiClient
+const dmnTableCode = CODE_HTML.dmnTable
+const formExampleCode = CODE_HTML.formExample
+const bpmnWithCompanionsCode = CODE_HTML.bpmnWithCompanions
+const typeGuardsCode = CODE_HTML.typeGuards
 ---
 
 <!DOCTYPE html>
@@ -34,7 +38,7 @@ const apiCode = CODE_HTML.apiClient
   <div class="scroll-bar" aria-hidden="true"></div>
 
   <!-- Nav -->
-  <nav class="nav">
+  <nav class="nav" aria-label="Main navigation">
     <div class="nav-inner">
       <a href="#" class="nav-logo" aria-label="BPMN SDK">
         <svg width="22" height="22" viewBox="0 0 100 100" aria-hidden="true">
@@ -47,10 +51,13 @@ const apiCode = CODE_HTML.apiClient
       <div class="nav-links">
         <a href="#features" class="nav-link">Features</a>
         <a href="#examples" class="nav-link">Examples</a>
+        <a href="#dmn-forms" class="nav-link">DMN &amp; Forms</a>
+        <a href="#playground" class="nav-link">Playground</a>
         <a href="#api" class="nav-link">API</a>
         <a href="#cli" class="nav-link">CLI</a>
         <a href="https://bpmn-sdk-docs.pages.dev" class="nav-link">Docs</a>
         <a href="/editor" class="nav-link">Editor</a>
+        <a href="/operate" class="nav-link">Operate</a>
         <a href="https://github.com/bpmn-sdk/monorepo" class="nav-cta" target="_blank" rel="noopener">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 0C5.374 0 0 5.373 0 12c0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0 1 12 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z"/></svg>
           GitHub
@@ -58,6 +65,8 @@ const apiCode = CODE_HTML.apiClient
       </div>
     </div>
   </nav>
+
+  <main>
 
   <!-- ── Hero ──────────────────────────────────────────────────────────────── -->
   <section class="hero">
@@ -92,7 +101,7 @@ const apiCode = CODE_HTML.apiClient
       </div>
 
       <!-- Live BPMN diagram preview (rendered by @bpmn-sdk/canvas) -->
-      <div class="hero-diagram" aria-hidden="true">
+      <div class="hero-diagram" aria-hidden="true" inert>
         <div class="diagram-card">
           <div class="diagram-topbar">
             <span class="tb-dot tb-red"></span>
@@ -152,6 +161,10 @@ const apiCode = CODE_HTML.apiClient
           </div>
           <h3>Auto-Layout</h3>
           <p>Sugiyama layout engine produces clean, readable diagrams with orthogonal edge routing. No coordinate math.</p>
+          <div class="bcard-chips">
+            <span class="dmn-chip">Sugiyama algorithm</span>
+            <span class="dmn-chip">SVG export</span>
+          </div>
         </div>
 
         <!-- Normal: Type-Safe -->
@@ -160,7 +173,12 @@ const apiCode = CODE_HTML.apiClient
             <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
           </div>
           <h3>Type-Safe</h3>
-          <p>Strict TypeScript throughout. Every element, attribute, and Zeebe extension is fully typed. Invalid processes fail at compile time.</p>
+          <p>Strict TypeScript throughout. 22 type guard predicates narrow the <code>BpmnFlowElement</code> union. Typed errors are <code>instanceof</code>-catchable.</p>
+          <div class="bcard-chips">
+            <span class="dmn-chip">22 type guards</span>
+            <span class="dmn-chip">ParseError / ValidationError</span>
+            <span class="dmn-chip">findElement / getZeebeExtensions</span>
+          </div>
         </div>
 
         <!-- Wide: Roundtrip -->
@@ -189,6 +207,68 @@ const apiCode = CODE_HTML.apiClient
           <div>
             <h3>Camunda&nbsp;8 Ready</h3>
             <p>Native Zeebe task definitions, IO mappings, connectors, forms, and modeler templates. Deploy directly to Camunda Cloud.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── SDK Developer Experience ────────────────────────────────────────── -->
+  <section class="sdk-dx-section">
+    <div class="section-wrap">
+      <div class="section-eyebrow">SDK Quality</div>
+      <h2 class="section-h2">TypeScript-first,<br>from top to bottom</h2>
+      <div class="sdk-dx-layout">
+        <!-- Left: feature list -->
+        <div class="sdk-dx-features">
+          <div class="sdk-dx-item">
+            <div class="sdk-dx-bullet" aria-hidden="true">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            </div>
+            <div>
+              <h3>22 Type Guard Predicates</h3>
+              <p>Narrow <code>BpmnFlowElement</code> to a specific type without casting. One predicate per BPMN element type — <code>isBpmnServiceTask</code>, <code>isBpmnParallelGateway</code>, <code>isBpmnBoundaryEvent</code>, and group guards like <code>isBpmnGateway</code>, <code>isBpmnActivity</code>, <code>isBpmnEvent</code>.</p>
+            </div>
+          </div>
+          <div class="sdk-dx-item">
+            <div class="sdk-dx-bullet" aria-hidden="true">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            </div>
+            <div>
+              <h3>Typed Error Classes</h3>
+              <p><code>ParseError</code> (malformed XML) and <code>ValidationError</code> (builder rule violations) both extend <code>BpmnSdkError</code>. Every error carries a machine-readable <code>code</code> string — no string matching on <code>err.message</code>.</p>
+            </div>
+          </div>
+          <div class="sdk-dx-item">
+            <div class="sdk-dx-bullet" aria-hidden="true">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            </div>
+            <div>
+              <h3>Element Lookup Utilities</h3>
+              <p><code>findElement</code>, <code>findProcess</code>, <code>findSequenceFlow</code>, <code>getAllElements</code>, and <code>getZeebeExtensions</code> give you a clean query layer over the parsed model — no manual array traversal.</p>
+            </div>
+          </div>
+          <div class="sdk-dx-item">
+            <div class="sdk-dx-bullet" aria-hidden="true">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+            </div>
+            <div>
+              <h3>Full JSDoc Coverage</h3>
+              <p>Every public API has <code>@param</code>, <code>@returns</code>, <code>@throws</code>, and <code>@example</code> documentation. Hover any function in your IDE and get complete usage guidance inline.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right: code panel -->
+        <div class="sdk-dx-code-panel">
+          <div class="diagram-topbar">
+            <span class="tb-dot tb-red"></span>
+            <span class="tb-dot tb-yellow"></span>
+            <span class="tb-dot tb-green"></span>
+            <span class="tb-title">type-guards.ts</span>
+          </div>
+          <div class="sdk-dx-code-body">
+            <pre><code set:html={typeGuardsCode}></code></pre>
           </div>
         </div>
       </div>
@@ -292,7 +372,7 @@ const apiCode = CODE_HTML.apiClient
       </div>
 
       <!-- Animated demo: code grows on left, diagram updates on right -->
-      <div class="anim-demo" id="anim-demo" aria-hidden="true">
+      <div class="anim-demo" id="anim-demo" aria-hidden="true" inert>
         <!-- Left: animated code panel -->
         <div class="anim-code-panel">
           <div class="code-topbar">
@@ -398,7 +478,7 @@ const apiCode = CODE_HTML.apiClient
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
             </div>
             <div>
-              <h4>Interactive TUI</h4>
+              <h3>Interactive TUI</h3>
               <p>Arrow-key navigation through menus, commands, and input forms. No flags to memorize.</p>
             </div>
           </div>
@@ -407,7 +487,7 @@ const apiCode = CODE_HTML.apiClient
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
             </div>
             <div>
-              <h4>Connection Profiles</h4>
+              <h3>Connection Profiles</h3>
               <p>Store multiple Camunda clusters. Switch between dev, staging, and prod in one keystroke.</p>
             </div>
           </div>
@@ -416,7 +496,7 @@ const apiCode = CODE_HTML.apiClient
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
             </div>
             <div>
-              <h4>Full API Coverage</h4>
+              <h3>Full API Coverage</h3>
               <p>Processes, jobs, incidents, decisions, variables, messages — all accessible from the terminal.</p>
             </div>
           </div>
@@ -425,7 +505,7 @@ const apiCode = CODE_HTML.apiClient
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
             </div>
             <div>
-              <h4>Tabular Results</h4>
+              <h3>Tabular Results</h3>
               <p>Query results rendered as scrollable tables with detail view on enter. Copy-friendly output.</p>
             </div>
           </div>
@@ -484,6 +564,180 @@ const apiCode = CODE_HTML.apiClient
     </div>
   </section>
 
+  <!-- ── DMN & Forms ─────────────────────────────────────────────────────── -->
+  <section class="dmn-section" id="dmn-forms">
+    <div class="section-wrap">
+      <div class="section-eyebrow">DMN &amp; Forms</div>
+      <h2 class="section-h2">Beyond BPMN — decisions<br>and forms, too</h2>
+      <p class="section-sub" style="text-align:center; margin-top:-16px; margin-bottom:32px;">
+        The same fluent builder pattern works for DMN decision tables and Camunda Forms.
+        Reference them directly from your BPMN process.
+      </p>
+
+      <!-- Tab buttons -->
+      <div class="dmn-tabs" role="tablist">
+        <button class="dmn-tab active" data-tab="dmn" role="tab">DMN Decision Table</button>
+        <button class="dmn-tab" data-tab="form" role="tab">Camunda Form</button>
+        <button class="dmn-tab" data-tab="bpmn" role="tab">BPMN with DMN + Form</button>
+      </div>
+
+      <div class="dmn-panels">
+
+        <!-- DMN panel -->
+        <div class="dmn-panel active" data-panel="dmn">
+          <div class="dmn-layout">
+            <div class="dmn-code-panel">
+              <div class="diagram-topbar">
+                <span class="tb-dot tb-red"></span>
+                <span class="tb-dot tb-yellow"></span>
+                <span class="tb-dot tb-green"></span>
+                <span class="tb-title">eligibility.ts</span>
+              </div>
+              <div class="dmn-code-body">
+                <pre><code set:html={dmnTableCode}></code></pre>
+              </div>
+            </div>
+            <div class="dmn-desc">
+              <h3>DMN Decision Tables</h3>
+              <p>Build DMN decision tables with a fluent API. Define inputs, outputs, and rules —
+              the SDK generates valid DMN 2.0 XML with auto-computed DMNDI layout.</p>
+              <div class="dmn-chips">
+                <span class="dmn-chip">Fluent builder</span>
+                <span class="dmn-chip">DMN 2.0 XML export</span>
+                <span class="dmn-chip">Auto-layout DMNDI</span>
+                <span class="dmn-chip">Hit policies</span>
+                <span class="dmn-chip">FEEL type refs</span>
+                <span class="dmn-chip">Compact AI format</span>
+              </div>
+              <p style="font-size:13px; color:var(--text-muted);">
+                Use <code>Dmn.createDecisionTable(id)</code> to build decision tables,
+                <code>Dmn.export(defs)</code> to serialize to XML, and
+                <code>Dmn.layout(defs)</code> to assign diagram positions automatically.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Form panel -->
+        <div class="dmn-panel" data-panel="form">
+          <div class="dmn-layout">
+            <div class="dmn-code-panel">
+              <div class="diagram-topbar">
+                <span class="tb-dot tb-red"></span>
+                <span class="tb-dot tb-yellow"></span>
+                <span class="tb-dot tb-green"></span>
+                <span class="tb-title">application-form.ts</span>
+              </div>
+              <div class="dmn-code-body">
+                <pre><code set:html={formExampleCode}></code></pre>
+              </div>
+            </div>
+            <div class="dmn-desc">
+              <h3>Camunda Forms</h3>
+              <p>Scaffold Camunda form JSON from code. Use <code>Form.makeEmpty(id)</code>
+              to get a baseline form structure, then extend it with typed fields for
+              text inputs, numbers, dropdowns, and more.</p>
+              <div class="dmn-chips">
+                <span class="dmn-chip">Form JSON export</span>
+                <span class="dmn-chip">textfield / number / select</span>
+                <span class="dmn-chip">Schema version 16</span>
+                <span class="dmn-chip">Compact AI format</span>
+                <span class="dmn-chip">Round-trip fidelity</span>
+              </div>
+              <p style="font-size:13px; color:var(--text-muted);">
+                After applying a BPMN from the AI chat, the editor automatically detects
+                referenced forms and DMN tables and offers to scaffold them as companion files.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- BPMN with companions panel -->
+        <div class="dmn-panel" data-panel="bpmn">
+          <div class="dmn-layout">
+            <div class="dmn-code-panel">
+              <div class="diagram-topbar">
+                <span class="tb-dot tb-red"></span>
+                <span class="tb-dot tb-yellow"></span>
+                <span class="tb-dot tb-green"></span>
+                <span class="tb-title">loan-application.ts</span>
+              </div>
+              <div class="dmn-code-body">
+                <pre><code set:html={bpmnWithCompanionsCode}></code></pre>
+              </div>
+            </div>
+            <div class="dmn-desc">
+              <h3>BPMN with DMN &amp; Form references</h3>
+              <p>Link your BPMN process to a DMN decision table via
+              <code>businessRuleTask</code> and to a Camunda Form via
+              <code>userTask</code>. Both use Zeebe extension attributes
+              so the process is immediately deployable to Camunda 8.</p>
+              <div class="dmn-chips">
+                <span class="dmn-chip">userTask → formId</span>
+                <span class="dmn-chip">businessRuleTask → decisionId</span>
+                <span class="dmn-chip">resultVariable</span>
+                <span class="dmn-chip">Camunda 8 / Zeebe</span>
+                <span class="dmn-chip">Auto-layout</span>
+              </div>
+              <div id="dmn-bpmn-preview" class="dmn-bpmn-preview"></div>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /.dmn-panels -->
+    </div>
+  </section>
+
+  <!-- ── Playground ───────────────────────────────────────────────────────── -->
+  <section class="playground-section" id="playground">
+    <div class="section-wrap">
+      <div class="section-eyebrow">Playground</div>
+      <h2 class="section-h2">Try the builder API<br>live in your browser</h2>
+      <p class="section-sub" style="text-align:center; margin-top:-16px; margin-bottom:32px;">
+        Write <code>Bpmn</code>, <code>Dmn</code>, and <code>Form</code> builder expressions.
+        Press <kbd>Ctrl+Enter</kbd> (or <kbd>⌘ Enter</kbd>) to render.
+      </p>
+
+      <div class="playground-wrap">
+        <!-- Editor -->
+        <div class="pg-editor-panel">
+          <div class="pg-topbar">
+            <span class="tb-dot tb-red"></span>
+            <span class="tb-dot tb-yellow"></span>
+            <span class="tb-dot tb-green"></span>
+            <span class="pg-topbar-title">playground.ts</span>
+            <span class="pg-shortcut">Ctrl+Enter to run</span>
+            <button class="pg-run-btn" id="playground-run">▶ Run</button>
+          </div>
+          <div class="pg-code-wrap">
+            <div id="pg-highlight" aria-hidden="true"></div>
+            <textarea id="playground-code" aria-label="Playground code editor" spellcheck="false" autocomplete="off" autocorrect="off"></textarea>
+          </div>
+          <div id="playground-error"></div>
+        </div>
+
+        <!-- Preview -->
+        <div class="pg-diagram-panel">
+          <div class="diagram-topbar">
+            <span class="tb-dot tb-red"></span>
+            <span class="tb-dot tb-yellow"></span>
+            <span class="tb-dot tb-green"></span>
+            <span class="tb-title">Live Preview</span>
+          </div>
+          <div id="playground-diagram"></div>
+        </div>
+      </div>
+
+      <!-- Example presets -->
+      <div class="pg-examples">
+        <div class="pg-examples-label">Examples</div>
+        <div id="playground-examples"></div>
+      </div>
+    </div>
+  </section>
+
+  </main>
+
   <!-- ── Footer ───────────────────────────────────────────────────────────── -->
   <footer class="footer">
     <div class="footer-inner">
@@ -510,6 +764,7 @@ const apiCode = CODE_HTML.apiClient
   <script>
     import "../scripts/main.ts";
     import "../scripts/cli-anim.ts";
+    import "../scripts/playground.ts";
   </script>
 </body>
 </html>

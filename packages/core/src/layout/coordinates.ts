@@ -141,7 +141,8 @@ function centerLayersVertically(nodes: LayoutNode[], orderedLayers: string[][]):
 function computeLabelBounds(node: BpmnFlowElement, bounds: Bounds): Bounds | undefined {
 	if (!node.name) return undefined
 
-	const labelWidth = Math.max(node.name.length * 7, 40)
+	// Cap label width to one grid cell so labels don't overlap adjacent elements
+	const labelWidth = Math.min(Math.max(node.name.length * 7, 40), GRID_CELL_WIDTH)
 	const labelHeight = 14
 
 	switch (node.type) {
@@ -160,10 +161,10 @@ function computeLabelBounds(node: BpmnFlowElement, bounds: Bounds): Bounds | und
 		case "parallelGateway":
 		case "inclusiveGateway":
 		case "eventBasedGateway":
-			// Labels at top-right of gateway diamond (avoids interfering with upward paths)
+			// Labels centered below gateway diamond (standard BPMN convention)
 			return {
-				x: bounds.x + bounds.width + 4,
-				y: bounds.y - labelHeight - 4,
+				x: bounds.x + bounds.width / 2 - labelWidth / 2,
+				y: bounds.y + bounds.height + 4,
 				width: labelWidth,
 				height: labelHeight,
 			}
@@ -573,7 +574,18 @@ export function findBaselinePath(
 					// True split gateway: find join and jump to it
 					const joinId = findJoinGateway(currentId, dag, nodeMap)
 					if (joinId) {
-						currentId = joinId
+						// If the join is a direct successor (bypass edge exists), follow the longer
+						// task-bearing branch instead of jumping over it. This keeps task nodes on
+						// the baseline so they stay flat (same y as the gateways).
+						if (trueSuccs.includes(joinId)) {
+							const nonBypass = trueSuccs.filter((s) => s !== joinId)
+							currentId =
+								nonBypass.length === 1
+									? nonBypass[0]
+									: (findContinuationSuccessor(nonBypass, dag, nodeMap, visited) ?? joinId)
+						} else {
+							currentId = joinId
+						}
 					} else {
 						currentId = findContinuationSuccessor(trueSuccs, dag, nodeMap, visited)
 					}
@@ -844,7 +856,13 @@ export function resolveLayerOverlaps(layoutNodes: LayoutNode[]): void {
 			const prev = nodes[i - 1]
 			const curr = nodes[i]
 			if (!prev || !curr) continue
-			const prevBottom = prev.bounds.y + prev.bounds.height
+			// Account for the previous element's below-element label (e.g. gateway labels)
+			// so that labels don't overlap the next element in the same layer.
+			const prevLabelBottom =
+				prev.labelBounds && prev.labelBounds.y > prev.bounds.y
+					? prev.labelBounds.y + prev.labelBounds.height
+					: 0
+			const prevBottom = Math.max(prev.bounds.y + prev.bounds.height, prevLabelBottom)
 			if (curr.bounds.y < prevBottom + 1) {
 				const shift = prevBottom + 1 - curr.bounds.y
 				curr.bounds.y += shift

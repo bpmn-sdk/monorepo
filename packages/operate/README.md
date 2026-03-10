@@ -1,0 +1,131 @@
+<div align="center">
+  <img src="https://raw.githubusercontent.com/bpmn-sdk/monorepo/main/doc/logos/logo-2-gateway.svg" width="72" height="72" alt="BPMN SDK logo">
+  <h1>@bpmn-sdk/operate</h1>
+  <p>Monitoring and operations frontend for Camunda 8 clusters — real-time SSE, zero dependencies</p>
+
+  [![npm](https://img.shields.io/npm/v/@bpmn-sdk/operate?style=flat-square&color=6244d7)](https://www.npmjs.com/package/@bpmn-sdk/operate)
+  [![license](https://img.shields.io/npm/l/@bpmn-sdk/operate?style=flat-square)](https://github.com/bpmn-sdk/monorepo/blob/main/LICENSE)
+  [![typescript](https://img.shields.io/badge/TypeScript-strict-6244d7?style=flat-square&logo=typescript&logoColor=white)](https://github.com/bpmn-sdk/monorepo)
+
+  [Documentation](https://bpmn-sdk-docs.pages.dev) · [GitHub](https://github.com/bpmn-sdk/monorepo) · [Changelog](https://github.com/bpmn-sdk/monorepo/blob/main/packages/operate/CHANGELOG.md)
+</div>
+
+---
+
+## Overview
+
+`@bpmn-sdk/operate` is a zero-dependency monitoring and operations frontend for Camunda 8. Mount it into any HTML element to get a full process monitoring UI — live dashboard, instance browser, incident management, job queue, and user tasks.
+
+It pairs with the `@bpmn-sdk/proxy` local server, which polls the Camunda REST API server-side and pushes updates via **Server-Sent Events**. The frontend stays clean with no polling timers.
+
+A **mock mode** (`mock: true`) ships fixture data without any running proxy or cluster — useful for demos and local development.
+
+## Features
+
+- **Dashboard** — real-time stats: active instances, open incidents, active jobs, pending tasks
+- **Process Definitions** — deployed process list with name, version, and tenant
+- **Process Instances** — paginated list with state filter (Active / Completed / Terminated)
+- **Instance Detail** — BPMN canvas via `@bpmn-sdk/canvas` with live token-highlight overlay; active elements glow amber, visited elements show green tint
+- **Incidents** — error type, message, process, and resolution state
+- **Jobs** — job type, worker, retries, state, error message
+- **User Tasks** — name, assignee, state, due date, priority
+- **Profile switcher** — header dropdown populated from the proxy `/profiles` endpoint; switches reconnect all SSE streams
+- **Mock/demo mode** — fully self-contained fixture data, no cluster required
+- **SSE architecture** — proxy polls server-side; frontend opens one `EventSource` per view, gets pushed updates
+- **Hash router** — `#/`, `#/instances`, `#/instances/:key`, `#/definitions`, etc.
+- **Themeable** — light / dark / auto via CSS custom properties; `--op-*` variables
+
+## Installation
+
+```sh
+npm install @bpmn-sdk/operate @bpmn-sdk/proxy
+```
+
+## Quick Start
+
+### Demo mode (no cluster needed)
+
+```typescript
+import { createOperate } from "@bpmn-sdk/operate"
+
+createOperate({
+  container: document.getElementById("app")!,
+  mock: true,
+  theme: "auto",
+})
+```
+
+### Connected to a real Camunda cluster via proxy
+
+```typescript
+import { createOperate } from "@bpmn-sdk/operate"
+
+createOperate({
+  container: document.getElementById("app")!,
+  proxyUrl: "http://localhost:3033",   // default
+  profile: "production",               // optional, uses active profile if omitted
+  pollInterval: 15_000,                // ms between server-side polls (default: 30 000)
+  theme: "dark",
+})
+```
+
+The proxy must be running (`pnpm proxy`) and have at least one profile configured via the `casen` CLI.
+
+## How it works
+
+```
+Browser  ──── EventSource ────▶  @bpmn-sdk/proxy  ──── CamundaClient ────▶  Camunda cluster
+         ◀─── SSE events ──────  (polls on interval, pushes results)
+```
+
+1. Each view opens an SSE connection to `/operate/stream?topic=<view>&interval=<ms>`.
+2. The proxy creates a `CamundaClient` using the configured profile's auth credentials.
+3. On each polling tick, the proxy fetches the relevant Camunda data and emits a `{ type: "data", payload }` SSE event.
+4. The store updates and the view re-renders.
+
+## API Reference
+
+### `createOperate(options)`
+
+```typescript
+interface OperateOptions {
+  container: HTMLElement
+  proxyUrl?: string        // default: "http://localhost:3033"
+  profile?: string         // profile name; uses active profile if omitted
+  theme?: "light" | "dark" | "auto"  // default: "auto"
+  pollInterval?: number    // ms between polls; default: 30 000
+  mock?: boolean           // use built-in fixture data; default: false
+}
+```
+
+Returns an `OperateApi`:
+
+```typescript
+interface OperateApi {
+  el: HTMLElement
+  setProfile(name: string | null): void
+  setTheme(theme: "light" | "dark" | "auto"): void
+  navigate(path: string): void  // e.g. "/instances/123456789"
+  destroy(): void
+}
+```
+
+---
+
+## Related Packages
+
+| Package | Description |
+|---------|-------------|
+| [`@bpmn-sdk/core`](https://www.npmjs.com/package/@bpmn-sdk/core) | BPMN/DMN/Form parser, builder, layout engine |
+| [`@bpmn-sdk/canvas`](https://www.npmjs.com/package/@bpmn-sdk/canvas) | Zero-dependency SVG BPMN viewer |
+| [`@bpmn-sdk/editor`](https://www.npmjs.com/package/@bpmn-sdk/editor) | Full-featured interactive BPMN editor |
+| [`@bpmn-sdk/engine`](https://www.npmjs.com/package/@bpmn-sdk/engine) | Lightweight BPMN process execution engine |
+| [`@bpmn-sdk/feel`](https://www.npmjs.com/package/@bpmn-sdk/feel) | FEEL expression language parser & evaluator |
+| [`@bpmn-sdk/plugins`](https://www.npmjs.com/package/@bpmn-sdk/plugins) | 22 composable canvas plugins |
+| [`@bpmn-sdk/api`](https://www.npmjs.com/package/@bpmn-sdk/api) | Camunda 8 REST API TypeScript client |
+| [`@bpmn-sdk/ascii`](https://www.npmjs.com/package/@bpmn-sdk/ascii) | Render BPMN diagrams as Unicode ASCII art |
+| [`@bpmn-sdk/profiles`](https://www.npmjs.com/package/@bpmn-sdk/profiles) | Shared auth, profile storage, and client factories for CLI & proxy |
+
+## License
+
+[MIT](https://github.com/bpmn-sdk/monorepo/blob/main/LICENSE) © bpmn-sdk

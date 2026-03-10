@@ -1,5 +1,5 @@
-use bpmn_ai_server::ai_server;
-use bpmn_ai_server::bridge::CoreBridge;
+use bpmn_proxy::ai_server;
+use bpmn_proxy::bridge::CoreBridge;
 use std::path::PathBuf;
 
 #[tokio::main]
