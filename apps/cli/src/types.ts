@@ -1,6 +1,7 @@
 import type { AdminApiClient, CamundaClient, RawResponseEvent } from "@bpmn-sdk/api"
+import type { Relation } from "@bpmn-sdk/api"
 
-export type { RawResponseEvent }
+export type { RawResponseEvent, Relation }
 
 // ─── Output ───────────────────────────────────────────────────────────────────
 
@@ -48,28 +49,27 @@ export interface FlagSpec {
 	required?: boolean
 	/** Display placeholder in help, e.g. "JSON" or "KEY" */
 	placeholder?: string
+	/** Restricts to specific values; TUI shows a cycling picker (↑↓ to select). */
+	enum?: string[]
+	/** Value is a JSON object; TUI opens a structured key-value editor. */
+	json?: boolean
+	/** Preset values for number fields; ↑↓ cycles through them in edit mode. */
+	presets?: number[]
 }
 
 export interface ArgSpec {
 	name: string
 	description: string
 	required?: boolean
+	/** Restricts to specific values; TUI shows a cycling picker. */
+	enum?: string[]
+	/** Value is a JSON object; TUI opens a key-value editor. */
+	json?: boolean
 }
 
 export interface Example {
 	description: string
 	command: string
-}
-
-export interface Relation {
-	/** Name of the group containing the target command */
-	groupName: string
-	/** Name of the target command */
-	commandName: string
-	/** Human-readable description of the follow-up action */
-	description: string
-	/** How to map fields from the source item to target command parameters */
-	params: Array<{ field: string; param: string }>
 }
 
 /** Context passed to every command's run function. */

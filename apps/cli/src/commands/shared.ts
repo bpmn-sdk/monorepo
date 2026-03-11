@@ -9,6 +9,7 @@ export const FILTER_FLAG: FlagSpec = {
 	description: "Filter as JSON object",
 	type: "string",
 	placeholder: "JSON",
+	json: true,
 }
 
 export const DATA_FLAG: FlagSpec = {
@@ -18,6 +19,7 @@ export const DATA_FLAG: FlagSpec = {
 	type: "string",
 	required: true,
 	placeholder: "JSON",
+	json: true,
 }
 
 export const DATA_OPT_FLAG: FlagSpec = {
@@ -26,6 +28,7 @@ export const DATA_OPT_FLAG: FlagSpec = {
 	description: "Request body as JSON",
 	type: "string",
 	placeholder: "JSON",
+	json: true,
 }
 
 export const LIMIT_FLAG: FlagSpec = {
@@ -34,6 +37,7 @@ export const LIMIT_FLAG: FlagSpec = {
 	description: "Maximum number of results",
 	type: "number",
 	default: 20,
+	presets: [5, 10, 20, 50, 100, 200, 500],
 }
 
 export const SORT_FLAG: FlagSpec = {
@@ -45,9 +49,10 @@ export const SORT_FLAG: FlagSpec = {
 
 export const SORT_ORDER_FLAG: FlagSpec = {
 	name: "sort-order",
-	description: "Sort order: asc|desc",
+	description: "Sort order",
 	type: "string",
 	default: "asc",
+	enum: ["asc", "desc"],
 }
 
 // ─── JSON helpers ─────────────────────────────────────────────────────────────

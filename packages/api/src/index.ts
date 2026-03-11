@@ -53,3 +53,7 @@ export { AdminApiClient } from "./generated/admin-resources.js"
 
 // Generated Admin API types
 export type * from "./generated/admin-types.js"
+
+// Relations — framework-agnostic follow-up operation graph
+export type { Relation, RelationSource } from "./runtime/relations.js"
+export { buildRelations } from "./runtime/relations.js"

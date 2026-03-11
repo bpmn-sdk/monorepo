@@ -1,5 +1,10 @@
 import type { RawResponseEvent } from "@bpmn-sdk/api"
-import { createAdminClientFromProfile, createClientFromProfile } from "@bpmn-sdk/profiles"
+import {
+	createAdminClientFromProfile,
+	createClientFromProfile,
+	getActiveName,
+	getProfile,
+} from "@bpmn-sdk/profiles"
 import { parseArgs } from "./args.js"
 import { commandGroups } from "./commands/index.js"
 import { getRuntimeCompletions } from "./completion.js"
@@ -8,6 +13,39 @@ import { createNullWriter, createOutputWriter, printRawResponse } from "./output
 import { runProfileManager } from "./profile-tui.js"
 import { runGroupTui, runMainTui } from "./tui.js"
 import type { OutputFormat, RunContext } from "./types.js"
+
+// ─── Profile info ─────────────────────────────────────────────────────────────
+
+function buildProfileInfo(profileName: string | undefined): {
+	name: string
+	info: Array<{ key: string; value: string }>
+} {
+	const effectiveName = profileName ?? getActiveName() ?? "none"
+	const p = profileName ? getProfile(profileName) : getProfile(effectiveName)
+	if (!p) return { name: effectiveName, info: [{ key: "status", value: "profile not found" }] }
+	const info: Array<{ key: string; value: string }> = [
+		{ key: "name", value: p.name },
+		{ key: "apiType", value: p.apiType },
+		{ key: "baseUrl", value: p.config.baseUrl ?? "(default)" },
+		{ key: "createdAt", value: p.createdAt ?? "unknown" },
+	]
+	const auth = p.config.auth
+	if (auth) {
+		info.push({ key: "auth.type", value: auth.type })
+		if (auth.type === "bearer") {
+			info.push({ key: "auth.token", value: "***" })
+		} else if (auth.type === "oauth2") {
+			info.push({ key: "auth.clientId", value: auth.clientId })
+			info.push({ key: "auth.clientSecret", value: "***" })
+			info.push({ key: "auth.tokenUrl", value: auth.tokenUrl })
+			if (auth.scope) info.push({ key: "auth.scope", value: auth.scope })
+		} else if (auth.type === "basic") {
+			info.push({ key: "auth.username", value: auth.username })
+			info.push({ key: "auth.password", value: "***" })
+		}
+	}
+	return { name: effectiveName, info }
+}
 
 // ─── Error display ────────────────────────────────────────────────────────────
 
@@ -53,10 +91,12 @@ export async function run(argv: string[]): Promise<void> {
 		if (wantHelp) {
 			printGlobalHelp(commandGroups, colors)
 		} else {
+			const { name: pName, info: pInfo } = buildProfileInfo(profileName)
 			await runMainTui(
 				commandGroups,
 				() => Promise.resolve(createClientFromProfile(profileName)),
 				() => Promise.resolve(createAdminClientFromProfile(profileName)),
+				{ profile: pName, profileInfo: pInfo },
 			)
 		}
 		return
@@ -83,7 +123,11 @@ export async function run(argv: string[]): Promise<void> {
 		if (group.name === "profile") {
 			await runProfileManager()
 		} else if (group.name !== "completion") {
-			await runGroupTui(group, commandGroups, getClient, getAdminClient)
+			const { name: pName, info: pInfo } = buildProfileInfo(profileName)
+			await runGroupTui(group, commandGroups, getClient, getAdminClient, {
+				profile: pName,
+				profileInfo: pInfo,
+			})
 		} else {
 			printGroupHelp(group, colors)
 		}

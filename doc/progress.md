@@ -1,5 +1,55 @@
 # Progress
 
+## 2026-03-11 — editor12 (cont): CLI parameter UX — enum picker, number presets, JSON editor
+
+### `apps/cli/src/types.ts`
+- `FlagSpec`: added `enum?: string[]`, `json?: boolean`, `presets?: number[]`
+- `ArgSpec`: added `enum?: string[]`, `json?: boolean`
+
+### `apps/cli/src/commands/shared.ts`
+- `SORT_ORDER_FLAG`: added `enum: ["asc", "desc"]`
+- `LIMIT_FLAG`: added `presets: [5, 10, 20, 50, 100, 200, 500]`
+- `FILTER_FLAG`, `DATA_FLAG`, `DATA_OPT_FLAG`: added `json: true`
+
+### `apps/cli/src/tui.ts` — parameter input improvements
+- **Enum fields**: pressing Enter enters edit mode where ↑↓ cycles through allowed values (no free text). Current position shown as `1/N` in hint.
+- **Number fields with presets**: in edit mode, ↑↓ cycles through preset values; free text input still works.
+- **JSON fields** (`--filter`, `--data`): pressing Enter or → opens a dedicated `json-editor` screen instead of a text input.
+- **JSON editor screen** (`json-editor`): two-column key/value editor.
+  - ↑↓ navigate rows; Tab to switch between KEY and VALUE columns; Enter to start/confirm editing; `a` to add new field; `d` to delete; Esc to save and return.
+  - On save, serializes entries back to JSON and writes to the parent input field.
+  - Existing JSON is pre-parsed into entries when the editor opens.
+- Contextual hints: each focused field shows relevant hint (`↑↓ pick  1/2`, `→ json editor`, `↑↓ preset`) instead of static type info.
+
+## 2026-03-11 — editor12 (cont): CLI profile view, ASCII toggle, 3× scroll, profile header
+
+### `packages/api` — relations moved to shared package
+- New `packages/api/src/runtime/relations.ts`: exports `Relation`, `RelationSource`, `buildRelations()` — framework-agnostic, usable by CLI and operate.
+- `packages/api/src/index.ts`: re-exports the new types and function.
+- `apps/cli/src/types.ts`: imports `Relation` from `@bpmn-sdk/api` (removed local duplicate).
+- `apps/cli/src/commands/relations.ts`: rewritten as thin adapter — converts `CommandGroup[]` to `RelationSource[]`, calls `buildRelations()`, wires results back.
+
+### `apps/cli` — profile name in header
+- All TUI screens now show `profile: <name>` right-aligned in the header line.
+- `renderHeader(crumbs, cols, profile?)` gains an optional profile parameter.
+- `runMainTui` and `runGroupTui` accept a new `TuiOptions` object `{ profile?, profileInfo?, getAdminClient? }`.
+- `run.ts`: computes effective profile name (explicit flag or active profile) and passes it to both TUI entry points.
+
+### `apps/cli` — profile info view (p key)
+- New `{ kind: "profile"; scroll: number }` screen type.
+- Pressing `p` from any screen (except while editing an input field) pushes the profile screen.
+- Shows all profile fields — secrets (`token`, `clientSecret`, `password`) are displayed as `***`.
+- `esc`/`p` closes the view; `↑↓` scrolls if many fields.
+- `run.ts`: `buildProfileInfo()` extracts profile fields with secrets redacted and passes `profileInfo` to the TUI.
+
+### `apps/cli` — ASCII art toggle (x key) in messages view
+- After a command produces BPMN XML output, `renderBpmnAscii` is called automatically to generate `altLines`.
+- Pressing `x` in the messages view toggles between raw XML and ASCII art rendering (only shown when ASCII is available).
+- Toggling resets scroll and horizontal pan to 0.
+
+### `apps/cli` — 3× movement speed in messages view
+- Arrow key scroll/pan in the messages view now moves 3 lines/columns per keypress (was 1).
+
 ## 2026-03-11 — editor12 (cont): CLI ASCII scrolling, arrow keys, follow-up relations
 
 ### `apps/cli` — scrollable ASCII diagram view
