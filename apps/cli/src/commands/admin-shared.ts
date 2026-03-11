@@ -1,5 +1,5 @@
 import type { AdminApiClient } from "@bpmn-sdk/api"
-import type { ColumnDef, Command, FlagSpec, RunContext } from "../types.js"
+import type { ColumnDef, Command, FlagSpec, JsonFieldSpec, RunContext } from "../types.js"
 
 // ─── Shared flag specs ────────────────────────────────────────────────────────
 
@@ -86,13 +86,17 @@ export function makeListCmd(opts: {
 	columns: ColumnDef[]
 	extraFlags?: FlagSpec[]
 	examples?: Command["examples"]
+	filterFields?: JsonFieldSpec[]
 	search: (client: AdminApiClient, body: unknown) => Promise<unknown>
 }): Command {
+	const filterFlag: FlagSpec = opts.filterFields
+		? { ...FILTER_FLAG, fields: opts.filterFields }
+		: FILTER_FLAG
 	return {
 		name: opts.name ?? "list",
 		aliases: opts.aliases,
 		description: opts.description,
-		flags: [FILTER_FLAG, LIMIT_FLAG, SORT_FLAG, SORT_ORDER_FLAG, ...(opts.extraFlags ?? [])],
+		flags: [filterFlag, LIMIT_FLAG, SORT_FLAG, SORT_ORDER_FLAG, ...(opts.extraFlags ?? [])],
 		examples: opts.examples,
 		async run(ctx) {
 			const client = await ctx.getAdminClient()
@@ -171,14 +175,16 @@ export function makeCreateCmd(opts: {
 	description: string
 	examples?: Command["examples"]
 	extraFlags?: FlagSpec[]
+	bodyFields?: JsonFieldSpec[]
 	create: (client: AdminApiClient, body: unknown) => Promise<unknown>
 	successMsg?: string
 }): Command {
+	const dataFlag: FlagSpec = opts.bodyFields ? { ...DATA_FLAG, fields: opts.bodyFields } : DATA_FLAG
 	return {
 		name: opts.name ?? "create",
 		aliases: opts.aliases,
 		description: opts.description,
-		flags: [DATA_FLAG, ...(opts.extraFlags ?? [])],
+		flags: [dataFlag, ...(opts.extraFlags ?? [])],
 		examples: opts.examples,
 		async run(ctx) {
 			const raw = ctx.flags.data as string | undefined
@@ -201,14 +207,16 @@ export function makeUpdateCmd(opts: {
 	argName: string
 	examples?: Command["examples"]
 	extraFlags?: FlagSpec[]
+	bodyFields?: JsonFieldSpec[]
 	update: (client: AdminApiClient, key: string, body: unknown) => Promise<unknown>
 }): Command {
+	const dataFlag: FlagSpec = opts.bodyFields ? { ...DATA_FLAG, fields: opts.bodyFields } : DATA_FLAG
 	return {
 		name: opts.name ?? "update",
 		aliases: opts.aliases,
 		description: opts.description,
 		args: [{ name: opts.argName, description: `${opts.argName} to update`, required: true }],
-		flags: [DATA_FLAG, ...(opts.extraFlags ?? [])],
+		flags: [dataFlag, ...(opts.extraFlags ?? [])],
 		examples: opts.examples,
 		async run(ctx) {
 			const key = ctx.positional[0]

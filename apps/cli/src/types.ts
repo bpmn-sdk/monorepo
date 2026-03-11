@@ -40,6 +40,16 @@ export interface OutputWriter {
 
 // ─── Commands ─────────────────────────────────────────────────────────────────
 
+/** Schema spec for a single field inside a JSON flag value. */
+export interface JsonFieldSpec {
+	name: string
+	type: "string" | "boolean" | "number" | "object" | "array"
+	description?: string
+	required?: boolean
+	/** Restricts to specific values; TUI shows a cycling picker. */
+	enum?: string[]
+}
+
 export interface FlagSpec {
 	name: string
 	short?: string
@@ -55,6 +65,8 @@ export interface FlagSpec {
 	json?: boolean
 	/** Preset values for number fields; ↑↓ cycles through them in edit mode. */
 	presets?: number[]
+	/** Known fields within this JSON object, sourced from OpenAPI schema. */
+	fields?: JsonFieldSpec[]
 }
 
 export interface ArgSpec {

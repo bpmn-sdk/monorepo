@@ -1,5 +1,32 @@
 # Progress
 
+## 2026-03-11 — editor12 (cont): CLI spec-driven JSON editor
+
+### `apps/cli/src/types.ts`
+- Added `JsonFieldSpec` interface (`name`, `type`, `description?`, `required?`, `enum?`)
+- Added `fields?: JsonFieldSpec[]` to `FlagSpec` — carries per-field metadata for JSON flags
+
+### `apps/cli/src/commands/shared.ts`
+- `makeListCmd`: added `filterFields?: JsonFieldSpec[]` option → injected into `--filter` flag as `fields`
+- `makeCreateCmd`: added `bodyFields?: JsonFieldSpec[]` → injected into `--data` flag as `fields`
+- `makeUpdateCmd`: added `bodyFields?: JsonFieldSpec[]` → injected into `--data` flag as `fields`
+
+### `packages/api/scripts/generate.mjs` — spec-driven field metadata
+- Added `flattenSchema(schema)`: recursively merges `allOf`/`anyOf` into flat properties + required lists
+- Added `extractJsonFieldSpecs(schema, schemas)`: resolves schema, flattens, returns `JsonFieldSpec[]`
+- Added `extractFilterFieldSpecs(requestBodySchema, schemas)`: flattens body schema, extracts `filter` property's field specs
+- Added `serializeFieldSpecs(specs)`: serializes specs to compact TypeScript literal
+- `generateCliCommandsContent()` now emits `filterFields: [...]` in list commands and `bodyFields: [...]` in create/update commands (when specs are available from the OpenAPI schema)
+- Re-generated `apps/cli/src/generated/commands.ts`: 61 commands now carry field metadata
+
+### `apps/cli/src/tui.ts` — guided JSON editor
+- `json-editor` Screen: added `fieldSpecs?: JsonFieldSpec[]`
+- Added `buildInitialEntries(json, fieldSpecs?)`: pre-populates all known fields (in spec order), merges existing values, appends unknown keys at end
+- Added `getFieldSpec(key, fieldSpecs?)`: looks up a field spec by key name
+- Both Enter/→ paths that open `json-editor` now: pass `fieldSpecs` from flag, use `buildInitialEntries`, default cursor column to `val`
+- `renderJsonEditor`: known fields shown normally, extra/unknown fields dimmed; enum fields show `<pick ↑↓>` or `value ↑↓` hint in VALUE column; field hint line below table shows type, required/optional, description for the cursor row; edit mode shows appropriate hint
+- `handleJsonEditorKey` edit mode: when in VALUE column of an enum field, ↑↓ cycles through enum values (no free text); Enter advances to next field; non-enum fields retain free-text editing
+
 ## 2026-03-11 — editor12 (cont): CLI parameter UX — enum picker, number presets, JSON editor
 
 ### `apps/cli/src/types.ts`

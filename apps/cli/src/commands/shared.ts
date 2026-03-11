@@ -1,5 +1,5 @@
 import type { CamundaClient } from "@bpmn-sdk/api"
-import type { ColumnDef, Command, FlagSpec, RunContext } from "../types.js"
+import type { ColumnDef, Command, FlagSpec, JsonFieldSpec, RunContext } from "../types.js"
 
 // ─── Shared flag specs ────────────────────────────────────────────────────────
 
@@ -97,14 +97,19 @@ export function makeListCmd(opts: {
 	columns: ColumnDef[]
 	extraFlags?: FlagSpec[]
 	examples?: Command["examples"]
+	/** Known fields for the --filter JSON flag, sourced from OpenAPI schema. */
+	filterFields?: JsonFieldSpec[]
 	search: (client: CamundaClient, body: unknown) => Promise<unknown>
 }): Command {
+	const filterFlag: FlagSpec = opts.filterFields
+		? { ...FILTER_FLAG, fields: opts.filterFields }
+		: FILTER_FLAG
 	return {
 		name: opts.name ?? "list",
 		aliases: opts.aliases,
 		description: opts.description,
 		columns: opts.columns,
-		flags: [FILTER_FLAG, LIMIT_FLAG, SORT_FLAG, SORT_ORDER_FLAG, ...(opts.extraFlags ?? [])],
+		flags: [filterFlag, LIMIT_FLAG, SORT_FLAG, SORT_ORDER_FLAG, ...(opts.extraFlags ?? [])],
 		examples: opts.examples,
 		async run(ctx) {
 			const client = await ctx.getClient()
@@ -186,14 +191,17 @@ export function makeCreateCmd(opts: {
 	description: string
 	examples?: Command["examples"]
 	extraFlags?: FlagSpec[]
+	/** Known fields for the --data JSON flag, sourced from OpenAPI schema. */
+	bodyFields?: JsonFieldSpec[]
 	create: (client: CamundaClient, body: unknown) => Promise<unknown>
 	successMsg?: string
 }): Command {
+	const dataFlag: FlagSpec = opts.bodyFields ? { ...DATA_FLAG, fields: opts.bodyFields } : DATA_FLAG
 	return {
 		name: opts.name ?? "create",
 		aliases: opts.aliases,
 		description: opts.description,
-		flags: [DATA_FLAG, ...(opts.extraFlags ?? [])],
+		flags: [dataFlag, ...(opts.extraFlags ?? [])],
 		examples: opts.examples,
 		async run(ctx) {
 			const raw = ctx.flags.data as string | undefined
@@ -217,14 +225,17 @@ export function makeUpdateCmd(opts: {
 	argName: string
 	examples?: Command["examples"]
 	extraFlags?: FlagSpec[]
+	/** Known fields for the --data JSON flag, sourced from OpenAPI schema. */
+	bodyFields?: JsonFieldSpec[]
 	update: (client: CamundaClient, key: string, body: unknown) => Promise<unknown>
 }): Command {
+	const dataFlag: FlagSpec = opts.bodyFields ? { ...DATA_FLAG, fields: opts.bodyFields } : DATA_FLAG
 	return {
 		name: opts.name ?? "update",
 		aliases: opts.aliases,
 		description: opts.description,
 		args: [{ name: opts.argName, description: `${opts.argName} to update`, required: true }],
-		flags: [DATA_FLAG, ...(opts.extraFlags ?? [])],
+		flags: [dataFlag, ...(opts.extraFlags ?? [])],
 		examples: opts.examples,
 		async run(ctx) {
 			const key = ctx.positional[0]

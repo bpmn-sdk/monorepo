@@ -6,6 +6,7 @@ import type {
 	Command,
 	CommandGroup,
 	FlagSpec,
+	JsonFieldSpec,
 	OutputWriter,
 	RunContext,
 } from "./types.js"
@@ -113,6 +114,8 @@ type Screen =
 			fieldIndex: number
 			fieldLabel: string
 			entries: Array<{ key: string; keyCursor: number; val: string; valCursor: number }>
+			/** Known field specs from the OpenAPI schema — drives guided editing. */
+			fieldSpecs?: JsonFieldSpec[]
 			/** Row cursor (0..entries.length-1 = entry rows; entries.length = "add" row). */
 			cursor: number
 			/** Active column within the current row. */
@@ -301,6 +304,49 @@ function entriesToJson(entries: JsonEntry[]): string {
 		}
 	}
 	return Object.keys(obj).length === 0 ? "" : JSON.stringify(obj)
+}
+
+/**
+ * Build initial entries for the JSON editor.
+ * If fieldSpecs are provided, pre-populate with all known fields (in spec order),
+ * merging in any existing values. Extra keys from existing JSON are appended at the end.
+ */
+function buildInitialEntries(existingJson: string, fieldSpecs?: JsonFieldSpec[]): JsonEntry[] {
+	const existing: Record<string, string> = {}
+	if (existingJson.trim()) {
+		try {
+			const obj = JSON.parse(existingJson) as Record<string, unknown>
+			for (const [k, v] of Object.entries(obj)) {
+				existing[k] = typeof v === "string" ? v : JSON.stringify(v)
+			}
+		} catch {
+			// ignore malformed JSON
+		}
+	}
+
+	if (!fieldSpecs || fieldSpecs.length === 0) return parseJsonToEntries(existingJson)
+
+	const seenKeys = new Set<string>()
+	const entries: JsonEntry[] = []
+
+	for (const spec of fieldSpecs) {
+		seenKeys.add(spec.name)
+		const val = existing[spec.name] ?? ""
+		entries.push({ key: spec.name, keyCursor: spec.name.length, val, valCursor: val.length })
+	}
+	// Append extra keys not in the spec
+	for (const [k, v] of Object.entries(existing)) {
+		if (!seenKeys.has(k)) {
+			entries.push({ key: k, keyCursor: k.length, val: v, valCursor: v.length })
+		}
+	}
+
+	return entries
+}
+
+/** Look up a JsonFieldSpec by key name. */
+function getFieldSpec(key: string, fieldSpecs?: JsonFieldSpec[]): JsonFieldSpec | undefined {
+	return fieldSpecs?.find((s) => s.name === key)
 }
 
 // ─── Table helpers ────────────────────────────────────────────────────────────
@@ -844,7 +890,8 @@ function renderJsonEditor(
 	screen: Extract<Screen, { kind: "json-editor" }>,
 ): string[] {
 	const { cols, rows } = termSize()
-	const viewH = Math.max(3, rows - 9)
+	// Reserve extra row for field hint line
+	const viewH = Math.max(3, rows - 10)
 	const keyW = Math.max(14, Math.min(28, Math.floor((cols - 12) * 0.38)))
 	const valW = Math.max(16, cols - keyW - 12)
 
@@ -877,15 +924,29 @@ function renderJsonEditor(
 		const entry = screen.entries[absIdx]
 		if (!entry) continue
 
+		const spec = getFieldSpec(entry.key, screen.fieldSpecs)
+		const isKnown = spec !== undefined
+		const hasEnum = spec?.enum && spec.enum.length > 0
+
 		const editKey = isCursor && screen.col === "key" && screen.editing
 		const editVal = isCursor && screen.col === "val" && screen.editing
-		const keyStr = renderText(entry.key, entry.keyCursor, keyW, editKey)
-		const valStr = renderText(entry.val, entry.valCursor, valW, editVal)
+		const keyStr = renderText(entry.key, entry.keyCursor, keyW - (isKnown ? 0 : 0), editKey)
+
+		// For known enum fields in nav mode, show cycling hint instead of raw value
+		const valDisplay =
+			!editVal && hasEnum && entry.val
+				? `${entry.val} ${dim("↑↓")}`
+				: !editVal && hasEnum && !entry.val
+					? dim("<pick ↑↓>")
+					: renderText(entry.val, entry.valCursor, valW - 4, editVal)
+		const valStr = valDisplay
 
 		const keyPart =
 			isCursor && screen.col === "key" && !editKey
 				? cyan(padEnd(keyStr, keyW))
-				: padEnd(keyStr, keyW)
+				: isKnown
+					? padEnd(keyStr, keyW)
+					: dim(padEnd(keyStr, keyW))
 		const valPart =
 			isCursor && screen.col === "val" && !editVal
 				? cyan(padEnd(valStr, valW))
@@ -896,6 +957,21 @@ function renderJsonEditor(
 	}
 
 	lines.push("")
+
+	// Field hint line: show description/type for the row under the cursor
+	const cursorEntry = screen.entries[screen.cursor]
+	const cursorSpec = cursorEntry ? getFieldSpec(cursorEntry.key, screen.fieldSpecs) : undefined
+	if (cursorSpec) {
+		const req = cursorSpec.required ? red("required") : dim("optional")
+		const typeStr = cursorSpec.enum
+			? `enum(${cursorSpec.enum.slice(0, 3).join("|")}${cursorSpec.enum.length > 3 ? "…" : ""})`
+			: cursorSpec.type
+		const desc = cursorSpec.description ? ` — ${fit(cursorSpec.description, 40)}` : ""
+		lines.push(`  ${dim(typeStr)} ${req}${desc}`)
+	} else {
+		lines.push("")
+	}
+
 	if (rowCount > viewH) {
 		const hi = Math.min(screen.scroll + viewH, rowCount)
 		lines.push(`  ${dim(`${screen.scroll + 1}–${hi} of ${rowCount}`)}`)
@@ -903,9 +979,15 @@ function renderJsonEditor(
 	if (screen.error) {
 		lines.push(`  ${red("error:")} ${screen.error}`)
 	} else if (screen.editing) {
-		lines.push(
-			`  ${dim("←→")} cursor  ${cyan("tab")} switch col  ${cyan("enter")} confirm  ${cyan("esc")} cancel`,
-		)
+		const cursorEntryEditing = screen.entries[screen.cursor]
+		const editSpec =
+			screen.col === "val" && cursorEntryEditing
+				? getFieldSpec(cursorEntryEditing.key, screen.fieldSpecs)
+				: undefined
+		const editHint = editSpec?.enum
+			? `${dim("↑↓")} pick value  ${cyan("enter")} confirm  ${cyan("esc")} cancel`
+			: `${dim("←→")} cursor  ${cyan("tab")} switch col  ${cyan("enter")} confirm  ${cyan("esc")} cancel`
+		lines.push(`  ${editHint}`)
 	} else {
 		lines.push(
 			`  ${dim("↑↓")} navigate  ${cyan("tab")} switch col  ${cyan("enter")} edit  ${cyan("a")} add  ${cyan("d")} del  ${cyan("esc")} save  ${cyan("q")} quit`,
@@ -1314,15 +1396,17 @@ async function handleInputKey(
 				await executeCommand(screen, state)
 			} else if (isJsonField(field)) {
 				// Open the key-value JSON editor
+				const jsonFieldSpecs = field.kind === "flag" ? field.flagSpec?.fields : undefined
 				state.stack.push({
 					kind: "json-editor",
 					group: screen.group,
 					cmd: screen.cmd,
 					fieldIndex: screen.cursor,
 					fieldLabel: field.label,
-					entries: parseJsonToEntries(field.value),
+					entries: buildInitialEntries(field.value, jsonFieldSpecs),
+					fieldSpecs: jsonFieldSpecs,
 					cursor: 0,
-					col: "key",
+					col: "val",
 					editing: false,
 					scroll: 0,
 					error: "",
@@ -1337,15 +1421,17 @@ async function handleInputKey(
 			break
 		case "\x1b[C": // right arrow also opens JSON editor
 			if (field && isJsonField(field)) {
+				const jsonFieldSpecs2 = field.kind === "flag" ? field.flagSpec?.fields : undefined
 				state.stack.push({
 					kind: "json-editor",
 					group: screen.group,
 					cmd: screen.cmd,
 					fieldIndex: screen.cursor,
 					fieldLabel: field.label,
-					entries: parseJsonToEntries(field.value),
+					entries: buildInitialEntries(field.value, jsonFieldSpecs2),
+					fieldSpecs: jsonFieldSpecs2,
 					cursor: 0,
-					col: "key",
+					col: "val",
 					editing: false,
 					scroll: 0,
 					error: "",
@@ -1738,6 +1824,48 @@ function handleJsonEditorKey(
 			}
 		}
 
+		// Enum cycling for value column of a known enum field
+		const valSpec = !activeIsKey ? getFieldSpec(entry.key, screen.fieldSpecs) : undefined
+		const enumVals = valSpec?.enum
+		if (enumVals && enumVals.length > 0 && !activeIsKey) {
+			const curIdx = enumVals.indexOf(entry.val)
+			switch (key) {
+				case "\x1b[A": // up
+					entry.val = enumVals[(curIdx - 1 + enumVals.length) % enumVals.length] ?? ""
+					entry.valCursor = entry.val.length
+					render(state)
+					return
+				case "\x1b[B": // down
+					entry.val = enumVals[(curIdx + 1) % enumVals.length] ?? ""
+					entry.valCursor = entry.val.length
+					render(state)
+					return
+				case "\r":
+				case "\n":
+					// If no value selected yet, pick first
+					if (!entry.val && enumVals[0]) {
+						entry.val = enumVals[0]
+						entry.valCursor = entry.val.length
+					}
+					screen.editing = false
+					screen.col = "key"
+					if (screen.cursor < rowCount - 1) {
+						screen.cursor++
+						if (screen.cursor >= screen.scroll + viewH) screen.scroll++
+					}
+					render(state)
+					return
+				case "\x1b":
+					screen.editing = false
+					render(state)
+					return
+				case "\t":
+					screen.col = "key"
+					render(state)
+					return
+			}
+		}
+
 		switch (key) {
 			case "\r":
 			case "\n":
@@ -1824,6 +1952,14 @@ function handleJsonEditorKey(
 				screen.col = "key"
 				screen.editing = true
 			} else {
+				// For known enum fields in val column, seed with first enum value
+				if (screen.col === "val" && entry) {
+					const spec = getFieldSpec(entry.key, screen.fieldSpecs)
+					if (spec?.enum && spec.enum.length > 0 && !entry.val) {
+						entry.val = spec.enum[0] ?? ""
+						entry.valCursor = entry.val.length
+					}
+				}
 				screen.editing = true
 			}
 			break
