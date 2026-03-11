@@ -147,6 +147,22 @@ export class HttpClient {
 			cached: false,
 		})
 
+		// Emit raw response event (clones body so the original stream is untouched)
+		{
+			const rawHeaders: Record<string, string> = {}
+			for (const [k, v] of response.headers.entries()) {
+				rawHeaders[k] = v
+			}
+			const rawBody = await response.clone().text()
+			this.#emitter.emit("rawResponse", {
+				method: options.method,
+				url,
+				status: response.status,
+				headers: rawHeaders,
+				body: rawBody,
+			})
+		}
+
 		// Handle 401 with potential token refresh
 		if (response.status === 401) {
 			const canRetry = await this.#auth.handleUnauthorized()

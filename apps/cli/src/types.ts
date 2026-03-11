@@ -1,4 +1,6 @@
-import type { AdminApiClient, CamundaClient } from "@bpmn-sdk/api"
+import type { AdminApiClient, CamundaClient, RawResponseEvent } from "@bpmn-sdk/api"
+
+export type { RawResponseEvent }
 
 // ─── Output ───────────────────────────────────────────────────────────────────
 

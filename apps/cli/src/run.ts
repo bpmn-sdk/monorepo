@@ -1,9 +1,10 @@
+import type { RawResponseEvent } from "@bpmn-sdk/api"
 import { createAdminClientFromProfile, createClientFromProfile } from "@bpmn-sdk/profiles"
 import { parseArgs } from "./args.js"
 import { commandGroups } from "./commands/index.js"
 import { getRuntimeCompletions } from "./completion.js"
 import { printCommandHelp, printGlobalHelp, printGroupHelp, printVersion } from "./help.js"
-import { createOutputWriter } from "./output.js"
+import { createNullWriter, createOutputWriter, printRawResponse } from "./output.js"
 import { runProfileManager } from "./profile-tui.js"
 import { runGroupTui, runMainTui } from "./tui.js"
 import type { OutputFormat, RunContext } from "./types.js"
@@ -115,18 +116,54 @@ export async function run(argv: string[]): Promise<void> {
 	}
 
 	// ── Execute ───────────────────────────────────────────────────────────────
-	const output = createOutputWriter(outputFormat, noColor)
+	const isRaw = flags.raw === true
+
+	// Wrap client factories to capture the last raw HTTP response
+	// Typed as array to prevent TypeScript's control-flow narrowing from collapsing to never
+	const rawCaptureRef: [RawResponseEvent | null] = [null]
+	const instrumentedGetClient = () => {
+		const client = createClientFromProfile(profileName)
+		client.on("rawResponse", (evt) => {
+			rawCaptureRef[0] = evt
+		})
+		return Promise.resolve(client)
+	}
+	const instrumentedGetAdminClient = () => {
+		const client = createAdminClientFromProfile(profileName)
+		client.on("rawResponse", (evt) => {
+			rawCaptureRef[0] = evt
+		})
+		return Promise.resolve(client)
+	}
+
+	const output = isRaw ? createNullWriter() : createOutputWriter(outputFormat, noColor)
 	const ctx: RunContext = {
 		positional: positional.slice(2),
 		flags,
 		output,
-		getClient,
-		getAdminClient,
+		getClient: instrumentedGetClient,
+		getAdminClient: instrumentedGetAdminClient,
 	}
 
 	try {
 		await cmd.run(ctx)
+		const capture = rawCaptureRef[0]
+		if (isRaw && capture) {
+			printRawResponse(capture, noColor)
+		} else if (capture) {
+			// Always show status code in normal mode
+			const statusFn =
+				capture.status >= 200 && capture.status < 300
+					? (s: string) => `\x1b[32m${s}\x1b[39m`
+					: (s: string) => `\x1b[31m${s}\x1b[39m`
+			const statusStr = colors ? statusFn(`HTTP ${capture.status}`) : `HTTP ${capture.status}`
+			process.stdout.write(`\n${statusStr}\n`)
+		}
 	} catch (err) {
+		const capture = rawCaptureRef[0]
+		if (isRaw && capture) {
+			printRawResponse(capture, noColor)
+		}
 		const msg = err instanceof Error ? err.message : String(err)
 		printError(msg, colors)
 		if (flags.debug) {

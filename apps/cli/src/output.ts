@@ -1,5 +1,5 @@
 import { bold, cyan, dim, green, red, shouldUseColor, stateColor } from "./color.js"
-import type { ColumnDef, OutputFormat, OutputWriter } from "./types.js"
+import type { ColumnDef, OutputFormat, OutputWriter, RawResponseEvent } from "./types.js"
 
 // ─── Formatting helpers ────────────────────────────────────────────────────────
 
@@ -228,3 +228,34 @@ export function createOutputWriter(format: OutputFormat, noColor: boolean): Outp
 
 /** Date transformer for use in ColumnDef. */
 export const dateTransform = fmtDate
+
+/** An OutputWriter that discards all output (used when --raw suppresses formatted output). */
+export function createNullWriter(): OutputWriter {
+	return {
+		format: "table",
+		isInteractive: false,
+		printList() {},
+		printItem() {},
+		print() {},
+		ok() {},
+		info() {},
+	}
+}
+
+/** Print a raw HTTP response (status, headers, body) to stdout. */
+export function printRawResponse(raw: RawResponseEvent, noColor: boolean): void {
+	const colors = shouldUseColor(noColor)
+	const statusFn = raw.status >= 200 && raw.status < 300 ? green : red
+	process.stdout.write(`${statusFn(`HTTP ${raw.status}`, colors)}\n`)
+	for (const [k, v] of Object.entries(raw.headers)) {
+		process.stdout.write(`${cyan(k, colors)}: ${v}\n`)
+	}
+	process.stdout.write("\n")
+	// Pretty-print JSON body if possible, otherwise raw text
+	try {
+		const parsed = JSON.parse(raw.body)
+		process.stdout.write(`${JSON.stringify(parsed, null, 2)}\n`)
+	} catch {
+		process.stdout.write(`${raw.body}\n`)
+	}
+}

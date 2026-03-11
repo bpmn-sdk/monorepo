@@ -17,6 +17,7 @@ export type {
 	ClientEventMap,
 	RequestEvent,
 	ResponseEvent,
+	RawResponseEvent,
 	ErrorEvent,
 	RetryEvent,
 	TokenRefreshEvent,

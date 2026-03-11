@@ -1,4 +1,4 @@
-import type { AdminApiClient, CamundaClient } from "@bpmn-sdk/api"
+import type { AdminApiClient, CamundaClient, RawResponseEvent } from "@bpmn-sdk/api"
 import type {
 	ColumnDef,
 	Command,
@@ -75,6 +75,8 @@ type Screen =
 			group: CommandGroup
 			cmd: Command
 			output: CapturedOutput
+			raw: RawResponseEvent | null
+			rawView: boolean
 			cursor: number
 			scroll: number
 	  }
@@ -388,15 +390,67 @@ function renderInput(state: TuiState, screen: Extract<Screen, { kind: "input" }>
 	return lines
 }
 
+function renderRawView(screen: Extract<Screen, { kind: "results" }>, cols: number): string[] {
+	const raw = screen.raw
+	if (!raw) return [`  ${dim("(no raw response captured)")}`]
+	const lines: string[] = []
+	const statusCol = raw.status >= 200 && raw.status < 300 ? green : red
+	lines.push(`  ${bold("Status:")}  ${statusCol(`HTTP ${raw.status}`)}`)
+	lines.push("")
+	lines.push(`  ${bold("Headers:")}`)
+	for (const [k, v] of Object.entries(raw.headers)) {
+		const kStr = padEnd(cyan(k), 36)
+		lines.push(`  ${kStr}  ${fit(v, cols - 42)}`)
+	}
+	lines.push("")
+	lines.push(`  ${bold("Body:")}`)
+	let bodyLines: string[]
+	try {
+		const parsed = JSON.parse(raw.body)
+		bodyLines = JSON.stringify(parsed, null, 2).split("\n")
+	} catch {
+		bodyLines = raw.body.split("\n")
+	}
+	for (const l of bodyLines) {
+		lines.push(`  ${fit(l, cols - 4)}`)
+	}
+	return lines
+}
+
 function renderResults(state: TuiState, screen: Extract<Screen, { kind: "results" }>): string[] {
 	const { cols, rows } = termSize()
 	const viewH = Math.max(3, rows - 10)
 	const out = screen.output
 	const lines: string[] = []
 
+	const statusBadge = screen.raw
+		? (() => {
+				const fn = screen.raw.status >= 200 && screen.raw.status < 300 ? green : red
+				return `  ${dim(fn(`HTTP ${screen.raw.status}`))}`
+			})()
+		: ""
+	const rawToggle = `  ${screen.rawView ? cyan("r") : dim("r")} ${dim("raw")}`
+
+	if (screen.rawView) {
+		lines.push(renderHeader([screen.group.name, screen.cmd.name], cols))
+		lines.push("")
+		const rawLines = renderRawView(screen, cols)
+		const visible = rawLines.slice(screen.scroll, screen.scroll + rows - 8)
+		for (const l of visible) lines.push(l)
+		lines.push("")
+		if (rawLines.length > rows - 8) {
+			const hi = Math.min(screen.scroll + rows - 8, rawLines.length)
+			lines.push(`  ${dim(`${screen.scroll + 1}–${hi} of ${rawLines.length}`)}`)
+		}
+		lines.push(
+			`  ${dim("↑↓")} scroll${rawToggle}  ${cyan("m")} main menu  ${cyan("esc")} back  ${cyan("q")} quit`,
+		)
+		return lines
+	}
+
 	if (out.type === "list") {
 		lines.push(renderHeader([screen.group.name, screen.cmd.name], cols))
-		lines.push(`\n  ${dim(`${out.total} item${out.total !== 1 ? "s" : ""}`)}\n`)
+		lines.push(`\n  ${dim(`${out.total} item${out.total !== 1 ? "s" : ""}`)}${statusBadge}\n`)
 
 		const available = cols - 4
 		const widths = calcColWidths(out.items, out.columns, available)
@@ -425,11 +479,11 @@ function renderResults(state: TuiState, screen: Extract<Screen, { kind: "results
 			lines.push(`  ${dim(`${screen.scroll + 1}–${hi} of ${out.total}`)}`)
 		}
 		lines.push(
-			`  ${dim("↑↓")} navigate  ${cyan("enter")} detail  ${dim("pgup/pgdn")} page  ${cyan("m")} main menu  ${cyan("esc")} back  ${cyan("q")} quit`,
+			`  ${dim("↑↓")} navigate  ${cyan("enter")} detail  ${dim("pgup/pgdn")} page${rawToggle}  ${cyan("m")} main menu  ${cyan("esc")} back  ${cyan("q")} quit`,
 		)
 	} else if (out.type === "item") {
 		lines.push(renderHeader([screen.group.name, screen.cmd.name], cols))
-		lines.push("")
+		lines.push(statusBadge ? `\n${statusBadge}` : "")
 		const flat = flattenObj(out.data)
 		const kw = Object.keys(flat).reduce((m, k) => Math.max(m, k.length), 0)
 		for (const [k, v] of Object.entries(flat)) {
@@ -437,13 +491,13 @@ function renderResults(state: TuiState, screen: Extract<Screen, { kind: "results
 				`  ${padEnd(cyan(k), kw + 2)}  ${v === null || v === undefined ? dim("—") : String(v)}`,
 			)
 		}
-		lines.push(`\n  ${cyan("m")} main menu  ${cyan("esc")} back  ${cyan("q")} quit`)
+		lines.push(`\n${rawToggle}  ${cyan("m")} main menu  ${cyan("esc")} back  ${cyan("q")} quit`)
 	} else {
 		lines.push(renderHeader([screen.group.name, screen.cmd.name], cols))
-		lines.push("")
+		lines.push(statusBadge ? `\n${statusBadge}` : "")
 		if (out.lines.length === 0) lines.push(`  ${dim("(no output)")}`)
 		for (const line of out.lines) lines.push(`  ${line}`)
-		lines.push(`\n  ${cyan("m")} main menu  ${cyan("esc")} back  ${cyan("q")} quit`)
+		lines.push(`\n${rawToggle}  ${cyan("m")} main menu  ${cyan("esc")} back  ${cyan("q")} quit`)
 	}
 	return lines
 }
@@ -612,7 +666,23 @@ async function executeCommand(
 	render(state)
 
 	const { writer, get } = makeCapturingWriter()
-	const ctx = buildContext(screen.cmd, screen.fields, writer, state.getClient, state.getAdminClient)
+	// Wrap client factories to capture the last raw HTTP response
+	let rawCapture: RawResponseEvent | null = null
+	const getClient = async () => {
+		const client = await state.getClient()
+		client.on("rawResponse", (evt) => {
+			rawCapture = evt
+		})
+		return client
+	}
+	const getAdminClient = async () => {
+		const client = await state.getAdminClient()
+		client.on("rawResponse", (evt) => {
+			rawCapture = evt
+		})
+		return client
+	}
+	const ctx = buildContext(screen.cmd, screen.fields, writer, getClient, getAdminClient)
 	try {
 		await screen.cmd.run(ctx)
 		state.stack.push({
@@ -620,6 +690,8 @@ async function executeCommand(
 			group: screen.group,
 			cmd: screen.cmd,
 			output: get(),
+			raw: rawCapture,
+			rawView: false,
 			cursor: 0,
 			scroll: 0,
 		})
@@ -741,6 +813,38 @@ function handleResultsKey(
 ): void {
 	const { rows } = termSize()
 	const viewH = Math.max(3, rows - 10)
+
+	// r/R toggles raw view regardless of output type
+	if (key === "r" || key === "R") {
+		screen.rawView = !screen.rawView
+		screen.scroll = 0
+		render(state)
+		return
+	}
+
+	if (screen.rawView) {
+		switch (key) {
+			case "\x1b[A":
+				if (screen.scroll > 0) screen.scroll--
+				break
+			case "\x1b[B":
+				screen.scroll++
+				break
+			case "m":
+			case "M":
+				popToMain(state)
+				break
+			case "\x1b":
+				state.stack.pop()
+				break
+			case "q":
+			case "Q":
+				done()
+				return
+		}
+		render(state)
+		return
+	}
 
 	if (screen.output.type !== "list") {
 		if (key === "\x1b") state.stack.pop()

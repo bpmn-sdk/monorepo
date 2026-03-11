@@ -1,5 +1,19 @@
 # Progress
 
+## 2026-03-11 — editor12 (cont): CLI raw mode + HTTP status code
+
+### `apps/cli` — raw mode and HTTP status visibility
+- **HTTP status always shown**: After every CLI command, the HTTP status code is printed (`HTTP 200` in green, 4xx/5xx in red).
+- **`--raw` flag**: Shows the full raw response — status line, all response headers, pretty-printed JSON body (or plain text if not JSON). Suppresses the formatted output when active.
+- **TUI `r` toggle**: In the results screen, pressing `r` switches between the rendered view (table/item) and the raw view showing status, headers, and body. The raw view is scrollable.
+
+### `packages/api` — `rawResponse` event
+- Added `RawResponseEvent` interface: `{ method, url, status, headers, body }`.
+- `HttpClient` emits `rawResponse` after every HTTP response (before error handling), using `response.clone().text()` to buffer the body without consuming the original stream.
+- Exported `RawResponseEvent` from `@bpmn-sdk/api` public index.
+
+---
+
 ## 2026-03-11 — editor12: packages/ui — shared design system; operate visual unification
 
 ### `packages/ui` (new package — `@bpmn-sdk/ui`)
