@@ -1,4 +1,7 @@
-import type { AdminApiClient, CamundaClient } from "@bpmn-sdk/api"
+import type { AdminApiClient, CamundaClient, RawResponseEvent } from "@bpmn-sdk/api"
+import type { Relation } from "@bpmn-sdk/api"
+
+export type { RawResponseEvent, Relation }
 
 // ─── Output ───────────────────────────────────────────────────────────────────
 
@@ -37,6 +40,16 @@ export interface OutputWriter {
 
 // ─── Commands ─────────────────────────────────────────────────────────────────
 
+/** Schema spec for a single field inside a JSON flag value. */
+export interface JsonFieldSpec {
+	name: string
+	type: "string" | "boolean" | "number" | "object" | "array"
+	description?: string
+	required?: boolean
+	/** Restricts to specific values; TUI shows a cycling picker. */
+	enum?: string[]
+}
+
 export interface FlagSpec {
 	name: string
 	short?: string
@@ -46,12 +59,24 @@ export interface FlagSpec {
 	required?: boolean
 	/** Display placeholder in help, e.g. "JSON" or "KEY" */
 	placeholder?: string
+	/** Restricts to specific values; TUI shows a cycling picker (↑↓ to select). */
+	enum?: string[]
+	/** Value is a JSON object; TUI opens a structured key-value editor. */
+	json?: boolean
+	/** Preset values for number fields; ↑↓ cycles through them in edit mode. */
+	presets?: number[]
+	/** Known fields within this JSON object, sourced from OpenAPI schema. */
+	fields?: JsonFieldSpec[]
 }
 
 export interface ArgSpec {
 	name: string
 	description: string
 	required?: boolean
+	/** Restricts to specific values; TUI shows a cycling picker. */
+	enum?: string[]
+	/** Value is a JSON object; TUI opens a key-value editor. */
+	json?: boolean
 }
 
 export interface Example {
@@ -80,6 +105,10 @@ export interface Command {
 	args?: ArgSpec[]
 	flags?: FlagSpec[]
 	examples?: Example[]
+	/** Column definitions — stored on list commands for display and relation detection. */
+	columns?: ColumnDef[]
+	/** Follow-up commands whose args can be pre-filled from this command's result fields. */
+	relations?: Relation[]
 	run(ctx: RunContext): Promise<void>
 }
 

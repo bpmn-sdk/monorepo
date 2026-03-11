@@ -1,3 +1,4 @@
+import { type Theme, applyTheme, injectUiStyles, loadPersistedTheme } from "@bpmn-sdk/ui"
 import { injectOperateStyles } from "./css.js"
 import { createRouter } from "./router.js"
 import { DashboardStore } from "./stores/dashboard.js"
@@ -6,8 +7,9 @@ import { IncidentsStore } from "./stores/incidents.js"
 import { InstancesStore } from "./stores/instances.js"
 import { JobsStore } from "./stores/jobs.js"
 import { TasksStore } from "./stores/tasks.js"
-import type { OperateApi, OperateOptions, ProfileInfo, Theme } from "./types.js"
+import type { OperateApi, OperateOptions, ProfileInfo } from "./types.js"
 import { createDashboardView } from "./views/dashboard.js"
+import { createDefinitionDetailView } from "./views/definition-detail.js"
 import { createDefinitionsView } from "./views/definitions.js"
 import { createHeader } from "./views/header.js"
 import { createIncidentsView } from "./views/incidents.js"
@@ -26,24 +28,31 @@ const TITLE_MAP: Record<string, string> = {
 	"/tasks": "Tasks",
 }
 
+// Keep TITLE_MAP reference to avoid unused-variable lint error
+void TITLE_MAP
+
 export function createOperate(options: OperateOptions): OperateApi {
+	// Inject shared tokens first, then operate-specific layout CSS
+	injectUiStyles()
 	injectOperateStyles()
 
 	const {
 		container,
 		proxyUrl = "http://localhost:3033",
-		theme = "auto",
 		pollInterval = 30_000,
 		mock = false,
 	} = options
 
 	let profile: string | null = options.profile ?? null
 
+	// Resolve initial theme: persisted preference > option > auto
+	const initialTheme: Theme = loadPersistedTheme() ?? options.theme ?? "auto"
+
 	// ── Root element ──────────────────────────────────────────────────────────
 
 	const el = document.createElement("div")
 	el.className = "op-root"
-	el.setAttribute("data-theme", resolveTheme(theme))
+	applyTheme(el, initialTheme)
 	container.appendChild(el)
 
 	// ── Stores ────────────────────────────────────────────────────────────────
@@ -55,16 +64,22 @@ export function createOperate(options: OperateOptions): OperateApi {
 	const jobStore = new JobsStore()
 	const taskStore = new TasksStore()
 
-	function connectAll(): void {
-		dashStore.connect(proxyUrl, profile, pollInterval, mock)
-		defStore.connect(proxyUrl, profile, pollInterval, mock)
-		instStore.connect(proxyUrl, profile, pollInterval, mock)
-		incStore.connect(proxyUrl, profile, pollInterval, mock)
-		jobStore.connect(proxyUrl, profile, pollInterval, mock)
-		taskStore.connect(proxyUrl, profile, pollInterval, mock)
+	// Disconnect every store to free all HTTP connection slots.
+	function disconnectAll(): void {
+		dashStore.disconnect()
+		defStore.disconnect()
+		instStore.disconnect()
+		incStore.disconnect()
+		jobStore.disconnect()
+		taskStore.disconnect()
 	}
 
-	connectAll()
+	// Called when profile changes — reconnects only the currently active stores.
+	let reconnectCurrent: (() => void) | null = null
+
+	function connectAll(): void {
+		reconnectCurrent?.()
+	}
 
 	// ── Profiles ──────────────────────────────────────────────────────────────
 
@@ -73,7 +88,6 @@ export function createOperate(options: OperateOptions): OperateApi {
 	if (!mock) {
 		fetchProfiles()
 	} else {
-		// Demo profiles for mock mode
 		profiles = [{ name: "demo", active: true, apiType: "saas", baseUrl: null, authType: "none" }]
 	}
 
@@ -87,7 +101,7 @@ export function createOperate(options: OperateOptions): OperateApi {
 				header.setProfiles(profiles, profile)
 			})
 			.catch(() => {
-				// proxy not running — silently ignore in mock mode
+				// proxy not running — silently ignore
 			})
 	}
 
@@ -106,10 +120,18 @@ export function createOperate(options: OperateOptions): OperateApi {
 	main.className = "op-main"
 	layout.appendChild(main)
 
-	const header = createHeader((name) => {
-		profile = name
-		connectAll()
-	})
+	const header = createHeader(
+		(name) => {
+			profile = name
+			connectAll()
+		},
+		(theme, resolved) => {
+			el.setAttribute("data-theme", resolved)
+			// Keep instance-detail canvas in sync
+			currentTheme = theme
+		},
+		initialTheme,
+	)
 	header.setProfiles(profiles, profile)
 	main.appendChild(header.el)
 
@@ -120,6 +142,7 @@ export function createOperate(options: OperateOptions): OperateApi {
 	// ── Router ────────────────────────────────────────────────────────────────
 
 	let destroyView: (() => void) | null = null
+	let currentTheme: Theme = initialTheme
 
 	function showView(viewEl: HTMLElement, destroy: () => void): void {
 		destroyView?.()
@@ -129,6 +152,11 @@ export function createOperate(options: OperateOptions): OperateApi {
 	}
 
 	router.on("/", () => {
+		reconnectCurrent = () => {
+			disconnectAll()
+			dashStore.connect(proxyUrl, profile, pollInterval, mock)
+		}
+		reconnectCurrent()
 		header.setTitle("Dashboard")
 		nav.setActive("/")
 		const { el: vEl, destroy } = createDashboardView(dashStore, (path) => router.navigate(path))
@@ -136,6 +164,11 @@ export function createOperate(options: OperateOptions): OperateApi {
 	})
 
 	router.on("/definitions", () => {
+		reconnectCurrent = () => {
+			disconnectAll()
+			defStore.connect(proxyUrl, profile, pollInterval, mock)
+		}
+		reconnectCurrent()
 		header.setTitle("Processes")
 		nav.setActive("/definitions")
 		const { el: vEl, destroy } = createDefinitionsView(defStore, (def) => {
@@ -145,23 +178,35 @@ export function createOperate(options: OperateOptions): OperateApi {
 	})
 
 	router.on("/definitions/:key", (params) => {
+		// Disconnect all stores: no polling while the XML fetch is in-flight.
+		disconnectAll()
+		reconnectCurrent = () => {
+			disconnectAll()
+		}
 		header.setTitle("Process Definition")
 		nav.setActive("/definitions")
-		// For now, navigate to instances filtered by this definition
-		instStore.destroy()
-		instStore.connect(proxyUrl, profile, pollInterval, mock, {
-			processDefinitionKey: params.key,
-		})
-		const { el: vEl, destroy } = createInstancesView(instStore, (inst) =>
-			router.navigate(`/instances/${inst.processInstanceKey}`),
+		const { el: vEl, destroy } = createDefinitionDetailView(
+			params.key ?? "",
+			defStore,
+			{
+				proxyUrl,
+				profile,
+				mock,
+				theme: el.getAttribute("data-theme") === "light" ? "light" : "dark",
+			},
+			() => router.navigate("/definitions"),
 		)
 		showView(vEl, destroy)
 	})
 
 	router.on("/instances", () => {
+		reconnectCurrent = () => {
+			disconnectAll()
+			instStore.connect(proxyUrl, profile, pollInterval, mock)
+		}
+		reconnectCurrent()
 		header.setTitle("Instances")
 		nav.setActive("/instances")
-		instStore.connect(proxyUrl, profile, pollInterval, mock)
 		const { el: vEl, destroy } = createInstancesView(
 			instStore,
 			(inst) => router.navigate(`/instances/${inst.processInstanceKey}`),
@@ -173,18 +218,24 @@ export function createOperate(options: OperateOptions): OperateApi {
 	})
 
 	router.on("/instances/:key", (params) => {
-		const title = `Instance ${params.key}`
-		header.setTitle(title)
+		// Keep only instStore connected (needed to look up processDefinitionKey for the XML fetch).
+		reconnectCurrent = () => {
+			disconnectAll()
+			instStore.connect(proxyUrl, profile, pollInterval, mock)
+		}
+		reconnectCurrent()
+		const instanceKey = params.key ?? ""
+		header.setTitle(`Instance ${instanceKey}`)
 		nav.setActive("/instances")
 		const { el: vEl, destroy } = createInstanceDetailView(
-			params.key ?? "",
+			instanceKey,
 			instStore,
 			{
 				proxyUrl,
 				profile,
 				interval: pollInterval,
 				mock,
-				theme: resolveTheme(theme),
+				theme: el.getAttribute("data-theme") === "light" ? "light" : "dark",
 			},
 			() => router.navigate("/instances"),
 		)
@@ -192,6 +243,11 @@ export function createOperate(options: OperateOptions): OperateApi {
 	})
 
 	router.on("/incidents", () => {
+		reconnectCurrent = () => {
+			disconnectAll()
+			incStore.connect(proxyUrl, profile, pollInterval, mock)
+		}
+		reconnectCurrent()
 		header.setTitle("Incidents")
 		nav.setActive("/incidents")
 		const { el: vEl, destroy } = createIncidentsView(incStore)
@@ -199,6 +255,11 @@ export function createOperate(options: OperateOptions): OperateApi {
 	})
 
 	router.on("/jobs", () => {
+		reconnectCurrent = () => {
+			disconnectAll()
+			jobStore.connect(proxyUrl, profile, pollInterval, mock)
+		}
+		reconnectCurrent()
 		header.setTitle("Jobs")
 		nav.setActive("/jobs")
 		const { el: vEl, destroy } = createJobsView(jobStore)
@@ -206,6 +267,11 @@ export function createOperate(options: OperateOptions): OperateApi {
 	})
 
 	router.on("/tasks", () => {
+		reconnectCurrent = () => {
+			disconnectAll()
+			taskStore.connect(proxyUrl, profile, pollInterval, mock)
+		}
+		reconnectCurrent()
 		header.setTitle("Tasks")
 		nav.setActive("/tasks")
 		const { el: vEl, destroy } = createTasksView(taskStore)
@@ -226,7 +292,9 @@ export function createOperate(options: OperateOptions): OperateApi {
 		},
 
 		setTheme(t: Theme): void {
-			el.setAttribute("data-theme", resolveTheme(t))
+			currentTheme = t
+			applyTheme(el, t)
+			header.setTheme(t)
 		},
 
 		navigate(path: string): void {
@@ -245,11 +313,4 @@ export function createOperate(options: OperateOptions): OperateApi {
 			el.remove()
 		},
 	}
-}
-
-function resolveTheme(theme: Theme): "light" | "dark" {
-	if (theme === "auto") {
-		return window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark"
-	}
-	return theme
 }

@@ -1,5 +1,5 @@
 import { badge } from "../components/badge.js"
-import { createTable } from "../components/table.js"
+import { createFilterTable } from "../components/filter-table.js"
 import type { IncidentsStore } from "../stores/incidents.js"
 import type { IncidentResult } from "../types.js"
 
@@ -21,12 +21,13 @@ export function createIncidentsView(store: IncidentsStore): {
 	const el = document.createElement("div")
 	el.className = "op-view"
 
-	const { el: tableEl, setRows } = createTable<IncidentResult>({
+	const { el: tableEl, setRows } = createFilterTable<IncidentResult>({
 		columns: [
 			{
 				label: "Type",
 				width: "180px",
 				render: (row) => row.errorType ?? "UNKNOWN",
+				sortValue: (row) => row.errorType ?? "",
 			},
 			{
 				label: "Message",
@@ -42,23 +43,31 @@ export function createIncidentsView(store: IncidentsStore): {
 				label: "Process",
 				width: "180px",
 				render: (row) => row.processDefinitionId ?? "—",
+				sortValue: (row) => row.processDefinitionId ?? "",
 			},
 			{
 				label: "Instance",
 				width: "140px",
 				render: (row) => row.processInstanceKey ?? "—",
+				sortValue: (row) => row.processInstanceKey ?? "",
 			},
 			{
 				label: "State",
 				width: "100px",
 				render: (row) => badge(row.state ?? "UNKNOWN"),
+				sortValue: (row) => row.state ?? "",
 			},
 			{
 				label: "Created",
 				width: "100px",
 				render: (row) => relTime(row.creationTime),
+				sortValue: (row) => row.creationTime ?? "",
 			},
 		],
+		searchFn: (row) =>
+			[row.errorType, row.errorMessage, row.processDefinitionId, row.processInstanceKey, row.state]
+				.filter(Boolean)
+				.join(" "),
 		emptyText: "No incidents",
 	})
 	el.appendChild(tableEl)

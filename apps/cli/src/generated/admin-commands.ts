@@ -162,6 +162,7 @@ export const clustersGroup: CommandGroup = {
       name: "create-cluster",
       description: "create-cluster",
       create: (client, body) => client.clusters.createCluster(body as never),
+      bodyFields: [{ name: "identityBackendChecksEnabled", type: "boolean" }],
     }),
     makeGetCmd({
       name: "get-cluster",
@@ -174,6 +175,7 @@ export const clustersGroup: CommandGroup = {
       description: "Updates name or labels of a cluster identified by the given clusterUuid.",
       argName: "clusterUuid",
       update: (client, key, body) => client.clusters.updateCluster(key, body as never),
+      bodyFields: [{ name: "name", type: "string", description: "The name of your cluster." }, { name: "description", type: "string", description: "Optional description for the cluster (max 150 characters)." }, { name: "stageLabel", type: "string", enum: ["dev","test","stage","prod"] }, { name: "numberOfAllocatedHwPackages", type: "number", description: "Optional number uf hardware packages, defaults to 1. Only availabe on request and for Advanced offering cluster types." }],
     }),
     makeDeleteCmd({
       name: "delete-cluster",
@@ -201,12 +203,14 @@ export const clustersGroup: CommandGroup = {
       description: "Updates the IP Allowlist rules for your cluster. Each entry in the array must be a valid comma separated list of CIDRs.",
       argName: "clusterUuid",
       update: (client, key, body) => client.clusters.updateIpAllowlist(key, body as never),
+      bodyFields: [{ name: "ipallowlist", type: "array", required: true }],
     }),
     makeUpdateCmd({
       name: "update-ip-whitelist",
       description: "Updates the IP Whitelist rules for your cluster. Each entry in the array must be a valid comma separated list of CIDRs.",
       argName: "clusterUuid",
       update: (client, key, body) => client.clusters.updateIpWhitelist(key, body as never),
+      bodyFields: [{ name: "ipwhitelist", type: "array", required: true }],
     }),
     makeUpdateCmd({
       name: "wake",

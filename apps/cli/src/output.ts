@@ -1,5 +1,5 @@
 import { bold, cyan, dim, green, red, shouldUseColor, stateColor } from "./color.js"
-import type { ColumnDef, OutputFormat, OutputWriter } from "./types.js"
+import type { ColumnDef, OutputFormat, OutputWriter, RawResponseEvent } from "./types.js"
 
 // ─── Formatting helpers ────────────────────────────────────────────────────────
 
@@ -123,17 +123,31 @@ function printKV(obj: Record<string, unknown>, colors: boolean): void {
 	}
 }
 
-/** Flatten one level of nesting for display in KV pairs. */
-function flattenForDisplay(obj: unknown): Record<string, unknown> {
+/** Recursively flatten an object for KV display. Arrays of objects are expanded with [i] keys. */
+function flattenForDisplay(obj: unknown, prefix = ""): Record<string, unknown> {
 	if (typeof obj !== "object" || obj === null) return { value: obj }
 	const result: Record<string, unknown> = {}
 	for (const [k, v] of Object.entries(obj as Record<string, unknown>)) {
-		if (typeof v === "object" && v !== null && !Array.isArray(v)) {
-			for (const [nk, nv] of Object.entries(v as Record<string, unknown>)) {
-				result[`${k}.${nk}`] = nv
+		const key = prefix ? `${prefix}.${k}` : k
+		if (Array.isArray(v)) {
+			if (v.length === 0) {
+				result[key] = "[]"
+			} else if (v.every((item) => typeof item !== "object" || item === null)) {
+				result[key] = v.join(", ")
+			} else {
+				for (let i = 0; i < v.length; i++) {
+					const elem = v[i]
+					if (typeof elem === "object" && elem !== null) {
+						Object.assign(result, flattenForDisplay(elem, `${key}[${i}]`))
+					} else {
+						result[`${key}[${i}]`] = elem
+					}
+				}
 			}
+		} else if (typeof v === "object" && v !== null) {
+			Object.assign(result, flattenForDisplay(v, key))
 		} else {
-			result[k] = v
+			result[key] = v
 		}
 	}
 	return result
@@ -228,3 +242,34 @@ export function createOutputWriter(format: OutputFormat, noColor: boolean): Outp
 
 /** Date transformer for use in ColumnDef. */
 export const dateTransform = fmtDate
+
+/** An OutputWriter that discards all output (used when --raw suppresses formatted output). */
+export function createNullWriter(): OutputWriter {
+	return {
+		format: "table",
+		isInteractive: false,
+		printList() {},
+		printItem() {},
+		print() {},
+		ok() {},
+		info() {},
+	}
+}
+
+/** Print a raw HTTP response (status, headers, body) to stdout. */
+export function printRawResponse(raw: RawResponseEvent, noColor: boolean): void {
+	const colors = shouldUseColor(noColor)
+	const statusFn = raw.status >= 200 && raw.status < 300 ? green : red
+	process.stdout.write(`${statusFn(`HTTP ${raw.status}`, colors)}\n`)
+	for (const [k, v] of Object.entries(raw.headers)) {
+		process.stdout.write(`${cyan(k, colors)}: ${v}\n`)
+	}
+	process.stdout.write("\n")
+	// Pretty-print JSON body if possible, otherwise raw text
+	try {
+		const parsed = JSON.parse(raw.body)
+		process.stdout.write(`${JSON.stringify(parsed, null, 2)}\n`)
+	} catch {
+		process.stdout.write(`${raw.body}\n`)
+	}
+}

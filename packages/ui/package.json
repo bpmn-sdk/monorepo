@@ -1,0 +1,29 @@
+{
+	"name": "@bpmn-sdk/ui",
+	"version": "0.0.1",
+	"description": "Shared design tokens, theme management, and UI components for bpmn-sdk frontends",
+	"type": "module",
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js"
+		}
+	},
+	"files": ["dist/**/*.js", "dist/**/*.d.ts"],
+	"scripts": {
+		"build": "tsc",
+		"typecheck": "tsc --noEmit",
+		"check": "biome check ."
+	},
+	"keywords": ["bpmn", "ui", "design-tokens", "theme", "components", "css-variables", "typescript"],
+	"license": "MIT",
+	"publishConfig": {
+		"access": "public"
+	},
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/bpmn-sdk/monorepo"
+	}
+}

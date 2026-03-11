@@ -1477,6 +1477,126 @@ function deriveColumns(responseSchema, schemas) {
 	return columns.slice(0, 7)
 }
 
+/**
+ * Flatten a schema (possibly using allOf/anyOf) into a single object with
+ * merged properties and required list. Works on already-resolved schemas.
+ */
+function flattenSchema(schema) {
+	if (!schema || typeof schema !== "object") return null
+
+	const merged = { properties: {}, required: [] }
+
+	// Direct properties
+	if (schema.properties && typeof schema.properties === "object") {
+		Object.assign(merged.properties, schema.properties)
+	}
+	if (Array.isArray(schema.required)) {
+		for (const r of schema.required) merged.required.push(r)
+	}
+
+	// Merge allOf / anyOf members
+	for (const key of ["allOf", "anyOf"]) {
+		if (Array.isArray(schema[key])) {
+			for (const sub of schema[key]) {
+				const subFlat = flattenSchema(sub)
+				if (subFlat) {
+					Object.assign(merged.properties, subFlat.properties)
+					for (const r of subFlat.required) merged.required.push(r)
+				}
+			}
+		}
+	}
+
+	return Object.keys(merged.properties).length > 0 ? merged : null
+}
+
+/**
+ * Extract JsonFieldSpec[] from an OpenAPI schema object.
+ * Returns null if no properties found.
+ */
+function extractJsonFieldSpecs(schema, schemas) {
+	if (!schema) return null
+
+	// Resolve $ref to a named schema
+	let resolved = schema
+	if (schema.$ref) {
+		const typeName = schema.$ref.split("/").pop()
+		resolved = typeName ? schemas.get(typeName) : null
+	}
+	if (!resolved || typeof resolved !== "object") return null
+
+	// Flatten allOf/anyOf composition
+	const flat = flattenSchema(resolved)
+	if (!flat) return null
+
+	const { properties: props, required: requiredList } = flat
+	const specs = []
+
+	for (const [name, propSchema] of Object.entries(props)) {
+		if (!propSchema || typeof propSchema !== "object") continue
+		// Resolve allOf to get actual type (common pattern: allOf: [{$ref}] with description)
+		let effectiveSchema = propSchema
+		if (!propSchema.type && Array.isArray(propSchema.allOf) && propSchema.allOf.length > 0) {
+			effectiveSchema = propSchema.allOf[0] ?? propSchema
+		}
+		const rawType = effectiveSchema.type ?? "string"
+		const type = ["string", "boolean", "number", "object", "array"].includes(rawType)
+			? rawType
+			: "string"
+		const enumVals = Array.isArray(effectiveSchema.enum) ? effectiveSchema.enum : undefined
+		const description =
+			typeof propSchema.description === "string"
+				? propSchema.description
+				: typeof propSchema.title === "string"
+					? propSchema.title
+					: undefined
+		specs.push({
+			name,
+			type,
+			...(description ? { description } : {}),
+			...(requiredList.includes(name) ? { required: true } : {}),
+			...(enumVals ? { enum: enumVals } : {}),
+		})
+	}
+
+	return specs.length > 0 ? specs : null
+}
+
+/**
+ * For search (list) operations, extract field specs from the `filter` property
+ * of the request body schema.
+ */
+function extractFilterFieldSpecs(requestBodySchema, schemas) {
+	if (!requestBodySchema) return null
+
+	// Resolve the request body schema
+	let bodyResolved = requestBodySchema
+	if (requestBodySchema.$ref) {
+		const typeName = requestBodySchema.$ref.split("/").pop()
+		bodyResolved = typeName ? schemas.get(typeName) : null
+	}
+	if (!bodyResolved || typeof bodyResolved !== "object") return null
+
+	// Flatten allOf/anyOf in the body schema to get all properties
+	const flat = flattenSchema(bodyResolved)
+	const filterProp = flat?.properties?.filter ?? bodyResolved.properties?.filter
+	if (!filterProp) return null
+
+	return extractJsonFieldSpecs(filterProp, schemas)
+}
+
+/** Serialise a JsonFieldSpec[] to a compact TypeScript literal. */
+function serializeFieldSpecs(specs) {
+	const items = specs.map((s) => {
+		const parts = [`name: ${JSON.stringify(s.name)}`, `type: ${JSON.stringify(s.type)}`]
+		if (s.description) parts.push(`description: ${JSON.stringify(s.description)}`)
+		if (s.required) parts.push("required: true")
+		if (s.enum) parts.push(`enum: ${JSON.stringify(s.enum)}`)
+		return `{ ${parts.join(", ")} }`
+	})
+	return `[${items.join(", ")}]`
+}
+
 /** Generate the full contents of apps/cli/src/generated/commands.ts (or admin-commands.ts). */
 function generateCliCommandsContent(
 	operations,
@@ -1553,6 +1673,7 @@ function generateCliCommandsContent(
 
 			if (cmdType === "list") {
 				const columns = deriveColumns(op.responseSchema, schemas)
+				const filterSpecs = extractFilterFieldSpecs(op.requestBodySchema, schemas)
 				lines.push("    makeListCmd({")
 				if (cmdName !== "list") lines.push(`      name: ${JSON.stringify(cmdName)},`)
 				lines.push(`      description: ${JSON.stringify(desc)},`)
@@ -1565,6 +1686,9 @@ function generateCliCommandsContent(
 					lines.push(`        ${colStr},`)
 				}
 				lines.push("      ],")
+				if (filterSpecs) {
+					lines.push(`      filterFields: ${serializeFieldSpecs(filterSpecs)},`)
+				}
 				lines.push(
 					`      search: (client, body) => client.${clientProp}.${methodName}(body as never),`,
 				)
@@ -1577,6 +1701,7 @@ function generateCliCommandsContent(
 				lines.push(`      get: (client, key) => client.${clientProp}.${methodName}(key),`)
 				lines.push("    }),")
 			} else if (cmdType === "create") {
+				const bodySpecs = extractJsonFieldSpecs(op.requestBodySchema, schemas)
 				lines.push("    makeCreateCmd({")
 				if (cmdName !== "create") lines.push(`      name: ${JSON.stringify(cmdName)},`)
 				lines.push(`      description: ${JSON.stringify(desc)},`)
@@ -1585,8 +1710,12 @@ function generateCliCommandsContent(
 				lines.push(
 					`      create: (client, body) => client.${clientProp}.${methodName}(${createBodyArg}),`,
 				)
+				if (bodySpecs) {
+					lines.push(`      bodyFields: ${serializeFieldSpecs(bodySpecs)},`)
+				}
 				lines.push("    }),")
 			} else if (cmdType === "update") {
+				const bodySpecs = extractJsonFieldSpecs(op.requestBodySchema, schemas)
 				lines.push("    makeUpdateCmd({")
 				if (cmdName !== "update") lines.push(`      name: ${JSON.stringify(cmdName)},`)
 				lines.push(`      description: ${JSON.stringify(desc)},`)
@@ -1597,6 +1726,9 @@ function generateCliCommandsContent(
 					)
 				} else {
 					lines.push(`      update: (client, key) => client.${clientProp}.${methodName}(key),`)
+				}
+				if (bodySpecs) {
+					lines.push(`      bodyFields: ${serializeFieldSpecs(bodySpecs)},`)
 				}
 				lines.push("    }),")
 			} else if (cmdType === "delete") {

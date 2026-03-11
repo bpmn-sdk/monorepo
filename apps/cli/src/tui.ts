@@ -1,9 +1,12 @@
-import type { AdminApiClient, CamundaClient } from "@bpmn-sdk/api"
+import type { AdminApiClient, CamundaClient, RawResponseEvent } from "@bpmn-sdk/api"
+import { renderBpmnAscii } from "@bpmn-sdk/ascii"
 import type {
+	ArgSpec,
 	ColumnDef,
 	Command,
 	CommandGroup,
 	FlagSpec,
+	JsonFieldSpec,
 	OutputWriter,
 	RunContext,
 } from "./types.js"
@@ -47,18 +50,19 @@ interface FieldState {
 	cursor: number
 	required: boolean
 	flagSpec?: FlagSpec
+	argSpec?: ArgSpec
 }
 
 type CapturedOutput =
 	| { type: "list"; items: Record<string, unknown>[]; columns: ColumnDef[]; total: number }
 	| { type: "item"; data: unknown }
-	| { type: "messages"; lines: string[] }
+	| { type: "messages"; lines: string[]; altLines?: string[] }
 
 // Each screen that belongs to a group carries the group reference so the TUI
 // can show the correct title and navigate back regardless of entry point.
 type Screen =
-	| { kind: "main"; cursor: number; scroll: number }
-	| { kind: "commands"; group: CommandGroup; cursor: number }
+	| { kind: "main"; cursor: number; scroll: number; search: string }
+	| { kind: "commands"; group: CommandGroup; cursor: number; search: string }
 	| {
 			kind: "input"
 			group: CommandGroup
@@ -75,10 +79,51 @@ type Screen =
 			group: CommandGroup
 			cmd: Command
 			output: CapturedOutput
+			raw: RawResponseEvent | null
+			rawView: boolean
+			altView: boolean
 			cursor: number
 			scroll: number
 	  }
-	| { kind: "detail"; group: CommandGroup; item: unknown; scroll: number }
+	| {
+			kind: "detail"
+			group: CommandGroup
+			item: unknown
+			label: string
+			cursor: number
+			scroll: number
+	  }
+	| {
+			kind: "followup"
+			sourceGroup: CommandGroup
+			item: Record<string, unknown>
+			relations: Array<{
+				group: CommandGroup
+				cmd: Command
+				params: Array<{ field: string; param: string }>
+			}>
+			cursor: number
+			scroll: number
+	  }
+	| { kind: "profile"; scroll: number }
+	| {
+			kind: "json-editor"
+			group: CommandGroup
+			cmd: Command
+			/** Index into the parent input screen's fields array. */
+			fieldIndex: number
+			fieldLabel: string
+			entries: Array<{ key: string; keyCursor: number; val: string; valCursor: number }>
+			/** Known field specs from the OpenAPI schema — drives guided editing. */
+			fieldSpecs?: JsonFieldSpec[]
+			/** Row cursor (0..entries.length-1 = entry rows; entries.length = "add" row). */
+			cursor: number
+			/** Active column within the current row. */
+			col: "key" | "val"
+			editing: boolean
+			scroll: number
+			error: string
+	  }
 
 interface TuiState {
 	/** All command groups — shown in the main menu. */
@@ -87,6 +132,10 @@ interface TuiState {
 	getClient: () => Promise<CamundaClient>
 	getAdminClient: () => Promise<AdminApiClient>
 	quitting: boolean
+	/** Active profile name for display in the header. */
+	profile: string
+	/** Profile fields with secrets redacted — shown in the profile view. */
+	profileInfo: Array<{ key: string; value: string }>
 }
 
 // ─── Capturing output writer ──────────────────────────────────────────────────
@@ -125,7 +174,10 @@ function makeCapturingWriter(): { writer: OutputWriter; get: () => CapturedOutpu
 		},
 		print(data) {
 			if (captured.type === "messages") {
-				captured.lines.push(typeof data === "string" ? data : JSON.stringify(data, null, 2))
+				const str = typeof data === "string" ? data : JSON.stringify(data, null, 2)
+				for (const line of str.split("\n")) {
+					captured.lines.push(line)
+				}
 			}
 		},
 		ok(msg) {
@@ -153,6 +205,7 @@ function buildFields(cmd: Command): FieldState[] {
 			value: "",
 			cursor: 0,
 			required: arg.required ?? false,
+			argSpec: arg,
 		})
 	}
 	for (const flag of cmd.flags ?? []) {
@@ -202,6 +255,100 @@ function buildContext(
 	return { positional, flags, output: writer, getClient, getAdminClient }
 }
 
+// ─── Field type helpers ────────────────────────────────────────────────────────
+
+function getEnum(field: FieldState): string[] | undefined {
+	if (field.kind === "flag") return field.flagSpec?.enum
+	if (field.kind === "arg") return field.argSpec?.enum
+	return undefined
+}
+
+function isJsonField(field: FieldState): boolean {
+	if (field.kind === "flag") return field.flagSpec?.json === true
+	if (field.kind === "arg") return field.argSpec?.json === true
+	return false
+}
+
+function getPresets(field: FieldState): number[] | undefined {
+	if (field.kind === "flag") return field.flagSpec?.presets
+	return undefined
+}
+
+// ─── JSON editor helpers ───────────────────────────────────────────────────────
+
+type JsonEntry = { key: string; keyCursor: number; val: string; valCursor: number }
+
+function parseJsonToEntries(json: string): JsonEntry[] {
+	if (!json.trim()) return []
+	try {
+		const obj = JSON.parse(json) as Record<string, unknown>
+		return Object.entries(obj).map(([key, val]) => ({
+			key,
+			keyCursor: key.length,
+			val: typeof val === "string" ? val : JSON.stringify(val),
+			valCursor: 0,
+		}))
+	} catch {
+		return []
+	}
+}
+
+function entriesToJson(entries: JsonEntry[]): string {
+	const obj: Record<string, unknown> = {}
+	for (const e of entries) {
+		if (!e.key) continue
+		try {
+			obj[e.key] = JSON.parse(e.val)
+		} catch {
+			obj[e.key] = e.val
+		}
+	}
+	return Object.keys(obj).length === 0 ? "" : JSON.stringify(obj)
+}
+
+/**
+ * Build initial entries for the JSON editor.
+ * If fieldSpecs are provided, pre-populate with all known fields (in spec order),
+ * merging in any existing values. Extra keys from existing JSON are appended at the end.
+ */
+function buildInitialEntries(existingJson: string, fieldSpecs?: JsonFieldSpec[]): JsonEntry[] {
+	const existing: Record<string, string> = {}
+	if (existingJson.trim()) {
+		try {
+			const obj = JSON.parse(existingJson) as Record<string, unknown>
+			for (const [k, v] of Object.entries(obj)) {
+				existing[k] = typeof v === "string" ? v : JSON.stringify(v)
+			}
+		} catch {
+			// ignore malformed JSON
+		}
+	}
+
+	if (!fieldSpecs || fieldSpecs.length === 0) return parseJsonToEntries(existingJson)
+
+	const seenKeys = new Set<string>()
+	const entries: JsonEntry[] = []
+
+	for (const spec of fieldSpecs) {
+		seenKeys.add(spec.name)
+		const val = existing[spec.name] ?? ""
+		entries.push({ key: spec.name, keyCursor: spec.name.length, val, valCursor: val.length })
+	}
+	// Append extra keys not in the spec
+	for (const [k, v] of Object.entries(existing)) {
+		if (!seenKeys.has(k)) {
+			entries.push({ key: k, keyCursor: k.length, val: v, valCursor: v.length })
+		}
+	}
+
+	return entries
+}
+
+/** Look up a JsonFieldSpec by key name. */
+function getFieldSpec(key: string, fieldSpecs?: JsonFieldSpec[]): JsonFieldSpec | undefined {
+	return fieldSpecs?.find((s) => s.name === key)
+}
+
 // ─── Table helpers ────────────────────────────────────────────────────────────
 
 function getCellStr(item: Record<string, unknown>, col: ColumnDef): string {
@@ -235,12 +382,42 @@ function calcColWidths(
 	return natural.map((w) => Math.max(5, Math.round(w * scale)))
 }
 
+/** Sentinel for arrays of objects — displayed as "[N items]", Space to drill down. */
+class ArrayValue {
+	constructor(public readonly items: unknown[]) {}
+	toString() {
+		return `[${this.items.length} item${this.items.length !== 1 ? "s" : ""}]`
+	}
+}
+
 function flattenObj(obj: unknown, prefix = ""): Record<string, unknown> {
+	// Top-level array (from drill-down): expand each element with [i] prefix
+	if (Array.isArray(obj)) {
+		const result: Record<string, unknown> = {}
+		for (let i = 0; i < obj.length; i++) {
+			const elem = obj[i]
+			if (typeof elem === "object" && elem !== null) {
+				Object.assign(result, flattenObj(elem, `[${i}]`))
+			} else {
+				result[`[${i}]`] = elem
+			}
+		}
+		return result
+	}
 	if (typeof obj !== "object" || obj === null) return { value: obj }
 	const result: Record<string, unknown> = {}
 	for (const [k, v] of Object.entries(obj as Record<string, unknown>)) {
 		const key = prefix ? `${prefix}.${k}` : k
-		if (typeof v === "object" && v !== null && !Array.isArray(v)) {
+		if (Array.isArray(v)) {
+			if (v.length === 0) {
+				result[key] = "[]"
+			} else if (v.every((item) => typeof item !== "object" || item === null)) {
+				result[key] = v.join(", ")
+			} else {
+				// Arrays of objects: show as collapsed summary; Space to expand
+				result[key] = new ArrayValue(v)
+			}
+		} else if (typeof v === "object" && v !== null) {
 			Object.assign(result, flattenObj(v, key))
 		} else {
 			result[key] = v
@@ -255,17 +432,20 @@ function termSize(): { cols: number; rows: number } {
 	return { cols: process.stdout.columns ?? 80, rows: process.stdout.rows ?? 24 }
 }
 
-function renderHeader(crumbs: string[], cols: number): string {
+function renderHeader(crumbs: string[], cols: number, profile?: string): string {
 	const title = crumbs.map((c, i) => (i === 0 ? bold(c) : cyan(c))).join(dim(" › "))
-	return `\n  ${title}\n  ${dim("─".repeat(cols - 4))}`
+	const profileStr = profile ? dim(`  profile: ${profile}`) : ""
+	const titleLen = crumbs.join(" › ").length + 2
+	const profileLen = profile ? `  profile: ${profile}`.length : 0
+	const pad = Math.max(0, cols - 4 - titleLen - profileLen)
+	const header = profileStr ? `  ${title}${" ".repeat(pad)}${profileStr}` : `  ${title}`
+	return `\n${header}\n  ${dim("─".repeat(cols - 4))}`
 }
 
-function renderFieldValue(field: FieldState, width: number, isEditing: boolean): string {
-	const v = field.value
-	const c = field.cursor
-	if (!isEditing) {
-		return v ? fit(v, width) : dim("─")
-	}
+function renderText(value: string, cursorPos: number, width: number, isEditing: boolean): string {
+	if (!isEditing) return value ? fit(value, width) : dim("─")
+	const v = value
+	const c = cursorPos
 	const start = c >= width ? c - width + 1 : 0
 	const segment = v.slice(start, start + width + 1)
 	const rel = c - start
@@ -275,6 +455,10 @@ function renderFieldValue(field: FieldState, width: number, isEditing: boolean):
 	return `${before}${ch ? inv(ch) : inv(" ")}${after}`
 }
 
+function renderFieldValue(field: FieldState, width: number, isEditing: boolean): string {
+	return renderText(field.value, field.cursor, width, isEditing)
+}
+
 /** Pop the stack all the way back to the main menu (first screen). */
 function popToMain(state: TuiState): void {
 	if (state.stack.length > 1) state.stack.splice(1)
@@ -282,13 +466,34 @@ function popToMain(state: TuiState): void {
 
 // ─── Screen renderers ─────────────────────────────────────────────────────────
 
+function filterGroups(groups: CommandGroup[], search: string): CommandGroup[] {
+	if (!search) return groups
+	const q = search.toLowerCase()
+	return groups.filter(
+		(g) => g.name.toLowerCase().includes(q) || g.description.toLowerCase().includes(q),
+	)
+}
+
+function filterCommands(cmds: Command[], search: string): Command[] {
+	if (!search) return cmds
+	const q = search.toLowerCase()
+	return cmds.filter(
+		(c) => c.name.toLowerCase().includes(q) || c.description.toLowerCase().includes(q),
+	)
+}
+
 function renderMain(state: TuiState, screen: Extract<Screen, { kind: "main" }>): string[] {
 	const { cols, rows } = termSize()
-	const viewH = Math.max(3, rows - 7)
-	const groups = state.groups
-	const nameW = groups.reduce((m, g) => Math.max(m, g.name.length), 0)
+	const searching = screen.search.length > 0
+	const viewH = Math.max(3, rows - (searching ? 9 : 7))
+	const groups = filterGroups(state.groups, screen.search)
+	const nameW = state.groups.reduce((m, g) => Math.max(m, g.name.length), 0)
 
-	const lines = [renderHeader(["casen"], cols), ""]
+	const lines = [renderHeader(["casen"], cols, state.profile), ""]
+
+	if (searching) {
+		lines.push(`  ${dim("/")} ${screen.search}█\n`)
+	}
 
 	const visible = groups.slice(screen.scroll, screen.scroll + viewH)
 	for (let vi = 0; vi < visible.length; vi++) {
@@ -306,17 +511,29 @@ function renderMain(state: TuiState, screen: Extract<Screen, { kind: "main" }>):
 		const hi = Math.min(screen.scroll + viewH, groups.length)
 		lines.push(`\n  ${dim(`${screen.scroll + 1}–${hi} of ${groups.length}`)}`)
 	}
-	lines.push(`\n  ${dim("↑↓")} navigate  ${cyan("enter")} open  ${cyan("q")} quit`)
+	const hint = searching
+		? `  ${dim("↑↓")} navigate  ${cyan("enter")} open  ${cyan("esc")} clear  ${dim("bksp")} delete`
+		: `  ${dim("↑↓")} navigate  ${cyan("enter")} open  ${dim("type")} search  ${cyan("q")} quit`
+	lines.push(`\n${hint}`)
 	return lines
 }
 
 function renderCommands(state: TuiState, screen: Extract<Screen, { kind: "commands" }>): string[] {
-	const { cols } = termSize()
-	const cmds = screen.group.commands
-	const nameW = cmds.reduce((m, c) => Math.max(m, c.name.length), 0)
+	const { cols, rows } = termSize()
+	const searching = screen.search.length > 0
+	const viewH = Math.max(3, rows - (searching ? 11 : 9))
+	const cmds = filterCommands(screen.group.commands, screen.search)
+	const nameW = screen.group.commands.reduce((m, c) => Math.max(m, c.name.length), 0)
 	const hasMain = state.stack[0]?.kind === "main"
 
-	const lines = [renderHeader([screen.group.name], cols), `\n  ${dim(screen.group.description)}\n`]
+	const lines = [
+		renderHeader([screen.group.name], cols, state.profile),
+		`\n  ${dim(screen.group.description)}\n`,
+	]
+
+	if (searching) {
+		lines.push(`  ${dim("/")} ${screen.search}█\n`)
+	}
 
 	for (let i = 0; i < cmds.length; i++) {
 		const cmd = cmds[i]
@@ -328,10 +545,16 @@ function renderCommands(state: TuiState, screen: Extract<Screen, { kind: "comman
 		lines.push(isCursor ? inv(line.padEnd(cols - 1)) : line)
 	}
 
-	const mHint = hasMain ? `  ${cyan("m")} main menu` : ""
-	lines.push(
-		`\n  ${dim("↑↓")} navigate  ${cyan("enter")} select  ${cyan("esc")} back${mHint}  ${cyan("q")} quit`,
-	)
+	if (searching) {
+		lines.push(
+			`\n  ${dim("↑↓")} navigate  ${cyan("enter")} select  ${cyan("esc")} clear  ${dim("bksp")} delete`,
+		)
+	} else {
+		const mHint = hasMain ? `  ${cyan("m")} main menu` : ""
+		lines.push(
+			`\n  ${dim("↑↓")} navigate  ${cyan("enter")} select  ${cyan("esc")} back${mHint}  ${dim("type")} search  ${cyan("q")} quit`,
+		)
+	}
 	return lines
 }
 
@@ -346,7 +569,7 @@ function renderInput(state: TuiState, screen: Extract<Screen, { kind: "input" }>
 	const valueW = Math.max(20, cols - labelW - hintW - 10)
 
 	const lines = [
-		renderHeader([screen.group.name, screen.cmd.name], cols),
+		renderHeader([screen.group.name, screen.cmd.name], cols, state.profile),
 		`\n  ${dim(screen.cmd.description)}\n`,
 	]
 
@@ -365,9 +588,31 @@ function renderInput(state: TuiState, screen: Extract<Screen, { kind: "input" }>
 
 		const marker = isCursor ? cyan("▶") : " "
 		const label = padEnd(isCursor ? cyan(field.label) : dim(field.label), labelW + 2)
-		const value = renderFieldValue(field, valueW, screen.editing && isCursor)
+		const enumVals = getEnum(field)
+		const isJson = isJsonField(field)
+		const presets = getPresets(field)
+		// In edit mode for enum fields, ↑↓ cycle rather than typing
+		const isEnumEditing = screen.editing && isCursor && enumVals !== undefined
+		const value = isEnumEditing
+			? enumVals.includes(field.value)
+				? cyan(padEnd(field.value, valueW))
+				: padEnd(field.value, valueW)
+			: renderFieldValue(field, valueW, screen.editing && isCursor && !isJson)
 		const req = field.required ? red("*") : " "
-		const hint = dim(fit(field.hint, hintW))
+		// Show contextual hint for the focused field
+		let hintText = field.hint
+		if (isCursor) {
+			if (enumVals) {
+				const idx = enumVals.indexOf(field.value)
+				const pos = idx >= 0 ? `${idx + 1}/${enumVals.length}` : `?/${enumVals.length}`
+				hintText = `↑↓ pick  ${pos}`
+			} else if (isJson) {
+				hintText = "→ json editor"
+			} else if (presets) {
+				hintText = "↑↓ preset"
+			}
+		}
+		const hint = isCursor ? cyan(fit(hintText, hintW)) : dim(fit(hintText, hintW))
 		lines.push(`  ${marker} ${label} ${padEnd(value, valueW)}  ${req} ${hint}`)
 	}
 
@@ -377,13 +622,53 @@ function renderInput(state: TuiState, screen: Extract<Screen, { kind: "input" }>
 	} else if (screen.running) {
 		lines.push(`  ${dim("running…")}`)
 	} else if (screen.editing) {
-		lines.push(
-			`  ${dim("←→")} cursor  ${cyan("ctrl+a/e")} home/end  ${cyan("ctrl+k/u")} clear  ${cyan("enter")} confirm  ${cyan("esc")} cancel`,
-		)
+		const curField = screen.fields[screen.cursor]
+		const curEnum = curField ? getEnum(curField) : undefined
+		const curPresets = curField ? getPresets(curField) : undefined
+		if (curEnum) {
+			lines.push(
+				`  ${dim("↑↓")} cycle  ${cyan("enter")} confirm  ${cyan("esc")} cancel  ${dim(curEnum.join(" | "))}`,
+			)
+		} else if (curPresets) {
+			lines.push(
+				`  ${dim("←→")} cursor  ${cyan("↑↓")} presets  ${cyan("enter")} confirm  ${cyan("esc")} cancel`,
+			)
+		} else {
+			lines.push(
+				`  ${dim("←→")} cursor  ${cyan("ctrl+a/e")} home/end  ${cyan("ctrl+k/u")} clear  ${cyan("enter")} confirm  ${cyan("esc")} cancel`,
+			)
+		}
 	} else {
 		lines.push(
 			`  ${dim("↑↓")} navigate  ${cyan("enter")} edit/run  ${cyan("m")} main menu  ${cyan("esc")} back  ${cyan("q")} quit`,
 		)
+	}
+	return lines
+}
+
+function renderRawView(screen: Extract<Screen, { kind: "results" }>, cols: number): string[] {
+	const raw = screen.raw
+	if (!raw) return [`  ${dim("(no raw response captured)")}`]
+	const lines: string[] = []
+	const statusCol = raw.status >= 200 && raw.status < 300 ? green : red
+	lines.push(`  ${bold("Status:")}  ${statusCol(`HTTP ${raw.status}`)}`)
+	lines.push("")
+	lines.push(`  ${bold("Headers:")}`)
+	for (const [k, v] of Object.entries(raw.headers)) {
+		const kStr = padEnd(cyan(k), 36)
+		lines.push(`  ${kStr}  ${fit(v, cols - 42)}`)
+	}
+	lines.push("")
+	lines.push(`  ${bold("Body:")}`)
+	let bodyLines: string[]
+	try {
+		const parsed = JSON.parse(raw.body)
+		bodyLines = JSON.stringify(parsed, null, 2).split("\n")
+	} catch {
+		bodyLines = raw.body.split("\n")
+	}
+	for (const l of bodyLines) {
+		lines.push(`  ${fit(l, cols - 4)}`)
 	}
 	return lines
 }
@@ -394,9 +679,34 @@ function renderResults(state: TuiState, screen: Extract<Screen, { kind: "results
 	const out = screen.output
 	const lines: string[] = []
 
+	const statusBadge = screen.raw
+		? (() => {
+				const fn = screen.raw.status >= 200 && screen.raw.status < 300 ? green : red
+				return `  ${dim(fn(`HTTP ${screen.raw.status}`))}`
+			})()
+		: ""
+	const rawToggle = `  ${screen.rawView ? cyan("r") : dim("r")} ${dim("raw")}`
+
+	if (screen.rawView) {
+		lines.push(renderHeader([screen.group.name, screen.cmd.name], cols, state.profile))
+		lines.push("")
+		const rawLines = renderRawView(screen, cols)
+		const visible = rawLines.slice(screen.scroll, screen.scroll + rows - 8)
+		for (const l of visible) lines.push(l)
+		lines.push("")
+		if (rawLines.length > rows - 8) {
+			const hi = Math.min(screen.scroll + rows - 8, rawLines.length)
+			lines.push(`  ${dim(`${screen.scroll + 1}–${hi} of ${rawLines.length}`)}`)
+		}
+		lines.push(
+			`  ${dim("↑↓")} scroll${rawToggle}  ${cyan("m")} main menu  ${cyan("esc")} back  ${cyan("q")} quit`,
+		)
+		return lines
+	}
+
 	if (out.type === "list") {
-		lines.push(renderHeader([screen.group.name, screen.cmd.name], cols))
-		lines.push(`\n  ${dim(`${out.total} item${out.total !== 1 ? "s" : ""}`)}\n`)
+		lines.push(renderHeader([screen.group.name, screen.cmd.name], cols, state.profile))
+		lines.push(`\n  ${dim(`${out.total} item${out.total !== 1 ? "s" : ""}`)}${statusBadge}\n`)
 
 		const available = cols - 4
 		const widths = calcColWidths(out.items, out.columns, available)
@@ -424,26 +734,57 @@ function renderResults(state: TuiState, screen: Extract<Screen, { kind: "results
 			const hi = Math.min(screen.scroll + viewH, out.total)
 			lines.push(`  ${dim(`${screen.scroll + 1}–${hi} of ${out.total}`)}`)
 		}
+		const followupHint = screen.cmd.relations ? `  ${cyan("f")} follow-up` : ""
 		lines.push(
-			`  ${dim("↑↓")} navigate  ${cyan("enter")} detail  ${dim("pgup/pgdn")} page  ${cyan("m")} main menu  ${cyan("esc")} back  ${cyan("q")} quit`,
+			`  ${dim("↑↓")} navigate  ${cyan("enter")} detail${followupHint}  ${dim("pgup/pgdn")} page${rawToggle}  ${cyan("m")} main menu  ${cyan("esc")} back  ${cyan("q")} quit`,
 		)
 	} else if (out.type === "item") {
-		lines.push(renderHeader([screen.group.name, screen.cmd.name], cols))
-		lines.push("")
+		lines.push(renderHeader([screen.group.name, screen.cmd.name], cols, state.profile))
+		lines.push(statusBadge ? `\n${statusBadge}` : "")
 		const flat = flattenObj(out.data)
-		const kw = Object.keys(flat).reduce((m, k) => Math.max(m, k.length), 0)
-		for (const [k, v] of Object.entries(flat)) {
-			lines.push(
-				`  ${padEnd(cyan(k), kw + 2)}  ${v === null || v === undefined ? dim("—") : String(v)}`,
-			)
+		const entries = Object.entries(flat)
+		const kw = entries.reduce((m, [k]) => Math.max(m, k.length), 0)
+		for (let i = 0; i < entries.length; i++) {
+			const entry = entries[i]
+			if (!entry) continue
+			const [k, v] = entry
+			const isCursor = i === screen.cursor
+			const isArr = v instanceof ArrayValue
+			const valueStr = v === null || v === undefined ? dim("—") : String(v)
+			const hint = isArr && isCursor ? `  ${dim("[space] expand")}` : ""
+			const line = `  ${padEnd(cyan(k), kw + 2)}  ${valueStr}${hint}`
+			lines.push(isCursor ? inv(line.padEnd(cols - 1)) : line)
 		}
-		lines.push(`\n  ${cyan("m")} main menu  ${cyan("esc")} back  ${cyan("q")} quit`)
+		const spaceHint = entries.some(([, v]) => v instanceof ArrayValue)
+			? `  ${cyan("space")} expand array`
+			: ""
+		lines.push(
+			`\n${rawToggle}${spaceHint}  ${cyan("m")} main menu  ${cyan("esc")} back  ${cyan("q")} quit`,
+		)
 	} else {
-		lines.push(renderHeader([screen.group.name, screen.cmd.name], cols))
-		lines.push("")
-		if (out.lines.length === 0) lines.push(`  ${dim("(no output)")}`)
-		for (const line of out.lines) lines.push(`  ${line}`)
-		lines.push(`\n  ${cyan("m")} main menu  ${cyan("esc")} back  ${cyan("q")} quit`)
+		lines.push(renderHeader([screen.group.name, screen.cmd.name], cols, state.profile))
+		lines.push(statusBadge ? `\n${statusBadge}` : "")
+		const displayLines = screen.altView && out.altLines ? out.altLines : out.lines
+		const altToggle = out.altLines
+			? `  ${screen.altView ? cyan("x") : dim("x")} ${dim("ascii")}`
+			: ""
+		if (displayLines.length === 0) {
+			lines.push(`  ${dim("(no output)")}`)
+		} else {
+			const hOff = screen.altView ? 0 : screen.cursor
+			const visible = displayLines.slice(screen.scroll, screen.scroll + viewH)
+			for (const line of visible) {
+				lines.push(`  ${fit(line.slice(hOff), cols - 4)}`)
+			}
+			if (displayLines.length > viewH || hOff > 0) {
+				const hi = Math.min(screen.scroll + viewH, displayLines.length)
+				const panHint = hOff > 0 ? `  col +${hOff}` : ""
+				lines.push(`  ${dim(`${screen.scroll + 1}–${hi} of ${displayLines.length}${panHint}`)}`)
+			}
+		}
+		lines.push(
+			`\n  ${dim("↑↓←→")} scroll/pan${rawToggle}${altToggle}  ${cyan("m")} main menu  ${cyan("esc")} back  ${cyan("q")} quit`,
+		)
 	}
 	return lines
 }
@@ -455,21 +796,203 @@ function renderDetail(state: TuiState, screen: Extract<Screen, { kind: "detail" 
 	const entries = Object.entries(flat)
 	const kw = entries.reduce((m, [k]) => Math.max(m, k.length), 0)
 
-	const lines = [renderHeader([screen.group.name, "detail"], cols), ""]
+	const lines = [renderHeader([screen.group.name, screen.label], cols, state.profile), ""]
 	const visible = entries.slice(screen.scroll, screen.scroll + viewH)
-	for (const [k, v] of visible) {
-		lines.push(
-			`  ${padEnd(cyan(k), kw + 2)}  ${v === null || v === undefined ? dim("—") : String(v)}`,
-		)
+	for (let vi = 0; vi < visible.length; vi++) {
+		const entry = visible[vi]
+		if (!entry) continue
+		const [k, v] = entry
+		const isCursor = screen.scroll + vi === screen.cursor
+		const isArr = v instanceof ArrayValue
+		const valueStr = v === null || v === undefined ? dim("—") : String(v)
+		const hint = isArr && isCursor ? `  ${dim("[space] expand")}` : ""
+		const line = `  ${padEnd(cyan(k), kw + 2)}  ${valueStr}${hint}`
+		lines.push(isCursor ? inv(line.padEnd(cols - 1)) : line)
 	}
 	lines.push("")
 	if (entries.length > viewH) {
 		const hi = Math.min(screen.scroll + viewH, entries.length)
 		lines.push(`  ${dim(`${screen.scroll + 1}–${hi} of ${entries.length} fields`)}`)
 	}
+	const spaceHint = entries.some(([, v]) => v instanceof ArrayValue)
+		? `  ${cyan("space/→")} expand  ${cyan("←")} back`
+		: `  ${cyan("←")} back`
 	lines.push(
-		`  ${dim("↑↓")} scroll  ${cyan("m")} main menu  ${cyan("esc")} back  ${cyan("q")} quit`,
+		`  ${dim("↑↓")} navigate${spaceHint}  ${cyan("m")} main menu  ${cyan("esc")} back  ${cyan("q")} quit`,
 	)
+	return lines
+}
+
+function renderFollowup(state: TuiState, screen: Extract<Screen, { kind: "followup" }>): string[] {
+	const { cols, rows } = termSize()
+	const viewH = Math.max(3, rows - 8)
+	const lines = [
+		renderHeader([screen.sourceGroup.name, "follow-up actions"], cols, state.profile),
+		"",
+	]
+
+	// Show the fields that will be pre-filled
+	const usedFields = new Set<string>()
+	for (const rel of screen.relations) {
+		for (const p of rel.params) usedFields.add(p.field)
+	}
+	const summary = [...usedFields]
+		.map((f) => `${dim(f)}: ${String(screen.item[f] ?? "")}`)
+		.join("   ")
+	if (summary) {
+		lines.push(`  ${summary}`)
+		lines.push("")
+	}
+
+	const visible = screen.relations.slice(screen.scroll, screen.scroll + viewH)
+	for (let vi = 0; vi < visible.length; vi++) {
+		const rel = visible[vi]
+		if (!rel) continue
+		const isCursor = screen.scroll + vi === screen.cursor
+		const gName = padEnd(cyan(rel.group.name), 22)
+		const cName = rel.cmd.name.padEnd(26)
+		const line = `  ${gName}  ${cName}  ${dim(fit(rel.cmd.description, cols - 56))}`
+		lines.push(isCursor ? inv(line.padEnd(cols - 1)) : line)
+	}
+
+	lines.push("")
+	if (screen.relations.length > viewH) {
+		const hi = Math.min(screen.scroll + viewH, screen.relations.length)
+		lines.push(`  ${dim(`${screen.scroll + 1}–${hi} of ${screen.relations.length}`)}`)
+	}
+	lines.push(
+		`  ${dim("↑↓")} navigate  ${cyan("enter")} run pre-filled  ${cyan("esc")} back  ${cyan("q")} quit`,
+	)
+	return lines
+}
+
+function renderProfile(state: TuiState, screen: Extract<Screen, { kind: "profile" }>): string[] {
+	const { cols, rows } = termSize()
+	const viewH = Math.max(3, rows - 7)
+	const kw = state.profileInfo.reduce((m, { key }) => Math.max(m, key.length), 0)
+
+	const lines = [renderHeader(["profile"], cols, state.profile), ""]
+	const visible = state.profileInfo.slice(screen.scroll, screen.scroll + viewH)
+	for (const { key, value } of visible) {
+		lines.push(`  ${padEnd(cyan(key), kw + 2)}  ${value}`)
+	}
+	lines.push("")
+	if (state.profileInfo.length > viewH) {
+		const hi = Math.min(screen.scroll + viewH, state.profileInfo.length)
+		lines.push(`  ${dim(`${screen.scroll + 1}–${hi} of ${state.profileInfo.length}`)}`)
+	}
+	lines.push(`  ${dim("↑↓")} scroll  ${cyan("esc/p")} close  ${cyan("q")} quit`)
+	return lines
+}
+
+function renderJsonEditor(
+	state: TuiState,
+	screen: Extract<Screen, { kind: "json-editor" }>,
+): string[] {
+	const { cols, rows } = termSize()
+	// Reserve extra row for field hint line
+	const viewH = Math.max(3, rows - 10)
+	const keyW = Math.max(14, Math.min(28, Math.floor((cols - 12) * 0.38)))
+	const valW = Math.max(16, cols - keyW - 12)
+
+	const lines = [
+		renderHeader(
+			[screen.group.name, screen.cmd.name, `--${screen.fieldLabel}`],
+			cols,
+			state.profile,
+		),
+		"",
+	]
+	lines.push(`  ${padEnd(dim("KEY"), keyW + 4)}${dim("VALUE")}`)
+	lines.push(`  ${dim("─".repeat(cols - 4))}`)
+
+	// entries + add-row
+	const rowCount = screen.entries.length + 1
+	const visible = Math.min(viewH, rowCount)
+	for (let vi = 0; vi < visible; vi++) {
+		const absIdx = screen.scroll + vi
+		const isCursor = absIdx === screen.cursor
+		const marker = isCursor ? cyan("▶") : " "
+
+		if (absIdx === screen.entries.length) {
+			// "add" row
+			const label = `${isCursor ? cyan("+ add field") : dim("+ add field")}`
+			lines.push(isCursor ? inv(`  ${marker} ${label}`.padEnd(cols - 1)) : `  ${marker} ${label}`)
+			continue
+		}
+
+		const entry = screen.entries[absIdx]
+		if (!entry) continue
+
+		const spec = getFieldSpec(entry.key, screen.fieldSpecs)
+		const isKnown = spec !== undefined
+		const hasEnum = spec?.enum && spec.enum.length > 0
+
+		const editKey = isCursor && screen.col === "key" && screen.editing
+		const editVal = isCursor && screen.col === "val" && screen.editing
+		const keyStr = renderText(entry.key, entry.keyCursor, keyW - (isKnown ? 0 : 0), editKey)
+
+		// For known enum fields in nav mode, show cycling hint instead of raw value
+		const valDisplay =
+			!editVal && hasEnum && entry.val
+				? `${entry.val} ${dim("↑↓")}`
+				: !editVal && hasEnum && !entry.val
+					? dim("<pick ↑↓>")
+					: renderText(entry.val, entry.valCursor, valW - 4, editVal)
+		const valStr = valDisplay
+
+		const keyPart =
+			isCursor && screen.col === "key" && !editKey
+				? cyan(padEnd(keyStr, keyW))
+				: isKnown
+					? padEnd(keyStr, keyW)
+					: dim(padEnd(keyStr, keyW))
+		const valPart =
+			isCursor && screen.col === "val" && !editVal
+				? cyan(padEnd(valStr, valW))
+				: padEnd(valStr, valW)
+
+		const line = `  ${marker} ${keyPart}  ${valPart}`
+		lines.push(isCursor && !screen.editing ? inv(line.padEnd(cols - 1)) : line)
+	}
+
+	lines.push("")
+
+	// Field hint line: show description/type for the row under the cursor
+	const cursorEntry = screen.entries[screen.cursor]
+	const cursorSpec = cursorEntry ? getFieldSpec(cursorEntry.key, screen.fieldSpecs) : undefined
+	if (cursorSpec) {
+		const req = cursorSpec.required ? red("required") : dim("optional")
+		const typeStr = cursorSpec.enum
+			? `enum(${cursorSpec.enum.slice(0, 3).join("|")}${cursorSpec.enum.length > 3 ? "…" : ""})`
+			: cursorSpec.type
+		const desc = cursorSpec.description ? ` — ${fit(cursorSpec.description, 40)}` : ""
+		lines.push(`  ${dim(typeStr)} ${req}${desc}`)
+	} else {
+		lines.push("")
+	}
+
+	if (rowCount > viewH) {
+		const hi = Math.min(screen.scroll + viewH, rowCount)
+		lines.push(`  ${dim(`${screen.scroll + 1}–${hi} of ${rowCount}`)}`)
+	}
+	if (screen.error) {
+		lines.push(`  ${red("error:")} ${screen.error}`)
+	} else if (screen.editing) {
+		const cursorEntryEditing = screen.entries[screen.cursor]
+		const editSpec =
+			screen.col === "val" && cursorEntryEditing
+				? getFieldSpec(cursorEntryEditing.key, screen.fieldSpecs)
+				: undefined
+		const editHint = editSpec?.enum
+			? `${dim("↑↓")} pick value  ${cyan("enter")} confirm  ${cyan("esc")} cancel`
+			: `${dim("←→")} cursor  ${cyan("tab")} switch col  ${cyan("enter")} confirm  ${cyan("esc")} cancel`
+		lines.push(`  ${editHint}`)
+	} else {
+		lines.push(
+			`  ${dim("↑↓")} navigate  ${cyan("tab")} switch col  ${cyan("enter")} edit  ${cyan("a")} add  ${cyan("d")} del  ${cyan("esc")} save  ${cyan("q")} quit`,
+		)
+	}
 	return lines
 }
 
@@ -494,6 +1017,15 @@ function render(state: TuiState): void {
 		case "detail":
 			lines = renderDetail(state, screen)
 			break
+		case "followup":
+			lines = renderFollowup(state, screen)
+			break
+		case "profile":
+			lines = renderProfile(state, screen)
+			break
+		case "json-editor":
+			lines = renderJsonEditor(state, screen)
+			break
 	}
 	process.stdout.write(`${CLEAR}${lines.join("\n")}\n`)
 }
@@ -507,8 +1039,32 @@ function handleMainKey(
 	done: () => void,
 ): void {
 	const { rows } = termSize()
-	const viewH = Math.max(3, rows - 7)
-	const groups = state.groups
+	const searching = screen.search.length > 0
+	const viewH = Math.max(3, rows - (searching ? 9 : 7))
+	const groups = filterGroups(state.groups, screen.search)
+
+	// Backspace removes last search char
+	if (key === "\x7f" || key === "\x08") {
+		screen.search = screen.search.slice(0, -1)
+		screen.cursor = 0
+		screen.scroll = 0
+		render(state)
+		return
+	}
+
+	// ESC clears search; quits only when search is already empty
+	if (key === "\x1b") {
+		if (searching) {
+			screen.search = ""
+			screen.cursor = 0
+			screen.scroll = 0
+		} else {
+			done()
+			return
+		}
+		render(state)
+		return
+	}
 
 	switch (key) {
 		case "\x1b[A": // up
@@ -534,18 +1090,22 @@ function handleMainKey(
 		case "\r":
 		case "\n": {
 			const group = groups[screen.cursor]
-			if (group) state.stack.push({ kind: "commands", group, cursor: 0 })
+			if (group) state.stack.push({ kind: "commands", group, cursor: 0, search: "" })
 			break
 		}
-		case "m":
-		case "M":
-			// already at main, no-op
-			break
-		case "q":
-		case "Q":
-		case "\x1b":
-			done()
-			return
+		default:
+			// Any printable char starts/extends search; q/Q only quit when not searching
+			if (key === "q" || key === "Q") {
+				if (!searching) {
+					done()
+					return
+				}
+			}
+			if (key.length === 1 && key >= " ") {
+				screen.search += key
+				screen.cursor = 0
+				screen.scroll = 0
+			}
 	}
 	render(state)
 }
@@ -556,13 +1116,35 @@ function handleCommandsKey(
 	state: TuiState,
 	done: () => void,
 ): void {
-	const cmds = screen.group.commands
+	const searching = screen.search.length > 0
+	const cmds = filterCommands(screen.group.commands, screen.search)
+
+	// Backspace removes last search char
+	if (key === "\x7f" || key === "\x08") {
+		screen.search = screen.search.slice(0, -1)
+		screen.cursor = 0
+		render(state)
+		return
+	}
+
+	// ESC clears search; goes back when search already empty
+	if (key === "\x1b") {
+		if (searching) {
+			screen.search = ""
+			screen.cursor = 0
+		} else {
+			state.stack.pop()
+		}
+		render(state)
+		return
+	}
+
 	switch (key) {
 		case "\x1b[A":
-			screen.cursor = (screen.cursor - 1 + cmds.length) % cmds.length
+			if (screen.cursor > 0) screen.cursor--
 			break
 		case "\x1b[B":
-			screen.cursor = (screen.cursor + 1) % cmds.length
+			if (screen.cursor < cmds.length - 1) screen.cursor++
 			break
 		case "\r":
 		case "\n": {
@@ -582,17 +1164,23 @@ function handleCommandsKey(
 			}
 			break
 		}
-		case "m":
-		case "M":
-			popToMain(state)
-			break
-		case "q":
-		case "Q":
-			done()
-			return
-		case "\x1b":
-			state.stack.pop()
-			break
+		default:
+			if (key === "q" || key === "Q") {
+				if (!searching) {
+					done()
+					return
+				}
+			}
+			if (key === "m" || key === "M") {
+				if (!searching) {
+					popToMain(state)
+					break
+				}
+			}
+			if (key.length === 1 && key >= " ") {
+				screen.search += key
+				screen.cursor = 0
+			}
 	}
 	render(state)
 }
@@ -612,14 +1200,46 @@ async function executeCommand(
 	render(state)
 
 	const { writer, get } = makeCapturingWriter()
-	const ctx = buildContext(screen.cmd, screen.fields, writer, state.getClient, state.getAdminClient)
+	// Wrap client factories to capture the last raw HTTP response
+	let rawCapture: RawResponseEvent | null = null
+	const getClient = async () => {
+		const client = await state.getClient()
+		client.on("rawResponse", (evt) => {
+			rawCapture = evt
+		})
+		return client
+	}
+	const getAdminClient = async () => {
+		const client = await state.getAdminClient()
+		client.on("rawResponse", (evt) => {
+			rawCapture = evt
+		})
+		return client
+	}
+	const ctx = buildContext(screen.cmd, screen.fields, writer, getClient, getAdminClient)
 	try {
 		await screen.cmd.run(ctx)
+		const output = get()
+		// Try to generate ASCII art for BPMN XML output
+		if (output.type === "messages" && output.lines.length > 0) {
+			const xml = output.lines.join("\n")
+			if (xml.includes("<?xml") && (xml.includes("bpmn:") || xml.includes("definitions"))) {
+				try {
+					const ascii = renderBpmnAscii(xml)
+					output.altLines = ascii.split("\n")
+				} catch {
+					// ASCII rendering failed — no alt view
+				}
+			}
+		}
 		state.stack.push({
 			kind: "results",
 			group: screen.group,
 			cmd: screen.cmd,
-			output: get(),
+			output,
+			raw: rawCapture,
+			rawView: false,
+			altView: false,
 			cursor: 0,
 			scroll: 0,
 		})
@@ -642,6 +1262,63 @@ async function handleInputKey(
 
 	// ── Edit mode ────────────────────────────────────────────────────────────
 	if (screen.editing && field && field.kind !== "run") {
+		const enumVals = getEnum(field)
+		const presets = getPresets(field)
+
+		// ── Enum field: only cycle, no free text ──────────────────────────────
+		if (enumVals) {
+			const idx = enumVals.indexOf(field.value)
+			switch (key) {
+				case "\x1b[A": // up — cycle backward
+					field.value = enumVals[idx <= 0 ? enumVals.length - 1 : idx - 1] ?? field.value
+					break
+				case "\x1b[B": // down — cycle forward
+					field.value = enumVals[idx < 0 || idx >= enumVals.length - 1 ? 0 : idx + 1] ?? field.value
+					break
+				case "\r":
+				case "\n":
+					screen.editing = false
+					if (screen.cursor < screen.fields.length - 1) {
+						screen.cursor++
+						if (screen.cursor >= screen.scroll + viewH) screen.scroll++
+					}
+					break
+				case "\x1b":
+					screen.editing = false
+					break
+			}
+			render(state)
+			return
+		}
+
+		// ── Preset number field: ↑↓ cycle presets, free text still works ─────
+		if (presets) {
+			if (key === "\x1b[A") {
+				// up — previous preset (smaller)
+				const cur = Number(field.value)
+				const prev = [...presets].reverse().find((p) => p < cur) ?? presets[presets.length - 1]
+				if (prev !== undefined) {
+					field.value = String(prev)
+					field.cursor = field.value.length
+				}
+				render(state)
+				return
+			}
+			if (key === "\x1b[B") {
+				// down — next preset (larger)
+				const cur = Number(field.value)
+				const next = presets.find((p) => p > cur) ?? presets[0]
+				if (next !== undefined) {
+					field.value = String(next)
+					field.cursor = field.value.length
+				}
+				render(state)
+				return
+			}
+			// Fall through to normal text editing for all other keys
+		}
+
+		// ── Normal text editing ───────────────────────────────────────────────
 		switch (key) {
 			case "\r":
 			case "\n":
@@ -684,11 +1361,15 @@ async function handleInputKey(
 				field.value = ""
 				field.cursor = 0
 				break
-			default:
-				if (key.length === 1 && key >= " ") {
-					field.value = field.value.slice(0, field.cursor) + key + field.value.slice(field.cursor)
-					field.cursor++
+			default: {
+				// Filter printable chars to support both single keypresses and pasted text
+				const printable = [...key].filter((ch) => ch >= " ").join("")
+				if (printable) {
+					field.value =
+						field.value.slice(0, field.cursor) + printable + field.value.slice(field.cursor)
+					field.cursor += printable.length
 				}
+			}
 		}
 		render(state)
 		return
@@ -713,9 +1394,48 @@ async function handleInputKey(
 			if (!field) break
 			if (field.kind === "run") {
 				await executeCommand(screen, state)
+			} else if (isJsonField(field)) {
+				// Open the key-value JSON editor
+				const jsonFieldSpecs = field.kind === "flag" ? field.flagSpec?.fields : undefined
+				state.stack.push({
+					kind: "json-editor",
+					group: screen.group,
+					cmd: screen.cmd,
+					fieldIndex: screen.cursor,
+					fieldLabel: field.label,
+					entries: buildInitialEntries(field.value, jsonFieldSpecs),
+					fieldSpecs: jsonFieldSpecs,
+					cursor: 0,
+					col: "val",
+					editing: false,
+					scroll: 0,
+					error: "",
+				})
 			} else {
 				screen.editing = true
+				// For enum fields, set to first value if currently empty
+				const enumVals = getEnum(field)
+				if (enumVals && !field.value) field.value = enumVals[0] ?? ""
 				field.cursor = field.value.length
+			}
+			break
+		case "\x1b[C": // right arrow also opens JSON editor
+			if (field && isJsonField(field)) {
+				const jsonFieldSpecs2 = field.kind === "flag" ? field.flagSpec?.fields : undefined
+				state.stack.push({
+					kind: "json-editor",
+					group: screen.group,
+					cmd: screen.cmd,
+					fieldIndex: screen.cursor,
+					fieldLabel: field.label,
+					entries: buildInitialEntries(field.value, jsonFieldSpecs2),
+					fieldSpecs: jsonFieldSpecs2,
+					cursor: 0,
+					col: "val",
+					editing: false,
+					scroll: 0,
+					error: "",
+				})
 			}
 			break
 		case "m":
@@ -742,12 +1462,106 @@ function handleResultsKey(
 	const { rows } = termSize()
 	const viewH = Math.max(3, rows - 10)
 
+	// r/R toggles raw view regardless of output type
+	if (key === "r" || key === "R") {
+		screen.rawView = !screen.rawView
+		screen.scroll = 0
+		render(state)
+		return
+	}
+
+	if (screen.rawView) {
+		switch (key) {
+			case "\x1b[A":
+				if (screen.scroll > 0) screen.scroll--
+				break
+			case "\x1b[B":
+				screen.scroll++
+				break
+			case "m":
+			case "M":
+				popToMain(state)
+				break
+			case "\x1b":
+				state.stack.pop()
+				break
+			case "q":
+			case "Q":
+				done()
+				return
+		}
+		render(state)
+		return
+	}
+
 	if (screen.output.type !== "list") {
-		if (key === "\x1b") state.stack.pop()
-		else if (key === "m" || key === "M") popToMain(state)
-		else if (key === "q" || key === "Q") {
-			done()
-			return
+		if (screen.output.type === "item") {
+			const entries = Object.entries(flattenObj(screen.output.data))
+			const expandArray = () => {
+				const entry = entries[screen.cursor]
+				if (entry) {
+					const [fieldKey, v] = entry
+					if (v instanceof ArrayValue) {
+						state.stack.push({
+							kind: "detail",
+							group: screen.group,
+							item: v.items,
+							label: `${fieldKey} (${v.items.length})`,
+							cursor: 0,
+							scroll: 0,
+						})
+					}
+				}
+			}
+			if (key === "\x1b[A" && screen.cursor > 0) screen.cursor--
+			else if (key === "\x1b[B" && screen.cursor < entries.length - 1) screen.cursor++
+			else if (key === " " || key === "\x1b[C") expandArray()
+			else if (key === "\x1b[D") state.stack.pop()
+			else if (key === "\x1b") state.stack.pop()
+			else if (key === "m" || key === "M") popToMain(state)
+			else if (key === "q" || key === "Q") {
+				done()
+				return
+			}
+		} else {
+			// messages type — scrollable + horizontal pan (screen.cursor = hOff)
+			const msgLines =
+				screen.altView && screen.output.altLines ? screen.output.altLines : screen.output.lines
+			switch (key) {
+				case "x":
+				case "X":
+					if (screen.output.altLines) {
+						screen.altView = !screen.altView
+						screen.scroll = 0
+						screen.cursor = 0
+					}
+					break
+				case "\x1b[A":
+					if (screen.scroll > 0) screen.scroll = Math.max(0, screen.scroll - 3)
+					break
+				case "\x1b[B":
+					screen.scroll = Math.min(Math.max(0, msgLines.length - viewH), screen.scroll + 3)
+					break
+				case "\x1b[C":
+					if (!screen.altView) screen.cursor += 3
+					break
+				case "\x1b[D":
+					if (!screen.altView) screen.cursor = Math.max(0, screen.cursor - 3)
+					break
+				case "\x1b[5~":
+					screen.scroll = Math.max(0, screen.scroll - viewH)
+					break
+				case "\x1b[6~":
+					screen.scroll = Math.min(Math.max(0, msgLines.length - viewH), screen.scroll + viewH)
+					break
+				default:
+					if (key === "\x1b") state.stack.pop()
+					else if (key === "m" || key === "M") popToMain(state)
+					else if (key === "q" || key === "Q") {
+						done()
+						return
+					}
+			}
 		}
 		render(state)
 		return
@@ -778,7 +1592,45 @@ function handleResultsKey(
 		case "\r":
 		case "\n": {
 			const item = screen.output.items[screen.cursor]
-			if (item) state.stack.push({ kind: "detail", group: screen.group, item, scroll: 0 })
+			if (item) {
+				state.stack.push({
+					kind: "detail",
+					group: screen.group,
+					item,
+					label: "detail",
+					cursor: 0,
+					scroll: 0,
+				})
+			}
+			break
+		}
+		case "f":
+		case "F": {
+			const item = screen.output.items[screen.cursor]
+			if (item && screen.cmd.relations) {
+				const resolved: Array<{
+					group: CommandGroup
+					cmd: Command
+					params: Array<{ field: string; param: string }>
+				}> = []
+				for (const rel of screen.cmd.relations) {
+					const tGroup = state.groups.find((g) => g.name === rel.groupName)
+					if (!tGroup) continue
+					const tCmd = tGroup.commands.find((c) => c.name === rel.commandName)
+					if (!tCmd) continue
+					resolved.push({ group: tGroup, cmd: tCmd, params: rel.params })
+				}
+				if (resolved.length > 0) {
+					state.stack.push({
+						kind: "followup",
+						sourceGroup: screen.group,
+						item: item as Record<string, unknown>,
+						relations: resolved,
+						cursor: 0,
+						scroll: 0,
+					})
+				}
+			}
 			break
 		}
 		case "m":
@@ -804,25 +1656,363 @@ function handleDetailKey(
 ): void {
 	const { rows } = termSize()
 	const viewH = Math.max(3, rows - 7)
-	const entryCount = Object.keys(flattenObj(screen.item)).length
+	const entries = Object.entries(flattenObj(screen.item))
+	const entryCount = entries.length
 
 	switch (key) {
 		case "\x1b[A":
-			if (screen.scroll > 0) screen.scroll--
+			if (screen.cursor > 0) {
+				screen.cursor--
+				if (screen.cursor < screen.scroll) screen.scroll--
+			}
 			break
 		case "\x1b[B":
-			if (screen.scroll + viewH < entryCount) screen.scroll++
+			if (screen.cursor < entryCount - 1) {
+				screen.cursor++
+				if (screen.cursor >= screen.scroll + viewH) screen.scroll++
+			}
 			break
 		case "\x1b[5~":
+			screen.cursor = Math.max(0, screen.cursor - viewH)
 			screen.scroll = Math.max(0, screen.scroll - viewH)
 			break
 		case "\x1b[6~":
+			screen.cursor = Math.min(entryCount - 1, screen.cursor + viewH)
 			screen.scroll = Math.min(Math.max(0, entryCount - viewH), screen.scroll + viewH)
+			break
+		case " ":
+		case "\x1b[C": {
+			const entry = entries[screen.cursor]
+			if (entry) {
+				const [fieldKey, v] = entry
+				if (v instanceof ArrayValue) {
+					state.stack.push({
+						kind: "detail",
+						group: screen.group,
+						item: v.items,
+						label: `${fieldKey} (${v.items.length})`,
+						cursor: 0,
+						scroll: 0,
+					})
+				}
+			}
+			break
+		}
+		case "\x1b[D":
+			state.stack.pop()
 			break
 		case "m":
 		case "M":
 			popToMain(state)
 			break
+		case "\x1b":
+			state.stack.pop()
+			break
+		case "q":
+		case "Q":
+			done()
+			return
+	}
+	render(state)
+}
+
+function handleFollowupKey(
+	key: string,
+	screen: Extract<Screen, { kind: "followup" }>,
+	state: TuiState,
+	done: () => void,
+): void {
+	const { rows } = termSize()
+	const viewH = Math.max(3, rows - 8)
+
+	switch (key) {
+		case "\x1b[A":
+			if (screen.cursor > 0) {
+				screen.cursor--
+				if (screen.cursor < screen.scroll) screen.scroll--
+			}
+			break
+		case "\x1b[B":
+			if (screen.cursor < screen.relations.length - 1) {
+				screen.cursor++
+				if (screen.cursor >= screen.scroll + viewH) screen.scroll++
+			}
+			break
+		case "\r":
+		case "\n": {
+			const rel = screen.relations[screen.cursor]
+			if (rel) {
+				const fields = buildFields(rel.cmd)
+				// Pre-fill args from the source item
+				for (const p of rel.params) {
+					const val = String(screen.item[p.field] ?? "")
+					const field = fields.find((f) => f.kind === "arg" && f.label === p.param)
+					if (field) {
+						field.value = val
+						field.cursor = val.length
+					}
+				}
+				const allFilled = fields.filter((f) => f.required).every((f) => f.value)
+				const runIdx = fields.findIndex((f) => f.kind === "run")
+				state.stack.push({
+					kind: "input",
+					group: rel.group,
+					cmd: rel.cmd,
+					fields,
+					cursor: allFilled && runIdx >= 0 ? runIdx : 0,
+					scroll: 0,
+					editing: false,
+					error: "",
+					running: false,
+				})
+			}
+			break
+		}
+		case "m":
+		case "M":
+			popToMain(state)
+			break
+		case "\x1b":
+			state.stack.pop()
+			break
+		case "q":
+		case "Q":
+			done()
+			return
+	}
+	render(state)
+}
+
+function saveJsonEditorToField(
+	screen: Extract<Screen, { kind: "json-editor" }>,
+	state: TuiState,
+): void {
+	const inputScreen = [...state.stack].reverse().find((s) => s.kind === "input")
+	if (inputScreen?.kind === "input") {
+		const field = inputScreen.fields[screen.fieldIndex]
+		if (field) {
+			field.value = entriesToJson(screen.entries)
+			field.cursor = field.value.length
+		}
+	}
+}
+
+function handleJsonEditorKey(
+	key: string,
+	screen: Extract<Screen, { kind: "json-editor" }>,
+	state: TuiState,
+	done: () => void,
+): void {
+	const { rows } = termSize()
+	const viewH = Math.max(3, rows - 9)
+	const rowCount = screen.entries.length + 1
+	const isAddRow = screen.cursor === screen.entries.length
+	const entry = screen.entries[screen.cursor]
+
+	// ── Edit mode ────────────────────────────────────────────────────────────
+	if (screen.editing && entry) {
+		const activeIsKey = screen.col === "key"
+		const activeText = activeIsKey ? entry.key : entry.val
+		const activeCursor = activeIsKey ? entry.keyCursor : entry.valCursor
+		const setTextAndCursor = (text: string, cur: number) => {
+			if (activeIsKey) {
+				entry.key = text
+				entry.keyCursor = cur
+			} else {
+				entry.val = text
+				entry.valCursor = cur
+			}
+		}
+
+		// Enum cycling for value column of a known enum field
+		const valSpec = !activeIsKey ? getFieldSpec(entry.key, screen.fieldSpecs) : undefined
+		const enumVals = valSpec?.enum
+		if (enumVals && enumVals.length > 0 && !activeIsKey) {
+			const curIdx = enumVals.indexOf(entry.val)
+			switch (key) {
+				case "\x1b[A": // up
+					entry.val = enumVals[(curIdx - 1 + enumVals.length) % enumVals.length] ?? ""
+					entry.valCursor = entry.val.length
+					render(state)
+					return
+				case "\x1b[B": // down
+					entry.val = enumVals[(curIdx + 1) % enumVals.length] ?? ""
+					entry.valCursor = entry.val.length
+					render(state)
+					return
+				case "\r":
+				case "\n":
+					// If no value selected yet, pick first
+					if (!entry.val && enumVals[0]) {
+						entry.val = enumVals[0]
+						entry.valCursor = entry.val.length
+					}
+					screen.editing = false
+					screen.col = "key"
+					if (screen.cursor < rowCount - 1) {
+						screen.cursor++
+						if (screen.cursor >= screen.scroll + viewH) screen.scroll++
+					}
+					render(state)
+					return
+				case "\x1b":
+					screen.editing = false
+					render(state)
+					return
+				case "\t":
+					screen.col = "key"
+					render(state)
+					return
+			}
+		}
+
+		switch (key) {
+			case "\r":
+			case "\n":
+				screen.editing = false
+				// Advance: key → val, then val → next row key
+				if (activeIsKey) {
+					screen.col = "val"
+				} else {
+					screen.col = "key"
+					if (screen.cursor < rowCount - 1) {
+						screen.cursor++
+						if (screen.cursor >= screen.scroll + viewH) screen.scroll++
+					}
+				}
+				break
+			case "\t": // Tab: switch key↔val
+				screen.col = activeIsKey ? "val" : "key"
+				break
+			case "\x1b":
+				screen.editing = false
+				break
+			case "\x1b[D":
+				if (activeCursor > 0) setTextAndCursor(activeText, activeCursor - 1)
+				break
+			case "\x1b[C":
+				if (activeCursor < activeText.length) setTextAndCursor(activeText, activeCursor + 1)
+				break
+			case "\x7f":
+				if (activeCursor > 0) {
+					setTextAndCursor(
+						activeText.slice(0, activeCursor - 1) + activeText.slice(activeCursor),
+						activeCursor - 1,
+					)
+				}
+				break
+			case "\x01":
+			case "\x1b[H":
+				setTextAndCursor(activeText, 0)
+				break
+			case "\x05":
+			case "\x1b[F":
+				setTextAndCursor(activeText, activeText.length)
+				break
+			case "\x15":
+				setTextAndCursor("", 0)
+				break
+			default: {
+				const printable = [...key].filter((ch) => ch >= " ").join("")
+				if (printable) {
+					setTextAndCursor(
+						activeText.slice(0, activeCursor) + printable + activeText.slice(activeCursor),
+						activeCursor + printable.length,
+					)
+				}
+			}
+		}
+		render(state)
+		return
+	}
+
+	// ── Navigation mode ───────────────────────────────────────────────────────
+	switch (key) {
+		case "\x1b[A": // up
+			if (screen.cursor > 0) {
+				screen.cursor--
+				if (screen.cursor < screen.scroll) screen.scroll--
+			}
+			break
+		case "\x1b[B": // down
+			if (screen.cursor < rowCount - 1) {
+				screen.cursor++
+				if (screen.cursor >= screen.scroll + viewH) screen.scroll++
+			}
+			break
+		case "\t": // Tab: switch key↔val (not on add-row)
+			if (!isAddRow) screen.col = screen.col === "key" ? "val" : "key"
+			break
+		case "\r":
+		case "\n":
+			if (isAddRow) {
+				// Add a new entry and start editing its key
+				screen.entries.push({ key: "", keyCursor: 0, val: "", valCursor: 0 })
+				screen.cursor = screen.entries.length - 1
+				screen.col = "key"
+				screen.editing = true
+			} else {
+				// For known enum fields in val column, seed with first enum value
+				if (screen.col === "val" && entry) {
+					const spec = getFieldSpec(entry.key, screen.fieldSpecs)
+					if (spec?.enum && spec.enum.length > 0 && !entry.val) {
+						entry.val = spec.enum[0] ?? ""
+						entry.valCursor = entry.val.length
+					}
+				}
+				screen.editing = true
+			}
+			break
+		case "a":
+		case "A":
+			// Insert new entry after cursor and start editing
+			screen.entries.splice(screen.cursor + 1, 0, {
+				key: "",
+				keyCursor: 0,
+				val: "",
+				valCursor: 0,
+			})
+			screen.cursor = Math.min(screen.cursor + 1, screen.entries.length - 1)
+			screen.col = "key"
+			screen.editing = true
+			break
+		case "d":
+		case "D":
+			if (!isAddRow && screen.entries.length > 0) {
+				screen.entries.splice(screen.cursor, 1)
+				screen.cursor = Math.min(screen.cursor, screen.entries.length)
+			}
+			break
+		case "\x1b":
+			saveJsonEditorToField(screen, state)
+			state.stack.pop()
+			break
+		case "q":
+		case "Q":
+			saveJsonEditorToField(screen, state)
+			done()
+			return
+	}
+	render(state)
+}
+
+function handleProfileKey(
+	key: string,
+	screen: Extract<Screen, { kind: "profile" }>,
+	state: TuiState,
+	done: () => void,
+): void {
+	const { rows } = termSize()
+	const viewH = Math.max(3, rows - 7)
+	switch (key) {
+		case "\x1b[A":
+			if (screen.scroll > 0) screen.scroll--
+			break
+		case "\x1b[B":
+			if (screen.scroll < Math.max(0, state.profileInfo.length - viewH)) screen.scroll++
+			break
+		case "p":
+		case "P":
 		case "\x1b":
 			state.stack.pop()
 			break
@@ -842,6 +2032,20 @@ async function handleKey(key: string, state: TuiState, done: () => void): Promis
 	}
 	const screen = state.stack[state.stack.length - 1]
 	if (!screen) return
+
+	// Global p/P: open profile view (skip when actively editing text)
+	if (key === "p" || key === "P") {
+		const isEditing =
+			(screen.kind === "input" && screen.editing) ||
+			(screen.kind === "json-editor" && screen.editing)
+		const isProfile = screen.kind === "profile"
+		if (!isEditing && !isProfile) {
+			state.stack.push({ kind: "profile", scroll: 0 })
+			render(state)
+			return
+		}
+	}
+
 	switch (screen.kind) {
 		case "main":
 			handleMainKey(key, screen, state, done)
@@ -857,6 +2061,15 @@ async function handleKey(key: string, state: TuiState, done: () => void): Promis
 			break
 		case "detail":
 			handleDetailKey(key, screen, state, done)
+			break
+		case "followup":
+			handleFollowupKey(key, screen, state, done)
+			break
+		case "profile":
+			handleProfileKey(key, screen, state, done)
+			break
+		case "json-editor":
+			handleJsonEditorKey(key, screen, state, done)
 			break
 	}
 }
@@ -916,18 +2129,32 @@ async function startTui(state: TuiState): Promise<void> {
 
 // ─── Public entry points ──────────────────────────────────────────────────────
 
+export interface TuiOptions {
+	getAdminClient?: () => Promise<AdminApiClient>
+	/** Active profile name shown in the header. */
+	profile?: string
+	/** Profile fields with secrets redacted — shown in the profile view (p key). */
+	profileInfo?: Array<{ key: string; value: string }>
+}
+
 /** Open the TUI at the top-level main menu listing all command groups. */
 export async function runMainTui(
 	groups: CommandGroup[],
 	getClient: () => Promise<CamundaClient>,
 	getAdminClient?: () => Promise<AdminApiClient>,
+	opts?: TuiOptions,
 ): Promise<void> {
 	return startTui({
 		groups,
-		stack: [{ kind: "main", cursor: 0, scroll: 0 }],
+		stack: [{ kind: "main", cursor: 0, scroll: 0, search: "" }],
 		getClient,
-		getAdminClient: getAdminClient ?? (() => Promise.reject(new Error("No admin client"))),
+		getAdminClient:
+			getAdminClient ??
+			opts?.getAdminClient ??
+			(() => Promise.reject(new Error("No admin client"))),
 		quitting: false,
+		profile: opts?.profile ?? "",
+		profileInfo: opts?.profileInfo ?? [],
 	})
 }
 
@@ -940,16 +2167,22 @@ export async function runGroupTui(
 	groups: CommandGroup[],
 	getClient: () => Promise<CamundaClient>,
 	getAdminClient?: () => Promise<AdminApiClient>,
+	opts?: TuiOptions,
 ): Promise<void> {
 	const cursor = groups.findIndex((g) => g.name === group.name)
 	return startTui({
 		groups,
 		stack: [
-			{ kind: "main", cursor: Math.max(0, cursor), scroll: 0 },
-			{ kind: "commands", group, cursor: 0 },
+			{ kind: "main", cursor: Math.max(0, cursor), scroll: 0, search: "" },
+			{ kind: "commands", group, cursor: 0, search: "" },
 		],
 		getClient,
-		getAdminClient: getAdminClient ?? (() => Promise.reject(new Error("No admin client"))),
+		getAdminClient:
+			getAdminClient ??
+			opts?.getAdminClient ??
+			(() => Promise.reject(new Error("No admin client"))),
 		quitting: false,
+		profile: opts?.profile ?? "",
+		profileInfo: opts?.profileInfo ?? [],
 	})
 }

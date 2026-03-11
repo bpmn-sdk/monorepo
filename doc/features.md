@@ -1,5 +1,30 @@
 # Features
 
+## Auto-layout (2026-03-11) — `packages/core`, `packages/editor`
+
+- **`Bpmn.autoLayout(xml)`**: applies the Sugiyama layered layout to all processes in a BPMN XML string and returns updated XML with replaced BPMNDi positions.
+- **`applyAutoLayout(defs)`**: exported from `@bpmn-sdk/core` — operates on `BpmnDefinitions` directly; handles plain processes and collaborations with pools/lanes; pool and lane shapes carry `isHorizontal: true`.
+- **`BpmnEditor.autoLayout()`**: undoable auto-layout command in the editor; triggers `fitView` after layout.
+- **Auto-layout button**: HUD action bar now has an auto-layout button (grid icon) between `btnTopMore` and optional inject buttons.
+- **`BpmnDiShape.isHorizontal`**: new optional field parsed and serialized round-trip by parser/serializer.
+
+## ASCII rendering for DMN and Forms (2026-03-11) — `packages/ascii`
+
+- **`renderDmnAscii(xml, options?)`**: renders DMN decision tables as double-line box-drawing ASCII grids. Column widths auto-fit to content; hit policy in header; multiple decisions separated by blank lines.
+- **`renderFormAscii(json, options?)`**: renders Camunda Form JSON as text-mode mock-up. Supports all component types: inputs, selects, radios, checkboxes, buttons, groups, dynamic lists, tables, and display components.
+- **`RenderOptions.title`**: control whether a title header is prepended (`false` to suppress, string to override, default uses file/definition name).
+
+## Shared design system (2026-03-11) — `packages/ui`
+
+- **`@bpmn-sdk/ui`**: Shared design tokens, theme management, and primitive UI components for all bpmn-sdk frontends.
+- **Design tokens**: `--bpmn-bg`, `--bpmn-surface`, `--bpmn-surface-2`, `--bpmn-border`, `--bpmn-fg`, `--bpmn-fg-muted`, `--bpmn-accent` (blue), `--bpmn-success/warn/danger`, `--bpmn-radius`, `--bpmn-nav-bg/fg`. Light default, dark via `[data-theme="dark"]`.
+- **Theme management**: `resolveTheme` (auto→light|dark), `persistTheme`/`loadPersistedTheme` (localStorage), `applyTheme` (sets `data-theme` on element).
+- **Theme switcher component**: `createThemeSwitcher({ initial, onChange, persist })` — button+dropdown with Dark/Light/System options, icon updates to reflect selection.
+- **Shared components**: `badge(state)`, `cell(text)`, `createStatsCard(label, value, mod)`, `createTable<T>(options)` — generic, use `--bpmn-*` tokens.
+- **Icon library**: `IC_UI` — SVG icons for theme (moon/sun/auto/check) and navigation (dashboard/processes/instances/incidents/jobs/tasks).
+
+
+
 ## Monitoring & Operations frontend (2026-03-10) — `packages/operate`
 
 - **`@bpmn-sdk/operate`**: Zero-dependency monitoring frontend. `createOperate({ container, mock?, proxyUrl?, profile?, theme? })` mounts full monitoring UI.

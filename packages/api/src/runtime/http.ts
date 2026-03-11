@@ -85,7 +85,7 @@ export class HttpClient {
 		const authHeader = await this.#auth.getAuthorizationHeader()
 		const headers: Record<string, string> = {
 			"Content-Type": "application/json",
-			Accept: "application/json",
+			Accept: options.accept ?? "application/json",
 		}
 		if (authHeader) {
 			headers.Authorization = authHeader
@@ -147,6 +147,22 @@ export class HttpClient {
 			cached: false,
 		})
 
+		// Emit raw response event (clones body so the original stream is untouched)
+		{
+			const rawHeaders: Record<string, string> = {}
+			for (const [k, v] of response.headers.entries()) {
+				rawHeaders[k] = v
+			}
+			const rawBody = await response.clone().text()
+			this.#emitter.emit("rawResponse", {
+				method: options.method,
+				url,
+				status: response.status,
+				headers: rawHeaders,
+				body: rawBody,
+			})
+		}
+
 		// Handle 401 with potential token refresh
 		if (response.status === 401) {
 			const canRetry = await this.#auth.handleUnauthorized()
@@ -172,7 +188,9 @@ export class HttpClient {
 			return undefined as T
 		}
 
-		const data = (await response.json()) as T
+		const data = (
+			options.responseType === "text" ? await response.text() : await response.json()
+		) as T
 
 		// Store in cache if applicable
 		if (options.cacheable && this.#cache) {

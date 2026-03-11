@@ -10,9 +10,7 @@ export default defineConfig({
 			description:
 				"TypeScript SDK for generating, editing, and executing BPMN 2.0 diagrams programmatically.",
 			favicon: "/favicon.svg",
-			social: {
-				github: "https://github.com/bpmn-sdk/monorepo",
-			},
+			social: [{ icon: "github", label: "GitHub", href: "https://github.com/bpmn-sdk/monorepo" }],
 			editLink: {
 				baseUrl: "https://github.com/bpmn-sdk/monorepo/edit/main/apps/docs/src/content/docs/",
 			},

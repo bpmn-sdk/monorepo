@@ -1,5 +1,286 @@
 # Progress
 
+## 2026-03-11 — editor12 (cont): Auto-layout improvements
+
+### `packages/core/src/bpmn/bpmn-model.ts`
+- Added `isHorizontal?: boolean` to `BpmnDiShape` interface (after `isExpanded`)
+
+### `packages/core/src/bpmn/bpmn-parser.ts`
+- Added `"isHorizontal"` to `KNOWN_ATTRS` set
+- Added `isHorizontal` parsing in `parseDiShape` (same pattern as `isMarkerVisible`/`isExpanded`)
+
+### `packages/core/src/bpmn/bpmn-serializer.ts`
+- Added `isHorizontal` serialization in `serializeDiShape`
+
+### `packages/core/src/bpmn/auto-layout.ts` (new)
+- `applyAutoLayout(defs: BpmnDefinitions): BpmnDefinitions` — replaces all BPMNDi with freshly computed layout
+- Handles plain processes and collaborations with pools/lanes
+- Pool and lane shapes get `isHorizontal: true`; lane tiles sorted by mean-Y of their members
+- `contentBbox`, `nodeToShape`, `edgeToShape`, `buildLaneShapes` helpers
+
+### `packages/core/src/bpmn/index.ts`
+- Imported `applyAutoLayout` from `./auto-layout.js`
+- Added `Bpmn.autoLayout(xml: string): string` — parse → layout → serialize
+
+### `packages/core/src/index.ts`
+- Exported `applyAutoLayout` from `./bpmn/auto-layout.js`
+
+### `packages/editor/src/editor.ts`
+- Imported `applyAutoLayout` from `@bpmn-sdk/core`
+- Added `BpmnEditor.autoLayout(): void` — executes applyAutoLayout as undoable command, then fitView
+
+### `packages/editor/src/hud.ts`
+- Added `btnAutoLayout` button with layout SVG icon to `hudTopCenter` action bar
+- Wired click event to `editor.autoLayout()`
+
+## 2026-03-11 — editor12 (cont): CLI DMN/Form ASCII rendering
+
+### `apps/cli/src/commands/bpmn.ts`
+- Added `getDmnXmlCmd`: replaces `get-x-m-l` on `decision-definition` — fetches DMN XML and renders as ASCII art via `renderDmnAscii`
+- Added `getDmnReqsXmlCmd`: replaces `get-x-m-l` on `decision-requirements` — same for requirements XML
+- Added `getStartFormCmd`: replaces `getstart-form` on `process-definition` — fetches start form, extracts `schema`, renders as ASCII art via `renderFormAscii`
+- Added `getUserTaskFormCmd`: replaces `get-form` on `user-task` — fetches user task form schema and renders as ASCII art
+
+### `apps/cli/src/commands/index.ts`
+- Imported and wired new commands into `decision-definition`, `decision-requirements`, `process-definition`, and `user-task` groups, filtering out the old generated command names
+
+## 2026-03-11 — editor12 (cont): ASCII DMN/Forms, CLI version fix, form type exports
+
+### `packages/ascii/src/dmn.ts` (new)
+- `renderDmnAscii(xml, options?)`: parses DMN XML via `Dmn.parse()`, renders each decision table as a double-line box-drawing ASCII table (`╔═╦╗║╠╬╣╚╩╝`)
+- Column widths auto-fit to header label and longest entry text (minimum 4)
+- Hit policy shown in header; multiple decisions separated by blank lines
+- Optional title header from `DmnDefinitions.name` (controlled via `RenderOptions.title`)
+
+### `packages/ascii/src/form.ts` (new)
+- `renderFormAscii(json, options?)`: parses Camunda Form JSON via `Form.parse()`, renders each component as ASCII mock-up
+- Supported: text, textfield, textarea, number, datetime, select, taglist, radio, checkbox, checklist, button, separator, spacer, group (box), dynamiclist (box + add item), table (grid), image, iframe, html, expression, filepicker, documentPreview
+- Required field indicator (`*`) shown next to labels where applicable
+
+### `packages/ascii/src/index.ts`
+- Exported `renderDmnAscii` and `renderFormAscii`
+
+### `packages/core/src/form/index.ts`
+- Exported all previously-internal form component types: `FormButtonComponent`, `FormDatetimeComponent`, `FormDocumentPreviewComponent`, `FormDynamicListComponent`, `FormExpressionComponent`, `FormFilepickerComponent`, `FormHtmlComponent`, `FormIframeComponent`, `FormImageComponent`, `FormNumberComponent`, `FormSeparatorComponent`, `FormSpacerComponent`, `FormTableComponent`, `FormTaglistComponent`, `FormUnknownComponent`
+
+### `apps/cli/src/help.ts`
+- Fixed `--version` output: was hardcoded `"0.0.1"`, now reads dynamically from `package.json` via `new URL("../package.json", import.meta.url)` + `readFileSync`
+
+## 2026-03-11 — editor12: Pool and lane rendering support
+
+### `packages/canvas/src/canvas.ts`
+- Added `_containersG: SVGGElement` layer below `_edgesG`; layer order is now: containers → edges → shapes → labels
+- Pass `_containersG` to `render()`; clear it in `loadDefinitions()` and `clear()`
+
+### `packages/canvas/src/renderer.ts`
+- Added `containersLayer: SVGGElement` parameter to `render()`
+- Pool (participant) and lane shapes now render into `containersLayer` instead of `shapesLayer`, fixing the critical bug where opaque pool/lane bodies covered all edges inside them
+- Added `aria-label` attribute to pool and lane `<g>` elements
+
+### `packages/canvas/src/css.ts`
+- Extended `:focus` and `.bpmn-selected` CSS selectors to include `.bpmn-pool-body` and `.bpmn-lane-body` (focus/selection highlighting was previously missing for pool and lane shapes)
+
+### `packages/editor/src/editor.ts`
+- Applied matching `_containersG` layer changes (same architecture as canvas)
+- Updated hit-test at `_renderHit` to check `_containersG.contains(shapeEl)` so pool/lane clicks are detected
+
+## 2026-03-11 — editor12 (cont): operate instance-detail fix
+
+### `packages/operate/src/views/instance-detail.ts`
+- Fixed broken `instUnsub`/`startXmlFetch` scope: restructured mock vs. live branches so the subscription correctly calls `startXmlFetch` when store data arrives
+
+### `packages/operate/src/operate.ts`
+- Fixed Biome line-length errors in `reconnectCurrent` arrow function bodies
+
+## 2026-03-11 — editor12 (cont): CLI spec-driven JSON editor
+
+### `apps/cli/src/types.ts`
+- Added `JsonFieldSpec` interface (`name`, `type`, `description?`, `required?`, `enum?`)
+- Added `fields?: JsonFieldSpec[]` to `FlagSpec` — carries per-field metadata for JSON flags
+
+### `apps/cli/src/commands/shared.ts`
+- `makeListCmd`: added `filterFields?: JsonFieldSpec[]` option → injected into `--filter` flag as `fields`
+- `makeCreateCmd`: added `bodyFields?: JsonFieldSpec[]` → injected into `--data` flag as `fields`
+- `makeUpdateCmd`: added `bodyFields?: JsonFieldSpec[]` → injected into `--data` flag as `fields`
+
+### `packages/api/scripts/generate.mjs` — spec-driven field metadata
+- Added `flattenSchema(schema)`: recursively merges `allOf`/`anyOf` into flat properties + required lists
+- Added `extractJsonFieldSpecs(schema, schemas)`: resolves schema, flattens, returns `JsonFieldSpec[]`
+- Added `extractFilterFieldSpecs(requestBodySchema, schemas)`: flattens body schema, extracts `filter` property's field specs
+- Added `serializeFieldSpecs(specs)`: serializes specs to compact TypeScript literal
+- `generateCliCommandsContent()` now emits `filterFields: [...]` in list commands and `bodyFields: [...]` in create/update commands (when specs are available from the OpenAPI schema)
+- Re-generated `apps/cli/src/generated/commands.ts`: 61 commands now carry field metadata
+
+### `apps/cli/src/tui.ts` — guided JSON editor
+- `json-editor` Screen: added `fieldSpecs?: JsonFieldSpec[]`
+- Added `buildInitialEntries(json, fieldSpecs?)`: pre-populates all known fields (in spec order), merges existing values, appends unknown keys at end
+- Added `getFieldSpec(key, fieldSpecs?)`: looks up a field spec by key name
+- Both Enter/→ paths that open `json-editor` now: pass `fieldSpecs` from flag, use `buildInitialEntries`, default cursor column to `val`
+- `renderJsonEditor`: known fields shown normally, extra/unknown fields dimmed; enum fields show `<pick ↑↓>` or `value ↑↓` hint in VALUE column; field hint line below table shows type, required/optional, description for the cursor row; edit mode shows appropriate hint
+- `handleJsonEditorKey` edit mode: when in VALUE column of an enum field, ↑↓ cycles through enum values (no free text); Enter advances to next field; non-enum fields retain free-text editing
+
+## 2026-03-11 — editor12 (cont): CLI parameter UX — enum picker, number presets, JSON editor
+
+### `apps/cli/src/types.ts`
+- `FlagSpec`: added `enum?: string[]`, `json?: boolean`, `presets?: number[]`
+- `ArgSpec`: added `enum?: string[]`, `json?: boolean`
+
+### `apps/cli/src/commands/shared.ts`
+- `SORT_ORDER_FLAG`: added `enum: ["asc", "desc"]`
+- `LIMIT_FLAG`: added `presets: [5, 10, 20, 50, 100, 200, 500]`
+- `FILTER_FLAG`, `DATA_FLAG`, `DATA_OPT_FLAG`: added `json: true`
+
+### `apps/cli/src/tui.ts` — parameter input improvements
+- **Enum fields**: pressing Enter enters edit mode where ↑↓ cycles through allowed values (no free text). Current position shown as `1/N` in hint.
+- **Number fields with presets**: in edit mode, ↑↓ cycles through preset values; free text input still works.
+- **JSON fields** (`--filter`, `--data`): pressing Enter or → opens a dedicated `json-editor` screen instead of a text input.
+- **JSON editor screen** (`json-editor`): two-column key/value editor.
+  - ↑↓ navigate rows; Tab to switch between KEY and VALUE columns; Enter to start/confirm editing; `a` to add new field; `d` to delete; Esc to save and return.
+  - On save, serializes entries back to JSON and writes to the parent input field.
+  - Existing JSON is pre-parsed into entries when the editor opens.
+- Contextual hints: each focused field shows relevant hint (`↑↓ pick  1/2`, `→ json editor`, `↑↓ preset`) instead of static type info.
+
+## 2026-03-11 — editor12 (cont): CLI profile view, ASCII toggle, 3× scroll, profile header
+
+### `packages/api` — relations moved to shared package
+- New `packages/api/src/runtime/relations.ts`: exports `Relation`, `RelationSource`, `buildRelations()` — framework-agnostic, usable by CLI and operate.
+- `packages/api/src/index.ts`: re-exports the new types and function.
+- `apps/cli/src/types.ts`: imports `Relation` from `@bpmn-sdk/api` (removed local duplicate).
+- `apps/cli/src/commands/relations.ts`: rewritten as thin adapter — converts `CommandGroup[]` to `RelationSource[]`, calls `buildRelations()`, wires results back.
+
+### `apps/cli` — profile name in header
+- All TUI screens now show `profile: <name>` right-aligned in the header line.
+- `renderHeader(crumbs, cols, profile?)` gains an optional profile parameter.
+- `runMainTui` and `runGroupTui` accept a new `TuiOptions` object `{ profile?, profileInfo?, getAdminClient? }`.
+- `run.ts`: computes effective profile name (explicit flag or active profile) and passes it to both TUI entry points.
+
+### `apps/cli` — profile info view (p key)
+- New `{ kind: "profile"; scroll: number }` screen type.
+- Pressing `p` from any screen (except while editing an input field) pushes the profile screen.
+- Shows all profile fields — secrets (`token`, `clientSecret`, `password`) are displayed as `***`.
+- `esc`/`p` closes the view; `↑↓` scrolls if many fields.
+- `run.ts`: `buildProfileInfo()` extracts profile fields with secrets redacted and passes `profileInfo` to the TUI.
+
+### `apps/cli` — ASCII art toggle (x key) in messages view
+- After a command produces BPMN XML output, `renderBpmnAscii` is called automatically to generate `altLines`.
+- Pressing `x` in the messages view toggles between raw XML and ASCII art rendering (only shown when ASCII is available).
+- Toggling resets scroll and horizontal pan to 0.
+
+### `apps/cli` — 3× movement speed in messages view
+- Arrow key scroll/pan in the messages view now moves 3 lines/columns per keypress (was 1).
+
+## 2026-03-11 — editor12 (cont): CLI ASCII scrolling, arrow keys, follow-up relations
+
+### `apps/cli` — scrollable ASCII diagram view
+- `makeCapturingWriter.print()` now splits multi-line strings by `\n` before storing (enables line-level scrolling).
+- `renderResults` messages branch: `↑↓` scroll lines, `←→` pan horizontally; pagination counter shows current visible range.
+- `handleResultsKey` messages branch: full `↑↓←→` navigation plus `pgup/pgdn` for large diagrams.
+
+### `apps/cli` — arrow key navigation for array drill-down
+- In detail and item views: `→` expands an `[N items]` array field (same as Space).
+- In detail view: `←` navigates back (same as ESC).
+- Footer hint updated to `space/→ expand  ← back`.
+
+### `apps/cli` — follow-up action suggestions (relations)
+- New `Relation` interface in `types.ts`: links a result field to a target command arg.
+- `Command` type gains `columns?: ColumnDef[]` (stored by `makeListCmd`) and `relations?: Relation[]`.
+- New `commands/relations.ts`: `computeRelations(groups)` — auto-detects relations by matching list column keys to arg names across all commands; called on startup in `commands/index.ts`.
+- TUI: pressing `f` on a list item opens a new `followup` screen listing all related commands.
+- The followup screen shows which field values will be pre-filled and lets the user pick a command to run.
+- Selecting a command pushes an input screen with args already populated from the current item.
+- Example: `process-definition list` → select item → `f` → see `get`, `get-xml`, `render`, etc. pre-filled with `processDefinitionKey`.
+
+## 2026-03-11 — editor12 (cont): CLI array drill-down + layout overlap fix
+
+### `apps/cli` — array fields collapsed with Space to expand
+- Arrays of objects in item/detail views now render as `[N items]` summary on one line (using `ArrayValue` sentinel class).
+- Cursor navigation added to `detail` screen (↑↓) and `item` result view (↑↓).
+- Pressing Space on a highlighted `[N items]` field pushes a new `detail` drill-down screen showing the array expanded with `[i].key` notation.
+- `detail` screen carries `label` (used as breadcrumb header) and `cursor` fields.
+- Arrays of primitives continue to render as comma-separated values unchanged.
+
+### `packages/ascii` — fix layout overlap error
+- `renderBpmnAscii` now calls `layoutFlowNodes` directly instead of `layoutProcess`.
+- `layoutProcess` runs `assertNoOverlap` after layout, which throws for certain real-world BPMN files where event labels (centered below small event circles) produce pixel-level cross-layer overlaps.
+- The ASCII renderer uses `layer`/`position` indices (not pixel coords), so pixel overlaps have no effect on the rendered output. Skipping the assertion removes the crash without affecting correctness.
+
+---
+
+## 2026-03-11 — editor12 (cont): CLI TUI improvements
+
+### `apps/cli` — main menu sorted alphabetically
+- `commands/index.ts`: all groups (generated + admin + custom) sorted by `name.localeCompare` at assembly time.
+
+### `apps/cli` — live search on main menu and commands list
+- `main` and `commands` TUI screens carry a `search: string` field.
+- Typing any printable character starts search; the list filters immediately (name + description match).
+- Search bar `/ term█` shown above the list when active.
+- Backspace removes the last search character. ESC clears search (if non-empty) or navigates back.
+- `q`/`Q` and `m`/`M` only act as hotkeys when search is empty; otherwise they extend the search string.
+- Cursor resets to 0 on every search change.
+
+### `apps/cli` — paste support in input fields
+- Edit mode `default` case now iterates `[...key]` and filters printable chars (`ch >= " "`).
+- Pasted multi-character strings are inserted at the cursor in one go.
+
+### `apps/cli` + `packages/api` — fix `get-x-m-l` (XML endpoint)
+- Added `accept?: string` and `responseType?: "json" | "text"` to `RequestOptions`.
+- `HttpClient` uses `options.accept` for the `Accept` header (default `"application/json"`) and calls `response.text()` when `responseType === "text"`.
+- Generated `get-x-m-l` command removed; replaced with `get-xml` that requests `Accept: text/xml`, receives the XML as text, and renders it as ASCII art via `@bpmn-sdk/ascii`.
+
+---
+
+## 2026-03-11 — editor12 (cont): CLI object rendering + BPMN ASCII
+
+### `apps/cli` — nested object display
+- Fixed `[object Object]` rendering in `printItem` (output.ts) and the TUI detail/item views (tui.ts).
+- Arrays of primitives now display as comma-separated values: `"a, b, c"`.
+- Arrays of objects are expanded with indexed keys: `brokers[0].host`, `brokers[0].port`, `brokers[1].host`, etc.
+- Deeply nested plain objects continue to be flattened with dot notation.
+
+### `apps/cli` — BPMN ASCII render command
+- Added `process-definition render <processDefinitionKey>` command (alias: `pd render`).
+- Fetches the process definition's BPMN XML and renders it as Unicode ASCII art via `@bpmn-sdk/ascii`.
+- Command injected into the generated group in `commands/index.ts` without modifying generated files.
+- Added `@bpmn-sdk/ascii: workspace:*` dependency to the CLI package.
+
+---
+
+## 2026-03-11 — editor12 (cont): CLI raw mode + HTTP status code
+
+### `apps/cli` — raw mode and HTTP status visibility
+- **HTTP status always shown**: After every CLI command, the HTTP status code is printed (`HTTP 200` in green, 4xx/5xx in red).
+- **`--raw` flag**: Shows the full raw response — status line, all response headers, pretty-printed JSON body (or plain text if not JSON). Suppresses the formatted output when active.
+- **TUI `r` toggle**: In the results screen, pressing `r` switches between the rendered view (table/item) and the raw view showing status, headers, and body. The raw view is scrollable.
+
+### `packages/api` — `rawResponse` event
+- Added `RawResponseEvent` interface: `{ method, url, status, headers, body }`.
+- `HttpClient` emits `rawResponse` after every HTTP response (before error handling), using `response.clone().text()` to buffer the body without consuming the original stream.
+- Exported `RawResponseEvent` from `@bpmn-sdk/api` public index.
+
+---
+
+## 2026-03-11 — editor12: packages/ui — shared design system; operate visual unification
+
+### `packages/ui` (new package — `@bpmn-sdk/ui`)
+- New shared design-system package consumed by all frontends (operate, editor, canvas).
+- **Design tokens** (`UI_TOKENS_CSS`): CSS custom properties on `:root` (light default) + `[data-theme="dark"]` override. Namespace `--bpmn-*` for surfaces, typography, accent, semantic, radius, nav, header.
+- **Unified blue accent**: `#1a56db` (light) / `#4c8ef7` (dark) — replaces operate's purple `#7b61ff`.
+- **`injectUiStyles()`**: single call injects tokens + component CSS into `<head>`.
+- **`theme.ts`**: `resolveTheme`, `persistTheme`, `loadPersistedTheme`, `applyTheme` — shared logic for all frontends. Persists to `localStorage["bpmn-theme"]`.
+- **`createThemeSwitcher(options)`**: standalone Dark/Light/System button+dropdown. Used in operate header. Mirrors resolved theme onto dropdown element for correct dark CSS.
+- **Shared components**: `badge`, `cell`, `createStatsCard`, `createTable` — moved from operate into ui with `bpmn-*` class names.
+- **`IC_UI` icons**: SVG icon set for theme switcher (moon/sun/auto/check) and navigation (dashboard/processes/instances/incidents/jobs/tasks).
+
+### `packages/operate` — visual unification with editor
+- Replaced all `--op-*` CSS variables with shared `--bpmn-*` tokens from `@bpmn-sdk/ui`.
+- Theme switcher button added to header (next to profile picker). Persists selection across sessions.
+- Theme persistence: `loadPersistedTheme()` on init — user choice survives page reload.
+- Nav icons: replaced emoji (`⊞ ◈ ▷ ⚠ ⚙ ☑`) with clean SVG icons from `IC_UI`.
+- Active nav item: blue tint `rgba(76,142,247,0.18)` (was purple `rgba(123,97,255,0.18)`).
+- Component CSS (badge, card, table) moved to `@bpmn-sdk/ui`; operate components are now thin re-exports.
+- `injectUiStyles()` called before `injectOperateStyles()` — tokens always available.
+
 ## 2026-03-10 — editor11: packages/operate — monitoring frontend
 
 ### `packages/operate` (new package — `@bpmn-sdk/operate`)

@@ -150,6 +150,14 @@ export interface ResponseEvent {
 	cached: boolean
 }
 
+export interface RawResponseEvent {
+	method: string
+	url: string
+	status: number
+	headers: Record<string, string>
+	body: string
+}
+
 export interface ErrorEvent {
 	method: string
 	url: string
@@ -176,6 +184,7 @@ export interface CacheEvent {
 export type ClientEventMap = {
 	request: RequestEvent
 	response: ResponseEvent
+	rawResponse: RawResponseEvent
 	error: ErrorEvent
 	retry: RetryEvent
 	tokenRefresh: TokenRefreshEvent
@@ -195,4 +204,8 @@ export interface RequestOptions {
 	cacheable?: boolean
 	/** Override timeout for this request. */
 	timeout?: number
+	/** Custom Accept header. Defaults to "application/json". */
+	accept?: string
+	/** How to parse the response body. Defaults to "json". */
+	responseType?: "json" | "text"
 }

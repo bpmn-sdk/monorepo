@@ -30,6 +30,7 @@ export const auditLogGroup: CommandGroup = {
         { key: "rootProcessInstanceKey", header: "ROOT PROCESS INSTANCE KEY" },
         { key: "elementInstanceKey", header: "ELEMENT INSTANCE KEY" },
       ],
+      filterFields: [{ name: "auditLogKey", type: "object", description: "The audit log key search filter." }, { name: "processDefinitionKey", type: "object", description: "The process definition key search filter." }, { name: "processInstanceKey", type: "object", description: "The process instance key search filter." }, { name: "elementInstanceKey", type: "object", description: "The element instance key search filter." }, { name: "operationType", type: "object", description: "The operation type search filter." }, { name: "result", type: "object", description: "The result search filter." }, { name: "timestamp", type: "object", description: "The timestamp search filter." }, { name: "actorId", type: "object", description: "The actor ID search filter." }, { name: "actorType", type: "object", description: "The actor type search filter." }, { name: "agentElementId", type: "object", description: "The agent element ID search filter." }, { name: "entityKey", type: "object", description: "The entity key search filter." }, { name: "entityType", type: "object", description: "The entity type search filter." }, { name: "tenantId", type: "object", description: "The tenant ID search filter." }, { name: "category", type: "object", description: "The category search filter." }, { name: "deploymentKey", type: "object", description: "The deployment key search filter." }, { name: "formKey", type: "object", description: "The form key search filter." }, { name: "resourceKey", type: "object", description: "The resource key search filter." }, { name: "batchOperationType", type: "object", description: "The batch operation type search filter." }, { name: "processDefinitionId", type: "object", description: "The process definition ID search filter." }, { name: "jobKey", type: "object", description: "The job key search filter." }, { name: "userTaskKey", type: "object", description: "The user task key search filter." }, { name: "decisionRequirementsId", type: "object", description: "The decision requirements ID search filter." }, { name: "decisionRequirementsKey", type: "object", description: "The decision requirements key search filter." }, { name: "decisionDefinitionId", type: "object", description: "The decision definition ID search filter." }, { name: "decisionDefinitionKey", type: "object", description: "The decision definition key search filter." }, { name: "decisionEvaluationKey", type: "object", description: "The decision evaluation key search filter." }, { name: "relatedEntityKey", type: "object", description: "The related entity key search filter." }, { name: "relatedEntityType", type: "object", description: "The related entity type search filter." }, { name: "entityDescription", type: "object", description: "The entity description filter." }],
       search: (client, body) => client.auditLog.searchAuditLogs(body as never),
     }),
     makeGetCmd({
@@ -78,6 +79,7 @@ export const authorizationGroup: CommandGroup = {
         { key: "resourceType", header: "RESOURCE TYPE", maxWidth: 30 },
         { key: "permissionTypes", header: "PERMISSION TYPES" },
       ],
+      filterFields: [{ name: "ownerId", type: "string", description: "The ID of the owner of permissions." }, { name: "ownerType", type: "string", description: "The type of the owner of permissions.", enum: ["USER","CLIENT","ROLE","GROUP","MAPPING_RULE","UNSPECIFIED"] }, { name: "resourceIds", type: "array", description: "The IDs of the resource to search permissions for." }, { name: "resourcePropertyNames", type: "array", description: "The names of the resource properties to search permissions for." }, { name: "resourceType", type: "string", description: "The type of resource to search permissions for." }],
       search: (client, body) => client.authorization.searchAuthorizations(body as never),
     }),
     makeGetCmd({
@@ -116,6 +118,7 @@ export const batchOperationGroup: CommandGroup = {
         { key: "operationType", header: "OPERATION TYPE", maxWidth: 30 },
         { key: "errorMessage", header: "ERROR MESSAGE", maxWidth: 30 },
       ],
+      filterFields: [{ name: "batchOperationKey", type: "object", description: "The key (or operate legacy ID) of the batch operation." }, { name: "itemKey", type: "object", description: "The key of the item, e.g. a process instance key." }, { name: "processInstanceKey", type: "object", description: "The process instance key of the processed item." }, { name: "state", type: "string", description: "The state of the batch operation." }, { name: "operationType", type: "object", description: "The type of the batch operation." }],
       search: (client, body) => client.batchOperation.searchBatchOperationItems(body as never),
     }),
     makeListCmd({
@@ -129,6 +132,7 @@ export const batchOperationGroup: CommandGroup = {
         { key: "operationsTotalCount", header: "OPERATIONS TOTAL COUNT" },
         { key: "operationsFailedCount", header: "OPERATIONS FAILED COUNT" },
       ],
+      filterFields: [{ name: "batchOperationKey", type: "object", description: "The key (or operate legacy ID) of the batch operation." }, { name: "operationType", type: "object", description: "The type of the batch operation." }, { name: "state", type: "object", description: "The state of the batch operation." }, { name: "actorType", type: "string", description: "The type of the actor who performed the operation.", enum: ["ANONYMOUS","CLIENT","UNKNOWN","USER"] }, { name: "actorId", type: "object", description: "The ID of the actor who performed the operation." }],
       search: (client, body) => client.batchOperation.searchBatchOperations(body as never),
     }),
     makeGetCmd({
@@ -208,6 +212,7 @@ export const clusterVariableGroup: CommandGroup = {
       name: "createglobal",
       description: "Create a global-scoped cluster variable",
       create: (client, body) => client.clusterVariable.createGlobalClusterVariable(body as never),
+      bodyFields: [{ name: "name", type: "string", description: "The name of the cluster variable. Must be unique within its scope (global or tenant-specific).", required: true }, { name: "value", type: "object", description: "The value of the cluster variable. Can be any JSON object or primitive value. Will be serialized as a JSON string in responses.", required: true }],
     }),
     makeGetCmd({
       name: "getglobal",
@@ -220,6 +225,7 @@ export const clusterVariableGroup: CommandGroup = {
       description: "Update a global-scoped cluster variable",
       argName: "name",
       update: (client, key, body) => client.clusterVariable.updateGlobalClusterVariable(key, body as never),
+      bodyFields: [{ name: "value", type: "object", description: "The new value of the cluster variable. Can be any JSON object or primitive value. Will be serialized as a JSON string in responses.", required: true }],
     }),
     makeDeleteCmd({
       name: "deleteglobal",
@@ -233,6 +239,7 @@ export const clusterVariableGroup: CommandGroup = {
         { key: "value", header: "VALUE", maxWidth: 30 },
         { key: "isTruncated", header: "IS TRUNCATED" },
       ],
+      filterFields: [{ name: "name", type: "object", description: "Name of the cluster variable." }, { name: "value", type: "object", description: "The value of the cluster variable." }, { name: "scope", type: "object", description: "The scope filter for cluster variables." }, { name: "tenantId", type: "object", description: "Tenant ID of this variable." }, { name: "isTruncated", type: "boolean", description: " Filter cluster variables by truncation status of their stored values. When true, returns only variables whose stored values are truncated (i.e., the value exceeds the storage size limit and is truncated in storage). When false, returns only variables with non-truncated stored values. This filter is based on the underlying storage characteristic, not the response format." }],
       search: (client, body) => client.clusterVariable.searchClusterVariables(body as never),
     }),
     {
@@ -305,6 +312,7 @@ export const conditionalGroup: CommandGroup = {
       name: "evaluate",
       description: "Evaluate root level conditional start events",
       create: (client, body) => client.conditional.evaluateConditionals(body as never),
+      bodyFields: [{ name: "tenantId", type: "string", description: " Used to evaluate root-level conditional start events for a tenant with the given ID.\n This will only evaluate root-level conditional start events of process definitions which belong to the tenant." }, { name: "processDefinitionKey", type: "string", description: " Used to evaluate root-level conditional start events of the process definition with the given key." }, { name: "variables", type: "object", description: " JSON object representing the variables to use for evaluation of the conditions and to pass to the process instances that have been triggered.", required: true }],
     }),
   ],
 };
@@ -326,6 +334,7 @@ export const messageSubscriptionGroup: CommandGroup = {
         { key: "rootProcessInstanceKey", header: "ROOT PROCESS INSTANCE KEY" },
         { key: "subscriptionKey", header: "SUBSCRIPTION KEY" },
       ],
+      filterFields: [{ name: "correlationKey", type: "object", description: "The correlation key of the message." }, { name: "correlationTime", type: "object", description: "The time when the message was correlated." }, { name: "elementId", type: "object", description: "The element ID that received the message." }, { name: "elementInstanceKey", type: "object", description: "The element instance key that received the message." }, { name: "messageKey", type: "object", description: "The message key." }, { name: "messageName", type: "object", description: "The name of the message." }, { name: "partitionId", type: "object", description: "The partition ID that correlated the message." }, { name: "processDefinitionId", type: "object", description: "The process definition ID associated with this correlated message subscription." }, { name: "processDefinitionKey", type: "object", description: "The process definition key associated with this correlated message subscription. For intermediate message events, this only works for data created with 8.9 and later." }, { name: "processInstanceKey", type: "object", description: "The process instance key associated with this correlated message subscription." }, { name: "subscriptionKey", type: "object", description: "The subscription key that received the message." }, { name: "tenantId", type: "object", description: "The tenant ID associated with this correlated message subscription." }],
       search: (client, body) => client.messageSubscription.searchCorrelatedMessageSubscriptions(body as never),
     }),
     makeListCmd({
@@ -339,6 +348,7 @@ export const messageSubscriptionGroup: CommandGroup = {
         { key: "correlationKey", header: "CORRELATION KEY" },
         { key: "processDefinitionId", header: "PROCESS DEFINITION ID" },
       ],
+      filterFields: [{ name: "messageSubscriptionKey", type: "object", description: "The message subscription key associated with this message subscription." }, { name: "processDefinitionKey", type: "object", description: "The process definition key associated with this correlated message subscription. This only works for data created with 8.9 and later." }, { name: "processDefinitionId", type: "object", description: "The process definition ID associated with this message subscription." }, { name: "processInstanceKey", type: "object", description: "The process instance key associated with this message subscription." }, { name: "elementId", type: "object", description: "The element ID associated with this message subscription." }, { name: "elementInstanceKey", type: "object", description: "The element instance key associated with this message subscription." }, { name: "messageSubscriptionState", type: "object", description: "The message subscription state." }, { name: "lastUpdatedDate", type: "object", description: "The last updated date of the message subscription." }, { name: "messageName", type: "object", description: "The name of the message associated with the message subscription." }, { name: "correlationKey", type: "object", description: "The correlation key of the message subscription." }, { name: "tenantId", type: "object", description: "The unique external tenant ID." }],
       search: (client, body) => client.messageSubscription.searchMessageSubscriptions(body as never),
     }),
   ],
@@ -366,6 +376,7 @@ export const decisionDefinitionGroup: CommandGroup = {
         { key: "decisionRequirementsName", header: "DECISION REQUIREMENTS NAME", maxWidth: 30 },
         { key: "name", header: "NAME", maxWidth: 30 },
       ],
+      filterFields: [{ name: "decisionDefinitionId", type: "string", description: "The DMN ID of the decision definition." }, { name: "name", type: "string", description: "The DMN name of the decision definition." }, { name: "isLatestVersion", type: "boolean", description: " Whether to only return the latest version of each decision definition.\n When using this filter, pagination functionality is limited, you can only paginate forward using `after` and `limit`.\n The response contains no `startCursor` in the `page`, and requests ignore the `from` and `before` in the `page`." }, { name: "version", type: "string", description: "The assigned version of the decision definition." }, { name: "decisionRequirementsId", type: "string", description: "the DMN ID of the decision requirements graph that the decision definition is part of." }, { name: "tenantId", type: "string", description: "The tenant ID of the decision definition." }, { name: "decisionDefinitionKey", type: "string", description: "The assigned key, which acts as a unique identifier for this decision definition." }, { name: "decisionRequirementsKey", type: "string", description: "The assigned key of the decision requirements graph that the decision definition is part of." }, { name: "decisionRequirementsName", type: "string", description: "The DMN name of the decision requirements that the decision definition is part of." }, { name: "decisionRequirementsVersion", type: "string", description: "The assigned version of the decision requirements that the decision definition is part of." }],
       search: (client, body) => client.decisionDefinition.searchDecisionDefinitions(body as never),
     }),
     makeGetCmd({
@@ -398,6 +409,7 @@ export const decisionInstanceGroup: CommandGroup = {
         { key: "decisionDefinitionKey", header: "DECISION DEFINITION KEY" },
         { key: "elementInstanceKey", header: "ELEMENT INSTANCE KEY" },
       ],
+      filterFields: [{ name: "decisionEvaluationInstanceKey", type: "object", description: "The key of the decision evaluation instance." }, { name: "state", type: "object", description: "The state of the decision instance." }, { name: "evaluationFailure", type: "string", description: "The evaluation failure of the decision instance." }, { name: "evaluationDate", type: "object", description: "The evaluation date of the decision instance." }, { name: "decisionDefinitionId", type: "string", description: "The ID of the DMN decision." }, { name: "decisionDefinitionName", type: "string", description: "The name of the DMN decision." }, { name: "decisionDefinitionVersion", type: "string", description: "The version of the decision." }, { name: "decisionDefinitionType", type: "string", description: "The type of the decision. UNSPECIFIED is deprecated and should not be used anymore, for removal in 8.10", enum: ["DECISION_TABLE","LITERAL_EXPRESSION","UNSPECIFIED","UNKNOWN"] }, { name: "tenantId", type: "string", description: "The tenant ID of the decision instance." }, { name: "decisionEvaluationKey", type: "string", description: "The key of the parent decision evaluation. Note that this is not the identifier of an individual decision instance; the `decisionEvaluationInstanceKey` is the identifier for a decision instance." }, { name: "processDefinitionKey", type: "string", description: "The key of the process definition." }, { name: "processInstanceKey", type: "string", description: "The key of the process instance." }, { name: "decisionDefinitionKey", type: "object", description: "The key of the decision." }, { name: "elementInstanceKey", type: "object", description: "The key of the element instance this decision instance is linked to." }, { name: "rootDecisionDefinitionKey", type: "object", description: "The key of the root decision definition." }, { name: "decisionRequirementsKey", type: "object", description: "The key of the decision requirements definition." }],
       search: (client, body) => client.decisionInstance.searchDecisionInstances(body as never),
     }),
     makeGetCmd({
@@ -423,6 +435,7 @@ export const decisionInstanceGroup: CommandGroup = {
       name: "delete-batch-operation",
       description: "Delete decision instances (batch)",
       create: (client, body) => client.decisionInstance.deleteDecisionInstancesBatchOperation(body as never),
+      bodyFields: [{ name: "filter", type: "object", description: "The decision instance filter.", required: true }, { name: "operationReference", type: "string", description: " A reference key chosen by the user that will be part of all records resulting from this operation.\n Must be > 0 if provided." }],
     }),
   ],
 };
@@ -442,6 +455,7 @@ export const decisionRequirementsGroup: CommandGroup = {
         { key: "resourceName", header: "RESOURCE NAME", maxWidth: 30 },
         { key: "version", header: "VERSION" },
       ],
+      filterFields: [{ name: "decisionRequirementsName", type: "string", description: "The DMN name of the decision requirements." }, { name: "decisionRequirementsId", type: "string", description: "the DMN ID of the decision requirements." }, { name: "decisionRequirementsKey", type: "string", description: "System-generated key for a deployed decision requirements definition." }, { name: "version", type: "string", description: "The assigned version of the decision requirements." }, { name: "tenantId", type: "string", description: "The tenant ID of the decision requirements." }, { name: "resourceName", type: "string", description: "The name of the resource from which the decision requirements were parsed" }],
       search: (client, body) => client.decisionRequirements.searchDecisionRequirements(body as never),
     }),
     makeGetCmd({
@@ -576,6 +590,7 @@ export const elementInstanceGroup: CommandGroup = {
         { key: "state", header: "STATE" },
         { key: "processDefinitionId", header: "PROCESS DEFINITION ID" },
       ],
+      filterFields: [{ name: "processDefinitionId", type: "string", description: "The process definition ID associated to this element instance." }, { name: "state", type: "object", description: "State of element instance as defined set of values." }, { name: "type", type: "string", description: "Type of element as defined set of values.", enum: ["UNSPECIFIED","PROCESS","SUB_PROCESS","EVENT_SUB_PROCESS","AD_HOC_SUB_PROCESS","AD_HOC_SUB_PROCESS_INNER_INSTANCE","START_EVENT","INTERMEDIATE_CATCH_EVENT","INTERMEDIATE_THROW_EVENT","BOUNDARY_EVENT","END_EVENT","SERVICE_TASK","RECEIVE_TASK","USER_TASK","MANUAL_TASK","TASK","EXCLUSIVE_GATEWAY","INCLUSIVE_GATEWAY","PARALLEL_GATEWAY","EVENT_BASED_GATEWAY","SEQUENCE_FLOW","MULTI_INSTANCE_BODY","CALL_ACTIVITY","BUSINESS_RULE_TASK","SCRIPT_TASK","SEND_TASK","UNKNOWN"] }, { name: "elementId", type: "string", description: "The element ID for this element instance." }, { name: "elementName", type: "string", description: "The element name. This only works for data created with 8.8 and onwards. Instances from prior versions don't contain this data and cannot be found." }, { name: "hasIncident", type: "boolean", description: "Shows whether this element instance has an incident related to." }, { name: "tenantId", type: "string", description: "The unique identifier of the tenant." }, { name: "elementInstanceKey", type: "string", description: "The assigned key, which acts as a unique identifier for this element instance." }, { name: "processInstanceKey", type: "string", description: "The process instance key associated to this element instance." }, { name: "processDefinitionKey", type: "string", description: "The process definition key associated to this element instance." }, { name: "incidentKey", type: "string", description: "The key of incident if field incident is true." }, { name: "startDate", type: "object", description: "The start date of this element instance." }, { name: "endDate", type: "object", description: "The end date of this element instance." }, { name: "elementInstanceScopeKey", type: "string", description: "The scope key of this element instance. If provided with a process instance key it will return element instances that are immediate children of the process instance. If provided with an element instance key it will return element instances that are immediate children of the element instance." }],
       search: (client, body) => client.elementInstance.searchElementInstances(body as never),
     }),
     makeGetCmd({
@@ -602,6 +617,7 @@ export const elementInstanceGroup: CommandGroup = {
       description: "Update element instance variables",
       argName: "elementInstanceKey",
       update: (client, key, body) => client.elementInstance.createElementInstanceVariables(key, body as never),
+      bodyFields: [{ name: "variables", type: "object", description: "JSON object representing the variables to set in the element’s scope.", required: true }, { name: "local", type: "boolean", description: " If set to `true`, the variables are merged strictly into the local scope (as specified\n by the `elementInstanceKey`). Otherwise, the variables are propagated to upper scopes\n and set at the outermost one.\n\n Let's consider the following example:\n There are two scopes '1' and '2'. Scope '1' is the parent scope of '2'. The effective\n variables of the scopes are:\n 1 => { \"foo\" : 2 }\n 2 => { \"bar\" : 1 }\n\n An update request with elementInstanceKey as '2', variables { \"foo\": 5 }, and local set\n to `true` leaves scope '1' unchanged and adjusts scope '2' to { \"bar\": 1, \"foo\": 5 }. By\n default, with local set to `false`, scope '1' will be { \"foo\": 5 } and scope '2' will be\n { \"bar\": 1 }." }, { name: "operationReference", type: "string", description: " A reference key chosen by the user that will be part of all records resulting from this operation.\n Must be > 0 if provided." }],
     }),
   ],
 };
@@ -615,6 +631,7 @@ export const expressionGroup: CommandGroup = {
       name: "evaluate",
       description: "Evaluate an expression",
       create: (client, body) => client.expression.evaluateExpression(body as never),
+      bodyFields: [{ name: "expression", type: "string", description: "The expression to evaluate (e.g., \"=x + y\")", required: true }, { name: "tenantId", type: "string", description: "Required when the expression references tenant-scoped cluster variables" }, { name: "variables", type: "object", description: "Optional variables for expression evaluation. These variables are only used for the current evaluation and do not persist beyond it." }],
     }),
   ],
 };
@@ -628,6 +645,7 @@ export const globalListenerGroup: CommandGroup = {
       name: "create-task-listener",
       description: "Create global user task listener",
       create: (client, body) => client.globalListener.createGlobalTaskListener(body as never),
+      bodyFields: [{ name: "id", type: "string", description: "The user-defined id for the global listener", required: true }, { name: "eventTypes", type: "array", description: "List of user task event types that trigger the listener.", required: true }, { name: "type", type: "string", description: "The name of the job type, used as a reference to specify which job workers request the respective listener job.", required: true }, { name: "retries", type: "string", description: "Number of retries for the listener job." }, { name: "afterNonGlobal", type: "boolean", description: "Whether the listener should run after model-level listeners." }, { name: "priority", type: "string", description: "The priority of the listener. Higher priority listeners are executed before lower priority ones." }],
     }),
     makeGetCmd({
       name: "get-task-listener",
@@ -640,6 +658,7 @@ export const globalListenerGroup: CommandGroup = {
       description: "Update global user task listener",
       argName: "id",
       update: (client, key, body) => client.globalListener.updateGlobalTaskListener(key, body as never),
+      bodyFields: [{ name: "eventTypes", type: "array", description: "List of user task event types that trigger the listener.", required: true }, { name: "type", type: "string", description: "The name of the job type, used as a reference to specify which job workers request the respective listener job.", required: true }, { name: "retries", type: "string", description: "Number of retries for the listener job." }, { name: "afterNonGlobal", type: "boolean", description: "Whether the listener should run after model-level listeners." }, { name: "priority", type: "string", description: "The priority of the listener. Higher priority listeners are executed before lower priority ones." }],
     }),
     makeDeleteCmd({
       name: "delete-task-listener",
@@ -654,6 +673,7 @@ export const globalListenerGroup: CommandGroup = {
         { key: "id", header: "ID", maxWidth: 30 },
         { key: "source", header: "SOURCE", maxWidth: 30 },
       ],
+      filterFields: [{ name: "id", type: "object", description: "Id of the global listener." }, { name: "type", type: "object", description: "Job type of the global listener." }, { name: "retries", type: "object", description: "Number of retries of the global listener." }, { name: "eventTypes", type: "array", description: "Event types of the global listener." }, { name: "afterNonGlobal", type: "boolean", description: "Whether the listener runs after model-level listeners." }, { name: "priority", type: "object", description: "Priority of the global listener." }, { name: "source", type: "object", description: "How the global listener was defined." }],
       search: (client, body) => client.globalListener.searchGlobalTaskListeners(body as never),
     }),
   ],
@@ -667,6 +687,7 @@ export const groupGroup: CommandGroup = {
     makeCreateCmd({
       description: "Create group",
       create: (client, body) => client.group.createGroup(body as never),
+      bodyFields: [{ name: "groupId", type: "string", description: "The ID of the new group.", required: true }, { name: "name", type: "string", description: "The display name of the new group.", required: true }, { name: "description", type: "string", description: "The description of the new group." }],
     }),
     makeListCmd({
       description: "Search groups",
@@ -675,6 +696,7 @@ export const groupGroup: CommandGroup = {
         { key: "name", header: "NAME", maxWidth: 30 },
         { key: "description", header: "DESCRIPTION", maxWidth: 30 },
       ],
+      filterFields: [{ name: "groupId", type: "object", description: "The group ID search filters." }, { name: "name", type: "string", description: "The group name search filters." }],
       search: (client, body) => client.group.searchGroups(body as never),
     }),
     makeGetCmd({
@@ -686,6 +708,7 @@ export const groupGroup: CommandGroup = {
       description: "Update group",
       argName: "groupId",
       update: (client, key, body) => client.group.updateGroup(key, body as never),
+      bodyFields: [{ name: "name", type: "string", description: "The new name of the group.", required: true }, { name: "description", type: "string", description: "The new description of the group." }],
     }),
     makeDeleteCmd({
       description: "Delete group",
@@ -851,6 +874,7 @@ export const incidentGroup: CommandGroup = {
         { key: "jobKey", header: "JOB KEY" },
         { key: "state", header: "STATE" },
       ],
+      filterFields: [{ name: "processDefinitionId", type: "object", description: "The process definition ID associated to this incident." }, { name: "errorType", type: "object", description: "Incident error type with a defined set of values." }, { name: "errorMessage", type: "object", description: "The error message of this incident." }, { name: "elementId", type: "object", description: "The element ID associated to this incident." }, { name: "creationTime", type: "object", description: "Date of incident creation." }, { name: "state", type: "object", description: "State of this incident with a defined set of values." }, { name: "tenantId", type: "object", description: "The tenant ID of the incident." }, { name: "incidentKey", type: "object", description: "The assigned key, which acts as a unique identifier for this incident." }, { name: "processDefinitionKey", type: "object", description: "The process definition key associated to this incident." }, { name: "processInstanceKey", type: "object", description: "The process instance key associated to this incident." }, { name: "elementInstanceKey", type: "object", description: "The element instance key associated to this incident." }, { name: "jobKey", type: "object", description: "The job key, if exists, associated with this incident." }],
       search: (client, body) => client.incident.searchIncidents(body as never),
     }),
     makeGetCmd({
@@ -876,11 +900,13 @@ export const incidentGroup: CommandGroup = {
       name: "get-process-instance-statistics-by-definition",
       description: "Get process instance statistics by definition",
       create: (client, body) => client.incident.getProcessInstanceStatisticsByDefinition(body as never),
+      bodyFields: [{ name: "filter", type: "object", description: "Filter criteria for the aggregated process instance statistics.", required: true }, { name: "page", type: "object", description: "Pagination parameters for the aggregated process instance statistics." }, { name: "sort", type: "array", description: "Sorting criteria for process instance statistics grouped by process definition." }],
     }),
     makeCreateCmd({
       name: "get-process-instance-statistics-by-error",
       description: "Get process instance statistics by error",
       create: (client, body) => client.incident.getProcessInstanceStatisticsByError(body as never),
+      bodyFields: [{ name: "page", type: "object", description: " Pagination parameters for process instance statistics grouped by incident error." }, { name: "sort", type: "array", description: "Sorting criteria for process instance statistics grouped by incident error." }],
     }),
   ],
 };
@@ -894,6 +920,7 @@ export const jobGroup: CommandGroup = {
       name: "activate",
       description: "Activate jobs",
       create: (client, body) => client.job.activateJobs(body as never),
+      bodyFields: [{ name: "type", type: "string", description: "The job type, as defined in the BPMN process (e.g. <zeebe:taskDefinition type=\"payment-service\" />)", required: true }, { name: "worker", type: "string", description: "The name of the worker activating the jobs, mostly used for logging purposes." }, { name: "timeout", type: "string", description: "A job returned after this call will not be activated by another call until the timeout (in ms) has been reached.", required: true }, { name: "maxJobsToActivate", type: "string", description: "The maximum jobs to activate by this request.", required: true }, { name: "fetchVariable", type: "array", description: "A list of variables to fetch as the job variables; if empty, all visible variables at the time of activation for the scope of the job will be returned." }, { name: "requestTimeout", type: "string", description: "The request will be completed when at least one job is activated or after the requestTimeout (in ms). If the requestTimeout = 0, a default timeout is used. If the requestTimeout < 0, long polling is disabled and the request is completed immediately, even when no job is activated." }, { name: "tenantIds", type: "array", description: "A list of IDs of tenants for which to activate jobs." }, { name: "tenantFilter", type: "string", description: "The tenant filtering strategy - determines whether to use provided tenant IDs or assigned tenant IDs from the authenticated principal's authorized tenants.", enum: ["PROVIDED","ASSIGNED"] }],
     }),
     makeListCmd({
       description: "Search jobs",
@@ -906,12 +933,14 @@ export const jobGroup: CommandGroup = {
         { key: "state", header: "STATE", maxWidth: 30 },
         { key: "elementId", header: "ELEMENT ID" },
       ],
+      filterFields: [{ name: "deadline", type: "object", description: "When the job can next be activated." }, { name: "deniedReason", type: "object", description: "The reason provided by the user task listener for denying the work." }, { name: "elementId", type: "object", description: "The element ID associated with the job." }, { name: "elementInstanceKey", type: "object", description: "The element instance key associated with the job." }, { name: "endTime", type: "object", description: "When the job ended." }, { name: "errorCode", type: "object", description: "The error code provided for the failed job." }, { name: "errorMessage", type: "object", description: "The error message that provides additional context for a failed job." }, { name: "hasFailedWithRetriesLeft", type: "boolean", description: "Indicates whether the job has failed with retries left." }, { name: "isDenied", type: "boolean", description: "Indicates whether the user task listener denies the work." }, { name: "jobKey", type: "object", description: "The key, a unique identifier for the job." }, { name: "kind", type: "object", description: "The kind of the job." }, { name: "listenerEventType", type: "object", description: "The listener event type of the job." }, { name: "processDefinitionId", type: "object", description: "The process definition ID associated with the job." }, { name: "processDefinitionKey", type: "object", description: "The process definition key associated with the job." }, { name: "processInstanceKey", type: "object", description: "The process instance key associated with the job." }, { name: "retries", type: "object", description: "The number of retries left." }, { name: "state", type: "object", description: "The state of the job." }, { name: "tenantId", type: "object", description: "The tenant ID." }, { name: "type", type: "object", description: "The type of the job." }, { name: "worker", type: "object", description: "The name of the worker for this job." }, { name: "creationTime", type: "object", description: "When the job was created. Field is present for jobs created after 8.9." }, { name: "lastUpdateTime", type: "object", description: "When the job was last updated. Field is present for jobs created after 8.9." }],
       search: (client, body) => client.job.searchJobs(body as never),
     }),
     makeUpdateCmd({
       description: "Update job",
       argName: "jobKey",
       update: (client, key, body) => client.job.updateJob(key, body as never),
+      bodyFields: [{ name: "changeset", type: "object", description: "JSON object with changed job attribute values. The job cannot be completed or failed with this endpoint, use the complete job or fail job endpoints instead.", required: true }, { name: "operationReference", type: "string", description: " A reference key chosen by the user that will be part of all records resulting from this operation.\n Must be > 0 if provided." }],
     }),
     {
       name: "complete",
@@ -968,16 +997,19 @@ export const jobGroup: CommandGroup = {
       name: "get-type-statistics",
       description: "Get job statistics by type",
       create: (client, body) => client.job.getJobTypeStatistics(body as never),
+      bodyFields: [{ name: "filter", type: "object", description: "Job type statistics search filter." }, { name: "page", type: "object", description: "Search cursor pagination." }],
     }),
     makeCreateCmd({
       name: "get-worker-statistics",
       description: "Get job statistics by worker",
       create: (client, body) => client.job.getJobWorkerStatistics(body as never),
+      bodyFields: [{ name: "filter", type: "object", description: "Job worker statistics search filter.", required: true }, { name: "page", type: "object", description: "Search cursor pagination." }],
     }),
     makeCreateCmd({
       name: "get-time-series-statistics",
       description: "Get time-series metrics for a job type",
       create: (client, body) => client.job.getJobTimeSeriesStatistics(body as never),
+      bodyFields: [{ name: "filter", type: "object", description: "Job time-series statistics search filter.", required: true }, { name: "page", type: "object", description: "Search cursor pagination." }],
     }),
   ],
 };
@@ -1008,6 +1040,7 @@ export const mappingRuleGroup: CommandGroup = {
     makeCreateCmd({
       description: "Create mapping rule",
       create: (client, body) => client.mappingRule.createMappingRule(body as never),
+      bodyFields: [{ name: "mappingRuleId", type: "string", description: "The unique ID of the mapping rule.", required: true }, { name: "claimName", type: "string", description: "The name of the claim to map.", required: true }, { name: "claimValue", type: "string", description: "The value of the claim to map.", required: true }, { name: "name", type: "string", description: "The name of the mapping rule.", required: true }],
     }),
     makeListCmd({
       description: "Search mapping rules",
@@ -1017,6 +1050,7 @@ export const mappingRuleGroup: CommandGroup = {
         { key: "name", header: "NAME", maxWidth: 30 },
         { key: "claimValue", header: "CLAIM VALUE", maxWidth: 30 },
       ],
+      filterFields: [{ name: "claimName", type: "string", description: "The claim name to match against a token." }, { name: "claimValue", type: "string", description: "The value of the claim to match." }, { name: "name", type: "string", description: "The name of the mapping rule." }, { name: "mappingRuleId", type: "string", description: "The ID of the mapping rule." }],
       search: (client, body) => client.mappingRule.searchMappingRule(body as never),
     }),
     makeGetCmd({
@@ -1028,6 +1062,7 @@ export const mappingRuleGroup: CommandGroup = {
       description: "Update mapping rule",
       argName: "mappingRuleId",
       update: (client, key, body) => client.mappingRule.updateMappingRule(key, body as never),
+      bodyFields: [{ name: "claimName", type: "string", description: "The name of the claim to map.", required: true }, { name: "claimValue", type: "string", description: "The value of the claim to map.", required: true }, { name: "name", type: "string", description: "The name of the mapping rule.", required: true }],
     }),
     makeDeleteCmd({
       description: "Delete a mapping rule",
@@ -1046,11 +1081,13 @@ export const messageGroup: CommandGroup = {
       name: "correlate",
       description: "Correlate message",
       create: (client, body) => client.message.correlateMessage(body as never),
+      bodyFields: [{ name: "name", type: "string", description: "The message name as defined in the BPMN process", required: true }, { name: "correlationKey", type: "string", description: "The correlation key of the message." }, { name: "variables", type: "object", description: "The message variables as JSON document" }, { name: "tenantId", type: "string", description: "the tenant for which the message is published" }],
     }),
     makeCreateCmd({
       name: "publish",
       description: "Publish message",
       create: (client, body) => client.message.publishMessage(body as never),
+      bodyFields: [{ name: "name", type: "string", description: "The name of the message.", required: true }, { name: "correlationKey", type: "string", description: "The correlation key of the message." }, { name: "timeToLive", type: "string", description: "Timespan (in ms) to buffer the message on the broker." }, { name: "messageId", type: "string", description: " The unique ID of the message. This is used to ensure only one message with the given ID\n will be published during the lifetime of the message (if `timeToLive` is set)." }, { name: "variables", type: "object", description: "The message variables as JSON document." }, { name: "tenantId", type: "string", description: "The tenant of the message sender." }],
     }),
   ],
 };
@@ -1072,17 +1109,20 @@ export const processDefinitionGroup: CommandGroup = {
         { key: "version", header: "VERSION" },
         { key: "versionTag", header: "VERSION TAG", maxWidth: 30 },
       ],
+      filterFields: [{ name: "name", type: "object", description: "Name of this process definition." }, { name: "isLatestVersion", type: "boolean", description: " Whether to only return the latest version of each process definition.\n When using this filter, pagination functionality is limited, you can only paginate forward using `after` and `limit`.\n The response contains no `startCursor` in the `page`, and requests ignore the `from` and `before` in the `page`." }, { name: "resourceName", type: "string", description: "Resource name of this process definition." }, { name: "version", type: "string", description: "Version of this process definition." }, { name: "versionTag", type: "string", description: "Version tag of this process definition." }, { name: "processDefinitionId", type: "object", description: "Process definition ID of this process definition." }, { name: "tenantId", type: "string", description: "Tenant ID of this process definition." }, { name: "processDefinitionKey", type: "string", description: "The key for this process definition." }, { name: "hasStartForm", type: "boolean", description: "Indicates whether the start event of the process has an associated Form Key." }],
       search: (client, body) => client.processDefinition.searchProcessDefinitions(body as never),
     }),
     makeCreateCmd({
       name: "get-message-subscription-statistics",
       description: "Get message subscription statistics",
       create: (client, body) => client.processDefinition.getProcessDefinitionMessageSubscriptionStatistics(body as never),
+      bodyFields: [{ name: "page", type: "object", description: "Search cursor pagination." }, { name: "filter", type: "object", description: "The message subscription filters." }],
     }),
     makeCreateCmd({
       name: "get-instance-statistics",
       description: "Get process instance statistics",
       create: (client, body) => client.processDefinition.getProcessDefinitionInstanceStatistics(body as never),
+      bodyFields: [{ name: "page", type: "object", description: "Search cursor pagination." }, { name: "sort", type: "array", description: "Sort field criteria." }],
     }),
     makeGetCmd({
       description: "Get process definition",
@@ -1119,6 +1159,7 @@ export const processDefinitionGroup: CommandGroup = {
       name: "get-instance-version-statistics",
       description: "Get process instance statistics by version",
       create: (client, body) => client.processDefinition.getProcessDefinitionInstanceVersionStatistics(body as never),
+      bodyFields: [{ name: "page", type: "object", description: "Pagination criteria." }, { name: "sort", type: "array", description: "Sort field criteria." }, { name: "filter", type: "object", description: "The process definition instance version statistics search filters.", required: true }],
     }),
   ],
 };
@@ -1137,26 +1178,31 @@ export const processInstanceGroup: CommandGroup = {
       name: "cancel-batch-operation",
       description: "Cancel process instances (batch)",
       create: (client, body) => client.processInstance.cancelProcessInstancesBatchOperation(body as never),
+      bodyFields: [{ name: "filter", type: "string", description: "The process instance filter.", required: true }, { name: "operationReference", type: "string", description: " A reference key chosen by the user that will be part of all records resulting from this operation.\n Must be > 0 if provided." }],
     }),
     makeCreateCmd({
       name: "delete-batch-operation",
       description: "Delete process instances (batch)",
       create: (client, body) => client.processInstance.deleteProcessInstancesBatchOperation(body as never),
+      bodyFields: [{ name: "filter", type: "string", description: "The process instance filter.", required: true }, { name: "operationReference", type: "string", description: " A reference key chosen by the user that will be part of all records resulting from this operation.\n Must be > 0 if provided." }],
     }),
     makeCreateCmd({
       name: "resolve-incidents-batch-operation",
       description: "Resolve related incidents (batch)",
       create: (client, body) => client.processInstance.resolveIncidentsBatchOperation(body as never),
+      bodyFields: [{ name: "filter", type: "string", description: "The process instance filter.", required: true }, { name: "operationReference", type: "string", description: " A reference key chosen by the user that will be part of all records resulting from this operation.\n Must be > 0 if provided." }],
     }),
     makeCreateCmd({
       name: "migrate-batch-operation",
       description: "Migrate process instances (batch)",
       create: (client, body) => client.processInstance.migrateProcessInstancesBatchOperation(body as never),
+      bodyFields: [{ name: "filter", type: "string", description: "The process instance filter.", required: true }, { name: "migrationPlan", type: "object", description: "The migration plan.", required: true }, { name: "operationReference", type: "string", description: " A reference key chosen by the user that will be part of all records resulting from this operation.\n Must be > 0 if provided." }],
     }),
     makeCreateCmd({
       name: "modify-batch-operation",
       description: "Modify process instances (batch)",
       create: (client, body) => client.processInstance.modifyProcessInstancesBatchOperation(body as never),
+      bodyFields: [{ name: "filter", type: "string", description: "The process instance filter.", required: true }, { name: "moveInstructions", type: "array", description: "Instructions for moving tokens between elements.", required: true }, { name: "operationReference", type: "string", description: " A reference key chosen by the user that will be part of all records resulting from this operation.\n Must be > 0 if provided." }],
     }),
     makeListCmd({
       description: "Search process instances",
@@ -1169,6 +1215,7 @@ export const processInstanceGroup: CommandGroup = {
         { key: "state", header: "STATE", maxWidth: 30 },
         { key: "processDefinitionId", header: "PROCESS DEFINITION ID" },
       ],
+      filterFields: [{ name: "processDefinitionId", type: "object", description: "The process definition id." }, { name: "processDefinitionName", type: "object", description: "The process definition name." }, { name: "processDefinitionVersion", type: "object", description: "The process definition version." }, { name: "processDefinitionVersionTag", type: "object", description: "The process definition version tag." }, { name: "processDefinitionKey", type: "object", description: "The process definition key." }, { name: "startDate", type: "object", description: "The start date." }, { name: "endDate", type: "object", description: "The end date." }, { name: "state", type: "object", description: "The process instance state." }, { name: "hasIncident", type: "boolean", description: "Whether this process instance has a related incident or not." }, { name: "tenantId", type: "object", description: "The tenant id." }, { name: "variables", type: "array", description: "The process instance variables." }, { name: "processInstanceKey", type: "object", description: "The key of this process instance." }, { name: "parentProcessInstanceKey", type: "object", description: "The parent process instance key." }, { name: "parentElementInstanceKey", type: "object", description: "The parent element instance key." }, { name: "batchOperationId", type: "object", description: "The batch operation id." }, { name: "errorMessage", type: "object", description: "The error message related to the process." }, { name: "hasRetriesLeft", type: "boolean", description: "Whether the process has failed jobs with retries left." }, { name: "elementInstanceState", type: "object", description: "The state of the element instances associated with the process instance." }, { name: "elementId", type: "object", description: "The element id associated with the process instance." }, { name: "hasElementInstanceIncident", type: "boolean", description: "Whether the element instance has an incident or not." }, { name: "incidentErrorHashCode", type: "object", description: "The incident error hash code, associated with this process." }, { name: "tags", type: "array", description: "List of tags. Tags need to start with a letter; then alphanumerics, `_`, `-`, `:`, or `.`; length ≤ 100." }, { name: "$or", type: "array", description: " Defines a list of alternative filter groups combined using OR logic. Each object in the array is evaluated independently, and the filter matches if any one of them is satisfied.\n\n Top-level fields and the `$or` clause are combined using AND logic — meaning: (top-level filters) AND (any of the `$or` filters) must match.\n <br>\n <em>Example:</em>\n\n ```json\n {\n   \"state\": \"ACTIVE\",\n   \"tenantId\": 123,\n   \"$or\": [\n     { \"processDefinitionId\": \"process_v1\" },\n     { \"processDefinitionId\": \"process_v2\", \"hasIncident\": true }\n   ]\n }\n ```\n This matches process instances that:\n\n <ul style=\"padding-left: 20px; margin-left: 20px;\">\n   <li style=\"list-style-type: disc;\">are in <em>ACTIVE</em> state</li>\n   <li style=\"list-style-type: disc;\">have tenant id equal to <em>123</em></li>\n   <li style=\"list-style-type: disc;\">and match either:\n     <ul style=\"padding-left: 20px; margin-left: 20px;\">\n       <li style=\"list-style-type: circle;\"><code>processDefinitionId</code> is <em>process_v1</em>, or</li>\n       <li style=\"list-style-type: circle;\"><code>processDefinitionId</code> is <em>process_v2</em> and <code>hasIncident</code> is <em>true</em></li>\n     </ul>\n   </li>\n </ul>\n <br>\n <p>Note: Using complex <code>$or</code> conditions may impact performance, use with caution in high-volume environments." }],
       search: (client, body) => client.processInstance.searchProcessInstances(body as never),
     }),
     makeGetCmd({
@@ -1287,6 +1334,7 @@ export const roleGroup: CommandGroup = {
     makeCreateCmd({
       description: "Create role",
       create: (client, body) => client.role.createRole(body as never),
+      bodyFields: [{ name: "roleId", type: "string", description: "The ID of the new role.", required: true }, { name: "name", type: "string", description: "The display name of the new role.", required: true }, { name: "description", type: "string", description: "The description of the new role." }],
     }),
     makeListCmd({
       description: "Search roles",
@@ -1295,6 +1343,7 @@ export const roleGroup: CommandGroup = {
         { key: "name", header: "NAME", maxWidth: 30 },
         { key: "description", header: "DESCRIPTION", maxWidth: 30 },
       ],
+      filterFields: [{ name: "roleId", type: "string", description: "The role ID search filters." }, { name: "name", type: "string", description: "The role name search filters." }],
       search: (client, body) => client.role.searchRoles(body as never),
     }),
     makeGetCmd({
@@ -1306,6 +1355,7 @@ export const roleGroup: CommandGroup = {
       description: "Update role",
       argName: "roleId",
       update: (client, key, body) => client.role.updateRole(key, body as never),
+      bodyFields: [{ name: "name", type: "string", description: "The display name of the new role.", required: true }, { name: "description", type: "string", description: "The description of the new role." }],
     }),
     makeDeleteCmd({
       description: "Delete role",
@@ -1492,6 +1542,7 @@ export const setupGroup: CommandGroup = {
       name: "create-admin-user",
       description: "Create admin user",
       create: (client, body) => client.setup.createAdminUser(body as never),
+      bodyFields: [{ name: "password", type: "string", description: "The password of the user.", required: true }, { name: "username", type: "string", description: "The username of the user.", required: true }, { name: "name", type: "string", description: "The name of the user." }, { name: "email", type: "string", description: "The email of the user." }],
     }),
   ],
 };
@@ -1505,6 +1556,7 @@ export const signalGroup: CommandGroup = {
       name: "broadcast",
       description: "Broadcast signal",
       create: (client, body) => client.signal.broadcastSignal(body as never),
+      bodyFields: [{ name: "signalName", type: "string", description: "The name of the signal to broadcast.", required: true }, { name: "variables", type: "object", description: "The signal variables as a JSON object." }, { name: "tenantId", type: "string", description: "The ID of the tenant that owns the signal." }],
     }),
   ],
 };
@@ -1560,6 +1612,7 @@ export const tenantGroup: CommandGroup = {
     makeCreateCmd({
       description: "Create tenant",
       create: (client, body) => client.tenant.createTenant(body as never),
+      bodyFields: [{ name: "tenantId", type: "string", description: "The unique ID for the tenant. Must be 255 characters or less. Can contain letters, numbers, [`_`, `-`, `+`, `.`, `@`].", required: true }, { name: "name", type: "string", description: "The name of the tenant.", required: true }, { name: "description", type: "string", description: "The description of the tenant." }],
     }),
     makeListCmd({
       description: "Search tenants",
@@ -1568,6 +1621,7 @@ export const tenantGroup: CommandGroup = {
         { key: "name", header: "NAME", maxWidth: 30 },
         { key: "description", header: "DESCRIPTION", maxWidth: 30 },
       ],
+      filterFields: [{ name: "tenantId", type: "string", description: "The unique identifier of the tenant." }, { name: "name", type: "string", description: "The name of the tenant." }],
       search: (client, body) => client.tenant.searchTenants(body as never),
     }),
     makeGetCmd({
@@ -1579,6 +1633,7 @@ export const tenantGroup: CommandGroup = {
       description: "Update tenant",
       argName: "tenantId",
       update: (client, key, body) => client.tenant.updateTenant(key, body as never),
+      bodyFields: [{ name: "name", type: "string", description: "The new name of the tenant.", required: true }, { name: "description", type: "string", description: "The new description of the tenant." }],
     }),
     makeDeleteCmd({
       description: "Delete tenant",
@@ -1806,6 +1861,7 @@ export const userGroup: CommandGroup = {
     makeCreateCmd({
       description: "Create user",
       create: (client, body) => client.user.createUser(body as never),
+      bodyFields: [{ name: "password", type: "string", description: "The password of the user.", required: true }, { name: "username", type: "string", description: "The username of the user.", required: true }, { name: "name", type: "string", description: "The name of the user." }, { name: "email", type: "string", description: "The email of the user." }],
     }),
     makeListCmd({
       description: "Search users",
@@ -1814,6 +1870,7 @@ export const userGroup: CommandGroup = {
         { key: "name", header: "NAME", maxWidth: 30 },
         { key: "email", header: "EMAIL", maxWidth: 30 },
       ],
+      filterFields: [{ name: "username", type: "object", description: "The username of the user." }, { name: "name", type: "object", description: "The name of the user." }, { name: "email", type: "object", description: "The email of the user." }],
       search: (client, body) => client.user.searchUsers(body as never),
     }),
     makeGetCmd({
@@ -1825,6 +1882,7 @@ export const userGroup: CommandGroup = {
       description: "Update user",
       argName: "username",
       update: (client, key, body) => client.user.updateUser(key, body as never),
+      bodyFields: [{ name: "password", type: "string", description: "The password of the user. If blank, the password is unchanged." }, { name: "name", type: "string", description: "The name of the user." }, { name: "email", type: "string", description: "The email of the user." }],
     }),
     makeDeleteCmd({
       description: "Delete user",
@@ -1851,6 +1909,7 @@ export const userTaskGroup: CommandGroup = {
         { key: "formKey", header: "FORM KEY" },
         { key: "state", header: "STATE", maxWidth: 30 },
       ],
+      filterFields: [{ name: "state", type: "object", description: "The user task state." }, { name: "assignee", type: "object", description: "The assignee of the user task." }, { name: "priority", type: "object", description: "The priority of the user task." }, { name: "elementId", type: "string", description: "The element ID of the user task." }, { name: "name", type: "object", description: "The task name. This only works for data created with 8.8 and onwards. Instances from prior versions don't contain this data and cannot be found." }, { name: "candidateGroup", type: "object", description: "The candidate group for this user task." }, { name: "candidateUser", type: "object", description: "The candidate user for this user task." }, { name: "tenantId", type: "object", description: "Tenant ID of this user task." }, { name: "processDefinitionId", type: "string", description: "The ID of the process definition." }, { name: "creationDate", type: "object", description: "The user task creation date." }, { name: "completionDate", type: "object", description: "The user task completion date." }, { name: "followUpDate", type: "object", description: "The user task follow-up date." }, { name: "dueDate", type: "object", description: "The user task due date." }, { name: "processInstanceVariables", type: "array", description: "The variables of the process instance." }, { name: "localVariables", type: "array", description: "The local variables of the user task." }, { name: "userTaskKey", type: "string", description: "The key for this user task." }, { name: "processDefinitionKey", type: "string", description: "The key of the process definition." }, { name: "processInstanceKey", type: "string", description: "The key of the process instance." }, { name: "elementInstanceKey", type: "string", description: "The key of the element instance." }, { name: "tags", type: "array", description: "List of tags. Tags need to start with a letter; then alphanumerics, `_`, `-`, `:`, or `.`; length ≤ 100." }],
       search: (client, body) => client.userTask.searchUserTasks(body as never),
     }),
     makeGetCmd({
@@ -1862,6 +1921,7 @@ export const userTaskGroup: CommandGroup = {
       description: "Update user task",
       argName: "userTaskKey",
       update: (client, key, body) => client.userTask.updateUserTask(key, body as never),
+      bodyFields: [{ name: "changeset", type: "object", description: " JSON object with changed task attribute values.\n\n The following attributes can be adjusted with this endpoint, additional attributes\n will be ignored:\n\n * `candidateGroups` - reset by providing an empty list\n * `candidateUsers` - reset by providing an empty list\n * `dueDate` - reset by providing an empty String\n * `followUpDate` - reset by providing an empty String\n * `priority` - minimum 0, maximum 100, default 50\n\n Providing any of those attributes with a `null` value or omitting it preserves\n the persisted attribute's value.\n\n The assignee cannot be adjusted with this endpoint, use the Assign task endpoint.\n This ensures correct event emission for assignee changes." }, { name: "action", type: "string", description: "A custom action value that will be accessible from user task events resulting from this endpoint invocation. If not provided, it will default to \"update\"." }],
     }),
     makeDeleteCmd({
       name: "unassign",
@@ -1946,6 +2006,7 @@ export const variableGroup: CommandGroup = {
         { key: "value", header: "VALUE", maxWidth: 30 },
         { key: "isTruncated", header: "IS TRUNCATED" },
       ],
+      filterFields: [{ name: "name", type: "object", description: "Name of the variable." }, { name: "value", type: "object", description: " The value of the variable.\n Variable values in filters need to be in serialized JSON format. For example, a variable\n with string value `myValue` can be found with the filter value `\"myValue\"`. Consider\n appropriate escaping for special characters in JSON strings when constructing filter values." }, { name: "tenantId", type: "string", description: "Tenant ID of this variable." }, { name: "isTruncated", type: "boolean", description: "Whether the value is truncated or not." }, { name: "variableKey", type: "object", description: "The key for this variable." }, { name: "scopeKey", type: "object", description: " The key of the scope that defines where this variable is directly defined. This can be a\n process instance key (for process-level variables) or an element instance key (for local\n variables scoped to tasks, subprocesses, gateways, events, etc.). Use this filter to\n find variables directly defined in specific scopes. Note that this does not include\n variables from parent scopes that would be visible through the scope hierarchy." }, { name: "processInstanceKey", type: "string", description: "The key of the process instance of this variable." }],
       search: (client, body) => client.variable.searchVariables(body as never),
     }),
     makeGetCmd({

@@ -1,5 +1,5 @@
 import { badge } from "../components/badge.js"
-import { createTable } from "../components/table.js"
+import { createFilterTable } from "../components/filter-table.js"
 import type { JobsStore } from "../stores/jobs.js"
 import type { JobSearchResult } from "../types.js"
 
@@ -10,31 +10,36 @@ export function createJobsView(store: JobsStore): {
 	const el = document.createElement("div")
 	el.className = "op-view"
 
-	const { el: tableEl, setRows } = createTable<JobSearchResult>({
+	const { el: tableEl, setRows } = createFilterTable<JobSearchResult>({
 		columns: [
 			{
 				label: "Key",
 				width: "120px",
 				render: (row) => row.jobKey,
+				sortValue: (row) => row.jobKey,
 			},
 			{
 				label: "Type",
 				render: (row) => row.type,
+				sortValue: (row) => row.type,
 			},
 			{
 				label: "Worker",
 				width: "160px",
 				render: (row) => row.worker || "—",
+				sortValue: (row) => row.worker ?? "",
 			},
 			{
 				label: "Retries",
 				width: "70px",
 				render: (row) => String(row.retries),
+				sortValue: (row) => row.retries,
 			},
 			{
 				label: "State",
 				width: "120px",
 				render: (row) => badge(row.state),
+				sortValue: (row) => row.state,
 			},
 			{
 				label: "Error",
@@ -48,6 +53,8 @@ export function createJobsView(store: JobsStore): {
 				},
 			},
 		],
+		searchFn: (row) =>
+			[row.jobKey, row.type, row.worker, row.state, row.errorMessage].filter(Boolean).join(" "),
 		emptyText: "No jobs found",
 	})
 	el.appendChild(tableEl)
