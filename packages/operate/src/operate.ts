@@ -9,6 +9,7 @@ import { JobsStore } from "./stores/jobs.js"
 import { TasksStore } from "./stores/tasks.js"
 import type { OperateApi, OperateOptions, ProfileInfo } from "./types.js"
 import { createDashboardView } from "./views/dashboard.js"
+import { createDefinitionDetailView } from "./views/definition-detail.js"
 import { createDefinitionsView } from "./views/definitions.js"
 import { createHeader } from "./views/header.js"
 import { createIncidentsView } from "./views/incidents.js"
@@ -163,12 +164,16 @@ export function createOperate(options: OperateOptions): OperateApi {
 	router.on("/definitions/:key", (params) => {
 		header.setTitle("Process Definition")
 		nav.setActive("/definitions")
-		instStore.destroy()
-		instStore.connect(proxyUrl, profile, pollInterval, mock, {
-			processDefinitionKey: params.key,
-		})
-		const { el: vEl, destroy } = createInstancesView(instStore, (inst) =>
-			router.navigate(`/instances/${inst.processInstanceKey}`),
+		const { el: vEl, destroy } = createDefinitionDetailView(
+			params.key ?? "",
+			defStore,
+			{
+				proxyUrl,
+				profile,
+				mock,
+				theme: el.getAttribute("data-theme") === "light" ? "light" : "dark",
+			},
+			() => router.navigate("/definitions"),
 		)
 		showView(vEl, destroy)
 	})

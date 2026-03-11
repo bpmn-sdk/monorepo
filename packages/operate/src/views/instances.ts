@@ -1,5 +1,5 @@
 import { badge } from "../components/badge.js"
-import { createTable } from "../components/table.js"
+import { createFilterTable } from "../components/filter-table.js"
 import type { InstancesStore } from "../stores/instances.js"
 import type { ProcessInstanceResult } from "../types.js"
 
@@ -25,10 +25,9 @@ export function createInstancesView(
 	const el = document.createElement("div")
 	el.className = "op-view"
 
-	// Filter bar
+	// State filter bar
 	const filterBar = document.createElement("div")
 	filterBar.className = "op-filter-bar"
-
 	const filters = [
 		{ label: "All", value: "" },
 		{ label: "Active", value: "ACTIVE" },
@@ -36,7 +35,6 @@ export function createInstancesView(
 		{ label: "Terminated", value: "TERMINATED" },
 	]
 	let activeFilter = ""
-
 	for (const f of filters) {
 		const btn = document.createElement("button")
 		btn.className = `op-filter-btn${f.value === activeFilter ? " op-filter-btn--active" : ""}`
@@ -53,21 +51,24 @@ export function createInstancesView(
 	}
 	el.appendChild(filterBar)
 
-	const { el: tableEl, setRows } = createTable<ProcessInstanceResult>({
+	const { el: tableEl, setRows } = createFilterTable<ProcessInstanceResult>({
 		columns: [
 			{
 				label: "Key",
 				width: "140px",
 				render: (row) => row.processInstanceKey,
+				sortValue: (row) => row.processInstanceKey,
 			},
 			{
 				label: "Process",
-				render: (row) => row.processDefinitionName ?? row.processDefinitionId,
+				render: (row) => row.processDefinitionName ?? row.processDefinitionId ?? "—",
+				sortValue: (row) => row.processDefinitionName ?? row.processDefinitionId ?? "",
 			},
 			{
 				label: "Business ID",
 				width: "140px",
 				render: (row) => row.businessId || "—",
+				sortValue: (row) => row.businessId ?? "",
 			},
 			{
 				label: "State",
@@ -85,26 +86,38 @@ export function createInstancesView(
 					}
 					return wrap
 				},
+				sortValue: (row) => row.state,
 			},
 			{
 				label: "Started",
 				width: "100px",
 				render: (row) => relTime(row.startDate),
+				sortValue: (row) => row.startDate ?? "",
 			},
 			{
 				label: "Ended",
 				width: "100px",
 				render: (row) => relTime(row.endDate),
+				sortValue: (row) => row.endDate ?? "",
 			},
 		],
+		searchFn: (row) =>
+			[
+				row.processInstanceKey,
+				row.processDefinitionName,
+				row.processDefinitionId,
+				row.businessId,
+				row.state,
+			]
+				.filter(Boolean)
+				.join(" "),
 		onRowClick: onSelect,
 		emptyText: "No process instances found",
 	})
 	el.appendChild(tableEl)
 
 	function render(): void {
-		const items = store.state.data?.items ?? []
-		setRows(items)
+		setRows(store.state.data?.items ?? [])
 	}
 
 	const unsub = store.subscribe(render)

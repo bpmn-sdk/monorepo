@@ -4,7 +4,6 @@ import { badge } from "../components/badge.js"
 import {
 	MOCK_ACTIVE_ELEMENTS,
 	MOCK_BPMN_XML,
-	MOCK_INCIDENTS,
 	MOCK_VARIABLES,
 	MOCK_VISITED_ELEMENTS,
 } from "../mock-data.js"
@@ -270,16 +269,11 @@ export function createInstanceDetailView(
 		renderMeta(inst)
 	})
 
-	renderMeta(
-		cfg.mock
-			? MOCK_INCIDENTS.find((i) => i.processInstanceKey === instanceKey)
-				? null
-				: null
-			: null,
-	)
 	if (cfg.mock) {
 		const mockInst = {
 			processInstanceKey: instanceKey,
+			processDefinitionKey: "pd-1",
+			processDefinitionId: "order-process",
 			processDefinitionName: "Order Processing",
 			state: "ACTIVE",
 			hasIncident: false,
