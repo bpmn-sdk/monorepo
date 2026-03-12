@@ -107,6 +107,19 @@ type Screen =
 	  }
 	| { kind: "profile"; scroll: number }
 	| {
+			kind: "worker"
+			group: CommandGroup
+			cmd: Command
+			jobType: string
+			status: "starting" | "running" | "stopping" | "stopped"
+			stats: { activated: number; completed: number; failed: number }
+			log: Array<{ ts: string; level: "info" | "ok" | "err"; text: string }>
+			scroll: number
+			autoScroll: boolean
+			_stop: (() => void) | null
+			_timer: ReturnType<typeof setInterval> | null
+	  }
+	| {
 			kind: "json-editor"
 			group: CommandGroup
 			cmd: Command
@@ -885,6 +898,62 @@ function renderProfile(state: TuiState, screen: Extract<Screen, { kind: "profile
 	return lines
 }
 
+function renderWorker(state: TuiState, screen: Extract<Screen, { kind: "worker" }>): string[] {
+	const { cols, rows } = termSize()
+	const viewH = Math.max(3, rows - 13)
+
+	const statusStr =
+		screen.status === "running"
+			? green("● RUNNING")
+			: screen.status === "starting"
+				? dim("◌ STARTING")
+				: screen.status === "stopping"
+					? cyan("◌ STOPPING")
+					: dim("■ STOPPED")
+
+	const lines = [renderHeader(["job", "worker"], cols, state.profile), ""]
+
+	lines.push(
+		`  ${padEnd(dim("type"), 8)}  ${cyan(screen.jobType)}    ${dim("status")}  ${statusStr}`,
+	)
+	lines.push(`  ${dim("─".repeat(cols - 4))}`)
+	const { activated, completed, failed } = screen.stats
+	lines.push(
+		`  ${dim("activated")}  ${bold(String(activated))}    ${dim("completed")}  ${completed > 0 ? green(String(completed)) : dim("0")}    ${dim("failed")}  ${failed > 0 ? red(String(failed)) : dim("0")}`,
+	)
+	lines.push(`  ${dim("─".repeat(cols - 4))}`)
+	lines.push("")
+
+	if (screen.log.length === 0) {
+		lines.push(`  ${dim("Waiting for jobs…")}`)
+	} else {
+		const logLines = screen.log.map((e) => {
+			const ts = dim(e.ts)
+			const msg =
+				e.level === "ok"
+					? `${green("✓")} ${e.text}`
+					: e.level === "err"
+						? `${red("✗")} ${e.text}`
+						: `  ${dim(e.text)}`
+			return `  ${ts}  ${msg}`
+		})
+		const visible = logLines.slice(screen.scroll, screen.scroll + viewH)
+		for (const l of visible) lines.push(fit(l, cols - 2))
+		if (screen.log.length > viewH) {
+			const hi = Math.min(screen.scroll + viewH, screen.log.length)
+			lines.push(`  ${dim(`${screen.scroll + 1}–${hi} of ${screen.log.length}`)}`)
+		}
+	}
+
+	const isRunning = screen.status === "running" || screen.status === "starting"
+	const autoHint = `  ${screen.autoScroll ? cyan("a") : dim("a")} ${dim("auto")}`
+	const navHint = isRunning
+		? `  ${cyan("s")} ${dim("stop")}`
+		: `  ${cyan("esc")} back  ${cyan("m")} main menu`
+	lines.push(`\n  ${dim("↑↓")} scroll${autoHint}${navHint}  ${cyan("q")} quit`)
+	return lines
+}
+
 function renderJsonEditor(
 	state: TuiState,
 	screen: Extract<Screen, { kind: "json-editor" }>,
@@ -996,6 +1065,189 @@ function renderJsonEditor(
 	return lines
 }
 
+// ─── Worker view helpers ──────────────────────────────────────────────────────
+
+function workerLogH(): number {
+	return Math.max(3, (process.stdout.rows ?? 24) - 13)
+}
+
+function addWorkerLog(
+	ws: Extract<Screen, { kind: "worker" }>,
+	level: "info" | "ok" | "err",
+	text: string,
+): void {
+	const now = new Date()
+	const ts = [now.getHours(), now.getMinutes(), now.getSeconds()]
+		.map((n) => String(n).padStart(2, "0"))
+		.join(":")
+	ws.log.push({ ts, level, text })
+	if (ws.log.length > 500) ws.log.shift()
+	if (ws.autoScroll) ws.scroll = Math.max(0, ws.log.length - workerLogH())
+}
+
+function stopWorkerScreen(ws: Extract<Screen, { kind: "worker" }>): void {
+	if (ws._timer !== null) {
+		clearInterval(ws._timer)
+		ws._timer = null
+	}
+	if (ws._stop) {
+		ws._stop()
+		ws._stop = null
+	}
+}
+
+async function runWorkerLoop(
+	ws: Extract<Screen, { kind: "worker" }>,
+	state: TuiState,
+	variables: Record<string, unknown>,
+	jobTimeout: number,
+	maxJobs: number,
+): Promise<void> {
+	let client: CamundaClient
+	try {
+		client = await state.getClient()
+	} catch (err) {
+		addWorkerLog(ws, "err", `Client error: ${err instanceof Error ? err.message : String(err)}`)
+		ws.status = "stopped"
+		stopWorkerScreen(ws)
+		return
+	}
+
+	let running = true
+	ws._stop = () => {
+		running = false
+		ws.status = "stopping"
+		ws._stop = null
+	}
+	ws.status = "running"
+	addWorkerLog(ws, "info", `Worker started for type "${ws.jobType}"`)
+	addWorkerLog(ws, "info", `Returning: ${JSON.stringify(variables)}`)
+
+	while (running) {
+		let result: {
+			jobs: Array<{
+				jobKey: string
+				processDefinitionId: string
+				elementId: string
+				processInstanceKey: string
+				variables: Record<string, unknown>
+			}>
+		}
+		try {
+			result = (await client.job.activateJobs({
+				type: ws.jobType,
+				worker: "casen-worker",
+				timeout: jobTimeout,
+				maxJobsToActivate: maxJobs,
+				requestTimeout: 20000,
+			})) as typeof result
+		} catch (err) {
+			if (!running) break
+			addWorkerLog(
+				ws,
+				"err",
+				`Poll error: ${err instanceof Error ? err.message : String(err)} — retry in 5s`,
+			)
+			await new Promise((r) => setTimeout(r, 5000))
+			continue
+		}
+
+		const jobs = result?.jobs ?? []
+		for (const job of jobs) {
+			if (!running) break
+			ws.stats.activated++
+			addWorkerLog(
+				ws,
+				"info",
+				`Activated ${job.jobKey}  process=${job.processDefinitionId}  element=${job.elementId}`,
+			)
+			try {
+				await client.job.completeJob(job.jobKey, { variables })
+				ws.stats.completed++
+				addWorkerLog(ws, "ok", `Completed ${job.jobKey}`)
+			} catch (err) {
+				ws.stats.failed++
+				addWorkerLog(
+					ws,
+					"err",
+					`Failed to complete ${job.jobKey}: ${err instanceof Error ? err.message : String(err)}`,
+				)
+			}
+		}
+		if (jobs.length > 0) await new Promise((r) => setTimeout(r, 100))
+	}
+
+	ws.status = "stopped"
+	addWorkerLog(
+		ws,
+		"info",
+		`Stopped. Activated: ${ws.stats.activated}  Completed: ${ws.stats.completed}  Failed: ${ws.stats.failed}`,
+	)
+	stopWorkerScreen(ws)
+}
+
+function launchWorkerView(inputScreen: Extract<Screen, { kind: "input" }>, state: TuiState): void {
+	const typeArg = inputScreen.fields.find((f) => f.kind === "arg")
+	const jobType = typeArg?.value?.trim() ?? ""
+	if (!jobType) {
+		inputScreen.error = '"type" is required'
+		return
+	}
+
+	let variables: Record<string, unknown> = { result: "sample-value" }
+	const varField = inputScreen.fields.find((f) => f.label === "--variables")
+	if (varField?.value) {
+		try {
+			const parsed: unknown = JSON.parse(varField.value)
+			if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+				variables = parsed as Record<string, unknown>
+			}
+		} catch {
+			// use default
+		}
+	}
+	const timeoutField = inputScreen.fields.find((f) => f.label === "--timeout")
+	const workerTimeout = timeoutField?.value ? Number(timeoutField.value) : 30000
+	const maxJobsField = inputScreen.fields.find((f) => f.label === "--max-jobs")
+	const maxJobs = maxJobsField?.value ? Number(maxJobsField.value) : 32
+
+	const ws: Extract<Screen, { kind: "worker" }> = {
+		kind: "worker",
+		group: inputScreen.group,
+		cmd: inputScreen.cmd,
+		jobType,
+		status: "starting",
+		stats: { activated: 0, completed: 0, failed: 0 },
+		log: [],
+		scroll: 0,
+		autoScroll: true,
+		_stop: null,
+		_timer: null,
+	}
+
+	state.stack.push(ws)
+	render(state)
+
+	// Re-render at 200 ms so live updates appear without waiting for key presses
+	ws._timer = setInterval(() => {
+		if (!state.quitting && state.stack.includes(ws)) {
+			render(state)
+		} else {
+			if (ws._timer !== null) {
+				clearInterval(ws._timer)
+				ws._timer = null
+			}
+		}
+	}, 200)
+
+	// Fire-and-forget: the loop writes to ws state; the timer re-renders
+	runWorkerLoop(ws, state, variables, workerTimeout, maxJobs).catch((err) => {
+		addWorkerLog(ws, "err", `Unexpected: ${err instanceof Error ? err.message : String(err)}`)
+		ws.status = "stopped"
+		stopWorkerScreen(ws)
+	})
+}
+
 function render(state: TuiState): void {
 	if (state.quitting) return
 	const screen = state.stack[state.stack.length - 1]
@@ -1022,6 +1274,9 @@ function render(state: TuiState): void {
 			break
 		case "profile":
 			lines = renderProfile(state, screen)
+			break
+		case "worker":
+			lines = renderWorker(state, screen)
 			break
 		case "json-editor":
 			lines = renderJsonEditor(state, screen)
@@ -1393,7 +1648,11 @@ async function handleInputKey(
 		case "\n":
 			if (!field) break
 			if (field.kind === "run") {
-				await executeCommand(screen, state)
+				if (screen.cmd.name === "worker") {
+					launchWorkerView(screen, state)
+				} else {
+					await executeCommand(screen, state)
+				}
 			} else if (isJsonField(field)) {
 				// Open the key-value JSON editor
 				const jsonFieldSpecs = field.kind === "flag" ? field.flagSpec?.fields : undefined
@@ -2024,6 +2283,66 @@ function handleProfileKey(
 	render(state)
 }
 
+function handleWorkerKey(
+	key: string,
+	screen: Extract<Screen, { kind: "worker" }>,
+	state: TuiState,
+	done: () => void,
+): void {
+	const { rows } = termSize()
+	const viewH = Math.max(3, rows - 13)
+	const isRunning = screen.status === "running" || screen.status === "starting"
+
+	switch (key) {
+		case "\x1b[A": // up
+			screen.autoScroll = false
+			if (screen.scroll > 0) screen.scroll--
+			break
+		case "\x1b[B": // down
+			if (screen.scroll < Math.max(0, screen.log.length - viewH)) {
+				screen.scroll++
+				if (screen.scroll >= screen.log.length - viewH) screen.autoScroll = true
+			}
+			break
+		case "\x1b[5~": // page up
+			screen.autoScroll = false
+			screen.scroll = Math.max(0, screen.scroll - viewH)
+			break
+		case "\x1b[6~": // page down
+			screen.scroll = Math.min(Math.max(0, screen.log.length - viewH), screen.scroll + viewH)
+			break
+		case "a":
+		case "A":
+			screen.autoScroll = !screen.autoScroll
+			if (screen.autoScroll) screen.scroll = Math.max(0, screen.log.length - viewH)
+			break
+		case "s":
+		case "S":
+			if (isRunning && screen._stop) screen._stop()
+			break
+		case "\x1b": // esc — only go back when stopped
+			if (!isRunning) {
+				stopWorkerScreen(screen)
+				state.stack.pop()
+			}
+			break
+		case "m":
+		case "M":
+			if (!isRunning) {
+				stopWorkerScreen(screen)
+				popToMain(state)
+			}
+			break
+		case "q":
+		case "Q":
+			if (isRunning && screen._stop) screen._stop()
+			stopWorkerScreen(screen)
+			done()
+			return
+	}
+	render(state)
+}
+
 async function handleKey(key: string, state: TuiState, done: () => void): Promise<void> {
 	if (state.quitting) return
 	if (key === "\x03") {
@@ -2067,6 +2386,9 @@ async function handleKey(key: string, state: TuiState, done: () => void): Promis
 			break
 		case "profile":
 			handleProfileKey(key, screen, state, done)
+			break
+		case "worker":
+			handleWorkerKey(key, screen, state, done)
 			break
 		case "json-editor":
 			handleJsonEditorKey(key, screen, state, done)

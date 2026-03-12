@@ -1,5 +1,28 @@
 # Progress
 
+## 2026-03-12 — cli: job worker TUI live view
+
+### `apps/cli/src/tui.ts`
+- Added `"worker"` Screen variant: `jobType`, `status` (starting/running/stopping/stopped), `stats` (activated/completed/failed), rolling `log[]`, `scroll`, `autoScroll`, `_stop`, `_timer`
+- `renderWorker()` — full-screen dashboard: status bar (type + colored status badge), stats row, scrollable timestamped log (✓ green / ✗ red / dim info)
+- `launchWorkerView()` — parses fields from the input screen, creates the worker screen, starts a 200 ms re-render timer, fires `runWorkerLoop()` as fire-and-forget
+- `runWorkerLoop()` — polls `POST /jobs/activation` with 20 s long-polling, completes each job, appends log entries; stops cleanly when `_stop()` is called
+- `handleWorkerKey()` — `↑↓`/pgup/pgdn scroll, `a` toggle auto-scroll, `s` stop, `esc`/`m` back when stopped, `q` stop+quit
+- Intercepted "Run" in `handleInputKey`: when `cmd.name === "worker"` push the live view instead of the normal execute→results flow
+
+## 2026-03-12 — cli: job worker command
+
+### `apps/cli/src/commands/worker.ts` (new)
+- `casen job worker <type>` — subscribes to jobs of a given type and auto-completes them
+- Polls via `POST /jobs/activation` with 20 s long-polling (`requestTimeout: 20000`)
+- Completes each activated job via `POST /jobs/{jobKey}/completion` with configurable variables
+- Flags: `--variables` / `-v` (JSON object, default `{"result":"sample-value"}`), `--timeout` / `-t` (lock timeout ms, default 30000), `--max-jobs` / `-m` (jobs per poll, default 32)
+- Prints activated job key, processDefinitionId, elementId, instanceKey, and input variables
+- Handles backpressure (503) with 5 s retry; stops cleanly on Ctrl+C reporting total completed
+
+### `apps/cli/src/commands/index.ts`
+- Injected `workerCmd` into the generated `jobGroup`
+
 ## 2026-03-12 — profiles: Camunda Modeler connection import
 
 ### `packages/profiles/src/modeler.ts` (new)
