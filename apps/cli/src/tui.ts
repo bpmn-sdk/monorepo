@@ -527,8 +527,8 @@ function renderMain(state: TuiState, screen: Extract<Screen, { kind: "main" }>):
 		lines.push(`\n  ${dim(`${screen.scroll + 1}–${hi} of ${groups.length}`)}`)
 	}
 	const hint = searching
-		? `  ${dim("↑↓")} navigate  ${cyan("enter")} open  ${cyan("esc")} clear  ${dim("bksp")} delete`
-		: `  ${dim("↑↓")} navigate  ${cyan("enter")} open  ${dim("type")} search  ${cyan("q")} quit`
+		? `  ${dim("↑↓")} navigate  ${cyan("enter")} open  ${cyan("esc")} clear  ${dim("bksp")} delete  ${cyan("^C")} quit`
+		: `  ${dim("↑↓")} navigate  ${cyan("enter")} open  ${dim("type")} search  ${cyan("^C")} quit`
 	lines.push(`\n${hint}`)
 	return lines
 }
@@ -567,7 +567,7 @@ function renderCommands(state: TuiState, screen: Extract<Screen, { kind: "comman
 	} else {
 		const mHint = hasMain ? `  ${cyan("m")} main menu` : ""
 		lines.push(
-			`\n  ${dim("↑↓")} navigate  ${cyan("enter")} select  ${cyan("esc")} back${mHint}  ${dim("type")} search  ${cyan("q")} quit`,
+			`\n  ${dim("↑↓")} navigate  ${cyan("enter")} select  ${cyan("esc")} back${mHint}  ${dim("type")} search  ${cyan("^C")} quit`,
 		)
 	}
 	return lines
@@ -1401,6 +1401,12 @@ function handleMainKey(
 		return
 	}
 
+	// Ctrl+C quits unconditionally
+	if (key === "\x03") {
+		done()
+		return
+	}
+
 	// ESC clears search; quits only when search is already empty
 	if (key === "\x1b") {
 		if (searching) {
@@ -1443,13 +1449,7 @@ function handleMainKey(
 			break
 		}
 		default:
-			// Any printable char starts/extends search; q/Q only quit when not searching
-			if (key === "q" || key === "Q") {
-				if (!searching) {
-					done()
-					return
-				}
-			}
+			// Any printable char starts/extends search
 			if (key.length === 1 && key >= " ") {
 				screen.search += key
 				screen.cursor = 0
@@ -1473,6 +1473,12 @@ function handleCommandsKey(
 		screen.search = screen.search.slice(0, -1)
 		screen.cursor = 0
 		render(state)
+		return
+	}
+
+	// Ctrl+C quits unconditionally
+	if (key === "\x03") {
+		done()
 		return
 	}
 
@@ -1514,18 +1520,13 @@ function handleCommandsKey(
 			break
 		}
 		default:
-			if (key === "q" || key === "Q") {
-				if (!searching) {
-					done()
-					return
-				}
-			}
 			if (key === "m" || key === "M") {
 				if (!searching) {
 					popToMain(state)
 					break
 				}
 			}
+			// Any printable char starts/extends search
 			if (key.length === 1 && key >= " ") {
 				screen.search += key
 				screen.cursor = 0
