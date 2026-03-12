@@ -1,5 +1,17 @@
 # Progress
 
+## 2026-03-12 — landing: Mobile tile fix + playground neon styling
+
+### `apps/landing/src/styles/global.css`
+- Fixed mobile overflow: added `min-width: 0` to `.step` in `@media (max-width: 900px)` — prevents grid item from exceeding column width
+- Removed `overflow: visible` override on mobile `.step` (base `overflow: hidden` is correct)
+- Added `overflow-x: auto; white-space: pre` to `.step pre` on mobile for proper code block scrolling
+- Updated `.pg-diagram-panel` to match `.diagram-card` visual style: darker background, matching border color, added box-shadow
+- Added `background: var(--bg); position: relative` to `#playground-diagram` to match `diagram-canvas-wrap`
+
+### `apps/landing/src/scripts/playground.ts`
+- Added `createNeonThemePlugin()` to playground `BpmnCanvas` so its BPMN diagram uses the same neon color scheme, loading animation, and visual style as all other diagram previews on the page
+
 ## 2026-03-11 — editor12 (cont): Auto-layout improvements
 
 ### `packages/core/src/bpmn/bpmn-model.ts`
