@@ -2,6 +2,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import { homedir, platform } from "node:os"
 import { join } from "node:path"
 import type { CamundaClientInput } from "@bpmn-sdk/api"
+import { listModelerProfiles } from "./modeler.js"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -12,6 +13,7 @@ export interface Profile {
 	apiType: ApiType
 	config: CamundaClientInput
 	createdAt: string | null
+	source?: "modeler"
 }
 
 interface ConfigStore {
@@ -56,12 +58,18 @@ function writeStore(store: ConfigStore): void {
 
 export function listProfiles(): Profile[] {
 	const store = readStore()
-	return Object.entries(store.profiles).map(([name, config]) => ({
+	const own: Profile[] = Object.entries(store.profiles).map(([name, config]) => ({
 		name,
 		apiType: store.meta[name]?.apiType ?? "c8",
 		config,
 		createdAt: store.meta[name]?.createdAt ?? null,
 	}))
+
+	// Merge Camunda Modeler connections; own profiles take precedence by name
+	const ownNames = new Set(own.map((p) => p.name))
+	const modeler = listModelerProfiles().filter((p) => !ownNames.has(p.name))
+
+	return [...own, ...modeler]
 }
 
 export function getProfile(name: string): Profile | undefined {

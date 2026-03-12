@@ -1,5 +1,23 @@
 # Progress
 
+## 2026-03-12 — profiles: Camunda Modeler connection import
+
+### `packages/profiles/src/modeler.ts` (new)
+- Reads `settings.json` from the Camunda Modeler config dir (`~/.config/camunda-modeler/` on Linux, `~/Library/Application Support/camunda-modeler/` on macOS, `%APPDATA%\camunda-modeler\` on Windows)
+- Parses `connectionManagerPlugin.c8connections` array; silently returns `[]` on any error (missing file, bad JSON, wrong structure)
+- Maps modeler connections to `Profile` objects: `contactPoint` → `baseUrl`; auth resolved by `targetType`/`authType` fields
+  - `camundaCloud` + client credentials → `oauth2` with `https://login.cloud.camunda.io/oauth/token`
+  - `clientCredentials`/`oauth2` authType → self-managed `oauth2`
+  - `bearer` authType → `bearer`; `basic` → `basic`; fallback → `none`
+- Exports `listModelerProfiles(): Profile[]`
+
+### `packages/profiles/src/profile.ts`
+- Added `source?: "modeler"` to `Profile` interface
+- `listProfiles()` now merges Camunda Modeler connections; own profiles take precedence on name collision
+
+### `packages/profiles/src/index.ts`
+- Exported `listModelerProfiles`
+
 ## 2026-03-12 — landing: Mobile tile fix + playground neon styling
 
 ### `apps/landing/src/styles/global.css`
