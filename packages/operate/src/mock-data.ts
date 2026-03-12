@@ -4,6 +4,7 @@ import type {
 	JobSearchResult,
 	ProcessDefinitionResult,
 	ProcessInstanceResult,
+	TimePoint,
 	UserTaskResult,
 	VariableResult,
 } from "./types.js"
@@ -74,6 +75,37 @@ export function getMockDashboard(): DashboardData {
 		pendingTasks: 5,
 		definitions: 4,
 	}
+}
+
+/**
+ * Generate 20 synthetic time points spanning the last 30 minutes.
+ * Uses sine waves with different phases to produce realistic-looking variation.
+ */
+export function getMockHistory(): TimePoint[] {
+	const now = Date.now()
+	const n = 20
+	const step = 90_000 // 90 s between points → ~30 min window
+	const pts: TimePoint[] = []
+	for (let i = 0; i < n; i++) {
+		const t = i / (n - 1) // 0..1
+		pts.push({
+			ts: now - (n - 1 - i) * step,
+			data: {
+				activeInstances: Math.max(
+					0,
+					Math.round(20 + 8 * Math.sin(t * Math.PI * 2.4 + 0.5) + 3 * Math.sin(t * Math.PI * 6)),
+				),
+				openIncidents: Math.max(0, Math.round(2 + 1.5 * Math.sin(t * Math.PI * 1.8 + 1.2))),
+				activeJobs: Math.max(
+					0,
+					Math.round(7 + 5 * Math.sin(t * Math.PI * 3.1 + 0.3) + 2 * Math.sin(t * Math.PI * 8)),
+				),
+				pendingTasks: Math.max(0, Math.round(4 + 2.5 * Math.sin(t * Math.PI * 2.1 + 2.0))),
+				definitions: 4,
+			},
+		})
+	}
+	return pts
 }
 
 export const MOCK_DEFINITIONS: ProcessDefinitionResult[] = [
@@ -395,10 +427,11 @@ export const MOCK_TASKS: UserTaskResult[] = [
 	},
 ]
 
-export const MOCK_VARIABLES: VariableResult[] = [
+export const MOCK_VARIABLES: Array<VariableResult & { value: string }> = [
 	{
 		variableKey: "var-1",
 		name: "orderId",
+		value: '"ORD-10042"',
 		scopeKey: "pi-1",
 		processInstanceKey: "pi-1",
 		rootProcessInstanceKey: "pi-1",
@@ -407,6 +440,7 @@ export const MOCK_VARIABLES: VariableResult[] = [
 	{
 		variableKey: "var-2",
 		name: "customerId",
+		value: '"CUST-5512"',
 		scopeKey: "pi-1",
 		processInstanceKey: "pi-1",
 		rootProcessInstanceKey: "pi-1",
@@ -415,6 +449,7 @@ export const MOCK_VARIABLES: VariableResult[] = [
 	{
 		variableKey: "var-3",
 		name: "amount",
+		value: "149.99",
 		scopeKey: "pi-1",
 		processInstanceKey: "pi-1",
 		rootProcessInstanceKey: "pi-1",
@@ -423,6 +458,7 @@ export const MOCK_VARIABLES: VariableResult[] = [
 	{
 		variableKey: "var-4",
 		name: "approved",
+		value: "true",
 		scopeKey: "pi-1",
 		processInstanceKey: "pi-1",
 		rootProcessInstanceKey: "pi-1",

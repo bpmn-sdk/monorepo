@@ -9,7 +9,7 @@ export function createDefinitionsView(
 	destroy(): void
 } {
 	const el = document.createElement("div")
-	el.className = "op-view"
+	el.className = "op-view op-def-view"
 
 	// Toolbar
 	const toolbar = document.createElement("div")
@@ -29,8 +29,19 @@ export function createDefinitionsView(
 	groupsEl.className = "op-def-groups"
 	el.appendChild(groupsEl)
 
+	// Pagination bar
+	const paginationEl = document.createElement("div")
+	paginationEl.className = "op-pagination"
+	el.appendChild(paginationEl)
+
 	// Track collapsed state per processDefinitionId
 	const collapsed = new Map<string, boolean>()
+
+	// Sort + pagination state
+	let sortField: "name" | "versions" | null = null
+	let sortDir: "asc" | "desc" = "asc"
+	let currentPage = 0
+	const pageSize = 10
 
 	function buildGroups(items: ProcessDefinitionResult[]): Map<string, ProcessDefinitionResult[]> {
 		const map = new Map<string, ProcessDefinitionResult[]>()
@@ -50,6 +61,67 @@ export function createDefinitionsView(
 		return map
 	}
 
+	function renderPagination(total: number, start: number, end: number, totalPages: number): void {
+		paginationEl.innerHTML = ""
+
+		const prevBtn = document.createElement("button")
+		prevBtn.className = "op-pagination-btn"
+		prevBtn.textContent = "‹"
+		prevBtn.disabled = currentPage === 0
+		prevBtn.addEventListener("click", () => {
+			currentPage--
+			render()
+		})
+		paginationEl.appendChild(prevBtn)
+
+		const infoEl = document.createElement("span")
+		infoEl.className = "op-pagination-info"
+		infoEl.textContent = total > 0 ? `${start + 1}–${end} of ${total}` : "0 results"
+		paginationEl.appendChild(infoEl)
+
+		const nextBtn = document.createElement("button")
+		nextBtn.className = "op-pagination-btn"
+		nextBtn.textContent = "›"
+		nextBtn.disabled = currentPage >= totalPages - 1
+		nextBtn.addEventListener("click", () => {
+			currentPage++
+			render()
+		})
+		paginationEl.appendChild(nextBtn)
+	}
+
+	function makeSortTh(label: string, field: "name" | "versions", style: string): HTMLElement {
+		const th = document.createElement("div")
+		th.className = "bpmn-table-th op-th-sort"
+		th.setAttribute("style", style)
+		const labelSpan = document.createElement("span")
+		labelSpan.textContent = label
+		th.appendChild(labelSpan)
+		const icon = document.createElement("span")
+		icon.className = "op-sort-icon"
+		if (sortField === field) {
+			icon.textContent = sortDir === "asc" ? "↑" : "↓"
+			icon.classList.add("op-sort-icon--active")
+		} else {
+			icon.textContent = "↕"
+		}
+		th.addEventListener("click", () => {
+			if (sortField === field) {
+				if (sortDir === "asc") {
+					sortDir = "desc"
+				} else {
+					sortField = null
+				}
+			} else {
+				sortField = field
+				sortDir = "asc"
+			}
+			currentPage = 0
+			render()
+		})
+		return th
+	}
+
 	function render(): void {
 		const items = store.state.data?.items ?? []
 		const query = searchInput.value.toLowerCase()
@@ -65,31 +137,61 @@ export function createDefinitionsView(
 
 		const groups = buildGroups(filtered)
 
+		// Sort groups
+		let groupEntries = Array.from(groups.entries())
+		if (sortField !== null) {
+			const field = sortField
+			const dir = sortDir === "asc" ? 1 : -1
+			groupEntries = groupEntries.sort(([, av], [, bv]) => {
+				if (field === "name") {
+					const an = av[0]?.name ?? ""
+					const bn = bv[0]?.name ?? ""
+					return an.localeCompare(bn) * dir
+				}
+				return (av.length - bv.length) * dir
+			})
+		}
+
 		// Update count
-		countEl.textContent = String(groups.size)
+		countEl.textContent = String(groupEntries.length)
+
+		// Pagination
+		const total = groupEntries.length
+		const totalPages = Math.max(1, Math.ceil(total / pageSize))
+		if (currentPage >= totalPages) currentPage = totalPages - 1
+		const start = currentPage * pageSize
+		const pageEntries = groupEntries.slice(start, start + pageSize)
+		const end = start + pageEntries.length
 
 		groupsEl.innerHTML = ""
 
-		if (groups.size === 0) {
+		if (total === 0) {
 			const empty = document.createElement("div")
 			empty.className = "bpmn-table-empty"
 			empty.textContent = query ? "No results" : "No process definitions deployed"
 			groupsEl.appendChild(empty)
+			renderPagination(0, 0, 0, 1)
 			return
 		}
 
-		// Table-like header
+		// Sortable header
 		const header = document.createElement("div")
 		header.className = "bpmn-table-header op-def-header"
-		header.innerHTML = `
-			<div class="bpmn-table-th" style="flex:1">Name</div>
-			<div class="bpmn-table-th" style="width:160px">ID</div>
-			<div class="bpmn-table-th" style="width:80px">Versions</div>
-			<div class="bpmn-table-th" style="width:100px">Latest</div>
-		`
+		header.appendChild(makeSortTh("Name", "name", "flex:1"))
+		const idTh = document.createElement("div")
+		idTh.className = "bpmn-table-th"
+		idTh.style.width = "160px"
+		idTh.textContent = "ID"
+		header.appendChild(idTh)
+		header.appendChild(makeSortTh("Versions", "versions", "width:80px"))
+		const latestTh = document.createElement("div")
+		latestTh.className = "bpmn-table-th"
+		latestTh.style.width = "100px"
+		latestTh.textContent = "Latest"
+		header.appendChild(latestTh)
 		groupsEl.appendChild(header)
 
-		for (const [id, versions] of groups) {
+		for (const [id, versions] of pageEntries) {
 			const isCollapsed = collapsed.get(id) ?? true
 			const latest = versions[0]
 			if (!latest) continue
@@ -164,9 +266,14 @@ export function createDefinitionsView(
 
 			groupsEl.appendChild(group)
 		}
+
+		renderPagination(total, start, end, totalPages)
 	}
 
-	searchInput.addEventListener("input", render)
+	searchInput.addEventListener("input", () => {
+		currentPage = 0
+		render()
+	})
 	const unsub = store.subscribe(render)
 	render()
 

@@ -1,5 +1,52 @@
 # Progress
 
+## 2026-03-12 — operate: table pagination, sorting, and definitions improvements
+
+### `packages/operate/src/components/filter-table.ts`
+- Added client-side pagination: page size selector (10/25/50/100, default 10), prev/next navigation, "X–Y of Z" info display
+- Column sort now resets to page 1 on change; search also resets to page 1
+- Existing views (instances, incidents, jobs, tasks) get pagination automatically — no API changes
+
+### `packages/operate/src/views/definitions.ts`
+- Added sortable "Name" and "Versions" column headers (asc → desc → unsorted cycle)
+- Added group-level pagination (10 processes per page, prev/next navigation)
+- Converted toolbar from `innerHTML` to DOM elements for sortable header support
+- Wrapper class `op-def-view` for proper flex layout with pinned pagination bar
+
+### `packages/operate/src/css.ts`
+- Added `.op-pagination`, `.op-pagination-btn`, `.op-page-size`, `.op-pagination-info` styles
+- Added `.op-def-view` layout class (flex column, scrollable groups, pinned pagination)
+
+## 2026-03-12 — operate: dashboard activity chart
+
+### `packages/operate/src/types.ts`
+- Added `TimePoint { ts: number; data: DashboardData }` — single polled snapshot with timestamp
+
+### `packages/operate/src/mock-data.ts`
+- Added `getMockHistory()` — 20 synthetic time points over 30 min, using sine waves with different phases/frequencies for each metric to produce realistic-looking variation
+
+### `packages/operate/src/stores/dashboard.ts`
+- Added `history: TimePoint[]` public field (max 60 points, rolling window)
+- Each data callback appends a timestamped snapshot before notifying subscribers
+- In mock mode: pre-populates history with `getMockHistory()` so the chart renders immediately
+- In live mode: history accumulates from the first poll onward
+
+### `packages/operate/src/components/chart.ts` (new)
+- `createLineChart(container)` → `{ update(history), destroy() }` — zero-dependency SVG line chart
+- Four metric lines: Active Instances (accent blue), Open Incidents (amber), Active Jobs (green), Pending Tasks (purple)
+- Per-metric toggle legend: click to show/hide individual lines
+- Relative time X axis ("28m", "14m", "now"); auto-scaled Y axis with 4 gridlines; terminal dot per line
+- Responsive via `ResizeObserver` on the SVG element; `viewBox` updated on resize
+
+### `packages/operate/src/views/dashboard.ts`
+- Added chart section ("Activity over time" heading) below the stat cards
+- `chart.update(store.history)` called on every store subscription notification
+- Chart is properly destroyed in `destroy()`
+
+### `packages/operate/src/css.ts`
+- Added `.op-chart-section`, `.op-chart-heading`, `.op-chart`, `.op-chart-legend`, `.op-chart-legend-btn`, `.op-chart-legend-dot`, `.op-chart-svg`, `.op-chart-grid`, `.op-chart-axis`, `.op-chart-axis-label`, `.op-chart-empty`
+- Chart custom color tokens (`--op-c-amber`, `--op-c-green`, `--op-c-purple`) with light theme overrides
+
 ## 2026-03-12 — cli: curl view for HTTP results
 
 ### `packages/api/src/runtime/types.ts`

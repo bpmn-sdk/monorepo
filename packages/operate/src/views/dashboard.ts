@@ -1,5 +1,45 @@
-import { createStatsCard } from "../components/card.js"
+import { IC_UI } from "@bpmn-sdk/ui"
+import { createLineChart } from "../components/chart.js"
 import type { DashboardStore } from "../stores/dashboard.js"
+
+// ── Dashboard card ────────────────────────────────────────────────────────────
+
+function createDashboardCard(
+	label: string,
+	value: number | string,
+	icon: string,
+	accent: string,
+	onClick: () => void,
+): HTMLElement {
+	const card = document.createElement("div")
+	card.className = "op-dash-card"
+	card.style.setProperty("--accent", accent)
+
+	const top = document.createElement("div")
+	top.className = "op-dash-card-top"
+
+	const lbl = document.createElement("div")
+	lbl.className = "op-dash-card-label"
+	lbl.textContent = label
+
+	const iconWrap = document.createElement("div")
+	iconWrap.className = "op-dash-card-icon"
+	iconWrap.innerHTML = icon
+
+	top.appendChild(lbl)
+	top.appendChild(iconWrap)
+	card.appendChild(top)
+
+	const val = document.createElement("div")
+	val.className = "op-dash-card-value"
+	val.textContent = String(value)
+	card.appendChild(val)
+
+	card.addEventListener("click", onClick)
+	return card
+}
+
+// ── View ──────────────────────────────────────────────────────────────────────
 
 export function createDashboardView(
 	store: DashboardStore,
@@ -15,51 +55,74 @@ export function createDashboardView(
 	grid.className = "op-card-grid"
 	el.appendChild(grid)
 
-	let instanceCard: HTMLElement
-	let incidentCard: HTMLElement
-	let jobCard: HTMLElement
-	let taskCard: HTMLElement
+	const chartWrap = document.createElement("div")
+	chartWrap.className = "op-chart-section"
+
+	const chartHeading = document.createElement("div")
+	chartHeading.className = "op-chart-heading"
+	chartHeading.textContent = "Activity over time"
+	chartWrap.appendChild(chartHeading)
+
+	el.appendChild(chartWrap)
+	const chart = createLineChart(chartWrap)
 
 	function render(): void {
 		grid.innerHTML = ""
 		const d = store.state.data
 
-		instanceCard = createStatsCard("Active Instances", d?.activeInstances ?? "—")
-		instanceCard.classList.add("bpmn-card--clickable")
-		instanceCard.addEventListener("click", () => onNavigate("/instances"))
-		grid.appendChild(instanceCard)
-
-		incidentCard = createStatsCard(
-			"Open Incidents",
-			d?.openIncidents ?? "—",
-			d?.openIncidents ? "warn" : undefined,
+		grid.appendChild(
+			createDashboardCard(
+				"Active Instances",
+				d?.activeInstances ?? "—",
+				IC_UI.instances,
+				"var(--bpmn-accent)",
+				() => onNavigate("/instances"),
+			),
 		)
-		incidentCard.classList.add("bpmn-card--clickable")
-		incidentCard.addEventListener("click", () => onNavigate("/incidents"))
-		grid.appendChild(incidentCard)
 
-		jobCard = createStatsCard("Active Jobs", d?.activeJobs ?? "—")
-		jobCard.classList.add("bpmn-card--clickable")
-		jobCard.addEventListener("click", () => onNavigate("/jobs"))
-		grid.appendChild(jobCard)
+		// Incidents: use amber accent when there are open incidents
+		const incAccent = d?.openIncidents ? "var(--op-c-amber)" : "var(--bpmn-accent)"
+		grid.appendChild(
+			createDashboardCard(
+				"Open Incidents",
+				d?.openIncidents ?? "—",
+				IC_UI.incidents,
+				incAccent,
+				() => onNavigate("/incidents"),
+			),
+		)
 
-		taskCard = createStatsCard("Pending Tasks", d?.pendingTasks ?? "—")
-		taskCard.classList.add("bpmn-card--clickable")
-		taskCard.addEventListener("click", () => onNavigate("/tasks"))
-		grid.appendChild(taskCard)
+		grid.appendChild(
+			createDashboardCard(
+				"Active Jobs",
+				d?.activeJobs ?? "—",
+				IC_UI.jobs,
+				"var(--op-c-green)",
+				() => onNavigate("/jobs"),
+			),
+		)
 
-		const defCard = createStatsCard("Deployed Processes", d?.definitions ?? "—")
-		defCard.classList.add("bpmn-card--clickable")
-		defCard.addEventListener("click", () => onNavigate("/definitions"))
-		grid.appendChild(defCard)
+		grid.appendChild(
+			createDashboardCard(
+				"Pending Tasks",
+				d?.pendingTasks ?? "—",
+				IC_UI.tasks,
+				"var(--op-c-purple)",
+				() => onNavigate("/tasks"),
+			),
+		)
 
-		if (store.state.loading && !d) {
-			grid.innerHTML = ""
-			const loading = document.createElement("div")
-			loading.className = "op-loading"
-			loading.textContent = "Loading…"
-			grid.appendChild(loading)
-		}
+		grid.appendChild(
+			createDashboardCard(
+				"Deployed Processes",
+				d?.definitions ?? "—",
+				IC_UI.processes,
+				"var(--bpmn-fg-muted)",
+				() => onNavigate("/definitions"),
+			),
+		)
+
+		chart.update(store.history)
 	}
 
 	const unsub = store.subscribe(render)
@@ -69,6 +132,7 @@ export function createDashboardView(
 		el,
 		destroy(): void {
 			unsub()
+			chart.destroy()
 		},
 	}
 }
