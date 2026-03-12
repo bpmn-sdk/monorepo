@@ -1,5 +1,22 @@
 # Progress
 
+## 2026-03-12 — cli: curl view for HTTP results
+
+### `packages/api/src/runtime/types.ts`
+- Extended `RawResponseEvent` with `requestHeaders: Record<string, string>` and `requestBody?: string`
+
+### `packages/api/src/runtime/http.ts`
+- Updated `rawResponse` emit to include `requestHeaders` (the full request headers including `Authorization`) and `requestBody` (serialized JSON string)
+
+### `apps/cli/src/tui.ts`
+- Added `curlView: boolean` to the `results` Screen type
+- `buildCurlCmd(raw)` — builds a multiline curl command from a `RawResponseEvent`; Bearer tokens are replaced with `$CAMUNDA_TOKEN` placeholder; returns `{ cmd, token }` where `token` is the actual bearer value
+- `copyToClipboard(text)` — tries `pbcopy` (macOS), `clip` (Windows), `wl-copy` / `xclip` / `xsel` (Linux)
+- `renderCurlView(screen, cols)` — shows the curl command and copy shortcut hints
+- `u/U` toggles curl view (mutually exclusive with raw view)
+- In curl view: `y/Y` copies the curl command to clipboard; `e/E` copies `export CAMUNDA_TOKEN="<token>"` to clipboard
+- All result view footers updated to show `u curl` toggle hint
+
 ## 2026-03-12 — cli: job worker TUI live view
 
 ### `apps/cli/src/tui.ts`

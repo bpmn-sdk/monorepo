@@ -1,3 +1,4 @@
+import { spawn } from "node:child_process"
 import type { AdminApiClient, CamundaClient, RawResponseEvent } from "@bpmn-sdk/api"
 import { renderBpmnAscii } from "@bpmn-sdk/ascii"
 import type {
@@ -81,6 +82,7 @@ type Screen =
 			output: CapturedOutput
 			raw: RawResponseEvent | null
 			rawView: boolean
+			curlView: boolean
 			altView: boolean
 			cursor: number
 			scroll: number
@@ -686,6 +688,80 @@ function renderRawView(screen: Extract<Screen, { kind: "results" }>, cols: numbe
 	return lines
 }
 
+// ─── Curl view ────────────────────────────────────────────────────────────────
+
+const CURL_TOKEN_VAR = "CAMUNDA_TOKEN"
+
+function buildCurlCmd(raw: RawResponseEvent): { cmd: string; token: string | null } {
+	const parts: string[] = [`curl -X ${raw.method}`]
+	let token: string | null = null
+	for (const [k, v] of Object.entries(raw.requestHeaders)) {
+		let val = v
+		if (k.toLowerCase() === "authorization") {
+			const m = /^Bearer (.+)$/.exec(v)
+			if (m) {
+				token = m[1] ?? null
+				val = `Bearer $${CURL_TOKEN_VAR}`
+			}
+		}
+		parts.push(`  -H '${k}: ${val}'`)
+	}
+	if (raw.requestBody) {
+		parts.push(`  -d '${raw.requestBody.replace(/'/g, "'\\''")}'`)
+	}
+	parts.push(`  '${raw.url}'`)
+	return { cmd: parts.join(" \\\n"), token }
+}
+
+function copyToClipboard(text: string): void {
+	const cmds: string[][] =
+		process.platform === "darwin"
+			? [["pbcopy"]]
+			: process.platform === "win32"
+				? [["clip"]]
+				: [["wl-copy"], ["xclip", "-selection", "clipboard"], ["xsel", "--clipboard", "--input"]]
+	const tryNext = (i: number): void => {
+		const entry = cmds[i]
+		if (!entry) return
+		const [bin, ...args] = entry
+		if (!bin) {
+			tryNext(i + 1)
+			return
+		}
+		try {
+			const proc = spawn(bin, args, { stdio: ["pipe", "ignore", "ignore"] })
+			proc.on("error", () => tryNext(i + 1))
+			proc.stdin.write(text)
+			proc.stdin.end()
+			proc.unref()
+		} catch {
+			tryNext(i + 1)
+		}
+	}
+	tryNext(0)
+}
+
+function renderCurlView(screen: Extract<Screen, { kind: "results" }>, cols: number): string[] {
+	const raw = screen.raw
+	if (!raw) return [`  ${dim("(no raw response captured)")}`]
+	const { cmd, token } = buildCurlCmd(raw)
+	const lines: string[] = []
+	lines.push(`  ${bold("curl command:")}`)
+	lines.push("")
+	for (const l of cmd.split("\n")) {
+		lines.push(`  ${fit(l, cols - 4)}`)
+	}
+	if (token) {
+		lines.push("")
+		lines.push(
+			`  ${dim(`Token obfuscated as $${CURL_TOKEN_VAR}. Press ${bold("e")} to copy export statement.`)}`,
+		)
+	}
+	lines.push("")
+	lines.push(`  ${dim(`Press ${bold("y")} to copy curl command to clipboard.`)}`)
+	return lines
+}
+
 function renderResults(state: TuiState, screen: Extract<Screen, { kind: "results" }>): string[] {
 	const { cols, rows } = termSize()
 	const viewH = Math.max(3, rows - 10)
@@ -699,6 +775,24 @@ function renderResults(state: TuiState, screen: Extract<Screen, { kind: "results
 			})()
 		: ""
 	const rawToggle = `  ${screen.rawView ? cyan("r") : dim("r")} ${dim("raw")}`
+	const curlToggle = screen.raw ? `  ${screen.curlView ? cyan("u") : dim("u")} ${dim("curl")}` : ""
+
+	if (screen.curlView) {
+		lines.push(renderHeader([screen.group.name, screen.cmd.name], cols, state.profile))
+		lines.push("")
+		const curlLines = renderCurlView(screen, cols)
+		const visible = curlLines.slice(screen.scroll, screen.scroll + rows - 8)
+		for (const l of visible) lines.push(l)
+		lines.push("")
+		if (curlLines.length > rows - 8) {
+			const hi = Math.min(screen.scroll + rows - 8, curlLines.length)
+			lines.push(`  ${dim(`${screen.scroll + 1}–${hi} of ${curlLines.length}`)}`)
+		}
+		lines.push(
+			`  ${dim("↑↓")} scroll${rawToggle}${curlToggle}  ${cyan("y")} copy curl  ${cyan("e")} copy export  ${cyan("m")} main menu  ${cyan("esc")} back  ${cyan("q")} quit`,
+		)
+		return lines
+	}
 
 	if (screen.rawView) {
 		lines.push(renderHeader([screen.group.name, screen.cmd.name], cols, state.profile))
@@ -712,7 +806,7 @@ function renderResults(state: TuiState, screen: Extract<Screen, { kind: "results
 			lines.push(`  ${dim(`${screen.scroll + 1}–${hi} of ${rawLines.length}`)}`)
 		}
 		lines.push(
-			`  ${dim("↑↓")} scroll${rawToggle}  ${cyan("m")} main menu  ${cyan("esc")} back  ${cyan("q")} quit`,
+			`  ${dim("↑↓")} scroll${rawToggle}${curlToggle}  ${cyan("m")} main menu  ${cyan("esc")} back  ${cyan("q")} quit`,
 		)
 		return lines
 	}
@@ -749,7 +843,7 @@ function renderResults(state: TuiState, screen: Extract<Screen, { kind: "results
 		}
 		const followupHint = screen.cmd.relations ? `  ${cyan("f")} follow-up` : ""
 		lines.push(
-			`  ${dim("↑↓")} navigate  ${cyan("enter")} detail${followupHint}  ${dim("pgup/pgdn")} page${rawToggle}  ${cyan("m")} main menu  ${cyan("esc")} back  ${cyan("q")} quit`,
+			`  ${dim("↑↓")} navigate  ${cyan("enter")} detail${followupHint}  ${dim("pgup/pgdn")} page${rawToggle}${curlToggle}  ${cyan("m")} main menu  ${cyan("esc")} back  ${cyan("q")} quit`,
 		)
 	} else if (out.type === "item") {
 		lines.push(renderHeader([screen.group.name, screen.cmd.name], cols, state.profile))
@@ -772,7 +866,7 @@ function renderResults(state: TuiState, screen: Extract<Screen, { kind: "results
 			? `  ${cyan("space")} expand array`
 			: ""
 		lines.push(
-			`\n${rawToggle}${spaceHint}  ${cyan("m")} main menu  ${cyan("esc")} back  ${cyan("q")} quit`,
+			`\n${rawToggle}${curlToggle}${spaceHint}  ${cyan("m")} main menu  ${cyan("esc")} back  ${cyan("q")} quit`,
 		)
 	} else {
 		lines.push(renderHeader([screen.group.name, screen.cmd.name], cols, state.profile))
@@ -796,7 +890,7 @@ function renderResults(state: TuiState, screen: Extract<Screen, { kind: "results
 			}
 		}
 		lines.push(
-			`\n  ${dim("↑↓←→")} scroll/pan${rawToggle}${altToggle}  ${cyan("m")} main menu  ${cyan("esc")} back  ${cyan("q")} quit`,
+			`\n  ${dim("↑↓←→")} scroll/pan${rawToggle}${curlToggle}${altToggle}  ${cyan("m")} main menu  ${cyan("esc")} back  ${cyan("q")} quit`,
 		)
 	}
 	return lines
@@ -1494,6 +1588,7 @@ async function executeCommand(
 			output,
 			raw: rawCapture,
 			rawView: false,
+			curlView: false,
 			altView: false,
 			cursor: 0,
 			scroll: 0,
@@ -1721,10 +1816,45 @@ function handleResultsKey(
 	const { rows } = termSize()
 	const viewH = Math.max(3, rows - 10)
 
-	// r/R toggles raw view regardless of output type
+	// r/R toggles raw view; u/U toggles curl view — mutually exclusive
 	if (key === "r" || key === "R") {
 		screen.rawView = !screen.rawView
+		if (screen.rawView) screen.curlView = false
 		screen.scroll = 0
+		render(state)
+		return
+	}
+	if (key === "u" || key === "U") {
+		screen.curlView = !screen.curlView
+		if (screen.curlView) screen.rawView = false
+		screen.scroll = 0
+		render(state)
+		return
+	}
+
+	if (screen.curlView) {
+		if (key === "y" || key === "Y") {
+			if (screen.raw) {
+				const { cmd } = buildCurlCmd(screen.raw)
+				copyToClipboard(cmd)
+			}
+		} else if (key === "e" || key === "E") {
+			if (screen.raw) {
+				const { token } = buildCurlCmd(screen.raw)
+				if (token) copyToClipboard(`export ${CURL_TOKEN_VAR}="${token}"`)
+			}
+		} else if (key === "\x1b[A") {
+			if (screen.scroll > 0) screen.scroll--
+		} else if (key === "\x1b[B") {
+			screen.scroll++
+		} else if (key === "m" || key === "M") {
+			popToMain(state)
+		} else if (key === "\x1b") {
+			state.stack.pop()
+		} else if (key === "q" || key === "Q") {
+			done()
+			return
+		}
 		render(state)
 		return
 	}
