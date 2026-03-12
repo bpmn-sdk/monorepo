@@ -1798,7 +1798,12 @@ a:hover {
 	}
 
 	.step {
-		overflow: visible;
+		min-width: 0;
+	}
+
+	.step pre {
+		overflow-x: auto;
+		white-space: pre;
 	}
 
 	.step:last-child {
@@ -2120,17 +2125,20 @@ a:hover {
 }
 
 .pg-diagram-panel {
-	background: oklch(12% 0.02 280 / 0.8);
-	border: 1px solid oklch(50% 0.15 280 / 0.15);
-	border-radius: 12px;
+	background: oklch(7% 0.025 270 / 0.9);
+	border: 1px solid oklch(55% 0.22 280 / 0.2);
+	border-radius: var(--radius);
 	overflow: hidden;
 	display: flex;
 	flex-direction: column;
+	box-shadow: 0 0 0 1px oklch(55% 0.22 280 / 0.1), 0 20px 60px oklch(0% 0 0 / 0.5);
 }
 
 #playground-diagram {
 	flex: 1;
 	height: 460px;
+	background: var(--bg);
+	position: relative;
 }
 
 .pg-examples {

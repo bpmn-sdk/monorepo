@@ -160,6 +160,8 @@ export class HttpClient {
 				status: response.status,
 				headers: rawHeaders,
 				body: rawBody,
+				requestHeaders: headers,
+				requestBody: body,
 			})
 		}
 

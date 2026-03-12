@@ -1,3 +1,4 @@
+import { spawn } from "node:child_process"
 import type { AdminApiClient, CamundaClient, RawResponseEvent } from "@bpmn-sdk/api"
 import { renderBpmnAscii } from "@bpmn-sdk/ascii"
 import type {
@@ -81,6 +82,7 @@ type Screen =
 			output: CapturedOutput
 			raw: RawResponseEvent | null
 			rawView: boolean
+			curlView: boolean
 			altView: boolean
 			cursor: number
 			scroll: number
@@ -106,6 +108,19 @@ type Screen =
 			scroll: number
 	  }
 	| { kind: "profile"; scroll: number }
+	| {
+			kind: "worker"
+			group: CommandGroup
+			cmd: Command
+			jobType: string
+			status: "starting" | "running" | "stopping" | "stopped"
+			stats: { activated: number; completed: number; failed: number }
+			log: Array<{ ts: string; level: "info" | "ok" | "err"; text: string }>
+			scroll: number
+			autoScroll: boolean
+			_stop: (() => void) | null
+			_timer: ReturnType<typeof setInterval> | null
+	  }
 	| {
 			kind: "json-editor"
 			group: CommandGroup
@@ -512,8 +527,8 @@ function renderMain(state: TuiState, screen: Extract<Screen, { kind: "main" }>):
 		lines.push(`\n  ${dim(`${screen.scroll + 1}–${hi} of ${groups.length}`)}`)
 	}
 	const hint = searching
-		? `  ${dim("↑↓")} navigate  ${cyan("enter")} open  ${cyan("esc")} clear  ${dim("bksp")} delete`
-		: `  ${dim("↑↓")} navigate  ${cyan("enter")} open  ${dim("type")} search  ${cyan("q")} quit`
+		? `  ${dim("↑↓")} navigate  ${cyan("enter")} open  ${cyan("esc")} clear  ${dim("bksp")} delete  ${cyan("^C")} quit`
+		: `  ${dim("↑↓")} navigate  ${cyan("enter")} open  ${dim("type")} search  ${cyan("^C")} quit`
 	lines.push(`\n${hint}`)
 	return lines
 }
@@ -552,7 +567,7 @@ function renderCommands(state: TuiState, screen: Extract<Screen, { kind: "comman
 	} else {
 		const mHint = hasMain ? `  ${cyan("m")} main menu` : ""
 		lines.push(
-			`\n  ${dim("↑↓")} navigate  ${cyan("enter")} select  ${cyan("esc")} back${mHint}  ${dim("type")} search  ${cyan("q")} quit`,
+			`\n  ${dim("↑↓")} navigate  ${cyan("enter")} select  ${cyan("esc")} back${mHint}  ${dim("type")} search  ${cyan("^C")} quit`,
 		)
 	}
 	return lines
@@ -673,6 +688,80 @@ function renderRawView(screen: Extract<Screen, { kind: "results" }>, cols: numbe
 	return lines
 }
 
+// ─── Curl view ────────────────────────────────────────────────────────────────
+
+const CURL_TOKEN_VAR = "CAMUNDA_TOKEN"
+
+function buildCurlCmd(raw: RawResponseEvent): { cmd: string; token: string | null } {
+	const parts: string[] = [`curl -X ${raw.method}`]
+	let token: string | null = null
+	for (const [k, v] of Object.entries(raw.requestHeaders)) {
+		let val = v
+		if (k.toLowerCase() === "authorization") {
+			const m = /^Bearer (.+)$/.exec(v)
+			if (m) {
+				token = m[1] ?? null
+				val = `Bearer $${CURL_TOKEN_VAR}`
+			}
+		}
+		parts.push(`  -H '${k}: ${val}'`)
+	}
+	if (raw.requestBody) {
+		parts.push(`  -d '${raw.requestBody.replace(/'/g, "'\\''")}'`)
+	}
+	parts.push(`  '${raw.url}'`)
+	return { cmd: parts.join(" \\\n"), token }
+}
+
+function copyToClipboard(text: string): void {
+	const cmds: string[][] =
+		process.platform === "darwin"
+			? [["pbcopy"]]
+			: process.platform === "win32"
+				? [["clip"]]
+				: [["wl-copy"], ["xclip", "-selection", "clipboard"], ["xsel", "--clipboard", "--input"]]
+	const tryNext = (i: number): void => {
+		const entry = cmds[i]
+		if (!entry) return
+		const [bin, ...args] = entry
+		if (!bin) {
+			tryNext(i + 1)
+			return
+		}
+		try {
+			const proc = spawn(bin, args, { stdio: ["pipe", "ignore", "ignore"] })
+			proc.on("error", () => tryNext(i + 1))
+			proc.stdin.write(text)
+			proc.stdin.end()
+			proc.unref()
+		} catch {
+			tryNext(i + 1)
+		}
+	}
+	tryNext(0)
+}
+
+function renderCurlView(screen: Extract<Screen, { kind: "results" }>, cols: number): string[] {
+	const raw = screen.raw
+	if (!raw) return [`  ${dim("(no raw response captured)")}`]
+	const { cmd, token } = buildCurlCmd(raw)
+	const lines: string[] = []
+	lines.push(`  ${bold("curl command:")}`)
+	lines.push("")
+	for (const l of cmd.split("\n")) {
+		lines.push(`  ${fit(l, cols - 4)}`)
+	}
+	if (token) {
+		lines.push("")
+		lines.push(
+			`  ${dim(`Token obfuscated as $${CURL_TOKEN_VAR}. Press ${bold("e")} to copy export statement.`)}`,
+		)
+	}
+	lines.push("")
+	lines.push(`  ${dim(`Press ${bold("y")} to copy curl command to clipboard.`)}`)
+	return lines
+}
+
 function renderResults(state: TuiState, screen: Extract<Screen, { kind: "results" }>): string[] {
 	const { cols, rows } = termSize()
 	const viewH = Math.max(3, rows - 10)
@@ -686,6 +775,24 @@ function renderResults(state: TuiState, screen: Extract<Screen, { kind: "results
 			})()
 		: ""
 	const rawToggle = `  ${screen.rawView ? cyan("r") : dim("r")} ${dim("raw")}`
+	const curlToggle = screen.raw ? `  ${screen.curlView ? cyan("u") : dim("u")} ${dim("curl")}` : ""
+
+	if (screen.curlView) {
+		lines.push(renderHeader([screen.group.name, screen.cmd.name], cols, state.profile))
+		lines.push("")
+		const curlLines = renderCurlView(screen, cols)
+		const visible = curlLines.slice(screen.scroll, screen.scroll + rows - 8)
+		for (const l of visible) lines.push(l)
+		lines.push("")
+		if (curlLines.length > rows - 8) {
+			const hi = Math.min(screen.scroll + rows - 8, curlLines.length)
+			lines.push(`  ${dim(`${screen.scroll + 1}–${hi} of ${curlLines.length}`)}`)
+		}
+		lines.push(
+			`  ${dim("↑↓")} scroll${rawToggle}${curlToggle}  ${cyan("y")} copy curl  ${cyan("e")} copy export  ${cyan("m")} main menu  ${cyan("esc")} back  ${cyan("q")} quit`,
+		)
+		return lines
+	}
 
 	if (screen.rawView) {
 		lines.push(renderHeader([screen.group.name, screen.cmd.name], cols, state.profile))
@@ -699,7 +806,7 @@ function renderResults(state: TuiState, screen: Extract<Screen, { kind: "results
 			lines.push(`  ${dim(`${screen.scroll + 1}–${hi} of ${rawLines.length}`)}`)
 		}
 		lines.push(
-			`  ${dim("↑↓")} scroll${rawToggle}  ${cyan("m")} main menu  ${cyan("esc")} back  ${cyan("q")} quit`,
+			`  ${dim("↑↓")} scroll${rawToggle}${curlToggle}  ${cyan("m")} main menu  ${cyan("esc")} back  ${cyan("q")} quit`,
 		)
 		return lines
 	}
@@ -736,7 +843,7 @@ function renderResults(state: TuiState, screen: Extract<Screen, { kind: "results
 		}
 		const followupHint = screen.cmd.relations ? `  ${cyan("f")} follow-up` : ""
 		lines.push(
-			`  ${dim("↑↓")} navigate  ${cyan("enter")} detail${followupHint}  ${dim("pgup/pgdn")} page${rawToggle}  ${cyan("m")} main menu  ${cyan("esc")} back  ${cyan("q")} quit`,
+			`  ${dim("↑↓")} navigate  ${cyan("enter")} detail${followupHint}  ${dim("pgup/pgdn")} page${rawToggle}${curlToggle}  ${cyan("m")} main menu  ${cyan("esc")} back  ${cyan("q")} quit`,
 		)
 	} else if (out.type === "item") {
 		lines.push(renderHeader([screen.group.name, screen.cmd.name], cols, state.profile))
@@ -759,7 +866,7 @@ function renderResults(state: TuiState, screen: Extract<Screen, { kind: "results
 			? `  ${cyan("space")} expand array`
 			: ""
 		lines.push(
-			`\n${rawToggle}${spaceHint}  ${cyan("m")} main menu  ${cyan("esc")} back  ${cyan("q")} quit`,
+			`\n${rawToggle}${curlToggle}${spaceHint}  ${cyan("m")} main menu  ${cyan("esc")} back  ${cyan("q")} quit`,
 		)
 	} else {
 		lines.push(renderHeader([screen.group.name, screen.cmd.name], cols, state.profile))
@@ -783,7 +890,7 @@ function renderResults(state: TuiState, screen: Extract<Screen, { kind: "results
 			}
 		}
 		lines.push(
-			`\n  ${dim("↑↓←→")} scroll/pan${rawToggle}${altToggle}  ${cyan("m")} main menu  ${cyan("esc")} back  ${cyan("q")} quit`,
+			`\n  ${dim("↑↓←→")} scroll/pan${rawToggle}${curlToggle}${altToggle}  ${cyan("m")} main menu  ${cyan("esc")} back  ${cyan("q")} quit`,
 		)
 	}
 	return lines
@@ -882,6 +989,62 @@ function renderProfile(state: TuiState, screen: Extract<Screen, { kind: "profile
 		lines.push(`  ${dim(`${screen.scroll + 1}–${hi} of ${state.profileInfo.length}`)}`)
 	}
 	lines.push(`  ${dim("↑↓")} scroll  ${cyan("esc/p")} close  ${cyan("q")} quit`)
+	return lines
+}
+
+function renderWorker(state: TuiState, screen: Extract<Screen, { kind: "worker" }>): string[] {
+	const { cols, rows } = termSize()
+	const viewH = Math.max(3, rows - 13)
+
+	const statusStr =
+		screen.status === "running"
+			? green("● RUNNING")
+			: screen.status === "starting"
+				? dim("◌ STARTING")
+				: screen.status === "stopping"
+					? cyan("◌ STOPPING")
+					: dim("■ STOPPED")
+
+	const lines = [renderHeader(["job", "worker"], cols, state.profile), ""]
+
+	lines.push(
+		`  ${padEnd(dim("type"), 8)}  ${cyan(screen.jobType)}    ${dim("status")}  ${statusStr}`,
+	)
+	lines.push(`  ${dim("─".repeat(cols - 4))}`)
+	const { activated, completed, failed } = screen.stats
+	lines.push(
+		`  ${dim("activated")}  ${bold(String(activated))}    ${dim("completed")}  ${completed > 0 ? green(String(completed)) : dim("0")}    ${dim("failed")}  ${failed > 0 ? red(String(failed)) : dim("0")}`,
+	)
+	lines.push(`  ${dim("─".repeat(cols - 4))}`)
+	lines.push("")
+
+	if (screen.log.length === 0) {
+		lines.push(`  ${dim("Waiting for jobs…")}`)
+	} else {
+		const logLines = screen.log.map((e) => {
+			const ts = dim(e.ts)
+			const msg =
+				e.level === "ok"
+					? `${green("✓")} ${e.text}`
+					: e.level === "err"
+						? `${red("✗")} ${e.text}`
+						: `  ${dim(e.text)}`
+			return `  ${ts}  ${msg}`
+		})
+		const visible = logLines.slice(screen.scroll, screen.scroll + viewH)
+		for (const l of visible) lines.push(fit(l, cols - 2))
+		if (screen.log.length > viewH) {
+			const hi = Math.min(screen.scroll + viewH, screen.log.length)
+			lines.push(`  ${dim(`${screen.scroll + 1}–${hi} of ${screen.log.length}`)}`)
+		}
+	}
+
+	const isRunning = screen.status === "running" || screen.status === "starting"
+	const autoHint = `  ${screen.autoScroll ? cyan("a") : dim("a")} ${dim("auto")}`
+	const navHint = isRunning
+		? `  ${cyan("s")} ${dim("stop")}`
+		: `  ${cyan("esc")} back  ${cyan("m")} main menu`
+	lines.push(`\n  ${dim("↑↓")} scroll${autoHint}${navHint}  ${cyan("q")} quit`)
 	return lines
 }
 
@@ -996,6 +1159,189 @@ function renderJsonEditor(
 	return lines
 }
 
+// ─── Worker view helpers ──────────────────────────────────────────────────────
+
+function workerLogH(): number {
+	return Math.max(3, (process.stdout.rows ?? 24) - 13)
+}
+
+function addWorkerLog(
+	ws: Extract<Screen, { kind: "worker" }>,
+	level: "info" | "ok" | "err",
+	text: string,
+): void {
+	const now = new Date()
+	const ts = [now.getHours(), now.getMinutes(), now.getSeconds()]
+		.map((n) => String(n).padStart(2, "0"))
+		.join(":")
+	ws.log.push({ ts, level, text })
+	if (ws.log.length > 500) ws.log.shift()
+	if (ws.autoScroll) ws.scroll = Math.max(0, ws.log.length - workerLogH())
+}
+
+function stopWorkerScreen(ws: Extract<Screen, { kind: "worker" }>): void {
+	if (ws._timer !== null) {
+		clearInterval(ws._timer)
+		ws._timer = null
+	}
+	if (ws._stop) {
+		ws._stop()
+		ws._stop = null
+	}
+}
+
+async function runWorkerLoop(
+	ws: Extract<Screen, { kind: "worker" }>,
+	state: TuiState,
+	variables: Record<string, unknown>,
+	jobTimeout: number,
+	maxJobs: number,
+): Promise<void> {
+	let client: CamundaClient
+	try {
+		client = await state.getClient()
+	} catch (err) {
+		addWorkerLog(ws, "err", `Client error: ${err instanceof Error ? err.message : String(err)}`)
+		ws.status = "stopped"
+		stopWorkerScreen(ws)
+		return
+	}
+
+	let running = true
+	ws._stop = () => {
+		running = false
+		ws.status = "stopping"
+		ws._stop = null
+	}
+	ws.status = "running"
+	addWorkerLog(ws, "info", `Worker started for type "${ws.jobType}"`)
+	addWorkerLog(ws, "info", `Returning: ${JSON.stringify(variables)}`)
+
+	while (running) {
+		let result: {
+			jobs: Array<{
+				jobKey: string
+				processDefinitionId: string
+				elementId: string
+				processInstanceKey: string
+				variables: Record<string, unknown>
+			}>
+		}
+		try {
+			result = (await client.job.activateJobs({
+				type: ws.jobType,
+				worker: "casen-worker",
+				timeout: jobTimeout,
+				maxJobsToActivate: maxJobs,
+				requestTimeout: 20000,
+			})) as typeof result
+		} catch (err) {
+			if (!running) break
+			addWorkerLog(
+				ws,
+				"err",
+				`Poll error: ${err instanceof Error ? err.message : String(err)} — retry in 5s`,
+			)
+			await new Promise((r) => setTimeout(r, 5000))
+			continue
+		}
+
+		const jobs = result?.jobs ?? []
+		for (const job of jobs) {
+			if (!running) break
+			ws.stats.activated++
+			addWorkerLog(
+				ws,
+				"info",
+				`Activated ${job.jobKey}  process=${job.processDefinitionId}  element=${job.elementId}`,
+			)
+			try {
+				await client.job.completeJob(job.jobKey, { variables })
+				ws.stats.completed++
+				addWorkerLog(ws, "ok", `Completed ${job.jobKey}`)
+			} catch (err) {
+				ws.stats.failed++
+				addWorkerLog(
+					ws,
+					"err",
+					`Failed to complete ${job.jobKey}: ${err instanceof Error ? err.message : String(err)}`,
+				)
+			}
+		}
+		if (jobs.length > 0) await new Promise((r) => setTimeout(r, 100))
+	}
+
+	ws.status = "stopped"
+	addWorkerLog(
+		ws,
+		"info",
+		`Stopped. Activated: ${ws.stats.activated}  Completed: ${ws.stats.completed}  Failed: ${ws.stats.failed}`,
+	)
+	stopWorkerScreen(ws)
+}
+
+function launchWorkerView(inputScreen: Extract<Screen, { kind: "input" }>, state: TuiState): void {
+	const typeArg = inputScreen.fields.find((f) => f.kind === "arg")
+	const jobType = typeArg?.value?.trim() ?? ""
+	if (!jobType) {
+		inputScreen.error = '"type" is required'
+		return
+	}
+
+	let variables: Record<string, unknown> = { result: "sample-value" }
+	const varField = inputScreen.fields.find((f) => f.label === "--variables")
+	if (varField?.value) {
+		try {
+			const parsed: unknown = JSON.parse(varField.value)
+			if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+				variables = parsed as Record<string, unknown>
+			}
+		} catch {
+			// use default
+		}
+	}
+	const timeoutField = inputScreen.fields.find((f) => f.label === "--timeout")
+	const workerTimeout = timeoutField?.value ? Number(timeoutField.value) : 30000
+	const maxJobsField = inputScreen.fields.find((f) => f.label === "--max-jobs")
+	const maxJobs = maxJobsField?.value ? Number(maxJobsField.value) : 32
+
+	const ws: Extract<Screen, { kind: "worker" }> = {
+		kind: "worker",
+		group: inputScreen.group,
+		cmd: inputScreen.cmd,
+		jobType,
+		status: "starting",
+		stats: { activated: 0, completed: 0, failed: 0 },
+		log: [],
+		scroll: 0,
+		autoScroll: true,
+		_stop: null,
+		_timer: null,
+	}
+
+	state.stack.push(ws)
+	render(state)
+
+	// Re-render at 200 ms so live updates appear without waiting for key presses
+	ws._timer = setInterval(() => {
+		if (!state.quitting && state.stack.includes(ws)) {
+			render(state)
+		} else {
+			if (ws._timer !== null) {
+				clearInterval(ws._timer)
+				ws._timer = null
+			}
+		}
+	}, 200)
+
+	// Fire-and-forget: the loop writes to ws state; the timer re-renders
+	runWorkerLoop(ws, state, variables, workerTimeout, maxJobs).catch((err) => {
+		addWorkerLog(ws, "err", `Unexpected: ${err instanceof Error ? err.message : String(err)}`)
+		ws.status = "stopped"
+		stopWorkerScreen(ws)
+	})
+}
+
 function render(state: TuiState): void {
 	if (state.quitting) return
 	const screen = state.stack[state.stack.length - 1]
@@ -1023,6 +1369,9 @@ function render(state: TuiState): void {
 		case "profile":
 			lines = renderProfile(state, screen)
 			break
+		case "worker":
+			lines = renderWorker(state, screen)
+			break
 		case "json-editor":
 			lines = renderJsonEditor(state, screen)
 			break
@@ -1049,6 +1398,12 @@ function handleMainKey(
 		screen.cursor = 0
 		screen.scroll = 0
 		render(state)
+		return
+	}
+
+	// Ctrl+C quits unconditionally
+	if (key === "\x03") {
+		done()
 		return
 	}
 
@@ -1094,13 +1449,7 @@ function handleMainKey(
 			break
 		}
 		default:
-			// Any printable char starts/extends search; q/Q only quit when not searching
-			if (key === "q" || key === "Q") {
-				if (!searching) {
-					done()
-					return
-				}
-			}
+			// Any printable char starts/extends search
 			if (key.length === 1 && key >= " ") {
 				screen.search += key
 				screen.cursor = 0
@@ -1124,6 +1473,12 @@ function handleCommandsKey(
 		screen.search = screen.search.slice(0, -1)
 		screen.cursor = 0
 		render(state)
+		return
+	}
+
+	// Ctrl+C quits unconditionally
+	if (key === "\x03") {
+		done()
 		return
 	}
 
@@ -1165,18 +1520,13 @@ function handleCommandsKey(
 			break
 		}
 		default:
-			if (key === "q" || key === "Q") {
-				if (!searching) {
-					done()
-					return
-				}
-			}
 			if (key === "m" || key === "M") {
 				if (!searching) {
 					popToMain(state)
 					break
 				}
 			}
+			// Any printable char starts/extends search
 			if (key.length === 1 && key >= " ") {
 				screen.search += key
 				screen.cursor = 0
@@ -1239,6 +1589,7 @@ async function executeCommand(
 			output,
 			raw: rawCapture,
 			rawView: false,
+			curlView: false,
 			altView: false,
 			cursor: 0,
 			scroll: 0,
@@ -1393,7 +1744,11 @@ async function handleInputKey(
 		case "\n":
 			if (!field) break
 			if (field.kind === "run") {
-				await executeCommand(screen, state)
+				if (screen.cmd.name === "worker") {
+					launchWorkerView(screen, state)
+				} else {
+					await executeCommand(screen, state)
+				}
 			} else if (isJsonField(field)) {
 				// Open the key-value JSON editor
 				const jsonFieldSpecs = field.kind === "flag" ? field.flagSpec?.fields : undefined
@@ -1462,10 +1817,45 @@ function handleResultsKey(
 	const { rows } = termSize()
 	const viewH = Math.max(3, rows - 10)
 
-	// r/R toggles raw view regardless of output type
+	// r/R toggles raw view; u/U toggles curl view — mutually exclusive
 	if (key === "r" || key === "R") {
 		screen.rawView = !screen.rawView
+		if (screen.rawView) screen.curlView = false
 		screen.scroll = 0
+		render(state)
+		return
+	}
+	if (key === "u" || key === "U") {
+		screen.curlView = !screen.curlView
+		if (screen.curlView) screen.rawView = false
+		screen.scroll = 0
+		render(state)
+		return
+	}
+
+	if (screen.curlView) {
+		if (key === "y" || key === "Y") {
+			if (screen.raw) {
+				const { cmd } = buildCurlCmd(screen.raw)
+				copyToClipboard(cmd)
+			}
+		} else if (key === "e" || key === "E") {
+			if (screen.raw) {
+				const { token } = buildCurlCmd(screen.raw)
+				if (token) copyToClipboard(`export ${CURL_TOKEN_VAR}="${token}"`)
+			}
+		} else if (key === "\x1b[A") {
+			if (screen.scroll > 0) screen.scroll--
+		} else if (key === "\x1b[B") {
+			screen.scroll++
+		} else if (key === "m" || key === "M") {
+			popToMain(state)
+		} else if (key === "\x1b") {
+			state.stack.pop()
+		} else if (key === "q" || key === "Q") {
+			done()
+			return
+		}
 		render(state)
 		return
 	}
@@ -2024,6 +2414,66 @@ function handleProfileKey(
 	render(state)
 }
 
+function handleWorkerKey(
+	key: string,
+	screen: Extract<Screen, { kind: "worker" }>,
+	state: TuiState,
+	done: () => void,
+): void {
+	const { rows } = termSize()
+	const viewH = Math.max(3, rows - 13)
+	const isRunning = screen.status === "running" || screen.status === "starting"
+
+	switch (key) {
+		case "\x1b[A": // up
+			screen.autoScroll = false
+			if (screen.scroll > 0) screen.scroll--
+			break
+		case "\x1b[B": // down
+			if (screen.scroll < Math.max(0, screen.log.length - viewH)) {
+				screen.scroll++
+				if (screen.scroll >= screen.log.length - viewH) screen.autoScroll = true
+			}
+			break
+		case "\x1b[5~": // page up
+			screen.autoScroll = false
+			screen.scroll = Math.max(0, screen.scroll - viewH)
+			break
+		case "\x1b[6~": // page down
+			screen.scroll = Math.min(Math.max(0, screen.log.length - viewH), screen.scroll + viewH)
+			break
+		case "a":
+		case "A":
+			screen.autoScroll = !screen.autoScroll
+			if (screen.autoScroll) screen.scroll = Math.max(0, screen.log.length - viewH)
+			break
+		case "s":
+		case "S":
+			if (isRunning && screen._stop) screen._stop()
+			break
+		case "\x1b": // esc — only go back when stopped
+			if (!isRunning) {
+				stopWorkerScreen(screen)
+				state.stack.pop()
+			}
+			break
+		case "m":
+		case "M":
+			if (!isRunning) {
+				stopWorkerScreen(screen)
+				popToMain(state)
+			}
+			break
+		case "q":
+		case "Q":
+			if (isRunning && screen._stop) screen._stop()
+			stopWorkerScreen(screen)
+			done()
+			return
+	}
+	render(state)
+}
+
 async function handleKey(key: string, state: TuiState, done: () => void): Promise<void> {
 	if (state.quitting) return
 	if (key === "\x03") {
@@ -2067,6 +2517,9 @@ async function handleKey(key: string, state: TuiState, done: () => void): Promis
 			break
 		case "profile":
 			handleProfileKey(key, screen, state, done)
+			break
+		case "worker":
+			handleWorkerKey(key, screen, state, done)
 			break
 		case "json-editor":
 			handleJsonEditorKey(key, screen, state, done)

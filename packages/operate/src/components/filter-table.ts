@@ -12,6 +12,8 @@ export function createFilterTable<T>(options: {
 	searchFn?: (row: T) => string
 	onRowClick?: (row: T) => void
 	emptyText?: string
+	/** Initial page size (default: 10) */
+	pageSize?: number
 }): {
 	el: HTMLElement
 	setRows(rows: T[]): void
@@ -19,6 +21,8 @@ export function createFilterTable<T>(options: {
 	let allRows: T[] = []
 	let searchQuery = ""
 	let sortState: { col: number; dir: "asc" | "desc" } | null = null
+	let currentPage = 0
+	let pageSize = options.pageSize ?? 10
 
 	const el = document.createElement("div")
 	el.className = "op-filter-table"
@@ -71,6 +75,7 @@ export function createFilterTable<T>(options: {
 				} else {
 					sortState = { col: idx, dir: "asc" }
 				}
+				currentPage = 0
 				updateSortIcons()
 				renderRows()
 			})
@@ -85,6 +90,11 @@ export function createFilterTable<T>(options: {
 	const bodyEl = document.createElement("div")
 	bodyEl.className = "bpmn-table-body"
 	tableWrap.appendChild(bodyEl)
+
+	// Pagination bar (outside scroll area, always visible)
+	const paginationEl = document.createElement("div")
+	paginationEl.className = "op-pagination"
+	el.appendChild(paginationEl)
 
 	function updateSortIcons(): void {
 		for (let i = 0; i < headerCells.length; i++) {
@@ -123,21 +133,79 @@ export function createFilterTable<T>(options: {
 		return rows
 	}
 
+	function renderPagination(total: number, start: number, end: number, totalPages: number): void {
+		paginationEl.innerHTML = ""
+
+		const sizeLabel = document.createElement("span")
+		sizeLabel.textContent = "Rows:"
+		paginationEl.appendChild(sizeLabel)
+
+		const sizeSelect = document.createElement("select")
+		sizeSelect.className = "op-page-size"
+		for (const sz of [10, 25, 50, 100]) {
+			const opt = document.createElement("option")
+			opt.value = String(sz)
+			opt.textContent = String(sz)
+			if (sz === pageSize) opt.selected = true
+			sizeSelect.appendChild(opt)
+		}
+		sizeSelect.addEventListener("change", () => {
+			pageSize = Number(sizeSelect.value)
+			currentPage = 0
+			renderRows()
+		})
+		paginationEl.appendChild(sizeSelect)
+
+		const prevBtn = document.createElement("button")
+		prevBtn.className = "op-pagination-btn"
+		prevBtn.textContent = "‹"
+		prevBtn.disabled = currentPage === 0
+		prevBtn.addEventListener("click", () => {
+			currentPage--
+			renderRows()
+		})
+		paginationEl.appendChild(prevBtn)
+
+		const infoEl = document.createElement("span")
+		infoEl.className = "op-pagination-info"
+		infoEl.textContent = total > 0 ? `${start + 1}–${end} of ${total}` : "0 results"
+		paginationEl.appendChild(infoEl)
+
+		const nextBtn = document.createElement("button")
+		nextBtn.className = "op-pagination-btn"
+		nextBtn.textContent = "›"
+		nextBtn.disabled = currentPage >= totalPages - 1
+		nextBtn.addEventListener("click", () => {
+			currentPage++
+			renderRows()
+		})
+		paginationEl.appendChild(nextBtn)
+	}
+
 	function renderRows(): void {
 		const filtered = applyFilterSort()
+		const total = filtered.length
+		const totalPages = Math.max(1, Math.ceil(total / pageSize))
+		if (currentPage >= totalPages) currentPage = totalPages - 1
+		const start = currentPage * pageSize
+		const pageRows = filtered.slice(start, start + pageSize)
+		const end = start + pageRows.length
+
 		countEl.textContent =
 			filtered.length !== allRows.length
 				? `${filtered.length} / ${allRows.length}`
 				: String(allRows.length)
+
 		bodyEl.innerHTML = ""
-		if (filtered.length === 0) {
+		if (total === 0) {
 			const empty = document.createElement("div")
 			empty.className = "bpmn-table-empty"
 			empty.textContent = searchQuery ? "No results" : (options.emptyText ?? "No data")
 			bodyEl.appendChild(empty)
+			renderPagination(0, 0, 0, 1)
 			return
 		}
-		for (const row of filtered) {
+		for (const row of pageRows) {
 			const tr = document.createElement("div")
 			tr.className = "bpmn-table-row"
 			if (options.onRowClick) {
@@ -155,10 +223,12 @@ export function createFilterTable<T>(options: {
 			}
 			bodyEl.appendChild(tr)
 		}
+		renderPagination(total, start, end, totalPages)
 	}
 
 	searchInput.addEventListener("input", () => {
 		searchQuery = searchInput.value
+		currentPage = 0
 		renderRows()
 	})
 
@@ -166,6 +236,7 @@ export function createFilterTable<T>(options: {
 		el,
 		setRows(rows: T[]): void {
 			allRows = rows
+			currentPage = 0
 			renderRows()
 		},
 	}

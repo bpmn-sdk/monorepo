@@ -14,6 +14,94 @@ function relTime(iso: string | null | undefined): string {
 	return `${Math.floor(h / 24)}d ago`
 }
 
+type InstMap = Map<string, ProcessInstanceResult>
+
+function buildInstMap(items: ProcessInstanceResult[]): InstMap {
+	const m: InstMap = new Map()
+	for (const inst of items) m.set(inst.processInstanceKey, inst)
+	return m
+}
+
+/** Walk up the parent chain and return an ordered array of process definition names. */
+function getChain(inst: ProcessInstanceResult, map: InstMap): string[] {
+	const chain: string[] = []
+	let cur: ProcessInstanceResult | undefined = inst
+	const visited = new Set<string>()
+	while (cur && !visited.has(cur.processInstanceKey)) {
+		visited.add(cur.processInstanceKey)
+		chain.unshift(cur.processDefinitionName ?? cur.processDefinitionId ?? "?")
+		if (!cur.parentProcessInstanceKey) break
+		const parent = map.get(cur.parentProcessInstanceKey)
+		if (!parent) {
+			// Parent exists but not loaded — prefix with ellipsis
+			chain.unshift("…")
+			break
+		}
+		cur = parent
+	}
+	return chain
+}
+
+/**
+ * Returns the processDefinitionId of the root (top-level) process for this instance.
+ * Uses rootProcessInstanceKey (8.9+) as a shortcut; falls back to walking the chain.
+ */
+function getRootDefId(inst: ProcessInstanceResult, map: InstMap): string {
+	// 8.9+ shortcut
+	if (inst.rootProcessInstanceKey && inst.rootProcessInstanceKey !== inst.processInstanceKey) {
+		const root = map.get(inst.rootProcessInstanceKey)
+		if (root) return root.processDefinitionId
+	}
+	// Walk up
+	let cur: ProcessInstanceResult | undefined = inst
+	const visited = new Set<string>()
+	while (cur && !visited.has(cur.processInstanceKey)) {
+		visited.add(cur.processInstanceKey)
+		if (!cur.parentProcessInstanceKey) return cur.processDefinitionId
+		const parent = map.get(cur.parentProcessInstanceKey)
+		if (!parent) return cur.processDefinitionId
+		cur = parent
+	}
+	return inst.processDefinitionId
+}
+
+/** Collect unique {id, name} pairs for all root-level process definitions. */
+function getRootDefs(items: ProcessInstanceResult[]): Array<{ id: string; name: string }> {
+	const seen = new Set<string>()
+	const result: Array<{ id: string; name: string }> = []
+	for (const inst of items) {
+		if (inst.parentProcessInstanceKey) continue // skip sub-processes
+		const id = inst.processDefinitionId
+		if (!id || seen.has(id)) continue
+		seen.add(id)
+		result.push({ id, name: inst.processDefinitionName ?? id })
+	}
+	return result.sort((a, b) => a.name.localeCompare(b.name))
+}
+
+/** Render a breadcrumb element for the Process column. */
+function renderBreadcrumb(chain: string[]): HTMLElement {
+	const el = document.createElement("span")
+	el.className = "op-proc-breadcrumb"
+	if (chain.length === 0) {
+		el.textContent = "—"
+		return el
+	}
+	for (let i = 0; i < chain.length; i++) {
+		if (i > 0) {
+			const sep = document.createElement("span")
+			sep.className = "op-proc-sep"
+			sep.textContent = " / "
+			el.appendChild(sep)
+		}
+		const part = document.createElement("span")
+		part.className = i === chain.length - 1 ? "op-proc-leaf" : "op-proc-root"
+		part.textContent = chain[i] ?? ""
+		el.appendChild(part)
+	}
+	return el
+}
+
 export function createInstancesView(
 	store: InstancesStore,
 	onSelect: (inst: ProcessInstanceResult) => void,
@@ -25,22 +113,22 @@ export function createInstancesView(
 	const el = document.createElement("div")
 	el.className = "op-view"
 
-	// State filter bar
+	// ── State filter bar ────────────────────────────────────────────────────
 	const filterBar = document.createElement("div")
 	filterBar.className = "op-filter-bar"
-	const filters = [
+	const stateFilters = [
 		{ label: "All", value: "" },
 		{ label: "Active", value: "ACTIVE" },
 		{ label: "Completed", value: "COMPLETED" },
 		{ label: "Terminated", value: "TERMINATED" },
 	]
-	let activeFilter = ""
-	for (const f of filters) {
+	let activeStateFilter = ""
+	for (const f of stateFilters) {
 		const btn = document.createElement("button")
-		btn.className = `op-filter-btn${f.value === activeFilter ? " op-filter-btn--active" : ""}`
+		btn.className = `op-filter-btn${f.value === activeStateFilter ? " op-filter-btn--active" : ""}`
 		btn.textContent = f.label
 		btn.addEventListener("click", () => {
-			activeFilter = f.value
+			activeStateFilter = f.value
 			for (const b of Array.from(filterBar.querySelectorAll(".op-filter-btn"))) {
 				b.classList.remove("op-filter-btn--active")
 			}
@@ -49,7 +137,37 @@ export function createInstancesView(
 		})
 		filterBar.appendChild(btn)
 	}
+
+	// ── Main process filter ─────────────────────────────────────────────────
+	const procFilterWrap = document.createElement("div")
+	procFilterWrap.className = "op-proc-filter-wrap"
+
+	const procFilterLabel = document.createElement("span")
+	procFilterLabel.className = "op-proc-filter-label"
+	procFilterLabel.textContent = "Process:"
+	procFilterWrap.appendChild(procFilterLabel)
+
+	const procSelect = document.createElement("select")
+	procSelect.className = "op-proc-filter-select"
+
+	// "All" option is always first
+	const allOpt = document.createElement("option")
+	allOpt.value = ""
+	allOpt.textContent = "All"
+	procSelect.appendChild(allOpt)
+	procFilterWrap.appendChild(procSelect)
+
+	filterBar.appendChild(procFilterWrap)
 	el.appendChild(filterBar)
+
+	let mainProcessFilter = ""
+	procSelect.addEventListener("change", () => {
+		mainProcessFilter = procSelect.value
+		render()
+	})
+
+	// ── Table ───────────────────────────────────────────────────────────────
+	let instMap: InstMap = new Map()
 
 	const { el: tableEl, setRows } = createFilterTable<ProcessInstanceResult>({
 		columns: [
@@ -61,8 +179,11 @@ export function createInstancesView(
 			},
 			{
 				label: "Process",
-				render: (row) => row.processDefinitionName ?? row.processDefinitionId ?? "—",
-				sortValue: (row) => row.processDefinitionName ?? row.processDefinitionId ?? "",
+				render: (row) => renderBreadcrumb(getChain(row, instMap)),
+				sortValue: (row) => {
+					const chain = getChain(row, instMap)
+					return chain.join(" / ")
+				},
 			},
 			{
 				label: "Business ID",
@@ -101,23 +222,43 @@ export function createInstancesView(
 				sortValue: (row) => row.endDate ?? "",
 			},
 		],
-		searchFn: (row) =>
-			[
-				row.processInstanceKey,
-				row.processDefinitionName,
-				row.processDefinitionId,
-				row.businessId,
-				row.state,
-			]
-				.filter(Boolean)
-				.join(" "),
+		searchFn: (row) => {
+			const chain = getChain(row, instMap)
+			return [row.processInstanceKey, ...chain, row.businessId, row.state].filter(Boolean).join(" ")
+		},
 		onRowClick: onSelect,
 		emptyText: "No process instances found",
 	})
 	el.appendChild(tableEl)
 
+	function updateProcFilter(items: ProcessInstanceResult[]): void {
+		const defs = getRootDefs(items)
+		// Rebuild options after the "All" entry, preserving current selection
+		while (procSelect.options.length > 1) procSelect.remove(1)
+		for (const def of defs) {
+			const opt = document.createElement("option")
+			opt.value = def.id
+			opt.textContent = def.name
+			procSelect.appendChild(opt)
+		}
+		// Restore selection if still valid
+		procSelect.value = mainProcessFilter
+		if (!procSelect.value) {
+			mainProcessFilter = ""
+			procSelect.value = ""
+		}
+	}
+
 	function render(): void {
-		setRows(store.state.data?.items ?? [])
+		const items = store.state.data?.items ?? []
+		instMap = buildInstMap(items)
+		updateProcFilter(items)
+
+		let rows = items
+		if (mainProcessFilter) {
+			rows = rows.filter((inst) => getRootDefId(inst, instMap) === mainProcessFilter)
+		}
+		setRows(rows)
 	}
 
 	const unsub = store.subscribe(render)

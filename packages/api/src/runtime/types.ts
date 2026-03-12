@@ -156,6 +156,8 @@ export interface RawResponseEvent {
 	status: number
 	headers: Record<string, string>
 	body: string
+	requestHeaders: Record<string, string>
+	requestBody?: string
 }
 
 export interface ErrorEvent {

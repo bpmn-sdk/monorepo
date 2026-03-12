@@ -1,5 +1,6 @@
 import { BpmnCanvas } from "@bpmn-sdk/canvas"
 import { Bpmn, Dmn, Form } from "@bpmn-sdk/core"
+import { createNeonThemePlugin } from "./neon-plugin.js"
 
 // ── DMN section tabs ─────────────────────────────────────────────────────────
 
@@ -330,6 +331,7 @@ function setupPlayground(): void {
 				theme: "dark",
 				fit: "contain",
 				grid: false,
+				plugins: [createNeonThemePlugin()],
 			})
 		} catch (err) {
 			errEl.textContent = `Render failed: ${err instanceof Error ? err.message : String(err)}`

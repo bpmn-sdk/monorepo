@@ -14,7 +14,10 @@ function relTime(iso: string | null | undefined): string {
 	return `${Math.floor(h / 24)}d ago`
 }
 
-export function createTasksView(store: TasksStore): {
+export function createTasksView(
+	store: TasksStore,
+	onSelect?: (task: UserTaskResult) => void,
+): {
 	el: HTMLElement
 	destroy(): void
 } {
@@ -63,6 +66,7 @@ export function createTasksView(store: TasksStore): {
 			[row.name, row.assignee, row.processName, row.processDefinitionId, row.state]
 				.filter(Boolean)
 				.join(" "),
+		onRowClick: onSelect,
 		emptyText: "No user tasks found",
 	})
 	el.appendChild(tableEl)

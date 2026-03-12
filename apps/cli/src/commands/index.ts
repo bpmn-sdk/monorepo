@@ -3,6 +3,7 @@ import {
 	decisionDefinitionGroup,
 	decisionRequirementsGroup,
 	generatedCommandGroups,
+	jobGroup,
 	processDefinitionGroup,
 	userTaskGroup,
 } from "../generated/commands.js"
@@ -18,6 +19,7 @@ import {
 import { completionGroup } from "./completion.js"
 import { profileGroup } from "./profile.js"
 import { computeRelations } from "./relations.js"
+import { workerCmd } from "./worker.js"
 
 // Inject custom commands into generated groups without modifying generated files.
 // Also remove the broken generated get-x-m-l commands (return text/xml, not JSON)
@@ -38,6 +40,9 @@ const customisedGroups: CommandGroup[] = generatedCommandGroups.map((g) => {
 	if (g === userTaskGroup) {
 		const commands = g.commands.filter((c) => c.name !== "get-form")
 		return { ...g, commands: [...commands, getUserTaskFormCmd] }
+	}
+	if (g === jobGroup) {
+		return { ...g, commands: [...g.commands, workerCmd] }
 	}
 	return g
 })

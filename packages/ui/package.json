@@ -11,24 +11,13 @@
 			"import": "./dist/index.js"
 		}
 	},
-	"files": [
-		"dist/**/*.js",
-		"dist/**/*.d.ts"
-	],
+	"files": ["dist/**/*.js", "dist/**/*.d.ts"],
 	"scripts": {
 		"build": "tsc",
 		"typecheck": "tsc --noEmit",
 		"check": "biome check ."
 	},
-	"keywords": [
-		"bpmn",
-		"ui",
-		"design-tokens",
-		"theme",
-		"components",
-		"css-variables",
-		"typescript"
-	],
+	"keywords": ["bpmn", "ui", "design-tokens", "theme", "components", "css-variables", "typescript"],
 	"license": "MIT",
 	"publishConfig": {
 		"access": "public"

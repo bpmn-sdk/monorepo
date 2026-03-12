@@ -11,6 +11,9 @@ import { IncidentsStore } from "../stores/incidents.js"
 import type { InstancesStore } from "../stores/instances.js"
 import type { ProcessInstanceResult, VariableResult } from "../types.js"
 
+type VarItem = VariableResult & { value?: string }
+type VarType = "string" | "number" | "boolean" | "json" | "null"
+
 interface Config {
 	proxyUrl: string
 	profile: string | null
@@ -28,6 +31,105 @@ function relTime(iso: string | null | undefined): string {
 	const h = Math.floor(m / 60)
 	if (h < 24) return `${h}h ago`
 	return `${Math.floor(h / 24)}d ago`
+}
+
+function detectType(value: string | undefined): VarType {
+	if (!value || value === "null") return "null"
+	if (value === "true" || value === "false") return "boolean"
+	if (value.trim() !== "" && !Number.isNaN(Number(value))) return "number"
+	const trimmed = value.trim()
+	if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+		try {
+			JSON.parse(value)
+			return "json"
+		} catch {
+			// not valid json
+		}
+	}
+	return "string"
+}
+
+function buildJsonDom(container: HTMLElement, value: unknown, indent: number): void {
+	const pad = "  ".repeat(indent)
+	if (value === null) {
+		const s = document.createElement("span")
+		s.className = "op-json-null"
+		s.textContent = "null"
+		container.appendChild(s)
+	} else if (typeof value === "boolean") {
+		const s = document.createElement("span")
+		s.className = "op-json-bool"
+		s.textContent = String(value)
+		container.appendChild(s)
+	} else if (typeof value === "number") {
+		const s = document.createElement("span")
+		s.className = "op-json-number"
+		s.textContent = String(value)
+		container.appendChild(s)
+	} else if (typeof value === "string") {
+		const s = document.createElement("span")
+		s.className = "op-json-string"
+		s.textContent = JSON.stringify(value)
+		container.appendChild(s)
+	} else if (Array.isArray(value)) {
+		container.appendChild(document.createTextNode("[\n"))
+		for (let i = 0; i < value.length; i++) {
+			container.appendChild(document.createTextNode(`${pad}  `))
+			buildJsonDom(container, value[i], indent + 1)
+			container.appendChild(document.createTextNode(i < value.length - 1 ? ",\n" : "\n"))
+		}
+		container.appendChild(document.createTextNode(`${pad}]`))
+	} else if (typeof value === "object") {
+		const entries = Object.entries(value as Record<string, unknown>)
+		container.appendChild(document.createTextNode("{\n"))
+		for (let i = 0; i < entries.length; i++) {
+			const entry = entries[i]
+			if (!entry) continue
+			const [k, v] = entry
+			container.appendChild(document.createTextNode(`${pad}  `))
+			const keySpan = document.createElement("span")
+			keySpan.className = "op-json-key"
+			keySpan.textContent = JSON.stringify(k)
+			container.appendChild(keySpan)
+			container.appendChild(document.createTextNode(": "))
+			buildJsonDom(container, v, indent + 1)
+			container.appendChild(document.createTextNode(i < entries.length - 1 ? ",\n" : "\n"))
+		}
+		container.appendChild(document.createTextNode(`${pad}}`))
+	}
+}
+
+function highlightTextNodes(container: HTMLElement, query: string): void {
+	if (!query) return
+	const lower = query.toLowerCase()
+	const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT)
+	const hits: Array<{ parent: Node; node: Text }> = []
+	let node = walker.nextNode()
+	while (node) {
+		const t = node as Text
+		if ((t.textContent ?? "").toLowerCase().includes(lower) && t.parentNode) {
+			hits.push({ parent: t.parentNode, node: t })
+		}
+		node = walker.nextNode()
+	}
+	for (const { parent, node: t } of hits) {
+		const text = t.textContent ?? ""
+		const lowerText = text.toLowerCase()
+		const fragment = document.createDocumentFragment()
+		let last = 0
+		let idx = lowerText.indexOf(lower, 0)
+		while (idx !== -1) {
+			if (idx > last) fragment.appendChild(document.createTextNode(text.slice(last, idx)))
+			const mark = document.createElement("mark")
+			mark.className = "op-json-match"
+			mark.textContent = text.slice(idx, idx + query.length)
+			fragment.appendChild(mark)
+			last = idx + query.length
+			idx = lowerText.indexOf(lower, last)
+		}
+		if (last < text.length) fragment.appendChild(document.createTextNode(text.slice(last)))
+		parent.replaceChild(fragment, t)
+	}
 }
 
 export function createInstanceDetailView(
@@ -103,7 +205,7 @@ export function createInstanceDetailView(
 	sidebar.appendChild(tabBar)
 
 	const varPanel = document.createElement("div")
-	varPanel.className = "op-detail-panel"
+	varPanel.className = "op-detail-panel op-var-panel"
 	tabPanels.push(varPanel)
 	sidebar.appendChild(varPanel)
 
@@ -160,27 +262,221 @@ export function createInstanceDetailView(
 		meta.appendChild(started)
 	}
 
-	function renderVariables(vars: VariableResult[]): void {
-		varPanel.innerHTML = ""
+	// ── Variables panel ──────────────────────────────────────────────────────
+
+	let allVars: VarItem[] = []
+	let varSortDir: "asc" | "desc" = "asc"
+	let varTypeFilter: VarType | "all" = "all"
+	let varSearch = ""
+	let varPanelBuilt = false
+	let varListEl: HTMLElement | null = null
+	let varSortBtn: HTMLButtonElement | null = null
+	const varTypeBtns = new Map<VarType | "all", HTMLButtonElement>()
+
+	function showVarModal(name: string, value: string): void {
+		const overlay = document.createElement("div")
+		overlay.className = "op-modal-overlay"
+
+		const dialog = document.createElement("div")
+		dialog.className = "op-modal"
+
+		const header = document.createElement("div")
+		header.className = "op-modal-header"
+
+		const title = document.createElement("span")
+		title.className = "op-modal-title"
+		title.textContent = name
+		header.appendChild(title)
+
+		const modalSearch = document.createElement("input")
+		modalSearch.type = "search"
+		modalSearch.className = "op-modal-search-input"
+		modalSearch.placeholder = "Search…"
+		header.appendChild(modalSearch)
+
+		const closeBtn = document.createElement("button")
+		closeBtn.className = "op-modal-close"
+		closeBtn.textContent = "✕"
+		closeBtn.addEventListener("click", () => overlay.remove())
+		header.appendChild(closeBtn)
+
+		const pre = document.createElement("pre")
+		pre.className = "op-modal-body"
+
+		let parsed: unknown = null
+		let isJson = false
+		try {
+			parsed = JSON.parse(value)
+			if (typeof parsed === "object" && parsed !== null) isJson = true
+		} catch {
+			// plain text
+		}
+
+		function renderModalContent(query: string): void {
+			pre.textContent = ""
+			if (isJson) {
+				buildJsonDom(pre, parsed, 0)
+			} else {
+				pre.textContent = value
+			}
+			if (query) highlightTextNodes(pre, query)
+		}
+
+		modalSearch.addEventListener("input", () => renderModalContent(modalSearch.value))
+		renderModalContent("")
+
+		dialog.appendChild(header)
+		dialog.appendChild(pre)
+		overlay.appendChild(dialog)
+		overlay.addEventListener("click", (e) => {
+			if (e.target === overlay) overlay.remove()
+		})
+		el.appendChild(overlay)
+		setTimeout(() => modalSearch.focus(), 0)
+	}
+
+	function renderVarRows(): void {
+		if (!varListEl) return
+		varListEl.innerHTML = ""
+
+		let vars = [...allVars]
+		vars.sort((a, b) => {
+			const cmp = a.name.localeCompare(b.name)
+			return varSortDir === "asc" ? cmp : -cmp
+		})
+		if (varTypeFilter !== "all") {
+			vars = vars.filter((v) => detectType(v.value) === varTypeFilter)
+		}
+		if (varSearch) {
+			const q = varSearch.toLowerCase()
+			vars = vars.filter(
+				(v) => v.name.toLowerCase().includes(q) || (v.value ?? "").toLowerCase().includes(q),
+			)
+		}
+
 		if (vars.length === 0) {
-			varPanel.innerHTML = `<div class="op-panel-empty">No variables</div>`
+			const empty = document.createElement("div")
+			empty.className = "op-panel-empty"
+			empty.textContent = "No matches"
+			varListEl.appendChild(empty)
 			return
 		}
-		const list = document.createElement("div")
-		list.className = "op-var-list"
+
 		for (const v of vars) {
 			const row = document.createElement("div")
 			row.className = "op-var-row"
+
 			const name = document.createElement("span")
 			name.className = "op-var-name"
 			name.textContent = v.name
 			row.appendChild(name)
-			list.appendChild(row)
+
+			const type = detectType(v.value)
+			const typeBadge = document.createElement("span")
+			typeBadge.className = `op-var-type op-var-type--${type}`
+			typeBadge.textContent =
+				type === "json" ? "{}" : type === "string" ? '""' : type === "null" ? "∅" : type
+			row.appendChild(typeBadge)
+
+			const val = document.createElement("span")
+			val.className = "op-var-value"
+			val.textContent = v.value ?? "—"
+			row.appendChild(val)
+
+			if (v.value) {
+				row.classList.add("op-var-row--clickable")
+				row.title = "Click to expand"
+				row.addEventListener("click", () => showVarModal(v.name, v.value ?? ""))
+			}
+
+			varListEl.appendChild(row)
 		}
+	}
+
+	function buildVarHeader(): void {
+		const controls = document.createElement("div")
+		controls.className = "op-var-controls"
+
+		// Sort + type filter row
+		const row = document.createElement("div")
+		row.className = "op-var-controls-row"
+
+		const sortBtn = document.createElement("button")
+		sortBtn.className = "op-var-sort-btn"
+		sortBtn.textContent = "↑ Name"
+		sortBtn.addEventListener("click", () => {
+			varSortDir = varSortDir === "asc" ? "desc" : "asc"
+			sortBtn.textContent = varSortDir === "asc" ? "↑ Name" : "↓ Name"
+			renderVarRows()
+		})
+		varSortBtn = sortBtn
+		row.appendChild(sortBtn)
+
+		const sep = document.createElement("span")
+		sep.className = "op-var-controls-sep"
+		row.appendChild(sep)
+
+		const typeOpts: Array<{ label: string; value: VarType | "all" }> = [
+			{ label: "All", value: "all" },
+			{ label: "str", value: "string" },
+			{ label: "num", value: "number" },
+			{ label: "bool", value: "boolean" },
+			{ label: "{}", value: "json" },
+			{ label: "null", value: "null" },
+		]
+		for (const opt of typeOpts) {
+			const btn = document.createElement("button")
+			btn.className = `op-var-type-btn${varTypeFilter === opt.value ? " op-var-type-btn--active" : ""}`
+			btn.textContent = opt.label
+			btn.addEventListener("click", () => {
+				varTypeFilter = opt.value
+				for (const [, b] of varTypeBtns) b.classList.remove("op-var-type-btn--active")
+				btn.classList.add("op-var-type-btn--active")
+				renderVarRows()
+			})
+			varTypeBtns.set(opt.value, btn)
+			row.appendChild(btn)
+		}
+		controls.appendChild(row)
+
+		const searchInput = document.createElement("input")
+		searchInput.type = "search"
+		searchInput.className = "op-search"
+		searchInput.placeholder = "Search variables…"
+		searchInput.value = varSearch
+		searchInput.addEventListener("input", () => {
+			varSearch = searchInput.value
+			renderVarRows()
+		})
+		controls.appendChild(searchInput)
+
+		varPanel.appendChild(controls)
+
+		const list = document.createElement("div")
+		list.className = "op-var-list"
+		varListEl = list
 		varPanel.appendChild(list)
 	}
 
-	// Incidents sub-store
+	function renderVariables(vars: VarItem[]): void {
+		allVars = vars
+		if (!varPanelBuilt) {
+			varPanel.innerHTML = ""
+			if (vars.length === 0) {
+				varPanel.innerHTML = `<div class="op-panel-empty">No variables</div>`
+				return
+			}
+			buildVarHeader()
+			varPanelBuilt = true
+		} else if (varSortBtn) {
+			// Update sort button text in case direction was preserved
+			varSortBtn.textContent = varSortDir === "asc" ? "↑ Name" : "↓ Name"
+		}
+		renderVarRows()
+	}
+
+	// ── Incidents sub-store ──────────────────────────────────────────────────
+
 	const incStore = new IncidentsStore()
 	incStore.connect(cfg.proxyUrl, cfg.profile, cfg.interval, cfg.mock, instanceKey)
 
@@ -208,6 +504,8 @@ export function createInstanceDetailView(
 	}
 
 	const incUnsub = incStore.subscribe(renderIncidents)
+
+	// ── Instance data loading ────────────────────────────────────────────────
 
 	let instUnsub: () => void
 
@@ -276,13 +574,25 @@ export function createInstanceDetailView(
 				body: JSON.stringify({ filter: { processInstanceKey: instanceKey } }),
 			})
 				.then((r) => r.json())
-				.then((result: { items: VariableResult[] }) => renderVariables(result.items))
+				.then((result: { items: VarItem[] }) => renderVariables(result.items))
 				.catch(() => renderVariables([]))
 		}
 
-		// Try immediately if store already has data; otherwise wait for first poll.
+		// Try immediately if store already has data
 		const existing = getInstance()
-		if (existing) startXmlFetch(existing)
+		if (existing) {
+			startXmlFetch(existing)
+		} else {
+			// Deep-link: instance not in store yet — fetch it directly
+			fetch(`${cfg.proxyUrl}/api/process-instances/${instanceKey}`, {
+				headers: { ...(cfg.profile ? { "x-profile": cfg.profile } : {}) },
+			})
+				.then((r) => (r.ok ? r.json() : null))
+				.then((inst: ProcessInstanceResult | null) => {
+					if (inst && !xmlStarted) startXmlFetch(inst)
+				})
+				.catch(() => {})
+		}
 
 		instUnsub = instancesStore.subscribe(() => {
 			const inst = getInstance()

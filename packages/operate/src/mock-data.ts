@@ -1,5 +1,6 @@
 import type {
 	DashboardData,
+	DecisionDefinitionResult,
 	IncidentResult,
 	JobSearchResult,
 	ProcessDefinitionResult,
@@ -395,10 +396,11 @@ export const MOCK_TASKS: UserTaskResult[] = [
 	},
 ]
 
-export const MOCK_VARIABLES: VariableResult[] = [
+export const MOCK_VARIABLES: Array<VariableResult & { value: string }> = [
 	{
 		variableKey: "var-1",
 		name: "orderId",
+		value: '"ORD-10042"',
 		scopeKey: "pi-1",
 		processInstanceKey: "pi-1",
 		rootProcessInstanceKey: "pi-1",
@@ -407,6 +409,7 @@ export const MOCK_VARIABLES: VariableResult[] = [
 	{
 		variableKey: "var-2",
 		name: "customerId",
+		value: '"CUST-5512"',
 		scopeKey: "pi-1",
 		processInstanceKey: "pi-1",
 		rootProcessInstanceKey: "pi-1",
@@ -415,6 +418,7 @@ export const MOCK_VARIABLES: VariableResult[] = [
 	{
 		variableKey: "var-3",
 		name: "amount",
+		value: "149.99",
 		scopeKey: "pi-1",
 		processInstanceKey: "pi-1",
 		rootProcessInstanceKey: "pi-1",
@@ -423,9 +427,57 @@ export const MOCK_VARIABLES: VariableResult[] = [
 	{
 		variableKey: "var-4",
 		name: "approved",
+		value: "true",
 		scopeKey: "pi-1",
 		processInstanceKey: "pi-1",
 		rootProcessInstanceKey: "pi-1",
+		tenantId: "<default>",
+	},
+]
+
+export const MOCK_DECISIONS: DecisionDefinitionResult[] = [
+	{
+		decisionDefinitionId: "approve-order",
+		decisionDefinitionKey: "dd-1",
+		decisionRequirementsId: "order-decisions",
+		decisionRequirementsKey: "drg-1",
+		decisionRequirementsName: "Order Decisions",
+		decisionRequirementsVersion: 2,
+		name: "Approve Order",
+		version: 2,
+		tenantId: "<default>",
+	},
+	{
+		decisionDefinitionId: "approve-order",
+		decisionDefinitionKey: "dd-1b",
+		decisionRequirementsId: "order-decisions",
+		decisionRequirementsKey: "drg-1b",
+		decisionRequirementsName: "Order Decisions",
+		decisionRequirementsVersion: 1,
+		name: "Approve Order",
+		version: 1,
+		tenantId: "<default>",
+	},
+	{
+		decisionDefinitionId: "discount-tier",
+		decisionDefinitionKey: "dd-2",
+		decisionRequirementsId: "order-decisions",
+		decisionRequirementsKey: "drg-1",
+		decisionRequirementsName: "Order Decisions",
+		decisionRequirementsVersion: 2,
+		name: "Discount Tier",
+		version: 2,
+		tenantId: "<default>",
+	},
+	{
+		decisionDefinitionId: "credit-check",
+		decisionDefinitionKey: "dd-3",
+		decisionRequirementsId: "credit-decisions",
+		decisionRequirementsKey: "drg-2",
+		decisionRequirementsName: "Credit Decisions",
+		decisionRequirementsVersion: 1,
+		name: "Credit Check",
+		version: 1,
 		tenantId: "<default>",
 	},
 ]

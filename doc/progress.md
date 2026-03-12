@@ -1,5 +1,192 @@
 # Progress
 
+## 2026-03-12 — operate: incident detail view + AI incident assist
+
+### Incidents: click to open detail
+- Incidents table rows are now clickable; clicking navigates to `/incidents/{key}`
+- `packages/operate/src/views/incidents.ts`: added `onSelect` callback passed as `onRowClick`
+
+### Incident detail view (new)
+- `packages/operate/src/views/incident-detail.ts`: full detail view with breadcrumb, metadata, split layout
+- Left pane: `BpmnCanvas` renders the process BPMN; the failing element is highlighted in amber via `createTokenHighlightPlugin().api.setActive([elementId])`
+- Right pane sidebar with two tabs: **Details** (all incident fields) and **AI Assist**
+- Action buttons: "Retry Job" (`PATCH /api/jobs/{jobKey}/retries` with `{ retries: 3 }`) and "Resolve" (`POST /api/incidents/{key}/resolution`)
+- Mock mode: resolves from `MOCK_INCIDENTS`, highlights element on `MOCK_BPMN_XML`; deep-link fallback fetches `GET /api/incidents/{key}` directly
+
+### AI Incident Assist
+- **AI Assist tab** in incident detail streams AI analysis from `POST /operate/incident-assist`
+- Streams tokens as SSE, renders markdown-formatted Root Cause / Impact / Remediation Steps / Prevention analysis
+- `apps/proxy/src/index.ts`: new `POST /operate/incident-assist` endpoint — fetches incident + process XML + variables from Camunda, builds context-rich prompt, streams AI response
+- `apps/proxy/src/prompt.ts`: `buildIncidentSystemPrompt()`, `buildIncidentUserMessage()`, `IncidentContext` interface
+
+### Dashboard chart simplified
+- Removed time-series accumulation; chart now shows 4 current-value bars (one per metric)
+- `DashboardStore` no longer maintains `history[]`; just stores current `DashboardData` snapshot
+
+### Task detail: form schema fix
+- `FormResult.schema` from Camunda REST API is a JSON string; `task-detail.ts` now `JSON.parse`s it before passing to `loadForm`
+- `form-editor.ts`: `loadSchema` normalizes schema (injects `id`/`type` defaults), wraps `Form.parse` in try/catch so malformed schemas still render the empty state
+
+## 2026-03-12 — form-editor: readonly mode; task-detail: fix mock form rendering
+
+### `packages/plugins/src/form-editor/form-editor.ts`
+- Added `readonly?: boolean` to `FormEditorOptions`; when true: no palette, no properties panel, no drag handles, no delete buttons, no drag/drop event handlers on cards
+- Empty state shows "No form" / "This task has no form schema." instead of design instructions in readonly mode
+
+### `packages/operate/src/views/task-detail.ts`
+- Pass `readonly: true` to `FormEditor` so tasks show view-only form
+- Fixed mock mode: check `cfg.mock` before the `formKey` guard so mock tasks always show a sample form
+
+## 2026-03-12 — operate: decisions nav, task detail, bar chart, usage metrics
+
+### Dashboard
+- Replaced line chart with grouped bar chart (`createBarChart`): each time point shows 4 colored bars (one per metric), legend toggles individual metrics, limited to 40 most recent data points
+- Added "Lifetime usage" section: fetches `GET /system/usage-metrics` (via proxy) — shows Process Instances, Decision Evaluations, Active Assignees cards when data is available
+- `DashboardData` extended with optional `usageTotalProcessInstances`, `usageDecisionInstances`, `usageAssignees` fields
+
+### Decisions (new)
+- Added "Decisions" nav item (`IC_UI.decisions` — table grid icon) between Processes and Instances
+- `packages/operate/src/stores/decisions.ts`: new `DecisionsStore` streaming `decisions` topic
+- `packages/operate/src/views/decisions.ts`: grouped list by DRG (`decisionRequirementsId`), collapsible with decision versions
+- `packages/operate/src/views/decision-detail.ts`: breadcrumb + metadata + `DmnEditor` rendering the decision XML (fetched via `/api/decision-definitions/{key}/xml`), mock mode uses minimal DMN XML
+- Proxy: added `case "decisions"` topic calling `searchDecisionDefinitions` with version DESC sort
+- `packages/ui/src/icons.ts`: added `decisions` icon
+
+### Tasks: click to open
+- Tasks table rows are now clickable; clicking navigates to `/tasks/{key}`
+- `packages/operate/src/views/task-detail.ts`: task metadata panel + `FormEditor` rendering the form (fetched via `/api/user-tasks/{key}/form`); shows "No form" message when no form key is present
+
+### Operate core
+- `operate.ts`: wired `DecisionsStore`, `/decisions`, `/decisions/:key`, `/tasks/:key` routes
+- `types.ts`: added `DecisionDefinitionResult` re-export
+
+## 2026-03-12 — operate: sort all entity queries most-recent-first
+
+### `apps/proxy/src/index.ts`
+- Added `sort` parameter to all five topic queries so results are returned most-recent-first:
+  - `definitions`: `sort: [{ field: "version", order: "DESC" }]`
+  - `instances`: `sort: [{ field: "startDate", order: "DESC" }]`
+  - `incidents`: `sort: [{ field: "creationTime", order: "DESC" }]`
+  - `jobs`: `sort: [{ field: "jobKey", order: "DESC" }]`
+  - `tasks`: `sort: [{ field: "creationDate", order: "DESC" }]`
+
+## 2026-03-12 — operate: table pagination, sorting, and definitions improvements
+
+### `packages/operate/src/components/filter-table.ts`
+- Added client-side pagination: page size selector (10/25/50/100, default 10), prev/next navigation, "X–Y of Z" info display
+- Column sort now resets to page 1 on change; search also resets to page 1
+- Existing views (instances, incidents, jobs, tasks) get pagination automatically — no API changes
+
+### `packages/operate/src/views/definitions.ts`
+- Added sortable "Name" and "Versions" column headers (asc → desc → unsorted cycle)
+- Added group-level pagination (10 processes per page, prev/next navigation)
+- Converted toolbar from `innerHTML` to DOM elements for sortable header support
+- Wrapper class `op-def-view` for proper flex layout with pinned pagination bar
+
+### `packages/operate/src/css.ts`
+- Added `.op-pagination`, `.op-pagination-btn`, `.op-page-size`, `.op-pagination-info` styles
+- Added `.op-def-view` layout class (flex column, scrollable groups, pinned pagination)
+
+## 2026-03-12 — operate: dashboard activity chart
+
+### `packages/operate/src/types.ts`
+- Added `TimePoint { ts: number; data: DashboardData }` — single polled snapshot with timestamp
+
+### `packages/operate/src/mock-data.ts`
+- Added `getMockHistory()` — 20 synthetic time points over 30 min, using sine waves with different phases/frequencies for each metric to produce realistic-looking variation
+
+### `packages/operate/src/stores/dashboard.ts`
+- Added `history: TimePoint[]` public field (max 60 points, rolling window)
+- Each data callback appends a timestamped snapshot before notifying subscribers
+- In mock mode: pre-populates history with `getMockHistory()` so the chart renders immediately
+- In live mode: history accumulates from the first poll onward
+
+### `packages/operate/src/components/chart.ts` (new)
+- `createLineChart(container)` → `{ update(history), destroy() }` — zero-dependency SVG line chart
+- Four metric lines: Active Instances (accent blue), Open Incidents (amber), Active Jobs (green), Pending Tasks (purple)
+- Per-metric toggle legend: click to show/hide individual lines
+- Relative time X axis ("28m", "14m", "now"); auto-scaled Y axis with 4 gridlines; terminal dot per line
+- Responsive via `ResizeObserver` on the SVG element; `viewBox` updated on resize
+
+### `packages/operate/src/views/dashboard.ts`
+- Added chart section ("Activity over time" heading) below the stat cards
+- `chart.update(store.history)` called on every store subscription notification
+- Chart is properly destroyed in `destroy()`
+
+### `packages/operate/src/css.ts`
+- Added `.op-chart-section`, `.op-chart-heading`, `.op-chart`, `.op-chart-legend`, `.op-chart-legend-btn`, `.op-chart-legend-dot`, `.op-chart-svg`, `.op-chart-grid`, `.op-chart-axis`, `.op-chart-axis-label`, `.op-chart-empty`
+- Chart custom color tokens (`--op-c-amber`, `--op-c-green`, `--op-c-purple`) with light theme overrides
+
+## 2026-03-12 — cli: curl view for HTTP results
+
+### `packages/api/src/runtime/types.ts`
+- Extended `RawResponseEvent` with `requestHeaders: Record<string, string>` and `requestBody?: string`
+
+### `packages/api/src/runtime/http.ts`
+- Updated `rawResponse` emit to include `requestHeaders` (the full request headers including `Authorization`) and `requestBody` (serialized JSON string)
+
+### `apps/cli/src/tui.ts`
+- Added `curlView: boolean` to the `results` Screen type
+- `buildCurlCmd(raw)` — builds a multiline curl command from a `RawResponseEvent`; Bearer tokens are replaced with `$CAMUNDA_TOKEN` placeholder; returns `{ cmd, token }` where `token` is the actual bearer value
+- `copyToClipboard(text)` — tries `pbcopy` (macOS), `clip` (Windows), `wl-copy` / `xclip` / `xsel` (Linux)
+- `renderCurlView(screen, cols)` — shows the curl command and copy shortcut hints
+- `u/U` toggles curl view (mutually exclusive with raw view)
+- In curl view: `y/Y` copies the curl command to clipboard; `e/E` copies `export CAMUNDA_TOKEN="<token>"` to clipboard
+- All result view footers updated to show `u curl` toggle hint
+
+## 2026-03-12 — cli: job worker TUI live view
+
+### `apps/cli/src/tui.ts`
+- Added `"worker"` Screen variant: `jobType`, `status` (starting/running/stopping/stopped), `stats` (activated/completed/failed), rolling `log[]`, `scroll`, `autoScroll`, `_stop`, `_timer`
+- `renderWorker()` — full-screen dashboard: status bar (type + colored status badge), stats row, scrollable timestamped log (✓ green / ✗ red / dim info)
+- `launchWorkerView()` — parses fields from the input screen, creates the worker screen, starts a 200 ms re-render timer, fires `runWorkerLoop()` as fire-and-forget
+- `runWorkerLoop()` — polls `POST /jobs/activation` with 20 s long-polling, completes each job, appends log entries; stops cleanly when `_stop()` is called
+- `handleWorkerKey()` — `↑↓`/pgup/pgdn scroll, `a` toggle auto-scroll, `s` stop, `esc`/`m` back when stopped, `q` stop+quit
+- Intercepted "Run" in `handleInputKey`: when `cmd.name === "worker"` push the live view instead of the normal execute→results flow
+
+## 2026-03-12 — cli: job worker command
+
+### `apps/cli/src/commands/worker.ts` (new)
+- `casen job worker <type>` — subscribes to jobs of a given type and auto-completes them
+- Polls via `POST /jobs/activation` with 20 s long-polling (`requestTimeout: 20000`)
+- Completes each activated job via `POST /jobs/{jobKey}/completion` with configurable variables
+- Flags: `--variables` / `-v` (JSON object, default `{"result":"sample-value"}`), `--timeout` / `-t` (lock timeout ms, default 30000), `--max-jobs` / `-m` (jobs per poll, default 32)
+- Prints activated job key, processDefinitionId, elementId, instanceKey, and input variables
+- Handles backpressure (503) with 5 s retry; stops cleanly on Ctrl+C reporting total completed
+
+### `apps/cli/src/commands/index.ts`
+- Injected `workerCmd` into the generated `jobGroup`
+
+## 2026-03-12 — profiles: Camunda Modeler connection import
+
+### `packages/profiles/src/modeler.ts` (new)
+- Reads `settings.json` from the Camunda Modeler config dir (`~/.config/camunda-modeler/` on Linux, `~/Library/Application Support/camunda-modeler/` on macOS, `%APPDATA%\camunda-modeler\` on Windows)
+- Parses `connectionManagerPlugin.c8connections` array; silently returns `[]` on any error (missing file, bad JSON, wrong structure)
+- Maps modeler connections to `Profile` objects: `contactPoint` → `baseUrl`; auth resolved by `targetType`/`authType` fields
+  - `camundaCloud` + client credentials → `oauth2` with `https://login.cloud.camunda.io/oauth/token`
+  - `clientCredentials`/`oauth2` authType → self-managed `oauth2`
+  - `bearer` authType → `bearer`; `basic` → `basic`; fallback → `none`
+- Exports `listModelerProfiles(): Profile[]`
+
+### `packages/profiles/src/profile.ts`
+- Added `source?: "modeler"` to `Profile` interface
+- `listProfiles()` now merges Camunda Modeler connections; own profiles take precedence on name collision
+
+### `packages/profiles/src/index.ts`
+- Exported `listModelerProfiles`
+
+## 2026-03-12 — landing: Mobile tile fix + playground neon styling
+
+### `apps/landing/src/styles/global.css`
+- Fixed mobile overflow: added `min-width: 0` to `.step` in `@media (max-width: 900px)` — prevents grid item from exceeding column width
+- Removed `overflow: visible` override on mobile `.step` (base `overflow: hidden` is correct)
+- Added `overflow-x: auto; white-space: pre` to `.step pre` on mobile for proper code block scrolling
+- Updated `.pg-diagram-panel` to match `.diagram-card` visual style: darker background, matching border color, added box-shadow
+- Added `background: var(--bg); position: relative` to `#playground-diagram` to match `diagram-canvas-wrap`
+
+### `apps/landing/src/scripts/playground.ts`
+- Added `createNeonThemePlugin()` to playground `BpmnCanvas` so its BPMN diagram uses the same neon color scheme, loading animation, and visual style as all other diagram previews on the page
+
 ## 2026-03-11 — editor12 (cont): Auto-layout improvements
 
 ### `packages/core/src/bpmn/bpmn-model.ts`

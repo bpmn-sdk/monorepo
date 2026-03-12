@@ -1,4 +1,5 @@
 export type { ApiType, Profile } from "./profile.js"
+export { listModelerProfiles } from "./modeler.js"
 export {
 	deleteProfile,
 	getActiveProfile,

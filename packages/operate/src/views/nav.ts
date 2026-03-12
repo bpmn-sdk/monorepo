@@ -9,6 +9,7 @@ export interface NavItem {
 const NAV_ITEMS: NavItem[] = [
 	{ id: "/", label: "Dashboard", icon: IC_UI.dashboard },
 	{ id: "/definitions", label: "Processes", icon: IC_UI.processes },
+	{ id: "/decisions", label: "Decisions", icon: IC_UI.decisions },
 	{ id: "/instances", label: "Instances", icon: IC_UI.instances },
 	{ id: "/incidents", label: "Incidents", icon: IC_UI.incidents },
 	{ id: "/jobs", label: "Jobs", icon: IC_UI.jobs },
