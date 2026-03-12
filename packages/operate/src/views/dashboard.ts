@@ -1,5 +1,5 @@
 import { IC_UI } from "@bpmn-sdk/ui"
-import { createLineChart } from "../components/chart.js"
+import { createBarChart } from "../components/chart.js"
 import type { DashboardStore } from "../stores/dashboard.js"
 
 // ── Dashboard card ────────────────────────────────────────────────────────────
@@ -39,6 +39,23 @@ function createDashboardCard(
 	return card
 }
 
+function createUsageCard(label: string, value: number | undefined): HTMLElement {
+	const card = document.createElement("div")
+	card.className = "op-usage-card"
+
+	const lbl = document.createElement("div")
+	lbl.className = "op-usage-card-label"
+	lbl.textContent = label
+
+	const val = document.createElement("div")
+	val.className = "op-usage-card-value"
+	val.textContent = value !== undefined ? value.toLocaleString() : "—"
+
+	card.appendChild(val)
+	card.appendChild(lbl)
+	return card
+}
+
 // ── View ──────────────────────────────────────────────────────────────────────
 
 export function createDashboardView(
@@ -55,6 +72,21 @@ export function createDashboardView(
 	grid.className = "op-card-grid"
 	el.appendChild(grid)
 
+	// Usage metrics section (only shown if data available)
+	const usageSection = document.createElement("div")
+	usageSection.className = "op-usage-section"
+	usageSection.style.display = "none"
+	el.appendChild(usageSection)
+
+	const usageHeading = document.createElement("div")
+	usageHeading.className = "op-chart-heading"
+	usageHeading.textContent = "Lifetime usage"
+	usageSection.appendChild(usageHeading)
+
+	const usageGrid = document.createElement("div")
+	usageGrid.className = "op-usage-grid"
+	usageSection.appendChild(usageGrid)
+
 	const chartWrap = document.createElement("div")
 	chartWrap.className = "op-chart-section"
 
@@ -64,7 +96,7 @@ export function createDashboardView(
 	chartWrap.appendChild(chartHeading)
 
 	el.appendChild(chartWrap)
-	const chart = createLineChart(chartWrap)
+	const chart = createBarChart(chartWrap)
 
 	function render(): void {
 		grid.innerHTML = ""
@@ -80,7 +112,6 @@ export function createDashboardView(
 			),
 		)
 
-		// Incidents: use amber accent when there are open incidents
 		const incAccent = d?.openIncidents ? "var(--op-c-amber)" : "var(--bpmn-accent)"
 		grid.appendChild(
 			createDashboardCard(
@@ -121,6 +152,19 @@ export function createDashboardView(
 				() => onNavigate("/definitions"),
 			),
 		)
+
+		// Usage metrics cards (only if data arrived)
+		const hasUsage =
+			d?.usageTotalProcessInstances !== undefined ||
+			d?.usageDecisionInstances !== undefined ||
+			d?.usageAssignees !== undefined
+		if (hasUsage) {
+			usageSection.style.display = ""
+			usageGrid.innerHTML = ""
+			usageGrid.appendChild(createUsageCard("Process Instances", d?.usageTotalProcessInstances))
+			usageGrid.appendChild(createUsageCard("Decision Evaluations", d?.usageDecisionInstances))
+			usageGrid.appendChild(createUsageCard("Active Assignees", d?.usageAssignees))
+		}
 
 		chart.update(store.history)
 	}

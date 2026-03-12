@@ -1,4 +1,5 @@
 import type {
+	DecisionDefinitionResult,
 	IncidentResult,
 	JobSearchResult,
 	ProcessDefinitionResult,
@@ -58,6 +59,10 @@ export interface DashboardData {
 	activeJobs: number
 	pendingTasks: number
 	definitions: number
+	/** Usage metrics — aggregate totals (may be absent if endpoint unavailable) */
+	usageTotalProcessInstances?: number
+	usageDecisionInstances?: number
+	usageAssignees?: number
 }
 
 export interface TimePoint {
@@ -69,6 +74,7 @@ export interface TimePoint {
 // ── Re-export API result types for consumer convenience ───────────────────────
 
 export type {
+	DecisionDefinitionResult,
 	IncidentResult,
 	JobSearchResult,
 	ProcessDefinitionResult,

@@ -2,6 +2,7 @@ import { type Theme, applyTheme, injectUiStyles, loadPersistedTheme } from "@bpm
 import { injectOperateStyles } from "./css.js"
 import { createRouter } from "./router.js"
 import { DashboardStore } from "./stores/dashboard.js"
+import { DecisionsStore } from "./stores/decisions.js"
 import { DefinitionsStore } from "./stores/definitions.js"
 import { IncidentsStore } from "./stores/incidents.js"
 import { InstancesStore } from "./stores/instances.js"
@@ -9,6 +10,8 @@ import { JobsStore } from "./stores/jobs.js"
 import { TasksStore } from "./stores/tasks.js"
 import type { OperateApi, OperateOptions, ProfileInfo } from "./types.js"
 import { createDashboardView } from "./views/dashboard.js"
+import { createDecisionDetailView } from "./views/decision-detail.js"
+import { createDecisionsView } from "./views/decisions.js"
 import { createDefinitionDetailView } from "./views/definition-detail.js"
 import { createDefinitionsView } from "./views/definitions.js"
 import { createHeader } from "./views/header.js"
@@ -17,19 +20,8 @@ import { createInstanceDetailView } from "./views/instance-detail.js"
 import { createInstancesView } from "./views/instances.js"
 import { createJobsView } from "./views/jobs.js"
 import { createNav } from "./views/nav.js"
+import { createTaskDetailView } from "./views/task-detail.js"
 import { createTasksView } from "./views/tasks.js"
-
-const TITLE_MAP: Record<string, string> = {
-	"/": "Dashboard",
-	"/definitions": "Processes",
-	"/instances": "Instances",
-	"/incidents": "Incidents",
-	"/jobs": "Jobs",
-	"/tasks": "Tasks",
-}
-
-// Keep TITLE_MAP reference to avoid unused-variable lint error
-void TITLE_MAP
 
 export function createOperate(options: OperateOptions): OperateApi {
 	// Inject shared tokens first, then operate-specific layout CSS
@@ -59,22 +51,22 @@ export function createOperate(options: OperateOptions): OperateApi {
 
 	const dashStore = new DashboardStore()
 	const defStore = new DefinitionsStore()
+	const decStore = new DecisionsStore()
 	const instStore = new InstancesStore()
 	const incStore = new IncidentsStore()
 	const jobStore = new JobsStore()
 	const taskStore = new TasksStore()
 
-	// Disconnect every store to free all HTTP connection slots.
 	function disconnectAll(): void {
 		dashStore.disconnect()
 		defStore.disconnect()
+		decStore.disconnect()
 		instStore.disconnect()
 		incStore.disconnect()
 		jobStore.disconnect()
 		taskStore.disconnect()
 	}
 
-	// Called when profile changes — reconnects only the currently active stores.
 	let reconnectCurrent: (() => void) | null = null
 
 	function connectAll(): void {
@@ -127,7 +119,6 @@ export function createOperate(options: OperateOptions): OperateApi {
 		},
 		(theme, resolved) => {
 			el.setAttribute("data-theme", resolved)
-			// Keep instance-detail canvas in sync
 			currentTheme = theme
 		},
 		initialTheme,
@@ -149,6 +140,10 @@ export function createOperate(options: OperateOptions): OperateApi {
 		destroyView = destroy
 		content.innerHTML = ""
 		content.appendChild(viewEl)
+	}
+
+	function getTheme(): "light" | "dark" {
+		return el.getAttribute("data-theme") === "light" ? "light" : "dark"
 	}
 
 	router.on("/", () => {
@@ -178,7 +173,6 @@ export function createOperate(options: OperateOptions): OperateApi {
 	})
 
 	router.on("/definitions/:key", (params) => {
-		// Disconnect all stores: no polling while the XML fetch is in-flight.
 		disconnectAll()
 		reconnectCurrent = () => {
 			disconnectAll()
@@ -188,13 +182,40 @@ export function createOperate(options: OperateOptions): OperateApi {
 		const { el: vEl, destroy } = createDefinitionDetailView(
 			params.key ?? "",
 			defStore,
-			{
-				proxyUrl,
-				profile,
-				mock,
-				theme: el.getAttribute("data-theme") === "light" ? "light" : "dark",
-			},
+			{ proxyUrl, profile, mock, theme: getTheme() },
 			() => router.navigate("/definitions"),
+		)
+		showView(vEl, destroy)
+	})
+
+	router.on("/decisions", () => {
+		reconnectCurrent = () => {
+			disconnectAll()
+			decStore.connect(proxyUrl, profile, pollInterval, mock)
+		}
+		reconnectCurrent()
+		header.setTitle("Decisions")
+		nav.setActive("/decisions")
+		const { el: vEl, destroy } = createDecisionsView(decStore, (def) => {
+			router.navigate(`/decisions/${def.decisionDefinitionKey}`)
+		})
+		showView(vEl, destroy)
+	})
+
+	router.on("/decisions/:key", (params) => {
+		disconnectAll()
+		reconnectCurrent = () => {
+			disconnectAll()
+			decStore.connect(proxyUrl, profile, pollInterval, mock)
+		}
+		reconnectCurrent()
+		header.setTitle("Decision Definition")
+		nav.setActive("/decisions")
+		const { el: vEl, destroy } = createDecisionDetailView(
+			params.key ?? "",
+			decStore,
+			{ proxyUrl, profile, mock, theme: getTheme() },
+			() => router.navigate("/decisions"),
 		)
 		showView(vEl, destroy)
 	})
@@ -218,7 +239,6 @@ export function createOperate(options: OperateOptions): OperateApi {
 	})
 
 	router.on("/instances/:key", (params) => {
-		// Keep only instStore connected (needed to look up processDefinitionKey for the XML fetch).
 		reconnectCurrent = () => {
 			disconnectAll()
 			instStore.connect(proxyUrl, profile, pollInterval, mock)
@@ -235,7 +255,7 @@ export function createOperate(options: OperateOptions): OperateApi {
 				profile,
 				interval: pollInterval,
 				mock,
-				theme: el.getAttribute("data-theme") === "light" ? "light" : "dark",
+				theme: getTheme(),
 			},
 			() => router.navigate("/instances"),
 		)
@@ -274,7 +294,27 @@ export function createOperate(options: OperateOptions): OperateApi {
 		reconnectCurrent()
 		header.setTitle("Tasks")
 		nav.setActive("/tasks")
-		const { el: vEl, destroy } = createTasksView(taskStore)
+		const { el: vEl, destroy } = createTasksView(taskStore, (task) => {
+			router.navigate(`/tasks/${task.userTaskKey}`)
+		})
+		showView(vEl, destroy)
+	})
+
+	router.on("/tasks/:key", (params) => {
+		reconnectCurrent = () => {
+			disconnectAll()
+			taskStore.connect(proxyUrl, profile, pollInterval, mock)
+		}
+		reconnectCurrent()
+		const taskKey = params.key ?? ""
+		header.setTitle(`Task ${taskKey}`)
+		nav.setActive("/tasks")
+		const { el: vEl, destroy } = createTaskDetailView(
+			taskKey,
+			taskStore,
+			{ proxyUrl, profile, mock, theme: getTheme() },
+			() => router.navigate("/tasks"),
+		)
 		showView(vEl, destroy)
 	})
 
@@ -306,6 +346,7 @@ export function createOperate(options: OperateOptions): OperateApi {
 			destroyView?.()
 			dashStore.destroy()
 			defStore.destroy()
+			decStore.destroy()
 			instStore.destroy()
 			incStore.destroy()
 			jobStore.destroy()

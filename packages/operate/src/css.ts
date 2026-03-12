@@ -144,9 +144,36 @@ const OPERATE_CSS = `
 /* ── Filter bar ──────────────────────────────────────────────────────────── */
 .op-filter-bar {
   display: flex;
+  align-items: center;
   gap: 6px;
   margin-bottom: 14px;
+  flex-wrap: wrap;
 }
+.op-proc-filter-wrap {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: auto;
+}
+.op-proc-filter-label { font-size: 12px; color: var(--bpmn-fg-muted); white-space: nowrap; }
+.op-proc-filter-select {
+  background: var(--bpmn-surface);
+  border: 1px solid var(--bpmn-border);
+  border-radius: var(--bpmn-radius);
+  padding: 3px 8px;
+  font-size: 12px;
+  color: var(--bpmn-fg);
+  cursor: pointer;
+  font-family: var(--bpmn-font);
+  max-width: 200px;
+}
+.op-proc-filter-select:focus { outline: none; border-color: var(--bpmn-accent); }
+
+/* ── Process breadcrumb ──────────────────────────────────────────────────── */
+.op-proc-breadcrumb { display: inline-flex; align-items: center; min-width: 0; max-width: 100%; }
+.op-proc-root { color: var(--bpmn-fg-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.op-proc-sep { color: var(--bpmn-fg-muted); opacity: 0.5; flex-shrink: 0; }
+.op-proc-leaf { color: var(--bpmn-fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .op-filter-btn {
   background: var(--bpmn-surface);
   border: 1px solid var(--bpmn-border);
@@ -791,6 +818,104 @@ const OPERATE_CSS = `
   background: var(--bpmn-surface);
   border: 1px solid var(--bpmn-border);
   border-radius: var(--bpmn-radius);
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* ── Decisions view ──────────────────────────────────────────────────────── */
+.op-dec-def-header {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--bpmn-fg-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 6px 12px 2px 32px;
+}
+
+/* ── Usage metrics section ───────────────────────────────────────────────── */
+.op-usage-section { margin-bottom: 16px; }
+.op-usage-grid {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.op-usage-card {
+  background: var(--bpmn-surface);
+  border: 1px solid var(--bpmn-border);
+  border-radius: var(--bpmn-radius);
+  padding: 10px 16px;
+  min-width: 140px;
+  flex: 1;
+}
+.op-usage-card-value {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--bpmn-fg);
+  margin-bottom: 2px;
+}
+.op-usage-card-label {
+  font-size: 11px;
+  color: var(--bpmn-fg-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* ── Task detail ─────────────────────────────────────────────────────────── */
+.op-task-detail-body {
+  display: flex;
+  flex: 1;
+  gap: 16px;
+  overflow: hidden;
+  min-height: 0;
+}
+.op-task-info-panel {
+  width: 280px;
+  flex-shrink: 0;
+  background: var(--bpmn-surface);
+  border: 1px solid var(--bpmn-border);
+  border-radius: var(--bpmn-radius);
+  overflow-y: auto;
+  padding: 14px;
+}
+.op-task-info-heading {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--bpmn-fg-muted);
+  margin-bottom: 10px;
+}
+.op-task-meta-row {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin-bottom: 8px;
+}
+.op-task-meta-label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--bpmn-fg-muted);
+}
+.op-task-meta-value {
+  font-size: 12px;
+  color: var(--bpmn-fg);
+  word-break: break-all;
+}
+.op-task-form-wrap {
+  flex: 1;
+  background: var(--bpmn-surface);
+  border: 1px solid var(--bpmn-border);
+  border-radius: var(--bpmn-radius);
+  overflow: hidden;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 14px;
+}
+.op-task-form-container {
+  flex: 1;
   overflow: hidden;
   min-height: 0;
 }

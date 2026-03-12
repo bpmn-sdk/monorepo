@@ -353,7 +353,7 @@ const server = http.createServer(async (req, res) => {
 		async function fetchPayload(): Promise<unknown> {
 			switch (topicParam) {
 				case "dashboard": {
-					const [inst, inc, jobs, tasks, defs] = await Promise.all([
+					const [inst, inc, jobs, tasks, defs, usage] = await Promise.all([
 						client.processInstance.searchProcessInstances({
 							filter: { state: "ACTIVE" },
 						} as AnyQuery),
@@ -361,6 +361,7 @@ const server = http.createServer(async (req, res) => {
 						client.job.searchJobs({ filter: { state: "CREATED" } } as AnyQuery),
 						client.userTask.searchUserTasks({ filter: { state: "CREATED" } } as AnyQuery),
 						client.processDefinition.searchProcessDefinitions({}),
+						client.system.getUsageMetrics().catch(() => null),
 					])
 					return {
 						activeInstances: inst.page.totalItems,
@@ -368,11 +369,15 @@ const server = http.createServer(async (req, res) => {
 						activeJobs: jobs.page.totalItems,
 						pendingTasks: tasks.page.totalItems,
 						definitions: defs.page.totalItems,
+						usageTotalProcessInstances: usage?.processInstances,
+						usageDecisionInstances: usage?.decisionInstances,
+						usageAssignees: usage?.assignees,
 					}
 				}
 				case "definitions": {
 					const result = await client.processDefinition.searchProcessDefinitions({
 						page: { limit: 1000 },
+						sort: [{ field: "version", order: "DESC" }],
 					} as AnyQuery)
 					return { items: items(result) }
 				}
@@ -384,6 +389,8 @@ const server = http.createServer(async (req, res) => {
 					if (pdKey) filter.processDefinitionKey = pdKey
 					const result = await client.processInstance.searchProcessInstances({
 						filter,
+						page: { limit: 1000 },
+						sort: [{ field: "startDate", order: "DESC" }],
 					} as AnyQuery)
 					return { items: items(result), total: total(result) }
 				}
@@ -391,16 +398,33 @@ const server = http.createServer(async (req, res) => {
 					const piKey = url.searchParams.get("processInstanceKey")
 					const filter: AnyQuery = {}
 					if (piKey) filter.processInstanceKey = piKey
-					const result = await client.incident.searchIncidents({ filter } as AnyQuery)
+					const result = await client.incident.searchIncidents({
+						filter,
+						page: { limit: 1000 },
+						sort: [{ field: "creationTime", order: "DESC" }],
+					} as AnyQuery)
 					return { items: items(result), total: total(result) }
 				}
 				case "jobs": {
-					const result = await client.job.searchJobs({})
+					const result = await client.job.searchJobs({
+						page: { limit: 1000 },
+						sort: [{ field: "jobKey", order: "DESC" }],
+					} as AnyQuery)
 					return { items: items(result), total: total(result) }
 				}
 				case "tasks": {
-					const result = await client.userTask.searchUserTasks({})
+					const result = await client.userTask.searchUserTasks({
+						page: { limit: 1000 },
+						sort: [{ field: "creationDate", order: "DESC" }],
+					} as AnyQuery)
 					return { items: items(result), total: total(result) }
+				}
+				case "decisions": {
+					const result = await client.decisionDefinition.searchDecisionDefinitions({
+						page: { limit: 1000 },
+						sort: [{ field: "version", order: "DESC" }],
+					} as AnyQuery)
+					return { items: items(result) }
 				}
 				default:
 					throw new Error(`Unknown topic: ${topicParam}`)

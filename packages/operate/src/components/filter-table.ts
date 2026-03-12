@@ -236,6 +236,7 @@ export function createFilterTable<T>(options: {
 		el,
 		setRows(rows: T[]): void {
 			allRows = rows
+			currentPage = 0
 			renderRows()
 		},
 	}

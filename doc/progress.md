@@ -1,5 +1,38 @@
 # Progress
 
+## 2026-03-12 — operate: decisions nav, task detail, bar chart, usage metrics
+
+### Dashboard
+- Replaced line chart with grouped bar chart (`createBarChart`): each time point shows 4 colored bars (one per metric), legend toggles individual metrics, limited to 40 most recent data points
+- Added "Lifetime usage" section: fetches `GET /system/usage-metrics` (via proxy) — shows Process Instances, Decision Evaluations, Active Assignees cards when data is available
+- `DashboardData` extended with optional `usageTotalProcessInstances`, `usageDecisionInstances`, `usageAssignees` fields
+
+### Decisions (new)
+- Added "Decisions" nav item (`IC_UI.decisions` — table grid icon) between Processes and Instances
+- `packages/operate/src/stores/decisions.ts`: new `DecisionsStore` streaming `decisions` topic
+- `packages/operate/src/views/decisions.ts`: grouped list by DRG (`decisionRequirementsId`), collapsible with decision versions
+- `packages/operate/src/views/decision-detail.ts`: breadcrumb + metadata + `DmnEditor` rendering the decision XML (fetched via `/api/decision-definitions/{key}/xml`), mock mode uses minimal DMN XML
+- Proxy: added `case "decisions"` topic calling `searchDecisionDefinitions` with version DESC sort
+- `packages/ui/src/icons.ts`: added `decisions` icon
+
+### Tasks: click to open
+- Tasks table rows are now clickable; clicking navigates to `/tasks/{key}`
+- `packages/operate/src/views/task-detail.ts`: task metadata panel + `FormEditor` rendering the form (fetched via `/api/user-tasks/{key}/form`); shows "No form" message when no form key is present
+
+### Operate core
+- `operate.ts`: wired `DecisionsStore`, `/decisions`, `/decisions/:key`, `/tasks/:key` routes
+- `types.ts`: added `DecisionDefinitionResult` re-export
+
+## 2026-03-12 — operate: sort all entity queries most-recent-first
+
+### `apps/proxy/src/index.ts`
+- Added `sort` parameter to all five topic queries so results are returned most-recent-first:
+  - `definitions`: `sort: [{ field: "version", order: "DESC" }]`
+  - `instances`: `sort: [{ field: "startDate", order: "DESC" }]`
+  - `incidents`: `sort: [{ field: "creationTime", order: "DESC" }]`
+  - `jobs`: `sort: [{ field: "jobKey", order: "DESC" }]`
+  - `tasks`: `sort: [{ field: "creationDate", order: "DESC" }]`
+
 ## 2026-03-12 — operate: table pagination, sorting, and definitions improvements
 
 ### `packages/operate/src/components/filter-table.ts`

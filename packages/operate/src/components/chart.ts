@@ -2,7 +2,10 @@ import type { DashboardData, TimePoint } from "../types.js"
 
 // ── Metric definitions ────────────────────────────────────────────────────────
 
-type MetricKey = keyof Omit<DashboardData, "definitions">
+type MetricKey = keyof Omit<
+	DashboardData,
+	"definitions" | "usageTotalProcessInstances" | "usageDecisionInstances" | "usageAssignees"
+>
 
 const METRICS: ReadonlyArray<{ key: MetricKey; label: string; cssVar: string }> = [
 	{ key: "activeInstances", label: "Active Instances", cssVar: "--bpmn-accent" },
@@ -13,10 +16,11 @@ const METRICS: ReadonlyArray<{ key: MetricKey; label: string; cssVar: string }> 
 
 const MARGIN = { top: 12, right: 16, bottom: 28, left: 36 }
 const SVG_NS = "http://www.w3.org/2000/svg"
+/** Maximum number of time points shown in the bar chart. */
+const MAX_BARS = 40
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-/** Format a duration (ms) as a human-readable "ago" label. */
 function fmtAgo(ms: number): string {
 	if (ms < 5_000) return "now"
 	if (ms < 120_000) return `${Math.round(ms / 1_000)}s`
@@ -25,22 +29,18 @@ function fmtAgo(ms: number): string {
 	return `${Math.round(mins / 60)}h`
 }
 
-/**
- * Pick a tick interval (ms) that gives ~4–5 ticks across the given span.
- * Uses a fixed ladder so labels always fall on clean boundaries.
- */
 function pickTickInterval(spanMs: number): number {
 	const ladder = [
-		15_000, // 15 s
-		30_000, // 30 s
-		60_000, // 1 m
-		2 * 60_000, // 2 m
-		5 * 60_000, // 5 m
-		10 * 60_000, // 10 m
-		15 * 60_000, // 15 m
-		30 * 60_000, // 30 m
-		60 * 60_000, // 1 h
-		2 * 3_600_000, // 2 h
+		15_000,
+		30_000,
+		60_000,
+		2 * 60_000,
+		5 * 60_000,
+		10 * 60_000,
+		15 * 60_000,
+		30 * 60_000,
+		60 * 60_000,
+		2 * 3_600_000,
 	]
 	for (const t of ladder) {
 		if (spanMs / t <= 5) return t
@@ -61,7 +61,7 @@ function makeSvgEl(tag: string): SVGElement {
 
 // ── Chart factory ─────────────────────────────────────────────────────────────
 
-export function createLineChart(container: HTMLElement): {
+export function createBarChart(container: HTMLElement): {
 	update(history: TimePoint[]): void
 	destroy(): void
 } {
@@ -125,7 +125,6 @@ export function createLineChart(container: HTMLElement): {
 	}
 
 	function drawLoading(): void {
-		// Animated "waiting for first data" indicator — three pulsing dots
 		const cx = svgWidth / 2
 		const cy = svgHeight / 2
 		const offsets = [-16, 0, 16]
@@ -145,7 +144,10 @@ export function createLineChart(container: HTMLElement): {
 		clearSvg()
 		if (svgWidth <= 0 || svgHeight <= 0) return
 
-		if (history.length < 2) {
+		// Use the most recent MAX_BARS points
+		const pts = history.length > MAX_BARS ? history.slice(history.length - MAX_BARS) : history
+
+		if (pts.length < 1) {
 			drawLoading()
 			return
 		}
@@ -153,17 +155,17 @@ export function createLineChart(container: HTMLElement): {
 		const plotW = Math.max(1, svgWidth - MARGIN.left - MARGIN.right)
 		const plotH = Math.max(1, svgHeight - MARGIN.top - MARGIN.bottom)
 
-		const newest = history[history.length - 1]
-		const oldest = history[0]
+		const newest = pts[pts.length - 1]
+		const oldest = pts[0]
 		if (!newest || !oldest) return
 
-		const oldestTs = oldest.ts
 		const newestTs = newest.ts
+		const oldestTs = oldest.ts
 		const timeSpan = Math.max(1, newestTs - oldestTs)
 
-		// Y scale: max across all active metrics
+		// Y scale
 		let yMax = 0
-		for (const pt of history) {
+		for (const pt of pts) {
 			for (const m of METRICS) {
 				if (active.has(m.key)) {
 					const v = pt.data[m.key]
@@ -173,14 +175,11 @@ export function createLineChart(container: HTMLElement): {
 		}
 		yMax = niceMax(yMax)
 
-		function toX(ts: number): number {
-			return MARGIN.left + ((ts - oldestTs) / timeSpan) * plotW
-		}
 		function toY(v: number): number {
 			return MARGIN.top + plotH - (v / yMax) * plotH
 		}
 
-		// Y grid + labels (0, 25%, 50%, 75%, 100%)
+		// Y grid + labels
 		for (let i = 0; i <= 4; i++) {
 			const v = Math.round((i / 4) * yMax)
 			const y = toY(v)
@@ -211,62 +210,72 @@ export function createLineChart(container: HTMLElement): {
 		xBase.setAttribute("class", "op-chart-axis")
 		svg.appendChild(xBase)
 
-		// X labels: time-based ticks so labels are always at clean boundaries
-		// and never duplicate regardless of how many data points exist.
-		const tickInterval = pickTickInterval(timeSpan)
-		const alignedFirst = Math.ceil(oldestTs / tickInterval) * tickInterval
-		const rightEdge = MARGIN.left + plotW
-		const minSpacingPx = 36 // minimum pixels between adjacent x labels
-		let prevLabelX = Number.NEGATIVE_INFINITY
+		// X labels
+		if (pts.length > 1) {
+			const tickInterval = pickTickInterval(timeSpan)
+			const alignedFirst = Math.ceil(oldestTs / tickInterval) * tickInterval
+			const rightEdge = MARGIN.left + plotW
+			const minSpacingPx = 36
+			let prevLabelX = Number.NEGATIVE_INFINITY
 
-		for (let ts = alignedFirst; ts < newestTs - tickInterval * 0.1; ts += tickInterval) {
-			const x = toX(ts)
-			if (x - prevLabelX < minSpacingPx) continue
-			prevLabelX = x
+			for (let ts = alignedFirst; ts < newestTs - tickInterval * 0.1; ts += tickInterval) {
+				const x = MARGIN.left + ((ts - oldestTs) / timeSpan) * plotW
+				if (x - prevLabelX < minSpacingPx) continue
+				prevLabelX = x
 
-			const lbl = makeSvgEl("text")
-			lbl.setAttribute("x", String(x))
-			lbl.setAttribute("y", String(MARGIN.top + plotH + 18))
-			lbl.setAttribute("text-anchor", "middle")
-			lbl.setAttribute("class", "op-chart-axis-label")
-			lbl.textContent = fmtAgo(newestTs - ts)
-			svg.appendChild(lbl)
+				const lbl = makeSvgEl("text")
+				lbl.setAttribute("x", String(x))
+				lbl.setAttribute("y", String(MARGIN.top + plotH + 18))
+				lbl.setAttribute("text-anchor", "middle")
+				lbl.setAttribute("class", "op-chart-axis-label")
+				lbl.textContent = fmtAgo(newestTs - ts)
+				svg.appendChild(lbl)
+			}
+
+			if (rightEdge - prevLabelX >= minSpacingPx) {
+				const nowLbl = makeSvgEl("text")
+				nowLbl.setAttribute("x", String(rightEdge))
+				nowLbl.setAttribute("y", String(MARGIN.top + plotH + 18))
+				nowLbl.setAttribute("text-anchor", "middle")
+				nowLbl.setAttribute("class", "op-chart-axis-label")
+				nowLbl.textContent = "now"
+				svg.appendChild(nowLbl)
+			}
 		}
 
-		// "now" at the right edge — skip if too close to the last tick label
-		if (rightEdge - prevLabelX >= minSpacingPx) {
-			const nowLbl = makeSvgEl("text")
-			nowLbl.setAttribute("x", String(rightEdge))
-			nowLbl.setAttribute("y", String(MARGIN.top + plotH + 18))
-			nowLbl.setAttribute("text-anchor", "middle")
-			nowLbl.setAttribute("class", "op-chart-axis-label")
-			nowLbl.textContent = "now"
-			svg.appendChild(nowLbl)
-		}
+		// ── Grouped bars ─────────────────────────────────────────────────────
+		const activeMetrics = METRICS.filter((m) => active.has(m.key))
+		const numActive = activeMetrics.length
+		if (numActive === 0 || pts.length === 0) return
 
-		// Lines + terminal dots per metric
-		for (const m of METRICS) {
-			if (!active.has(m.key)) continue
+		const n = pts.length
+		const groupGap = Math.max(2, Math.min(6, (plotW / n) * 0.15))
+		const barGap = 1
+		const groupW = plotW / n
+		const barW = Math.max(1, (groupW - groupGap - barGap * (numActive - 1)) / numActive)
 
-			const pts = history.map((pt) => `${toX(pt.ts)},${toY(pt.data[m.key])}`).join(" ")
+		for (let gi = 0; gi < pts.length; gi++) {
+			const pt = pts[gi]
+			if (!pt) continue
+			const groupX = MARGIN.left + gi * groupW + groupGap / 2
 
-			const poly = makeSvgEl("polyline")
-			poly.setAttribute("points", pts)
-			poly.setAttribute("fill", "none")
-			poly.setAttribute("stroke", `var(${m.cssVar})`)
-			poly.setAttribute("stroke-width", "1.5")
-			poly.setAttribute("stroke-linejoin", "round")
-			poly.setAttribute("stroke-linecap", "round")
-			svg.appendChild(poly)
+			for (let mi = 0; mi < activeMetrics.length; mi++) {
+				const m = activeMetrics[mi]
+				if (!m) continue
+				const v = pt.data[m.key]
+				const barH = (v / yMax) * plotH
+				const x = groupX + mi * (barW + barGap)
+				const y = MARGIN.top + plotH - barH
 
-			const last = history[history.length - 1]
-			if (last) {
-				const dot = makeSvgEl("circle")
-				dot.setAttribute("cx", String(toX(last.ts)))
-				dot.setAttribute("cy", String(toY(last.data[m.key])))
-				dot.setAttribute("r", "3")
-				dot.setAttribute("fill", `var(${m.cssVar})`)
-				svg.appendChild(dot)
+				const rect = makeSvgEl("rect")
+				rect.setAttribute("x", String(x))
+				rect.setAttribute("y", String(y))
+				rect.setAttribute("width", String(barW))
+				rect.setAttribute("height", String(Math.max(1, barH)))
+				rect.setAttribute("fill", `var(${m.cssVar})`)
+				rect.setAttribute("opacity", "0.75")
+				rect.setAttribute("rx", "1")
+				svg.appendChild(rect)
 			}
 		}
 	}
