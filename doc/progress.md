@@ -1,5 +1,123 @@
 # Progress
 
+## 2026-03-13 — operate: live theme switching for canvas/DMN views
+
+- Added `setTheme(t: "light" | "dark"): void` to the return types of `createDefinitionDetailView`, `createInstanceDetailView`, and `createDecisionDetailView`
+- Each view's `setTheme` forwards to `BpmnCanvas.setTheme()` / `DmnEditor.setTheme()` and updates the sidebar `data-bpmn-hud-theme` attribute
+- `operate.ts`: extended `showView` to accept an optional `setTheme` callback; stored as `currentViewSetTheme`
+- Theme header callback now calls `currentViewSetTheme?.(resolved)` so switching the theme in the header immediately updates the canvas and properties panel of the current view
+
+## 2026-03-13 — canvas/plugins: sequence flow selection + subprocess token highlight fix
+
+### canvas — edge hit area
+- Added a 12px transparent `pointer-events: stroke` hit path to every rendered sequence flow so edges are easy to click without requiring pixel-perfect aim on a 1.5px line
+- Changed `.bpmn-edge { cursor: pointer }` (was `default`) to indicate edges are interactive
+
+### operate / config-panel — sequence flow properties
+- `BpmnCanvas` click handler already emits `element:click` for edges; the config panel renderer already has a `sequenceFlow` schema branch
+- Extended the sequence flow lookup in `ConfigPanelRenderer.onSelect` to also search subprocess sequence flows (previously only checked top-level `process.sequenceFlows`)
+
+### token-highlight — subprocess element highlighting
+- `shapeEl` and `edgeEl` now use `viewportEl.querySelector('[data-bpmn-id="..."]')` instead of searching `getShapes()`/`getEdges()` arrays; this finds subprocess child elements which are rendered with `data-bpmn-id` but not included in the top-level shape array
+- `applyHighlights` cleanup now queries the viewport for elements with highlight CSS classes instead of iterating the shape/edge arrays, so classes are correctly removed from subprocess children on the next update
+
+## 2026-03-13 — canvas: fix element:click hit-testing; operate: properties panel in definition-detail
+
+### canvas — fix element:click in flex/scroll containers
+- `BpmnCanvas` click handler now uses `document.elementFromPoint(clientX, clientY)` to resolve the
+  hit element instead of relying on `e.target`, which native SVG hit-testing was returning as the
+  root `<svg>` when the canvas is hosted inside a flex/scroll container (e.g. `@bpmn-sdk/operate`)
+- Falls back to `e.target.closest("[data-bpmn-id]")` so existing tests (happy-dom, dispatched events)
+  continue to pass
+
+### operate — definition-detail: Properties panel now works
+- Clicking a BPMN element in a process definition detail view now correctly fires `element:click`,
+  which the bridge plugin translates to `editor:select`, causing the config panel to populate
+
+## 2026-03-13 — operate: view UX improvements
+
+### Incidents view — state filter
+- Added a state filter bar above the incidents table (All / Active / Resolved / Migrated / Pending)
+- Client-side filtering: buttons call `applyFilter()` which passes filtered items to `setRows()`
+
+### Messages view — filter table + click-to-detail
+- Replaced custom `renderSubList` with `createFilterTable<MessageSubscriptionResult>` (same component as Tasks/Jobs)
+- Added click handler: clicking a subscription row opens a compact modal showing State, Correlation Key, Process, Instance Key, Element ID, Last Updated, Tenant
+- Removed orphaned CSS: `.op-msg-sub-list`, `.op-msg-sub-row`, `.op-msg-sub-header`, `.op-msg-name`, `.op-msg-key`
+- Added new CSS: `.op-kv-body`, `.op-kv-row`, `.op-kv-key`, `.op-kv-value` for the detail modal
+
+### Processes view — flat filter table (replaces expandable groups)
+- Replaced expandable-group layout with `createFilterTable<DefRow>` showing one row per process definition (latest version)
+- Columns: Name, ID, Versions, Latest; clicking a row opens the latest version's detail view
+- Removed orphaned CSS: op-def-group*, op-def-chevron*, op-def-name, op-def-count, op-def-versions, op-def-version-row*, op-def-version-key, op-def-version-tag
+
+### Decisions view — flat filter table (replaces expandable groups)
+- Replaced expandable-group layout with `createFilterTable<DecRow>` showing one row per decision definition (latest version)
+- Columns: Name, ID, DRG, Versions, Latest; clicking opens the latest version's detail view
+- Removed orphaned CSS: op-dec-def-header
+
+### Version dropdown in definition-detail and decision-detail
+- When multiple versions of the same process/decision definition exist in the store, a `<select>` version dropdown replaces the static version badge in the meta bar
+- Selecting a different version navigates to that version's detail page (via `cfg.navigate`)
+- Added `navigate?: (path: string) => void` to decision-detail Config; operate.ts passes the router navigate function
+- Added `.op-version-select` CSS (compact select styled like op-profile-select)
+
+### Properties panel theme fix
+- All three canvas detail views (definition-detail, instance-detail, incident-detail) now set `sidebar.dataset.bpmnHudTheme = cfg.theme`
+- This propagates the `data-bpmn-hud-theme` attribute that the config panel CSS uses for light-mode overrides
+- Fixes the "Properties tab always appears empty" visual bug (panel was rendering with dark styling in light mode)
+
+## 2026-03-13 — operate: properties panel + process chain breadcrumb
+
+### Config panel Properties tab (instance-detail, definition-detail, incident-detail)
+- Added a read-only "Properties" tab to the sidebar of all three canvas detail views
+- Uses `createConfigPanelPlugin` + `createConfigPanelBpmnPlugin` from `@bpmn-sdk/plugins`
+- A bridge plugin converts `element:click` → `editor:select` so the config panel responds to canvas element clicks
+- `getDefinitions` closure captures `BpmnDefinitions` from the canvas `diagram:load` event
+- `applyChange` is a no-op — all editing is disabled in Operate
+- Container-hosted mode renders the panel inside the sidebar pane (not as a floating overlay)
+- Read-only CSS: inputs/textareas/selects get `pointer-events: none; opacity: 0.75`; edit buttons (`bpmn-cfg-field-edit-btn`, `bpmn-cfg-overlay-trigger`) are hidden
+- Placeholder "Click an element to view its properties" shown when no element is selected
+
+### Process chain breadcrumb (instance-detail)
+- Added `op-process-chain` div showing the full parent-to-child process hierarchy for sub-process instances
+- `fetchProcessChain` walks up `parentProcessInstanceKey` to the root, building a clickable breadcrumb
+- Chain only shown when there are 2+ levels (i.e. the instance has a parent)
+- Clicking a breadcrumb segment navigates to that process instance
+- Added `navigate?: (path: string) => void` to instance-detail Config; operate.ts passes the router navigate function
+
+### definition-detail layout change
+- Changed from full-width canvas to canvas + 320px sidebar layout (same `op-detail-layout` flex row used by instance-detail and incident-detail)
+- Sidebar has a single "Properties" tab with the read-only config panel
+
+## 2026-03-13 — operate: new views + actions
+
+### Start Instance (definition-detail)
+- Added "▶ Start Instance" button to the definition detail meta bar
+- Opens a modal with optional Business ID + Variables JSON fields
+- POSTs to `/api/process-instances`; on success shows the new instance key with a "View Instance →" link
+
+### Cancel Instance (instance-detail)
+- Added "✕ Cancel" button in instance meta bar when state === `ACTIVE`
+- Two-step confirm pattern: first click → "Confirm Cancel?", second click → POST `/api/process-instances/{key}/cancellation`
+
+### Messages & Signals view (new)
+- New `/messages` route and nav item ("Messages")
+- Three action cards: **Correlate Message** (POST `/api/messages/correlation`), **Publish Message** (POST `/api/messages/publication`), **Broadcast Signal** (POST `/api/signals/broadcast`)
+- Each card opens a typed form modal with validation and success/error feedback
+- Active message subscriptions list loaded from `/api/message-subscriptions/search`
+- Mock mode shows fixture subscriptions and gives "Mock mode" feedback on actions
+
+### Supporting changes
+- Added `messages` envelope icon to `@bpmn-sdk/ui` `IC_UI`
+- Added `MessageSubscriptionResult` to operate types re-exports
+- Added mock message subscription fixtures to `mock-data.ts`
+- New CSS: form modal styles (`.op-modal--form`, `.op-form-*`), messages view (`.op-msg-*`), danger button (`.op-action-btn--danger`)
+
+## 2026-03-13 — operate: deduplicate variables by name
+
+- `packages/operate/src/views/instance-detail.ts`: added `deduplicateVars()` — groups variables by name, keeps the entry with the highest `variableKey` (BigInt comparison) to handle loops that write the same variable multiple times
+
 ## 2026-03-12 — operate: incident detail view + AI incident assist
 
 ### Incidents: click to open detail

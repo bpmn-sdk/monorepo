@@ -131,7 +131,6 @@ export const UI_COMPONENTS_CSS = `
 .bpmn-table-th[style*="width"] { flex: none; }
 .bpmn-table-body {
   overflow-y: auto;
-  max-height: calc(100vh - 240px);
 }
 .bpmn-table-row {
   display: flex;
@@ -143,7 +142,7 @@ export const UI_COMPONENTS_CSS = `
 .bpmn-table-row--clickable { cursor: pointer; }
 .bpmn-table-row--clickable:hover { background: var(--bpmn-surface-2); }
 .bpmn-table-td {
-  padding: 10px 14px;
+  padding: 7px 14px;
   font-size: 13px;
   flex: 1;
   overflow: hidden;

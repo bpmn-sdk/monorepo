@@ -144,7 +144,7 @@ export const CANVAS_CSS = `
 
 /* ── Edges ───────────────────────────────────────────────────────── */
 .bpmn-edge {
-  cursor: default;
+  cursor: pointer;
 }
 .bpmn-edge-path {
   fill: none;
