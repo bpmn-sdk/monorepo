@@ -162,7 +162,11 @@ importers:
         specifier: workspace:*
         version: link:../core
 
-  packages/astro-shared: {}
+  packages/astro-shared:
+    dependencies:
+      '@bpmn-sdk/ui':
+        specifier: workspace:*
+        version: link:../ui
 
   packages/canvas:
     dependencies:

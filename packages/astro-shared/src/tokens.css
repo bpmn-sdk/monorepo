@@ -1,22 +1,32 @@
-/* ── Design tokens ──────────────────────────────────────────────── */
+/* ── BPMN SDK brand tokens (Astro apps) ─────────────────────────────────────
+ * Imports the canonical --bpmn-* token set, then maps them to the shorter
+ * --* names used by the landing / learn / docs layouts so those templates
+ * don't need updating.  Aurora / layout tokens live here too.
+ * ─────────────────────────────────────────────────────────────────────────── */
+
+@import "@bpmn-sdk/ui/tokens.css";
+
+/* Map --bpmn-* → short names used in Astro layout templates */
 :root {
-	--bg: oklch(5% 0.025 270);
-	--bg-card: oklch(9% 0.025 270);
-	--surface: oklch(9% 0.025 270);
-	--bg-code: oklch(7% 0.025 270);
-	--border: oklch(15% 0.03 270);
-	--text: oklch(88% 0.02 270);
-	--text-muted: oklch(58% 0.03 270);
-	--accent: oklch(55% 0.22 280);
-	--accent-bright: oklch(73% 0.16 280);
-	--accent-glow: oklch(55% 0.22 280 / 0.15);
-	--teal: oklch(72% 0.18 185);
+	--bg: var(--bpmn-bg);
+	--bg-card: var(--bpmn-surface);
+	--surface: var(--bpmn-surface);
+	--bg-code: var(--bpmn-surface-2);
+	--border: var(--bpmn-border);
+	--text: var(--bpmn-fg);
+	--text-muted: var(--bpmn-fg-muted);
+	--accent: var(--bpmn-accent);
+	--accent-bright: var(--bpmn-accent-bright);
+	--accent-glow: var(--bpmn-accent-subtle);
+	--teal: var(--bpmn-teal);
+	--success: var(--bpmn-success);
+	--warn: var(--bpmn-warn);
+	--danger: var(--bpmn-danger);
+
+	/* Astro-specific layout tokens */
 	--pink: oklch(68% 0.22 340);
-	--success: oklch(72% 0.18 145);
-	--warn: oklch(78% 0.16 70);
-	--danger: oklch(62% 0.22 25);
-	--font-mono: "SF Mono", "Fira Code", "JetBrains Mono", monospace;
-	--font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+	--font-mono: var(--bpmn-font-mono);
+	--font-sans: var(--bpmn-font);
 	--max-width: 1120px;
 	--nav-h: 60px;
 	--radius: 14px;

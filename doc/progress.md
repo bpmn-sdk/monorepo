@@ -1,5 +1,67 @@
 # Progress
 
+## 2026-03-13 — Welcome screen: hide tab bar and bottom toolbar
+
+- `packages/plugins/src/tabs/tabs-plugin.ts`: `showWelcomeScreen` now hides `tabBar` and adds `bpmn-welcome-active` class to container; `hideWelcomeScreen` restores both
+- `packages/editor/src/css.ts`: added `.bpmn-welcome-active #hud-bottom-center { display: none !important; }` — hides bottom center HUD toolbar on welcome screen
+- `CLAUDE.md`: added Brand Tokens section documenting `packages/ui` as token authority, all `--bpmn-*` tokens with light/dark values, and usage rules
+
+## 2026-03-13 — Brand token system: full build verified, formatting fix
+
+- All 52 tasks pass (`pnpm turbo build typecheck check`) after brand token migration
+- Fixed Biome formatting in `packages/astro-shared/src/tokens.css` (whitespace alignment)
+
+## 2026-03-13 — HUD container scoping + brand token system
+
+### HUD container scoping (`packages/editor`)
+- All 13 HUD elements moved from `document.body` to `editor.container` (`.bpmn-canvas-host`, `position: relative`)
+- All position calculations converted from viewport-relative to container-relative (subtract `getBoundingClientRect()` left/top)
+- `position: fixed` → `position: absolute` for `.hud`, `.dropdown`, `.group-picker`, `#bpmn-empty-state`, `#bpmn-sim-banner`, `#bpmn-search-bar`, `#bpmn-shortcuts-modal`
+- `bpmn-sim-active` class moved from `document.body` to `editor.container`; `data-bpmn-hud-theme` kept on `document.body` for external elements (dock, modal)
+
+### Brand token system (`packages/ui`, `packages/astro-shared`, `packages/canvas`, `packages/editor`, `packages/plugins`)
+- **`packages/ui`**: expanded as brand token authority; new neon dark palette, new tokens (`--bpmn-accent-bright`, `--bpmn-accent-subtle`, `--bpmn-teal`, `--bpmn-panel-bg`, `--bpmn-panel-border`, `--bpmn-font-mono`); added `./tokens.css` CSS file export for Astro `@import` usage
+- **`packages/astro-shared`**: `tokens.css` now delegates to `@bpmn-sdk/ui/tokens.css` instead of duplicating palette; only adds Astro-specific layout tokens and `--* → --bpmn-*` alias mappings
+- **`packages/canvas`**: hardcoded highlight/accent/text colors replaced with `var(--bpmn-accent)`, `var(--bpmn-fg)` tokens
+- **`packages/editor`**: all hardcoded panel/accent colors in HUD_CSS and EDITOR_CSS replaced with `var(--bpmn-*)` tokens
+- **18 plugin CSS files** migrated: ai-bridge, tabs, config-panel, command-palette, history, main-menu, ascii-view, process-runner, dmn-editor, dmn-viewer, form-editor, form-viewer, minimap, zoom-controls; semantic colors (token-highlight amber/green, feel-playground syntax) unchanged
+
+### Learn app fix
+- `apps/learn`: added `initEditorHud` call and `fit: "center"` to `BpmnEditor` to restore HUD toolbar and correct zoom
+
+## 2026-03-13 — packages/plugins: CSS brand token migration (round 2)
+
+- Migrated hardcoded accent and panel colors to `var(--bpmn-*)` CSS custom properties in the remaining 7 plugin CSS files
+- `ai-bridge/css.ts`: `rgba(20,20,28,0.97)` → `var(--bpmn-panel-bg)`, border `rgba(255,255,255,0.1)` → `var(--bpmn-panel-border)`, preview border and light `border-bottom` also tokenized
+- `tabs/css.ts`: tab bar `--tabs-bg` default and theme values → `var(--bpmn-surface-2)`, active-tab border → `var(--bpmn-accent-bright)`, welcome icon/buttons, badge colors → corresponding `var(--bpmn-*)` tokens; dropdown bg/border → `var(--bpmn-surface-2)` / `var(--bpmn-border)`; close-dialog colors → `var(--bpmn-accent)` / `var(--bpmn-surface-2)`; raw-pane bg → `var(--bpmn-surface-2)`
+- `config-panel/css.ts`: `rgba(18,18,26,0.98)` → `var(--bpmn-panel-bg)`, all `#4c8ef7` → `var(--bpmn-accent)`, all `#1a56db` → `var(--bpmn-accent)`, `#f87171`/`#dc2626` → `var(--bpmn-danger)`, textarea/FEEL font → `var(--bpmn-font-mono)`, feel-mode-btn active states → `var(--bpmn-accent-subtle)` / `var(--bpmn-accent)`, toggle track checked → `var(--bpmn-accent)`, light panel bg → `var(--bpmn-panel-bg)` / `var(--bpmn-panel-border)`
+- `command-palette/css.ts`: panel bg `rgba(22,22,30,0.97)` → `var(--bpmn-panel-bg)`, border → `var(--bpmn-panel-border)`, caret `#4c8ef7` → `var(--bpmn-accent)`, light caret `#0066cc` → `var(--bpmn-accent)`, light border → `var(--bpmn-panel-border)`
+- `history/css.ts`: confirm panel `rgba(22,22,32,0.98)` → `var(--bpmn-panel-bg)`, restore button tints → `var(--bpmn-accent-subtle)`, confirm-ok button → `var(--bpmn-accent)`, light header border → `var(--bpmn-panel-border)`, light restore colors → `var(--bpmn-accent-subtle)` / `var(--bpmn-accent)`
+- `main-menu/css.ts`: dark panel bg `rgba(30,30,46,0.96)` → `var(--bpmn-panel-bg)`, dark border → `var(--bpmn-panel-border)`, dark sep → `var(--bpmn-panel-border)`, dark check color `#89b4fa` → `var(--bpmn-accent-bright)`, `#0066cc` → `var(--bpmn-accent)`, dark `#181825` bg → `var(--bpmn-surface-2)`
+- `ascii-view/css.ts`: panel bg `rgba(13,13,20,0.98)` → `var(--bpmn-panel-bg)`, border → `var(--bpmn-panel-border)`, light border overrides → `var(--bpmn-panel-border)`
+- typecheck and biome check pass with zero errors/warnings
+
+## 2026-03-13 — packages/plugins: CSS brand token migration
+
+- Migrated hardcoded accent and panel colors to `var(--bpmn-*)` CSS custom properties across 8 plugin CSS files
+- `process-runner/css.ts`: `rgba(22,22,30,0.88)` → `var(--bpmn-panel-bg)`, `#4c8ef7` → `var(--bpmn-accent)`, `#1a56db` → `var(--bpmn-accent)`, `#dc2626`/`#f87171` → `var(--bpmn-danger)`
+- `dmn-editor/css.ts`: `--dme-accent` light → `var(--bpmn-accent, #1a56db)`, dark → `var(--bpmn-accent-bright, #89b4fa)`; `--dme-bg` dark → `var(--bpmn-surface-2, #1e1e2e)`; DRD bar/active-button colors migrated to `var(--bpmn-panel-bg)`, `var(--bpmn-accent-subtle)`, `var(--bpmn-panel-border)`; align guide and edge selection stroke → `var(--bpmn-accent)`
+- `dmn-viewer/css.ts`: `--dmn-bg` dark → `var(--bpmn-surface-2, #1e1e2e)`, `--dmn-header-bg` dark → `var(--bpmn-surface-2, #1e1e2e)` (syntax highlight colors left unchanged)
+- `form-editor/css.ts`: `--fe-accent` light → `var(--bpmn-accent, #1a56db)`, dark → `var(--bpmn-accent-bright, #89b4fa)`; `--fe-bg` dark → `var(--bpmn-surface-2, #1e1e2e)`; `--fe-panel-bg` dark → `var(--bpmn-surface-2, #1e1e2e)`
+- `form-viewer/css.ts`: `--fv-accent` and `--fv-btn-bg` light → `var(--bpmn-accent, #1a56db)`, dark → `var(--bpmn-accent, #6b9df7)`; `--fv-bg`/`--fv-input-bg`/`--fv-group-bg` dark → `var(--bpmn-surface-2, #1e1e2e)`; `--fv-tag-fg` dark → `var(--bpmn-accent)`
+- `minimap/css.ts`: viewport fill/stroke fallbacks replaced with `var(--bpmn-accent-subtle)` / `var(--bpmn-accent)`
+- `zoom-controls/css.ts`: `--bpmn-highlight` and `--bpmn-focus` fallbacks → `var(--bpmn-accent, #1a56db)`
+- `token-highlight/css.ts`: no changes (amber/green/red are semantic BPMN simulation state colors)
+- `feel-playground/css.ts`: no changes needed (all `--fp-*` vars, no substitution targets in UI chrome)
+- `watermark/css.ts`: no changes needed
+- typecheck and biome check pass with zero errors/warnings
+
+## 2026-03-13 — packages/canvas, packages/editor: CSS brand token migration
+
+- Updated `packages/canvas/src/css.ts`: aligned dark theme `--bpmn-bg` to `#0d0d16`, `--bpmn-shape-fill` to `#1e1e2e`; switched `--bpmn-highlight` and `--bpmn-text` to use `var(--bpmn-accent*)` / `var(--bpmn-fg)` with fallbacks; added dark theme edge hover dot and waypoint ball rules using `var(--bpmn-accent)`
+- Updated `packages/editor/src/css.ts` (EDITOR_CSS): replaced all hardcoded accent colors (`#0066cc`, `#0052a3`, `#2563eb`, `#4c8ef7`) with `var(--bpmn-accent*)` vars; migrated `--bpmn-success` for edge split highlight, `--bpmn-warn` for dist/space guides
+- Updated `packages/editor/src/css.ts` (HUD_CSS): panel/dropdown/group-picker backgrounds and borders now use `var(--bpmn-panel-bg)` / `var(--bpmn-panel-border)`; HUD button colors use `var(--bpmn-fg)` / `var(--bpmn-fg-muted)`; search bar, onboarding overlay, shortcuts modal, drop separators, and ref-link buttons all migrated to brand tokens; ctx-ask-ai-btn uses `var(--bpmn-accent-bright)` / `var(--bpmn-accent-subtle)`
+
 ## 2026-03-13 — apps/learn: fix JSON parse error in step page
 
 - Fixed `Uncaught SyntaxError: Expected property name or '}' in JSON at position 1` on first tutorial step
