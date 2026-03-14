@@ -1,5 +1,26 @@
 # Progress
 
+## 2026-03-14 — CLI: audit log + settings menu
+
+### Audit log (`packages/profiles`, `apps/cli`)
+- `packages/profiles/src/profile.ts`: added `AuditEntry`, `Settings` types; extended `ConfigStore` with `settings?` and `auditLog?` fields; added `getSettings()`, `saveSettings()`, `appendAuditEntry()`, `getAuditLog()`, `clearAuditLog()` functions
+- `packages/profiles/src/index.ts`: exported all new types and functions
+- `apps/cli/src/run.ts`: records audit entry (with secret redaction) after every CLI command execution (success + error)
+- `apps/cli/src/tui.ts`: records audit entry after every TUI command execution (success + error)
+- Audit log stored in `~/.config/casen/config.json` under `auditLog` key, keyed by profile name
+- Default size: 15 entries per profile; configurable via `settings.auditLogSize`
+
+### Settings command group (`apps/cli/src/commands/settings.ts`)
+- `casen settings` — opens interactive settings TUI
+- `casen settings show` — print current settings
+- `casen settings set <key> <value>` — change a setting (e.g. `audit-log-size`)
+- `casen settings audit-log [--profile] [--limit]` — view audit log
+- `casen settings audit-log-clear [--profile] [--all]` — clear audit log
+
+### Settings TUI (`apps/cli/src/settings-tui.ts`)
+- Interactive settings editor: arrow keys navigate, Enter edits a value inline, ESC cancels, q quits
+- Shows each setting with description; validates numeric input against min/max bounds
+
 ## 2026-03-13 — Welcome screen: hide tab bar and bottom toolbar
 
 - `packages/plugins/src/tabs/tabs-plugin.ts`: `showWelcomeScreen` now hides `tabBar` and adds `bpmn-welcome-active` class to container; `hideWelcomeScreen` restores both

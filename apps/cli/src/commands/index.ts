@@ -19,6 +19,7 @@ import {
 import { completionGroup } from "./completion.js"
 import { profileGroup } from "./profile.js"
 import { computeRelations } from "./relations.js"
+import { settingsGroup } from "./settings.js"
 import { workerCmd } from "./worker.js"
 
 // Inject custom commands into generated groups without modifying generated files.
@@ -47,7 +48,13 @@ const customisedGroups: CommandGroup[] = generatedCommandGroups.map((g) => {
 	return g
 })
 
-const allGroups = [profileGroup, ...customisedGroups, ...adminCommandGroups, completionGroup]
+const allGroups = [
+	profileGroup,
+	settingsGroup,
+	...customisedGroups,
+	...adminCommandGroups,
+	completionGroup,
+]
 
 // Sort alphabetically by name for the main menu
 export const commandGroups: CommandGroup[] = allGroups.sort((a, b) => a.name.localeCompare(b.name))
