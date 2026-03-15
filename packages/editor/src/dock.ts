@@ -1,14 +1,14 @@
-const DOCK_STYLE_ID = "bpmn-side-dock-styles-v1"
-const STORAGE_KEY_WIDTH = "bpmn-side-dock-width"
-const STORAGE_KEY_COLLAPSED = "bpmn-side-dock-collapsed"
+const DOCK_STYLE_ID = "bpmnkit-side-dock-styles-v1"
+const STORAGE_KEY_WIDTH = "bpmnkit-side-dock-width"
+const STORAGE_KEY_COLLAPSED = "bpmnkit-side-dock-collapsed"
 const MIN_WIDTH = 280
 const MAX_WIDTH = 700
 const DEFAULT_WIDTH = 360
 
 const DOCK_CSS = `
 /* ── Side Dock ──────────────────────────────────────────────────────────── */
-.bpmn-side-dock__tab:disabled { opacity: 0.3; cursor: default; }
-.bpmn-side-dock {
+.bpmnkit-side-dock__tab:disabled { opacity: 0.3; cursor: default; }
+.bpmnkit-side-dock {
   position: fixed; right: 0; top: 36px; bottom: 0;
   z-index: 9999; display: flex; flex-direction: column;
   background: rgba(18, 18, 26, 0.98);
@@ -18,7 +18,7 @@ const DOCK_CSS = `
   transition: width 0.22s ease;
 }
 /* Pill handle — sticks out from the left edge; always visible + clickable */
-.bpmn-side-dock__collapse-handle {
+.bpmnkit-side-dock__collapse-handle {
   position: absolute; left: -20px; top: 50%; transform: translateY(-50%);
   width: 20px; height: 52px;
   background: rgba(18, 18, 26, 0.98);
@@ -30,77 +30,77 @@ const DOCK_CSS = `
   transition: color 0.1s, background 0.1s;
   user-select: none;
 }
-.bpmn-side-dock__collapse-handle:hover { color: #fff; background: rgba(40,40,60,0.99); }
-.bpmn-side-dock__resize-handle {
+.bpmnkit-side-dock__collapse-handle:hover { color: #fff; background: rgba(40,40,60,0.99); }
+.bpmnkit-side-dock__resize-handle {
   position: absolute; left: 0; top: 0; bottom: 0;
   width: 5px; cursor: ew-resize; z-index: 2;
 }
-.bpmn-side-dock__resize-handle:hover { background: rgba(76,142,247,0.35); }
-.bpmn-side-dock__tab-strip {
+.bpmnkit-side-dock__resize-handle:hover { background: rgba(76,142,247,0.35); }
+.bpmnkit-side-dock__tab-strip {
   display: flex; align-items: center; height: 38px; flex-shrink: 0;
   border-bottom: 1px solid rgba(255,255,255,0.08);
 }
-.bpmn-side-dock__tab {
+.bpmnkit-side-dock__tab {
   padding: 0 16px; height: 100%; background: none; border: none;
   border-bottom: 2px solid transparent; color: rgba(255,255,255,0.4);
   cursor: pointer; font-size: 12px; font-weight: 500; white-space: nowrap;
   transition: color 0.1s, border-color 0.1s;
   font-family: system-ui, -apple-system, sans-serif;
 }
-.bpmn-side-dock__tab:hover { color: rgba(255,255,255,0.75); }
-.bpmn-side-dock__tab.active { color: #4c8ef7; border-bottom-color: #4c8ef7; }
-.bpmn-side-dock__pane {
+.bpmnkit-side-dock__tab:hover { color: rgba(255,255,255,0.75); }
+.bpmnkit-side-dock__tab.active { color: #4c8ef7; border-bottom-color: #4c8ef7; }
+.bpmnkit-side-dock__pane {
   flex: 1; display: flex; flex-direction: column; overflow: hidden; min-height: 0;
 }
-.bpmn-side-dock__pane--hidden { display: none; }
+.bpmnkit-side-dock__pane--hidden { display: none; }
 /* Empty state — info widget + hint, shown when no element is selected */
-.bpmn-side-dock__empty {
+.bpmnkit-side-dock__empty {
   flex: 1; display: flex; flex-direction: column;
   overflow-y: auto; padding: 14px 16px;
   gap: 0;
 }
-.bpmn-side-dock__info-row {
+.bpmnkit-side-dock__info-row {
   display: flex; flex-direction: column;
   padding: 10px 0;
   border-bottom: 1px solid rgba(255,255,255,0.06);
   gap: 3px;
 }
-.bpmn-side-dock__info-label {
+.bpmnkit-side-dock__info-label {
   font-size: 10px; font-weight: 700; text-transform: uppercase;
   letter-spacing: 0.08em; color: rgba(255,255,255,0.3);
 }
-.bpmn-side-dock__info-value {
+.bpmnkit-side-dock__info-value {
   font-size: 13px; color: rgba(255,255,255,0.75); word-break: break-word;
 }
-.bpmn-side-dock__empty-hint {
+.bpmnkit-side-dock__empty-hint {
   font-size: 12px; color: rgba(255,255,255,0.25);
   text-align: center; padding: 20px 0;
 }
 /* Collapsed state — only the pill handle remains visible */
-.bpmn-side-dock--collapsed .bpmn-side-dock__tab-strip,
-.bpmn-side-dock--collapsed .bpmn-side-dock__pane { display: none; }
+.bpmnkit-side-dock--collapsed .bpmnkit-side-dock__tab-strip,
+.bpmnkit-side-dock--collapsed .bpmnkit-side-dock__pane { display: none; }
 /* Push watermark left of the dock using a CSS variable updated by JS */
-.bpmn-watermark { right: calc(var(--bpmn-dock-width, 0px) + 8px) !important; }
+.bpmnkit-watermark { right: calc(var(--bpmnkit-dock-width, 0px) + 8px) !important; }
 /* Light theme */
-[data-bpmn-hud-theme="light"] .bpmn-side-dock {
+[data-bpmnkit-hud-theme="light"] .bpmnkit-side-dock {
   background: rgba(248,248,252,0.99); border-left-color: rgba(0,0,0,0.08);
   box-shadow: -8px 0 40px rgba(0,0,0,0.12);
 }
-[data-bpmn-hud-theme="light"] .bpmn-side-dock__collapse-handle {
+[data-bpmnkit-hud-theme="light"] .bpmnkit-side-dock__collapse-handle {
   background: rgba(248,248,252,0.99); border-color: rgba(0,0,0,0.08); color: rgba(0,0,0,0.4);
 }
-[data-bpmn-hud-theme="light"] .bpmn-side-dock__collapse-handle:hover {
+[data-bpmnkit-hud-theme="light"] .bpmnkit-side-dock__collapse-handle:hover {
   background: rgba(235,235,242,0.99); color: rgba(0,0,0,0.9);
 }
-[data-bpmn-hud-theme="light"] .bpmn-side-dock__tab-strip { border-bottom-color: rgba(0,0,0,0.07); }
-[data-bpmn-hud-theme="light"] .bpmn-side-dock__tab { color: rgba(0,0,0,0.4); }
-[data-bpmn-hud-theme="light"] .bpmn-side-dock__tab:hover { color: rgba(0,0,0,0.7); }
-[data-bpmn-hud-theme="light"] .bpmn-side-dock__tab.active { color: #1a56db; border-bottom-color: #1a56db; }
-[data-bpmn-hud-theme="light"] .bpmn-side-dock__resize-handle:hover { background: rgba(26,86,219,0.2); }
-[data-bpmn-hud-theme="light"] .bpmn-side-dock__info-label { color: rgba(0,0,0,0.3); }
-[data-bpmn-hud-theme="light"] .bpmn-side-dock__info-value { color: rgba(0,0,0,0.75); }
-[data-bpmn-hud-theme="light"] .bpmn-side-dock__info-row { border-bottom-color: rgba(0,0,0,0.06); }
-[data-bpmn-hud-theme="light"] .bpmn-side-dock__empty-hint { color: rgba(0,0,0,0.25); }
+[data-bpmnkit-hud-theme="light"] .bpmnkit-side-dock__tab-strip { border-bottom-color: rgba(0,0,0,0.07); }
+[data-bpmnkit-hud-theme="light"] .bpmnkit-side-dock__tab { color: rgba(0,0,0,0.4); }
+[data-bpmnkit-hud-theme="light"] .bpmnkit-side-dock__tab:hover { color: rgba(0,0,0,0.7); }
+[data-bpmnkit-hud-theme="light"] .bpmnkit-side-dock__tab.active { color: #1a56db; border-bottom-color: #1a56db; }
+[data-bpmnkit-hud-theme="light"] .bpmnkit-side-dock__resize-handle:hover { background: rgba(26,86,219,0.2); }
+[data-bpmnkit-hud-theme="light"] .bpmnkit-side-dock__info-label { color: rgba(0,0,0,0.3); }
+[data-bpmnkit-hud-theme="light"] .bpmnkit-side-dock__info-value { color: rgba(0,0,0,0.75); }
+[data-bpmnkit-hud-theme="light"] .bpmnkit-side-dock__info-row { border-bottom-color: rgba(0,0,0,0.06); }
+[data-bpmnkit-hud-theme="light"] .bpmnkit-side-dock__empty-hint { color: rgba(0,0,0,0.25); }
 `
 
 function injectDockStyles(): void {
@@ -149,43 +149,43 @@ export function createSideDock(): SideDock {
 	injectDockStyles()
 
 	const el = document.createElement("div")
-	el.className = "bpmn-side-dock"
+	el.className = "bpmnkit-side-dock"
 
 	// Pill-shaped collapse handle on the left edge
 	const collapseHandle = document.createElement("div")
-	collapseHandle.className = "bpmn-side-dock__collapse-handle"
+	collapseHandle.className = "bpmnkit-side-dock__collapse-handle"
 	collapseHandle.setAttribute("role", "button")
 	collapseHandle.setAttribute("title", "Collapse panel")
 	collapseHandle.textContent = "›"
 
 	// Resize handle — 5px drag zone on the left edge
 	const resizeHandle = document.createElement("div")
-	resizeHandle.className = "bpmn-side-dock__resize-handle"
+	resizeHandle.className = "bpmnkit-side-dock__resize-handle"
 
 	// Tab strip
 	const tabStrip = document.createElement("div")
-	tabStrip.className = "bpmn-side-dock__tab-strip"
+	tabStrip.className = "bpmnkit-side-dock__tab-strip"
 
 	const propertiesTab = document.createElement("button")
-	propertiesTab.className = "bpmn-side-dock__tab active"
+	propertiesTab.className = "bpmnkit-side-dock__tab active"
 	propertiesTab.textContent = "Properties"
 
 	const historyTab = document.createElement("button")
-	historyTab.className = "bpmn-side-dock__tab"
+	historyTab.className = "bpmnkit-side-dock__tab"
 	historyTab.textContent = "History"
 	historyTab.disabled = true
 
 	const aiTab = document.createElement("button")
-	aiTab.className = "bpmn-side-dock__tab"
+	aiTab.className = "bpmnkit-side-dock__tab"
 	aiTab.textContent = "AI"
 
 	const playTab = document.createElement("button")
-	playTab.className = "bpmn-side-dock__tab"
+	playTab.className = "bpmnkit-side-dock__tab"
 	playTab.textContent = "Play"
 	playTab.style.display = "none"
 
 	const docsTab = document.createElement("button")
-	docsTab.className = "bpmn-side-dock__tab"
+	docsTab.className = "bpmnkit-side-dock__tab"
 	docsTab.textContent = "Docs"
 
 	tabStrip.appendChild(propertiesTab)
@@ -196,36 +196,36 @@ export function createSideDock(): SideDock {
 
 	// Properties pane — contains the info empty state
 	const propertiesPane = document.createElement("div")
-	propertiesPane.className = "bpmn-side-dock__pane"
+	propertiesPane.className = "bpmnkit-side-dock__pane"
 
 	const emptyEl = document.createElement("div")
-	emptyEl.className = "bpmn-side-dock__empty"
+	emptyEl.className = "bpmnkit-side-dock__empty"
 
 	// Info rows (file name + process name)
 	const fileRow = document.createElement("div")
-	fileRow.className = "bpmn-side-dock__info-row"
+	fileRow.className = "bpmnkit-side-dock__info-row"
 	const fileLabel = document.createElement("span")
-	fileLabel.className = "bpmn-side-dock__info-label"
+	fileLabel.className = "bpmnkit-side-dock__info-label"
 	fileLabel.textContent = "File"
 	const fileValue = document.createElement("span")
-	fileValue.className = "bpmn-side-dock__info-value"
+	fileValue.className = "bpmnkit-side-dock__info-value"
 	fileValue.textContent = "\u2014"
 	fileRow.appendChild(fileLabel)
 	fileRow.appendChild(fileValue)
 
 	const processRow = document.createElement("div")
-	processRow.className = "bpmn-side-dock__info-row"
+	processRow.className = "bpmnkit-side-dock__info-row"
 	const processLabel = document.createElement("span")
-	processLabel.className = "bpmn-side-dock__info-label"
+	processLabel.className = "bpmnkit-side-dock__info-label"
 	processLabel.textContent = "Process"
 	const processValue = document.createElement("span")
-	processValue.className = "bpmn-side-dock__info-value"
+	processValue.className = "bpmnkit-side-dock__info-value"
 	processValue.textContent = "\u2014"
 	processRow.appendChild(processLabel)
 	processRow.appendChild(processValue)
 
 	const hint = document.createElement("div")
-	hint.className = "bpmn-side-dock__empty-hint"
+	hint.className = "bpmnkit-side-dock__empty-hint"
 	hint.textContent = "Select an element to edit its properties"
 
 	emptyEl.appendChild(fileRow)
@@ -235,19 +235,19 @@ export function createSideDock(): SideDock {
 
 	// History pane
 	const historyPane = document.createElement("div")
-	historyPane.className = "bpmn-side-dock__pane bpmn-side-dock__pane--hidden"
+	historyPane.className = "bpmnkit-side-dock__pane bpmnkit-side-dock__pane--hidden"
 
 	// AI pane
 	const aiPane = document.createElement("div")
-	aiPane.className = "bpmn-side-dock__pane bpmn-side-dock__pane--hidden"
+	aiPane.className = "bpmnkit-side-dock__pane bpmnkit-side-dock__pane--hidden"
 
 	// Play pane
 	const playPane = document.createElement("div")
-	playPane.className = "bpmn-side-dock__pane bpmn-side-dock__pane--hidden"
+	playPane.className = "bpmnkit-side-dock__pane bpmnkit-side-dock__pane--hidden"
 
 	// Docs pane
 	const docsPane = document.createElement("div")
-	docsPane.className = "bpmn-side-dock__pane bpmn-side-dock__pane--hidden"
+	docsPane.className = "bpmnkit-side-dock__pane bpmnkit-side-dock__pane--hidden"
 
 	el.appendChild(collapseHandle)
 	el.appendChild(resizeHandle)
@@ -269,7 +269,7 @@ export function createSideDock(): SideDock {
 
 	function setDocWidth(w: number): void {
 		el.style.width = `${w}px`
-		document.body.style.setProperty("--bpmn-dock-width", `${w}px`)
+		document.body.style.setProperty("--bpmnkit-dock-width", `${w}px`)
 	}
 
 	// Restore from localStorage
@@ -284,7 +284,7 @@ export function createSideDock(): SideDock {
 	}
 
 	if (_collapsed) {
-		el.classList.add("bpmn-side-dock--collapsed")
+		el.classList.add("bpmnkit-side-dock--collapsed")
 		setDocWidth(0)
 		collapseHandle.textContent = "‹"
 		collapseHandle.setAttribute("title", "Expand panel")
@@ -294,7 +294,7 @@ export function createSideDock(): SideDock {
 
 	// Start hidden — the bridge shows it when the first tab is activated.
 	el.style.display = "none"
-	document.body.style.setProperty("--bpmn-dock-width", "0px")
+	document.body.style.setProperty("--bpmnkit-dock-width", "0px")
 
 	// ── Tab switching ──
 	function switchTab(tab: "properties" | "history" | "ai" | "play" | "docs"): void {
@@ -304,17 +304,17 @@ export function createSideDock(): SideDock {
 		aiTab.classList.toggle("active", tab === "ai")
 		playTab.classList.toggle("active", tab === "play")
 		docsTab.classList.toggle("active", tab === "docs")
-		propertiesPane.classList.toggle("bpmn-side-dock__pane--hidden", tab !== "properties")
-		historyPane.classList.toggle("bpmn-side-dock__pane--hidden", tab !== "history")
-		aiPane.classList.toggle("bpmn-side-dock__pane--hidden", tab !== "ai")
-		playPane.classList.toggle("bpmn-side-dock__pane--hidden", tab !== "play")
-		docsPane.classList.toggle("bpmn-side-dock__pane--hidden", tab !== "docs")
+		propertiesPane.classList.toggle("bpmnkit-side-dock__pane--hidden", tab !== "properties")
+		historyPane.classList.toggle("bpmnkit-side-dock__pane--hidden", tab !== "history")
+		aiPane.classList.toggle("bpmnkit-side-dock__pane--hidden", tab !== "ai")
+		playPane.classList.toggle("bpmnkit-side-dock__pane--hidden", tab !== "play")
+		docsPane.classList.toggle("bpmnkit-side-dock__pane--hidden", tab !== "docs")
 	}
 
 	// ── Expand / collapse ──
 	function expand(): void {
 		_collapsed = false
-		el.classList.remove("bpmn-side-dock--collapsed")
+		el.classList.remove("bpmnkit-side-dock--collapsed")
 		setDocWidth(_width)
 		collapseHandle.textContent = "›"
 		collapseHandle.setAttribute("title", "Collapse panel")
@@ -327,7 +327,7 @@ export function createSideDock(): SideDock {
 
 	function collapse(): void {
 		_collapsed = true
-		el.classList.add("bpmn-side-dock--collapsed")
+		el.classList.add("bpmnkit-side-dock--collapsed")
 		setDocWidth(0)
 		collapseHandle.textContent = "‹"
 		collapseHandle.setAttribute("title", "Expand panel")
@@ -390,7 +390,7 @@ export function createSideDock(): SideDock {
 			setDocWidth(_collapsed ? 0 : _width)
 		} else {
 			el.style.display = "none"
-			document.body.style.setProperty("--bpmn-dock-width", "0px")
+			document.body.style.setProperty("--bpmnkit-dock-width", "0px")
 		}
 	}
 

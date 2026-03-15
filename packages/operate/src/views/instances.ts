@@ -196,11 +196,11 @@ export function createInstancesView(
 				width: "120px",
 				render: (row) => {
 					const wrap = document.createElement("div")
-					wrap.className = "bpmn-badge-wrap"
+					wrap.className = "bpmnkit-badge-wrap"
 					wrap.appendChild(badge(row.state))
 					if (row.hasIncident) {
 						const inc = document.createElement("span")
-						inc.className = "bpmn-badge bpmn-badge--incident-dot"
+						inc.className = "bpmnkit-badge bpmnkit-badge--incident-dot"
 						inc.title = "Has incident"
 						inc.textContent = "⚠"
 						wrap.appendChild(inc)

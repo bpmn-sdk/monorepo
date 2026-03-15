@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="https://raw.githubusercontent.com/bpmn-sdk/monorepo/main/doc/logos/logo-2-gateway.svg" width="72" height="72" alt="BPMN SDK logo">
+  <img src="https://raw.githubusercontent.com/bpmn-sdk/monorepo/main/doc/logos/logo-2-gateway.svg" width="72" height="72" alt="BPMN Kit logo">
   <h1>@bpmn-sdk/operate</h1>
   <p>Monitoring and operations frontend for Camunda 8 clusters — real-time SSE, zero dependencies</p>
 
@@ -33,7 +33,7 @@ A **mock mode** (`mock: true`) ships fixture data without any running proxy or c
 - **Mock/demo mode** — fully self-contained fixture data, no cluster required
 - **SSE architecture** — proxy polls server-side; frontend opens one `EventSource` per view, gets pushed updates
 - **Hash router** — `#/`, `#/instances`, `#/instances/:key`, `#/definitions`, etc.
-- **Themeable** — light / dark / auto via `--bpmn-*` CSS custom properties from `@bpmn-sdk/ui`; theme choice persisted to `localStorage`
+- **Themeable** — light / dark / auto via `--bpmnkit-*` CSS custom properties from `@bpmn-sdk/ui`; theme choice persisted to `localStorage`
 
 ## Installation
 

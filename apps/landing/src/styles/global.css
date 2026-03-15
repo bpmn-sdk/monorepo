@@ -531,7 +531,7 @@ a:hover {
 }
 
 /* ── Neon diagram loader ─────────────────────────────────────────── */
-.bpmn-neon-loader {
+.bpmnkit-neon-loader {
 	position: absolute;
 	inset: 0;
 	display: flex;
@@ -1707,7 +1707,7 @@ a:hover {
 }
 
 /* ── Process runner play mode ──────────────────────────────────── */
-.bpmn-props-readonly {
+.bpmnkit-props-readonly {
 	pointer-events: none;
 	opacity: 0.65;
 }

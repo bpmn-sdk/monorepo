@@ -260,9 +260,9 @@ export function createAiPanel(options: PanelOptions): {
 		opt.textContent = label
 		backendSelect.append(opt)
 	}
-	backendSelect.value = localStorage.getItem("bpmn-sdk-ai-backend") ?? "auto"
+	backendSelect.value = localStorage.getItem("bpmnkit-ai-backend") ?? "auto"
 	backendSelect.addEventListener("change", () => {
-		localStorage.setItem("bpmn-sdk-ai-backend", backendSelect.value)
+		localStorage.setItem("bpmnkit-ai-backend", backendSelect.value)
 	})
 
 	const clearBtn = document.createElement("button")

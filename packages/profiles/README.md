@@ -1,7 +1,7 @@
 <div align="center">
-  <img src="https://raw.githubusercontent.com/bpmn-sdk/monorepo/main/doc/logos/logo-2-gateway.svg" width="72" height="72" alt="BPMN SDK logo">
+  <img src="https://raw.githubusercontent.com/bpmn-sdk/monorepo/main/doc/logos/logo-2-gateway.svg" width="72" height="72" alt="BPMN Kit logo">
   <h1>@bpmn-sdk/profiles</h1>
-  <p>Shared auth, profile storage, and client factories for the BPMN SDK CLI and proxy server</p>
+  <p>Shared auth, profile storage, and client factories for the BPMN Kit CLI and proxy server</p>
 
   [![npm](https://img.shields.io/npm/v/@bpmn-sdk/profiles?style=flat-square&color=6244d7)](https://www.npmjs.com/package/@bpmn-sdk/profiles)
   [![license](https://img.shields.io/npm/l/@bpmn-sdk/profiles?style=flat-square)](https://github.com/bpmn-sdk/monorepo/blob/main/LICENSE)

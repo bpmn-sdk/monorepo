@@ -56,17 +56,17 @@ describe("createZoomControlsPlugin", () => {
 		expect(document.getElementById(ZOOM_CONTROLS_STYLE_ID)).not.toBeNull()
 	})
 
-	it("mounts .bpmn-controls inside the canvas host", () => {
+	it("mounts .bpmnkit-controls inside the canvas host", () => {
 		const container = makeContainer()
 		new BpmnCanvas({ container, plugins: [createZoomControlsPlugin()] })
-		const host = container.querySelector(".bpmn-canvas-host")
-		expect(host?.querySelector(".bpmn-controls")).not.toBeNull()
+		const host = container.querySelector(".bpmnkit-canvas-host")
+		expect(host?.querySelector(".bpmnkit-controls")).not.toBeNull()
 	})
 
 	it("renders three buttons (zoom in, zoom out, fit)", () => {
 		const container = makeContainer()
 		new BpmnCanvas({ container, plugins: [createZoomControlsPlugin()] })
-		const buttons = container.querySelectorAll(".bpmn-control-btn")
+		const buttons = container.querySelectorAll(".bpmnkit-control-btn")
 		expect(buttons.length).toBe(3)
 	})
 
@@ -77,7 +77,7 @@ describe("createZoomControlsPlugin", () => {
 		canvas.on("viewport:change", (vp) => {
 			newScale = vp.scale
 		})
-		const btn = container.querySelectorAll<HTMLButtonElement>(".bpmn-control-btn")[0]
+		const btn = container.querySelectorAll<HTMLButtonElement>(".bpmnkit-control-btn")[0]
 		if (!btn) throw new Error("zoom-in button not found")
 		btn.dispatchEvent(new MouseEvent("click", { bubbles: true }))
 		vi.runAllTimers()
@@ -91,18 +91,18 @@ describe("createZoomControlsPlugin", () => {
 		canvas.on("viewport:change", (vp) => {
 			newScale = vp.scale
 		})
-		const btn = container.querySelectorAll<HTMLButtonElement>(".bpmn-control-btn")[1]
+		const btn = container.querySelectorAll<HTMLButtonElement>(".bpmnkit-control-btn")[1]
 		if (!btn) throw new Error("zoom-out button not found")
 		btn.dispatchEvent(new MouseEvent("click", { bubbles: true }))
 		vi.runAllTimers()
 		expect(newScale).toBeLessThan(1)
 	})
 
-	it("removes .bpmn-controls on uninstall (destroy)", () => {
+	it("removes .bpmnkit-controls on uninstall (destroy)", () => {
 		const container = makeContainer()
 		const canvas = new BpmnCanvas({ container, plugins: [createZoomControlsPlugin()] })
 		canvas.destroy()
-		expect(container.querySelector(".bpmn-controls")).toBeNull()
+		expect(container.querySelector(".bpmnkit-controls")).toBeNull()
 	})
 
 	it("each plugin instance is independent", () => {
@@ -110,9 +110,9 @@ describe("createZoomControlsPlugin", () => {
 		const c2 = makeContainer()
 		new BpmnCanvas({ container: c1, plugins: [createZoomControlsPlugin()] })
 		new BpmnCanvas({ container: c2, plugins: [createZoomControlsPlugin()] })
-		expect(c1.querySelector(".bpmn-controls")).not.toBeNull()
-		expect(c2.querySelector(".bpmn-controls")).not.toBeNull()
-		expect(c1.querySelector(".bpmn-controls")).not.toBe(c2.querySelector(".bpmn-controls"))
+		expect(c1.querySelector(".bpmnkit-controls")).not.toBeNull()
+		expect(c2.querySelector(".bpmnkit-controls")).not.toBeNull()
+		expect(c1.querySelector(".bpmnkit-controls")).not.toBe(c2.querySelector(".bpmnkit-controls"))
 	})
 
 	it("fit button fires viewport:change when shapes are loaded", () => {
@@ -126,7 +126,7 @@ describe("createZoomControlsPlugin", () => {
 		canvas.on("viewport:change", () => {
 			changed = true
 		})
-		const btn = container.querySelectorAll<HTMLButtonElement>(".bpmn-control-btn")[2]
+		const btn = container.querySelectorAll<HTMLButtonElement>(".bpmnkit-control-btn")[2]
 		if (!btn) throw new Error("fit button not found")
 		btn.dispatchEvent(new MouseEvent("click", { bubbles: true }))
 		vi.runAllTimers()

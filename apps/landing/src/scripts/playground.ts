@@ -26,7 +26,7 @@ function setupDmnTabs(): void {
 
 let _dmnBpmnCanvas: BpmnCanvas | null = null
 function renderDmnBpmnPreview(): void {
-	const container = document.getElementById("dmn-bpmn-preview")
+	const container = document.getElementById("dmn-bpmnkit-preview")
 	if (!container || _dmnBpmnCanvas) return
 
 	const xml = Bpmn.export(

@@ -1,9 +1,9 @@
 ---
 title: Installation
-description: Install BPMN SDK packages in your project.
+description: Install BPMN Kit packages in your project.
 ---
 
-BPMN SDK is a collection of focused packages. Install only what you need.
+BPMN Kit is a collection of focused packages. Install only what you need.
 
 ## Core SDK
 

@@ -107,12 +107,12 @@ export function createDashboardView(
 				"Active Instances",
 				d?.activeInstances ?? "—",
 				IC_UI.instances,
-				"var(--bpmn-accent)",
+				"var(--bpmnkit-accent)",
 				() => onNavigate("/instances"),
 			),
 		)
 
-		const incAccent = d?.openIncidents ? "var(--op-c-amber)" : "var(--bpmn-accent)"
+		const incAccent = d?.openIncidents ? "var(--op-c-amber)" : "var(--bpmnkit-accent)"
 		grid.appendChild(
 			createDashboardCard(
 				"Open Incidents",
@@ -148,7 +148,7 @@ export function createDashboardView(
 				"Deployed Processes",
 				d?.definitions ?? "—",
 				IC_UI.processes,
-				"var(--bpmn-fg-muted)",
+				"var(--bpmnkit-fg-muted)",
 				() => onNavigate("/definitions"),
 			),
 		)

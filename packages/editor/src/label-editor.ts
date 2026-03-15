@@ -31,7 +31,7 @@ export class LabelEditor {
 		this._activeId = id
 
 		const div = document.createElement("div")
-		div.className = "bpmn-label-editor"
+		div.className = "bpmnkit-label-editor"
 		div.contentEditable = "true"
 		div.textContent = currentText
 

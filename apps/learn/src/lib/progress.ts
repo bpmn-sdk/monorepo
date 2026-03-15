@@ -1,6 +1,6 @@
 import type { AllProgress, TutorialProgress } from "./types.js"
 
-const KEY = "bpmn_learn_progress"
+const KEY = "bpmnkit_learn_progress"
 
 export function loadAllProgress(): AllProgress {
 	try {

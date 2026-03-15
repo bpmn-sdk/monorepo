@@ -218,7 +218,7 @@ const server = http.createServer(async (req, res) => {
 		let outputFile: string | null = null
 
 		if (detected.adapter.supportsMcp) {
-			tmpDir = mkdtempSync(join(tmpdir(), "bpmn-mcp-"))
+			tmpDir = mkdtempSync(join(tmpdir(), "bpmnkit-mcp-"))
 			const inputFile = join(tmpDir, "input.json")
 			outputFile = join(tmpDir, "output.json")
 			mcpConfigFile = join(tmpDir, "mcp.json")
@@ -697,6 +697,6 @@ const server = http.createServer(async (req, res) => {
 })
 
 server.listen(PORT, () => {
-	console.log(`BPMN SDK AI Server running at http://localhost:${PORT}`)
+	console.log(`BPMN Kit AI Server running at http://localhost:${PORT}`)
 	console.log("Press Ctrl+C to stop")
 })

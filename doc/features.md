@@ -37,10 +37,10 @@
 ## Shared design system (2026-03-11) — `packages/ui`
 
 - **`@bpmn-sdk/ui`**: Shared design tokens, theme management, and primitive UI components for all bpmn-sdk frontends.
-- **Design tokens**: `--bpmn-bg`, `--bpmn-surface`, `--bpmn-surface-2`, `--bpmn-border`, `--bpmn-fg`, `--bpmn-fg-muted`, `--bpmn-accent` (blue), `--bpmn-success/warn/danger`, `--bpmn-radius`, `--bpmn-nav-bg/fg`. Light default, dark via `[data-theme="dark"]`.
+- **Design tokens**: `--bpmnkit-bg`, `--bpmnkit-surface`, `--bpmnkit-surface-2`, `--bpmnkit-border`, `--bpmnkit-fg`, `--bpmnkit-fg-muted`, `--bpmnkit-accent` (blue), `--bpmnkit-success/warn/danger`, `--bpmnkit-radius`, `--bpmnkit-nav-bg/fg`. Light default, dark via `[data-theme="dark"]`.
 - **Theme management**: `resolveTheme` (auto→light|dark), `persistTheme`/`loadPersistedTheme` (localStorage), `applyTheme` (sets `data-theme` on element).
 - **Theme switcher component**: `createThemeSwitcher({ initial, onChange, persist })` — button+dropdown with Dark/Light/System options, icon updates to reflect selection.
-- **Shared components**: `badge(state)`, `cell(text)`, `createStatsCard(label, value, mod)`, `createTable<T>(options)` — generic, use `--bpmn-*` tokens.
+- **Shared components**: `badge(state)`, `cell(text)`, `createStatsCard(label, value, mod)`, `createTable<T>(options)` — generic, use `--bpmnkit-*` tokens.
 - **Icon library**: `IC_UI` — SVG icons for theme (moon/sun/auto/check) and navigation (dashboard/processes/instances/incidents/jobs/tasks).
 
 
@@ -205,7 +205,7 @@ One-click AI operations on the current diagram, accessible via a quick-actions b
 
 ## Tauri desktop app (2026-03-02) — `apps/desktop`
 
-Native desktop application wrapping the BPMN SDK editor using Tauri v2:
+Native desktop application wrapping the BPMN Kit editor using Tauri v2:
 
 - **Identical editor** to the browser version — same plugins, sidebar dock, AI integration
 - **AI server auto-start** — on launch, spawns the bundled Node.js AI server automatically; no manual `pnpm ai-server` required

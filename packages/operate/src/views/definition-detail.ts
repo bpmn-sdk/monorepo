@@ -370,7 +370,7 @@ export function createDefinitionDetailView(
 			.then((r) => r.text())
 			.then((xml) => loadCanvas(xml))
 			.catch(() => {
-				canvasWrap.innerHTML = `<div style="padding:24px;color:var(--bpmn-fg-muted)">Failed to load diagram</div>`
+				canvasWrap.innerHTML = `<div style="padding:24px;color:var(--bpmnkit-fg-muted)">Failed to load diagram</div>`
 			})
 	}
 

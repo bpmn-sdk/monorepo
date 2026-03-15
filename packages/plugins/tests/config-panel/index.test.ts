@@ -55,7 +55,7 @@ describe("createConfigPanelPlugin", () => {
 			applyChange: vi.fn(),
 		})
 		plugin.install(makeApi())
-		expect(document.getElementById("bpmn-config-panel-styles-v1")).not.toBeNull()
+		expect(document.getElementById("bpmnkit-config-panel-styles-v1")).not.toBeNull()
 	})
 
 	it("registerSchema stores schema before install", () => {
@@ -133,7 +133,7 @@ describe("createConfigPanelPlugin", () => {
 		// Trigger selection
 		selectHandler?.(["el1"])
 
-		const panel = document.querySelector(".bpmn-cfg-full")
+		const panel = document.querySelector(".bpmnkit-cfg-full")
 		expect(panel).not.toBeNull()
 	})
 })

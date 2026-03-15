@@ -46,11 +46,11 @@ describe("createCommandPaletteEditorPlugin", () => {
 
 		// Open palette and check that element commands appear
 		ctrlK()
-		const input = document.querySelector<HTMLInputElement>(".bpmn-palette-input")
+		const input = document.querySelector<HTMLInputElement>(".bpmnkit-palette-input")
 		if (!input) throw new Error("input not found")
 		input.value = "Add"
 		input.dispatchEvent(new Event("input", { bubbles: true }))
-		const items = document.querySelectorAll(".bpmn-palette-item")
+		const items = document.querySelectorAll(".bpmnkit-palette-item")
 		expect(items.length).toBe(40) // 40 element types
 	})
 
@@ -65,12 +65,12 @@ describe("createCommandPaletteEditorPlugin", () => {
 		editorPlugin.uninstall?.()
 
 		ctrlK()
-		const input = document.querySelector<HTMLInputElement>(".bpmn-palette-input")
+		const input = document.querySelector<HTMLInputElement>(".bpmnkit-palette-input")
 		if (!input) throw new Error("input not found")
 		input.value = "Add"
 		input.dispatchEvent(new Event("input", { bubbles: true }))
 		// Commands deregistered — only "No commands found" empty state
-		expect(document.querySelector(".bpmn-palette-empty")).not.toBeNull()
+		expect(document.querySelector(".bpmnkit-palette-empty")).not.toBeNull()
 	})
 
 	it("calls setTool with correct create: prefix when command is executed", () => {
@@ -83,11 +83,11 @@ describe("createCommandPaletteEditorPlugin", () => {
 		editorPlugin.install(api)
 
 		ctrlK()
-		const input = document.querySelector<HTMLInputElement>(".bpmn-palette-input")
+		const input = document.querySelector<HTMLInputElement>(".bpmnkit-palette-input")
 		if (!input) throw new Error("input not found")
 		input.value = "service task"
 		input.dispatchEvent(new Event("input", { bubbles: true }))
-		const item = document.querySelector<HTMLDivElement>(".bpmn-palette-item")
+		const item = document.querySelector<HTMLDivElement>(".bpmnkit-palette-item")
 		if (!item) throw new Error("item not found")
 		item.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }))
 		expect(setTool).toHaveBeenCalledWith("create:serviceTask")
@@ -102,12 +102,12 @@ describe("createCommandPaletteEditorPlugin", () => {
 		editorPlugin.install(api)
 
 		ctrlK()
-		const input = document.querySelector<HTMLInputElement>(".bpmn-palette-input")
+		const input = document.querySelector<HTMLInputElement>(".bpmnkit-palette-input")
 		if (!input) throw new Error("input not found")
 		input.value = "Add"
 		input.dispatchEvent(new Event("input", { bubbles: true }))
 
-		const items = document.querySelectorAll(".bpmn-palette-item-title")
+		const items = document.querySelectorAll(".bpmnkit-palette-item-title")
 		const titles = Array.from(items).map((el) => el.textContent ?? "")
 		const unique = new Set(titles)
 		expect(unique.size).toBe(titles.length)

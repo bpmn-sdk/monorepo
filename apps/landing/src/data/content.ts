@@ -1,13 +1,13 @@
 // ── Site metadata ──────────────────────────────────────────────────────────────
 
 export const SITE = {
-	name: "BPMN SDK",
+	name: "BPMN Kit",
 	tagline: "Generate BPMN diagrams with code",
 	description:
 		"A TypeScript SDK for generating, editing, and executing BPMN 2.0 diagrams " +
 		"programmatically. Designed for AI agents, automation platforms, and Camunda 8 " +
 		"/ Zeebe workflow deployments. Zero runtime dependencies in the core packages.",
-	url: "https://bpmn-sdk-landing.pages.dev",
+	url: "https://bpmnkit.com",
 	github: "https://github.com/bpmn-sdk/monorepo",
 	npm: "https://www.npmjs.com/package/@bpmn-sdk/core",
 }

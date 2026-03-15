@@ -34,7 +34,7 @@ const DECISION_GATEWAY_TYPES: ReadonlySet<BpmnElementType> = new Set([
 
 /**
  * Analyze BPMN naming conventions based on Camunda best practices:
- * https://docs.camunda.io/docs/components/best-practices/modeling/naming-bpmn-elements/
+ * https://docs.camunda.io/docs/components/best-practices/modeling/naming-bpmnkit-elements/
  */
 export function analyzeNaming(p: BpmnProcess, _opts: ResolvedOptions): OptimizationFinding[] {
 	const findings: OptimizationFinding[] = []

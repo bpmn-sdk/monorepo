@@ -61,7 +61,7 @@ export interface ProcessRunnerOptions {
 
 function openRunnerDb(): Promise<IDBDatabase> {
 	return new Promise((resolve, reject) => {
-		const req = indexedDB.open("bpmn-process-runner-v1", 1)
+		const req = indexedDB.open("bpmnkit-process-runner-v1", 1)
 		req.onupgradeneeded = () => {
 			req.result.createObjectStore("data")
 		}
@@ -159,7 +159,7 @@ export function createProcessRunnerPlugin(
 	const inputVars: Array<{ name: string; value: string }> = []
 
 	const toolbarEl = document.createElement("div")
-	toolbarEl.className = "bpmn-runner-toolbar"
+	toolbarEl.className = "bpmnkit-runner-toolbar"
 
 	/** Entry button placed in the HUD action bar (styled by initEditorHud). */
 	const playButtonEl = document.createElement("button")
@@ -171,16 +171,16 @@ export function createProcessRunnerPlugin(
 	// ── Play panel DOM ──────────────────────────────────────────────────────
 
 	const playPanelEl = document.createElement("div")
-	playPanelEl.className = "bpmn-runner-play-panel"
+	playPanelEl.className = "bpmnkit-runner-play-panel"
 
 	const playTabBarEl = document.createElement("div")
-	playTabBarEl.className = "bpmn-runner-play-tabs"
+	playTabBarEl.className = "bpmnkit-runner-play-tabs"
 
 	function makeTabBtn(label: string, active: boolean): HTMLButtonElement {
 		const b = document.createElement("button")
 		b.className = active
-			? "bpmn-runner-play-tab bpmn-runner-play-tab--active"
-			: "bpmn-runner-play-tab"
+			? "bpmnkit-runner-play-tab bpmnkit-runner-play-tab--active"
+			: "bpmnkit-runner-play-tab"
 		b.textContent = label
 		return b
 	}
@@ -198,8 +198,8 @@ export function createProcessRunnerPlugin(
 	function makePaneEl(hidden: boolean): HTMLDivElement {
 		const d = document.createElement("div")
 		d.className = hidden
-			? "bpmn-runner-play-pane bpmn-runner-play-pane--hidden"
-			: "bpmn-runner-play-pane"
+			? "bpmnkit-runner-play-pane bpmnkit-runner-play-pane--hidden"
+			: "bpmnkit-runner-play-pane"
 		return d
 	}
 
@@ -215,14 +215,14 @@ export function createProcessRunnerPlugin(
 	playPanelEl.appendChild(ivarsPaneEl)
 
 	function switchPlayTab(tab: "variables" | "feel" | "errors" | "input"): void {
-		varTabBtn.classList.toggle("bpmn-runner-play-tab--active", tab === "variables")
-		feelTabBtn.classList.toggle("bpmn-runner-play-tab--active", tab === "feel")
-		errorsTabBtn.classList.toggle("bpmn-runner-play-tab--active", tab === "errors")
-		inputTabBtn.classList.toggle("bpmn-runner-play-tab--active", tab === "input")
-		varsPaneEl.classList.toggle("bpmn-runner-play-pane--hidden", tab !== "variables")
-		feelPaneEl.classList.toggle("bpmn-runner-play-pane--hidden", tab !== "feel")
-		errorsPaneEl.classList.toggle("bpmn-runner-play-pane--hidden", tab !== "errors")
-		ivarsPaneEl.classList.toggle("bpmn-runner-play-pane--hidden", tab !== "input")
+		varTabBtn.classList.toggle("bpmnkit-runner-play-tab--active", tab === "variables")
+		feelTabBtn.classList.toggle("bpmnkit-runner-play-tab--active", tab === "feel")
+		errorsTabBtn.classList.toggle("bpmnkit-runner-play-tab--active", tab === "errors")
+		inputTabBtn.classList.toggle("bpmnkit-runner-play-tab--active", tab === "input")
+		varsPaneEl.classList.toggle("bpmnkit-runner-play-pane--hidden", tab !== "variables")
+		feelPaneEl.classList.toggle("bpmnkit-runner-play-pane--hidden", tab !== "feel")
+		errorsPaneEl.classList.toggle("bpmnkit-runner-play-pane--hidden", tab !== "errors")
+		ivarsPaneEl.classList.toggle("bpmnkit-runner-play-pane--hidden", tab !== "input")
 	}
 
 	varTabBtn.addEventListener("click", () => switchPlayTab("variables"))
@@ -234,7 +234,7 @@ export function createProcessRunnerPlugin(
 
 	function emptyEl(text: string): HTMLDivElement {
 		const d = document.createElement("div")
-		d.className = "bpmn-runner-play-empty"
+		d.className = "bpmnkit-runner-play-empty"
 		d.textContent = text
 		return d
 	}
@@ -251,12 +251,12 @@ export function createProcessRunnerPlugin(
 		}
 		for (const [name, value] of variables) {
 			const row = document.createElement("div")
-			row.className = "bpmn-runner-play-var-row"
+			row.className = "bpmnkit-runner-play-var-row"
 			const nameEl = document.createElement("span")
-			nameEl.className = "bpmn-runner-play-var-name"
+			nameEl.className = "bpmnkit-runner-play-var-name"
 			nameEl.textContent = name
 			const valueEl = document.createElement("span")
-			valueEl.className = "bpmn-runner-play-var-value"
+			valueEl.className = "bpmnkit-runner-play-var-value"
 			valueEl.textContent = JSON.stringify(value)
 			row.appendChild(nameEl)
 			row.appendChild(valueEl)
@@ -284,34 +284,34 @@ export function createProcessRunnerPlugin(
 		}
 		for (const [elementId, evals] of groups) {
 			const groupEl = document.createElement("div")
-			groupEl.className = "bpmn-runner-play-feel-group"
+			groupEl.className = "bpmnkit-runner-play-feel-group"
 
 			const headerEl = document.createElement("div")
-			headerEl.className = "bpmn-runner-play-feel-header"
+			headerEl.className = "bpmnkit-runner-play-feel-header"
 			headerEl.textContent = elementId
 			groupEl.appendChild(headerEl)
 
 			for (const ev of evals) {
 				const rowEl = document.createElement("div")
-				rowEl.className = "bpmn-runner-play-feel-row"
+				rowEl.className = "bpmnkit-runner-play-feel-row"
 
 				const propEl = document.createElement("div")
-				propEl.className = "bpmn-runner-play-feel-prop"
+				propEl.className = "bpmnkit-runner-play-feel-prop"
 				propEl.textContent = ev.property
 
 				const exprEl = document.createElement("code")
-				exprEl.className = "bpmn-runner-play-feel-expr"
+				exprEl.className = "bpmnkit-runner-play-feel-expr"
 				exprEl.textContent = ev.expression
 
 				const resultRowEl = document.createElement("div")
-				resultRowEl.className = "bpmn-runner-play-feel-result-row"
+				resultRowEl.className = "bpmnkit-runner-play-feel-result-row"
 
 				const arrowEl = document.createElement("span")
-				arrowEl.className = "bpmn-runner-play-feel-arrow"
+				arrowEl.className = "bpmnkit-runner-play-feel-arrow"
 				arrowEl.textContent = "\u2192"
 
 				const resultEl = document.createElement("span")
-				resultEl.className = "bpmn-runner-play-feel-result"
+				resultEl.className = "bpmnkit-runner-play-feel-result"
 				resultEl.textContent = JSON.stringify(ev.result)
 
 				resultRowEl.appendChild(arrowEl)
@@ -333,15 +333,15 @@ export function createProcessRunnerPlugin(
 		}
 		for (const err of errors) {
 			const rowEl = document.createElement("div")
-			rowEl.className = "bpmn-runner-play-error-row"
+			rowEl.className = "bpmnkit-runner-play-error-row"
 			if (err.elementId !== undefined) {
 				const idEl = document.createElement("div")
-				idEl.className = "bpmn-runner-play-error-id"
+				idEl.className = "bpmnkit-runner-play-error-id"
 				idEl.textContent = err.elementId
 				rowEl.appendChild(idEl)
 			}
 			const msgEl = document.createElement("div")
-			msgEl.className = "bpmn-runner-play-error-msg"
+			msgEl.className = "bpmnkit-runner-play-error-msg"
 			msgEl.textContent = err.message
 			rowEl.appendChild(msgEl)
 			errorsPaneEl.appendChild(rowEl)
@@ -369,10 +369,10 @@ export function createProcessRunnerPlugin(
 			if (entry === undefined) continue
 
 			const row = document.createElement("div")
-			row.className = "bpmn-runner-play-ivar-row"
+			row.className = "bpmnkit-runner-play-ivar-row"
 
 			const nameInput = document.createElement("input")
-			nameInput.className = "bpmn-runner-play-ivar-name"
+			nameInput.className = "bpmnkit-runner-play-ivar-name"
 			nameInput.placeholder = "name"
 			nameInput.value = entry.name
 			nameInput.addEventListener("input", () => {
@@ -384,11 +384,11 @@ export function createProcessRunnerPlugin(
 			})
 
 			const eqEl = document.createElement("span")
-			eqEl.className = "bpmn-runner-play-ivar-eq"
+			eqEl.className = "bpmnkit-runner-play-ivar-eq"
 			eqEl.textContent = "="
 
 			const valueInput = document.createElement("input")
-			valueInput.className = "bpmn-runner-play-ivar-value"
+			valueInput.className = "bpmnkit-runner-play-ivar-value"
 			valueInput.placeholder = "value (JSON or string)"
 			valueInput.value = entry.value
 			valueInput.addEventListener("input", () => {
@@ -400,7 +400,7 @@ export function createProcessRunnerPlugin(
 			})
 
 			const delBtn = document.createElement("button")
-			delBtn.className = "bpmn-runner-play-ivar-del"
+			delBtn.className = "bpmnkit-runner-play-ivar-del"
 			delBtn.textContent = "\u00D7"
 			delBtn.addEventListener("click", () => {
 				inputVars.splice(i, 1)
@@ -416,14 +416,14 @@ export function createProcessRunnerPlugin(
 		}
 
 		const addBtn = document.createElement("button")
-		addBtn.className = "bpmn-runner-play-ivar-add"
+		addBtn.className = "bpmnkit-runner-play-ivar-add"
 		addBtn.textContent = "+ Add variable"
 		addBtn.addEventListener("click", () => {
 			inputVars.push({ name: "", value: "" })
 			renderInputVars()
 			void saveInputVars(currentProjectId, inputVars)
 			// Focus the name field of the new row
-			const rows = ivarsPaneEl.querySelectorAll<HTMLInputElement>(".bpmn-runner-play-ivar-name")
+			const rows = ivarsPaneEl.querySelectorAll<HTMLInputElement>(".bpmnkit-runner-play-ivar-name")
 			rows[rows.length - 1]?.focus()
 		})
 		ivarsPaneEl.appendChild(addBtn)
@@ -554,7 +554,8 @@ export function createProcessRunnerPlugin(
 
 	function btn(label: string, extraClass?: string): HTMLButtonElement {
 		const b = document.createElement("button")
-		b.className = extraClass !== undefined ? `bpmn-runner-btn ${extraClass}` : "bpmn-runner-btn"
+		b.className =
+			extraClass !== undefined ? `bpmnkit-runner-btn ${extraClass}` : "bpmnkit-runner-btn"
 		b.textContent = label
 		return b
 	}
@@ -588,7 +589,7 @@ export function createProcessRunnerPlugin(
 		toolbarEl.appendChild(runBtn)
 
 		// One Step button — enabled in idle (start step run) or when paused (advance)
-		const oneStepBtn = btn("\u21A6 One Step", "bpmn-runner-btn--step")
+		const oneStepBtn = btn("\u21A6 One Step", "bpmnkit-runner-btn--step")
 		oneStepBtn.disabled = isRunning && !hasPendingStep
 		oneStepBtn.addEventListener("click", () => {
 			if (mode === "running-step" && stepQueue.length > 0) {
@@ -604,7 +605,7 @@ export function createProcessRunnerPlugin(
 		toolbarEl.appendChild(oneStepBtn)
 
 		// Cancel button
-		const cancelBtn = btn("\u25A0 Cancel", "bpmn-runner-btn--stop")
+		const cancelBtn = btn("\u25A0 Cancel", "bpmnkit-runner-btn--stop")
 		cancelBtn.disabled = !isRunning
 		cancelBtn.addEventListener("click", () => {
 			if (mode !== "idle") cleanup()
@@ -612,7 +613,7 @@ export function createProcessRunnerPlugin(
 		toolbarEl.appendChild(cancelBtn)
 
 		// Exit button
-		const exitBtn = btn("Exit", "bpmn-runner-btn--exit")
+		const exitBtn = btn("Exit", "bpmnkit-runner-btn--exit")
 		exitBtn.addEventListener("click", () => exitPlayMode())
 		toolbarEl.appendChild(exitBtn)
 	}

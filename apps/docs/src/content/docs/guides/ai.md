@@ -1,9 +1,9 @@
 ---
 title: AI Integration
-description: Use BPMN SDK with LLMs to generate and modify process diagrams from natural language.
+description: Use BPMN Kit with LLMs to generate and modify process diagrams from natural language.
 ---
 
-BPMN SDK is designed from the ground up to work with AI agents. The compact intermediate
+BPMN Kit is designed from the ground up to work with AI agents. The compact intermediate
 format lets a complete process diagram fit in a single LLM prompt, and the builder API
 produces valid BPMN without requiring the AI to write raw XML.
 
@@ -138,7 +138,7 @@ const xml = Bpmn.export(expand(compact));
 
 ## MCP Server
 
-BPMN SDK ships with a Model Context Protocol (MCP) server that exposes process editing
+BPMN Kit ships with a Model Context Protocol (MCP) server that exposes process editing
 tools to any MCP-compatible AI client (Claude Desktop, Cursor, etc.):
 
 ```sh

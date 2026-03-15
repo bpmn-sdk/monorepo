@@ -70,8 +70,8 @@ export type PortDir = "top" | "right" | "bottom" | "left"
 export type EditorOptions = CanvasOptions & {
 	/**
 	 * When true, the editor reads the initial theme from
-	 * `localStorage.getItem("bpmn-theme")` and persists theme changes back to
-	 * localStorage automatically. The stored key is `"bpmn-theme"`.
+	 * `localStorage.getItem("bpmnkit-theme")` and persists theme changes back to
+	 * localStorage automatically. The stored key is `"bpmnkit-theme"`.
 	 */
 	persistTheme?: boolean
 }

@@ -106,7 +106,7 @@ export class BpmnCanvas {
 		container.innerHTML = ""
 
 		this._host = document.createElement("div")
-		this._host.className = "bpmn-canvas-host"
+		this._host.className = "bpmnkit-canvas-host"
 		this._host.setAttribute("role", "application")
 		this._host.setAttribute("aria-label", "BPMN Diagram")
 		this._host.setAttribute("tabindex", "0")
@@ -179,8 +179,9 @@ export class BpmnCanvas {
 			// to e.target for test environments where elementFromPoint isn't reliable.
 			const fromPoint = document.elementFromPoint(e.clientX, e.clientY)
 			const target =
-				fromPoint?.closest("[data-bpmn-id]") ?? (e.target as Element).closest("[data-bpmn-id]")
-			const id = target?.getAttribute("data-bpmn-id")
+				fromPoint?.closest("[data-bpmnkit-id]") ??
+				(e.target as Element).closest("[data-bpmnkit-id]")
+			const id = target?.getAttribute("data-bpmnkit-id")
 			if (id) this._emit("element:click", id, e as unknown as PointerEvent)
 		})
 

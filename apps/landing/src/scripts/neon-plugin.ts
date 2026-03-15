@@ -27,19 +27,19 @@ export function createNeonThemePlugin(options?: { maxZoom?: number }): CanvasPlu
 
 		install(api) {
 			const host =
-				api.svg.closest<HTMLElement>(".bpmn-canvas-host") ??
+				api.svg.closest<HTMLElement>(".bpmnkit-canvas-host") ??
 				(api.svg.parentElement as HTMLElement | null)
 			if (!host) return
 
 			// Neon color overrides — inline styles win over [data-theme] rules
-			host.style.setProperty("--bpmn-bg", "transparent")
-			host.style.setProperty("--bpmn-grid", "oklch(55% 0.04 270 / 0.12)")
-			host.style.setProperty("--bpmn-shape-fill", "oklch(6% 0.03 270 / 0.8)")
-			host.style.setProperty("--bpmn-shape-stroke", "oklch(65% 0.28 280)")
-			host.style.setProperty("--bpmn-flow-stroke", "oklch(72% 0.18 185)")
-			host.style.setProperty("--bpmn-text", "oklch(88% 0.02 270)")
-			host.style.setProperty("--bpmn-highlight", "oklch(72% 0.18 185)")
-			host.style.setProperty("--bpmn-focus", "oklch(72% 0.18 185)")
+			host.style.setProperty("--bpmnkit-bg", "transparent")
+			host.style.setProperty("--bpmnkit-grid", "oklch(55% 0.04 270 / 0.12)")
+			host.style.setProperty("--bpmnkit-shape-fill", "oklch(6% 0.03 270 / 0.8)")
+			host.style.setProperty("--bpmnkit-shape-stroke", "oklch(65% 0.28 280)")
+			host.style.setProperty("--bpmnkit-flow-stroke", "oklch(72% 0.18 185)")
+			host.style.setProperty("--bpmnkit-text", "oklch(88% 0.02 270)")
+			host.style.setProperty("--bpmnkit-highlight", "oklch(72% 0.18 185)")
+			host.style.setProperty("--bpmnkit-focus", "oklch(72% 0.18 185)")
 
 			// Keep canvas invisible until fitView has positioned it
 			host.style.opacity = "0"
@@ -47,7 +47,7 @@ export function createNeonThemePlugin(options?: { maxZoom?: number }): CanvasPlu
 
 			// Skeleton loader overlay
 			const loader = document.createElement("div")
-			loader.className = "bpmn-neon-loader"
+			loader.className = "bpmnkit-neon-loader"
 			loader.innerHTML = LOADER_SVG
 			api.container.appendChild(loader)
 			_loader = loader

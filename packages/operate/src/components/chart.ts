@@ -5,7 +5,7 @@ import type { DashboardData } from "../types.js"
 type MetricKey = "activeInstances" | "openIncidents" | "activeJobs" | "pendingTasks"
 
 const METRICS: ReadonlyArray<{ key: MetricKey; label: string; cssVar: string }> = [
-	{ key: "activeInstances", label: "Active Instances", cssVar: "--bpmn-accent" },
+	{ key: "activeInstances", label: "Active Instances", cssVar: "--bpmnkit-accent" },
 	{ key: "openIncidents", label: "Open Incidents", cssVar: "--op-c-amber" },
 	{ key: "activeJobs", label: "Active Jobs", cssVar: "--op-c-green" },
 	{ key: "pendingTasks", label: "Pending Tasks", cssVar: "--op-c-purple" },

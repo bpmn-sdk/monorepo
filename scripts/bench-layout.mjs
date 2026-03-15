@@ -5,7 +5,7 @@
  * Usage:  node scripts/bench-layout.mjs [folder] [options]
  *
  * Arguments:
- *   folder      Directory containing .bpmn, .dmn, and .form files (default: ./bpmn-samples/)
+ *   folder      Directory containing .bpmn, .dmn, and .form files (default: ./bpmnkit-samples/)
  *
  * Options:
  *   --verbose   Print full element-by-element breakdown for each file
@@ -31,7 +31,7 @@ const verbose = args.includes("--verbose")
 const topArg = args.indexOf("--top")
 const topN = topArg !== -1 ? Number(args[topArg + 1] ?? 5) : 5
 
-const folder = resolve(folderArg ?? "./bpmn-samples")
+const folder = resolve(folderArg ?? "./bpmnkit-samples")
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 

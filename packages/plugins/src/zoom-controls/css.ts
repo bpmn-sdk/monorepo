@@ -1,7 +1,7 @@
-export const ZOOM_CONTROLS_STYLE_ID = "bpmn-zoom-controls-styles-v1"
+export const ZOOM_CONTROLS_STYLE_ID = "bpmnkit-zoom-controls-styles-v1"
 
 export const ZOOM_CONTROLS_CSS = `
-.bpmn-controls {
+.bpmnkit-controls {
   position: absolute;
   bottom: 12px;
   left: 12px;
@@ -9,7 +9,7 @@ export const ZOOM_CONTROLS_CSS = `
   flex-direction: column;
   gap: 2px;
 }
-.bpmn-control-btn {
+.bpmnkit-control-btn {
   width: 28px;
   height: 28px;
   display: flex;
@@ -19,20 +19,20 @@ export const ZOOM_CONTROLS_CSS = `
   line-height: 1;
   font-size: 16px;
   font-family: system-ui, sans-serif;
-  background: var(--bpmn-overlay-bg, rgba(248, 249, 250, 0.92));
-  border: 1px solid var(--bpmn-overlay-border, rgba(0, 0, 0, 0.12));
+  background: var(--bpmnkit-overlay-bg, rgba(248, 249, 250, 0.92));
+  border: 1px solid var(--bpmnkit-overlay-border, rgba(0, 0, 0, 0.12));
   border-radius: 4px;
-  color: var(--bpmn-text, #333333);
+  color: var(--bpmnkit-text, #333333);
   cursor: pointer;
   transition: background 0.1s, color 0.1s;
 }
-.bpmn-control-btn:hover {
-  background: var(--bpmn-highlight, var(--bpmn-accent, #1a56db));
+.bpmnkit-control-btn:hover {
+  background: var(--bpmnkit-highlight, var(--bpmnkit-accent, #1a56db));
   color: #fff;
   border-color: transparent;
 }
-.bpmn-control-btn:focus {
-  outline: 2px solid var(--bpmn-focus, var(--bpmn-accent, #1a56db));
+.bpmnkit-control-btn:focus {
+  outline: 2px solid var(--bpmnkit-focus, var(--bpmnkit-accent, #1a56db));
   outline-offset: 1px;
 }
 `

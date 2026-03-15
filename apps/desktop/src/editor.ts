@@ -44,7 +44,7 @@ function setHudVisible(visible: boolean): void {
 	for (const el of document.querySelectorAll<HTMLElement>(".hud")) {
 		el.style.display = visible ? "" : "none"
 	}
-	const menuPanel = document.querySelector<HTMLElement>(".bpmn-main-menu-panel")
+	const menuPanel = document.querySelector<HTMLElement>(".bpmnkit-main-menu-panel")
 	if (menuPanel) menuPanel.style.display = visible ? "" : "none"
 }
 
@@ -56,7 +56,7 @@ document.body.appendChild(dock.el)
 // ── Main menu ─────────────────────────────────────────────────────────────────
 
 const mainMenuPlugin = createMainMenuPlugin({
-	title: "BPMN SDK",
+	title: "BPMN Kit",
 	menuItems: [
 		{
 			type: "drill",
@@ -141,7 +141,7 @@ const bridge = createStorageTabsBridge({
 	mainMenu: mainMenuPlugin,
 	resolver,
 	getExamples: (api) => makeExamples(api, resolver),
-	initialTitle: "BPMN SDK",
+	initialTitle: "BPMN Kit",
 	palette,
 	enableFileImport: true,
 	sideDock: dock,

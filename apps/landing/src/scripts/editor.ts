@@ -82,7 +82,7 @@ function setHudVisible(visible: boolean): void {
 	for (const el of document.querySelectorAll<HTMLElement>(".hud")) {
 		el.style.display = visible ? "" : "none"
 	}
-	const menuPanel = document.querySelector<HTMLElement>(".bpmn-main-menu-panel")
+	const menuPanel = document.querySelector<HTMLElement>(".bpmnkit-main-menu-panel")
 	if (menuPanel) menuPanel.style.display = visible ? "" : "none"
 }
 
@@ -94,7 +94,7 @@ document.body.appendChild(dock.el)
 // ── Main menu ─────────────────────────────────────────────────────────────────
 
 const mainMenuPlugin = createMainMenuPlugin({
-	title: "BPMN SDK",
+	title: "BPMN Kit",
 	menuItems: [
 		{
 			type: "drill",
@@ -234,7 +234,7 @@ const processRunnerPlugin = createProcessRunnerPlugin({
 		const el = document.getElementById("hud-bottom-center")
 		if (el) el.style.display = "none"
 		processRunnerPlugin.toolbar.style.display = ""
-		dock.propertiesPane.classList.add("bpmn-props-readonly")
+		dock.propertiesPane.classList.add("bpmnkit-props-readonly")
 		bridge.tabsPlugin.api.setPlayMode(true)
 		hudRef?.setSimulationActive(true)
 	},
@@ -242,7 +242,7 @@ const processRunnerPlugin = createProcessRunnerPlugin({
 		const el = document.getElementById("hud-bottom-center")
 		if (el) el.style.display = currentFileName !== null ? "" : "none"
 		processRunnerPlugin.toolbar.style.display = "none"
-		dock.propertiesPane.classList.remove("bpmn-props-readonly")
+		dock.propertiesPane.classList.remove("bpmnkit-props-readonly")
 		bridge.tabsPlugin.api.setPlayMode(false)
 		hudRef?.setSimulationActive(false)
 	},
@@ -250,7 +250,7 @@ const processRunnerPlugin = createProcessRunnerPlugin({
 })
 
 // Position runner toolbar at bottom center, hidden until play mode activates
-processRunnerPlugin.toolbar.classList.add("bpmn-runner-toolbar--hud-bottom")
+processRunnerPlugin.toolbar.classList.add("bpmnkit-runner-toolbar--hud-bottom")
 processRunnerPlugin.toolbar.style.display = "none"
 document.body.appendChild(processRunnerPlugin.toolbar)
 
@@ -260,7 +260,7 @@ const bridge = createStorageTabsBridge({
 	mainMenu: mainMenuPlugin,
 	resolver,
 	getExamples: (api) => makeExamples(api, resolver),
-	initialTitle: "BPMN SDK",
+	initialTitle: "BPMN Kit",
 	palette,
 	enableFileImport: true,
 	sideDock: dock,

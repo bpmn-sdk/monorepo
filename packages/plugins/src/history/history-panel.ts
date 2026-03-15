@@ -39,30 +39,30 @@ function timeLabel(ts: number): string {
 
 function showConfirm(onConfirm: () => void): void {
 	const overlay = document.createElement("div")
-	overlay.className = "bpmn-hist-confirm-overlay"
+	overlay.className = "bpmnkit-hist-confirm-overlay"
 
 	const panel = document.createElement("div")
-	panel.className = "bpmn-hist-confirm-panel"
+	panel.className = "bpmnkit-hist-confirm-panel"
 
 	const titleEl = document.createElement("div")
-	titleEl.className = "bpmn-hist-confirm-title"
+	titleEl.className = "bpmnkit-hist-confirm-title"
 	titleEl.textContent = "Restore checkpoint?"
 
 	const bodyEl = document.createElement("div")
-	bodyEl.className = "bpmn-hist-confirm-body"
+	bodyEl.className = "bpmnkit-hist-confirm-body"
 	bodyEl.textContent =
 		"Your current changes will be replaced with this checkpoint. This cannot be undone."
 
 	const actions = document.createElement("div")
-	actions.className = "bpmn-hist-confirm-actions"
+	actions.className = "bpmnkit-hist-confirm-actions"
 
 	const cancelBtn = document.createElement("button")
-	cancelBtn.className = "bpmn-hist-confirm-cancel"
+	cancelBtn.className = "bpmnkit-hist-confirm-cancel"
 	cancelBtn.textContent = "Cancel"
 	cancelBtn.addEventListener("click", () => overlay.remove())
 
 	const okBtn = document.createElement("button")
-	okBtn.className = "bpmn-hist-confirm-ok"
+	okBtn.className = "bpmnkit-hist-confirm-ok"
 	okBtn.textContent = "Restore"
 	okBtn.addEventListener("click", () => {
 		overlay.remove()
@@ -87,18 +87,18 @@ export function createHistoryPanel(options: HistoryPanelOptions): {
 	injectHistoryStyles()
 
 	const el = document.createElement("div")
-	el.className = "bpmn-hist-pane"
+	el.className = "bpmnkit-hist-pane"
 
 	// Header
 	const header = document.createElement("div")
-	header.className = "bpmn-hist-header"
+	header.className = "bpmnkit-hist-header"
 
 	const titleEl = document.createElement("span")
-	titleEl.className = "bpmn-hist-header-title"
+	titleEl.className = "bpmnkit-hist-header-title"
 	titleEl.textContent = "Checkpoints"
 
 	const refreshBtn = document.createElement("button")
-	refreshBtn.className = "bpmn-hist-refresh"
+	refreshBtn.className = "bpmnkit-hist-refresh"
 	refreshBtn.title = "Refresh"
 	refreshBtn.textContent = "↻"
 
@@ -106,7 +106,7 @@ export function createHistoryPanel(options: HistoryPanelOptions): {
 
 	// List
 	const list = document.createElement("div")
-	list.className = "bpmn-hist-list"
+	list.className = "bpmnkit-hist-list"
 
 	el.append(header, list)
 
@@ -116,7 +116,7 @@ export function createHistoryPanel(options: HistoryPanelOptions): {
 
 		if (!hasContext) {
 			const msg = document.createElement("div")
-			msg.className = "bpmn-hist-empty"
+			msg.className = "bpmnkit-hist-empty"
 			msg.textContent = "Open a saved file to view its checkpoint history."
 			list.append(msg)
 			return
@@ -124,7 +124,7 @@ export function createHistoryPanel(options: HistoryPanelOptions): {
 
 		if (checkpoints.length === 0) {
 			const msg = document.createElement("div")
-			msg.className = "bpmn-hist-empty"
+			msg.className = "bpmnkit-hist-empty"
 			msg.textContent = "No checkpoints yet. They are created automatically as you edit."
 			list.append(msg)
 			return
@@ -137,20 +137,20 @@ export function createHistoryPanel(options: HistoryPanelOptions): {
 			if (day !== currentDay) {
 				currentDay = day
 				const groupLabel = document.createElement("div")
-				groupLabel.className = "bpmn-hist-group-label"
+				groupLabel.className = "bpmnkit-hist-group-label"
 				groupLabel.textContent = dayLabel(cp.timestamp)
 				list.append(groupLabel)
 			}
 
 			const item = document.createElement("div")
-			item.className = "bpmn-hist-item"
+			item.className = "bpmnkit-hist-item"
 
 			const timeEl = document.createElement("span")
-			timeEl.className = "bpmn-hist-item-time"
+			timeEl.className = "bpmnkit-hist-item-time"
 			timeEl.textContent = timeLabel(cp.timestamp)
 
 			const restoreBtn = document.createElement("button")
-			restoreBtn.className = "bpmn-hist-restore"
+			restoreBtn.className = "bpmnkit-hist-restore"
 			restoreBtn.textContent = "Restore"
 			restoreBtn.addEventListener("click", () => {
 				showConfirm(() => options.loadXml(cp.xml))

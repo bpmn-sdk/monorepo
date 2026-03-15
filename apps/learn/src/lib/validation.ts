@@ -18,24 +18,24 @@ export function validateStep(
 		return { passed: false, message: "Canvas not ready" }
 	}
 
-	if (config.type === "bpmn-element-count") {
-		const elements = canvasContainer.querySelectorAll(`[data-bpmn-type="${config.elementType}"]`)
+	if (config.type === "bpmnkit-element-count") {
+		const elements = canvasContainer.querySelectorAll(`[data-bpmnkit-type="${config.elementType}"]`)
 		if (elements.length >= config.min) {
 			return { passed: true, message: config.successMessage }
 		}
 		return { passed: false, message: config.errorMessage }
 	}
 
-	if (config.type === "bpmn-has-connection") {
-		const edges = canvasContainer.querySelectorAll(".bpmn-edge")
+	if (config.type === "bpmnkit-has-connection") {
+		const edges = canvasContainer.querySelectorAll(".bpmnkit-edge")
 		if (edges.length > 0) {
 			return { passed: true, message: config.successMessage }
 		}
 		return { passed: false, message: config.errorMessage }
 	}
 
-	if (config.type === "bpmn-element-labeled") {
-		const labels = canvasContainer.querySelectorAll(".bpmn-label")
+	if (config.type === "bpmnkit-element-labeled") {
+		const labels = canvasContainer.querySelectorAll(".bpmnkit-label")
 		for (const label of labels) {
 			if (label.textContent && label.textContent.trim().length > 0) {
 				return { passed: true, message: config.successMessage }

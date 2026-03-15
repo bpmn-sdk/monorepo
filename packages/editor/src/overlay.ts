@@ -93,13 +93,13 @@ export class OverlayRenderer {
 			// Selection outline
 			const outline = svgEl("rect")
 			attr(outline, {
-				class: "bpmn-sel-indicator",
+				class: "bpmnkit-sel-indicator",
 				x: x - 2,
 				y: y - 2,
 				width: width + 4,
 				height: height + 4,
 				rx: 2,
-				"data-bpmn-id": shape.id,
+				"data-bpmnkit-id": shape.id,
 			})
 			this._selectionG.appendChild(outline)
 
@@ -110,9 +110,9 @@ export class OverlayRenderer {
 					const pos = positions[dir]
 					const handle = svgEl("rect")
 					attr(handle, {
-						class: "bpmn-resize-handle",
-						"data-bpmn-handle": dir,
-						"data-bpmn-id": shape.id,
+						class: "bpmnkit-resize-handle",
+						"data-bpmnkit-handle": dir,
+						"data-bpmnkit-id": shape.id,
 						x: pos.x - HANDLE_SIZE / 2,
 						y: pos.y - HANDLE_SIZE / 2,
 						width: HANDLE_SIZE,
@@ -143,7 +143,7 @@ export class OverlayRenderer {
 		for (const guide of guides) {
 			const line = svgEl("line")
 			attr(line, {
-				class: "bpmn-align-guide",
+				class: "bpmnkit-align-guide",
 				x1: guide.x1,
 				y1: guide.y1,
 				x2: guide.x2,
@@ -161,20 +161,20 @@ export class OverlayRenderer {
 		for (const g of guides) {
 			const isH = Math.abs(g.y2 - g.y1) < 0.5
 			const main = svgEl("line")
-			attr(main, { class: "bpmn-dist-guide", x1: g.x1, y1: g.y1, x2: g.x2, y2: g.y2 })
+			attr(main, { class: "bpmnkit-dist-guide", x1: g.x1, y1: g.y1, x2: g.x2, y2: g.y2 })
 			this._distG.appendChild(main)
 			const t1 = svgEl("line")
 			const t2 = svgEl("line")
 			if (isH) {
 				attr(t1, {
-					class: "bpmn-dist-guide",
+					class: "bpmnkit-dist-guide",
 					x1: g.x1,
 					y1: g.y1 - TICK,
 					x2: g.x1,
 					y2: g.y1 + TICK,
 				})
 				attr(t2, {
-					class: "bpmn-dist-guide",
+					class: "bpmnkit-dist-guide",
 					x1: g.x2,
 					y1: g.y2 - TICK,
 					x2: g.x2,
@@ -182,14 +182,14 @@ export class OverlayRenderer {
 				})
 			} else {
 				attr(t1, {
-					class: "bpmn-dist-guide",
+					class: "bpmnkit-dist-guide",
 					x1: g.x1 - TICK,
 					y1: g.y1,
 					x2: g.x1 + TICK,
 					y2: g.y1,
 				})
 				attr(t2, {
-					class: "bpmn-dist-guide",
+					class: "bpmnkit-dist-guide",
 					x1: g.x2 - TICK,
 					y1: g.y2,
 					x2: g.x2 + TICK,
@@ -213,7 +213,7 @@ export class OverlayRenderer {
 		const height = Math.abs(current.y - origin.y)
 
 		const rect = svgEl("rect")
-		attr(rect, { class: "bpmn-rubber-band", x, y, width, height })
+		attr(rect, { class: "bpmnkit-rubber-band", x, y, width, height })
 		this._rubberG.appendChild(rect)
 	}
 
@@ -225,7 +225,7 @@ export class OverlayRenderer {
 
 		const rect = svgEl("rect")
 		attr(rect, {
-			class: "bpmn-resize-preview",
+			class: "bpmnkit-resize-preview",
 			x: bounds.x,
 			y: bounds.y,
 			width: bounds.width,
@@ -242,7 +242,7 @@ export class OverlayRenderer {
 		const points = waypoints.map((wp) => `${wp.x},${wp.y}`).join(" ")
 		const poly = svgEl("polyline")
 		attr(poly, {
-			class: "bpmn-ghost-conn",
+			class: "bpmnkit-ghost-conn",
 			points,
 			"marker-end": `url(#${this._markerId})`,
 		})
@@ -263,9 +263,9 @@ export class OverlayRenderer {
 		] as const) {
 			const circle = svgEl("circle")
 			attr(circle, {
-				class: "bpmn-edge-endpoint",
-				"data-bpmn-endpoint": isStart ? "start" : "end",
-				"data-bpmn-id": edgeId,
+				class: "bpmnkit-edge-endpoint",
+				"data-bpmnkit-endpoint": isStart ? "start" : "end",
+				"data-bpmnkit-id": edgeId,
 				cx: pt.x,
 				cy: pt.y,
 				r: 5,
@@ -281,7 +281,7 @@ export class OverlayRenderer {
 		if (!waypoints || waypoints.length < 2) return
 		const points = waypoints.map((wp) => `${wp.x},${wp.y}`).join(" ")
 		const poly = svgEl("polyline")
-		attr(poly, { class: "bpmn-endpoint-ghost", points })
+		attr(poly, { class: "bpmnkit-endpoint-ghost", points })
 		this._endpointGhostG.appendChild(poly)
 	}
 
@@ -295,7 +295,7 @@ export class OverlayRenderer {
 		const line = svgEl("line")
 		if (axis === "h") {
 			attr(line, {
-				class: "bpmn-space-line",
+				class: "bpmnkit-space-line",
 				x1: splitValue,
 				y1: -EXTENT,
 				x2: splitValue,
@@ -303,7 +303,7 @@ export class OverlayRenderer {
 			})
 		} else {
 			attr(line, {
-				class: "bpmn-space-line",
+				class: "bpmnkit-space-line",
 				x1: -EXTENT,
 				y1: splitValue,
 				x2: EXTENT,
@@ -323,7 +323,7 @@ export class OverlayRenderer {
 		const { x, y, width, height } = bounds
 
 		const g = svgEl("g")
-		attr(g, { class: "bpmn-ghost", transform: `translate(${x} ${y})` })
+		attr(g, { class: "bpmnkit-ghost", transform: `translate(${x} ${y})` })
 
 		const isStartEvent =
 			type === "startEvent" ||
@@ -369,12 +369,12 @@ export class OverlayRenderer {
 				cx,
 				cy,
 				r,
-				class: isEndEvent ? "bpmn-end-body" : "bpmn-event-body",
+				class: isEndEvent ? "bpmnkit-end-body" : "bpmnkit-event-body",
 			})
 			g.appendChild(circle)
 			if (isIntermediateEvent) {
 				const inner = svgEl("circle")
-				attr(inner, { cx, cy, r: r - 3, class: "bpmn-event-inner" })
+				attr(inner, { cx, cy, r: r - 3, class: "bpmnkit-event-inner" })
 				g.appendChild(inner)
 			}
 		} else if (isGateway) {
@@ -383,20 +383,20 @@ export class OverlayRenderer {
 			const diamond = svgEl("polygon")
 			attr(diamond, {
 				points: `${cx},0 ${width},${cy} ${cx},${height} 0,${cy}`,
-				class: "bpmn-gw-body",
+				class: "bpmnkit-gw-body",
 			})
 			g.appendChild(diamond)
 		} else if (isAnnotation) {
 			const path = svgEl("path")
 			attr(path, {
 				d: `M ${width * 0.4} 0 L 0 0 L 0 ${height} L ${width * 0.4} ${height}`,
-				class: "bpmn-shape-body",
+				class: "bpmnkit-shape-body",
 				fill: "none",
 			})
 			g.appendChild(path)
 		} else {
 			const rect = svgEl("rect")
-			attr(rect, { x: 0, y: 0, width, height, rx: 10, class: "bpmn-shape-body" })
+			attr(rect, { x: 0, y: 0, width, height, rx: 10, class: "bpmnkit-shape-body" })
 			g.appendChild(rect)
 		}
 
@@ -409,7 +409,7 @@ export class OverlayRenderer {
 		this._edgeHoverDotG.innerHTML = ""
 		if (!pt) return
 		const circle = svgEl("circle")
-		attr(circle, { class: "bpmn-edge-hover-dot", cx: pt.x, cy: pt.y, r: 4 })
+		attr(circle, { class: "bpmnkit-edge-hover-dot", cx: pt.x, cy: pt.y, r: 4 })
 		this._edgeHoverDotG.appendChild(circle)
 	}
 
@@ -423,10 +423,10 @@ export class OverlayRenderer {
 			if (!wp) continue
 			const circle = svgEl("circle")
 			attr(circle, {
-				class: "bpmn-edge-waypoint-ball",
-				"data-bpmn-waypoint": "",
-				"data-bpmn-waypoint-idx": i,
-				"data-bpmn-id": edgeId,
+				class: "bpmnkit-edge-waypoint-ball",
+				"data-bpmnkit-waypoint": "",
+				"data-bpmnkit-waypoint-idx": i,
+				"data-bpmnkit-id": edgeId,
 				cx: wp.x,
 				cy: wp.y,
 				r: 5,
@@ -444,7 +444,7 @@ export class OverlayRenderer {
 		if (!shapeBounds) return
 		const rect = svgEl("rect")
 		attr(rect, {
-			class: "bpmn-boundary-host",
+			class: "bpmnkit-boundary-host",
 			x: shapeBounds.x - 3,
 			y: shapeBounds.y - 3,
 			width: shapeBounds.width + 6,

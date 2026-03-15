@@ -11,9 +11,9 @@ const content = `\
 
 ---
 
-## What is BPMN SDK?
+## What is BPMN Kit?
 
-BPMN SDK is an open-source TypeScript monorepo that makes it possible to work
+BPMN Kit is an open-source TypeScript monorepo that makes it possible to work
 with BPMN 2.0 processes entirely in code. Instead of wrestling with hundreds of
 lines of raw XML and manual coordinates, you call a fluent TypeScript API and
 get back valid, auto-laid-out BPMN XML ready to deploy to Camunda 8.

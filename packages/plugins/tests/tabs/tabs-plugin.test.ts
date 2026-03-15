@@ -50,8 +50,8 @@ describe("welcome screen", () => {
 	it("is shown on install before any tabs are opened", () => {
 		const container = makeContainer()
 		new BpmnCanvas({ container, plugins: [createTabsPlugin()] })
-		const host = container.querySelector(".bpmn-canvas-host")
-		const welcome = host?.querySelector(".bpmn-welcome") as HTMLElement | null
+		const host = container.querySelector(".bpmnkit-canvas-host")
+		const welcome = host?.querySelector(".bpmnkit-welcome") as HTMLElement | null
 		expect(welcome).not.toBeNull()
 		expect(welcome?.style.display).not.toBe("none")
 	})
@@ -61,8 +61,8 @@ describe("welcome screen", () => {
 		const plugin = createTabsPlugin()
 		new BpmnCanvas({ container, plugins: [plugin] })
 		plugin.api.openTab({ type: "bpmn", xml: "", name: "Test" })
-		const host = container.querySelector(".bpmn-canvas-host")
-		const welcome = host?.querySelector(".bpmn-welcome") as HTMLElement | null
+		const host = container.querySelector(".bpmnkit-canvas-host")
+		const welcome = host?.querySelector(".bpmnkit-welcome") as HTMLElement | null
 		expect(welcome?.style.display).toBe("none")
 	})
 
@@ -72,8 +72,8 @@ describe("welcome screen", () => {
 		new BpmnCanvas({ container, plugins: [plugin] })
 		const id = plugin.api.openTab({ type: "bpmn", xml: "", name: "Test" })
 		plugin.api.closeTab(id)
-		const host = container.querySelector(".bpmn-canvas-host")
-		const welcome = host?.querySelector(".bpmn-welcome") as HTMLElement | null
+		const host = container.querySelector(".bpmnkit-canvas-host")
+		const welcome = host?.querySelector(".bpmnkit-welcome") as HTMLElement | null
 		expect(welcome?.style.display).not.toBe("none")
 	})
 
@@ -81,8 +81,8 @@ describe("welcome screen", () => {
 		const onNewDiagram = vi.fn()
 		const container = makeContainer()
 		new BpmnCanvas({ container, plugins: [createTabsPlugin({ onNewDiagram })] })
-		const host = container.querySelector(".bpmn-canvas-host")
-		const btn = host?.querySelector(".bpmn-welcome-btn.primary") as HTMLButtonElement | null
+		const host = container.querySelector(".bpmnkit-canvas-host")
+		const btn = host?.querySelector(".bpmnkit-welcome-btn.primary") as HTMLButtonElement | null
 		if (!btn) throw new Error("New diagram button not found")
 		btn.dispatchEvent(new MouseEvent("click", { bubbles: true }))
 		expect(onNewDiagram).toHaveBeenCalledOnce()
@@ -92,8 +92,8 @@ describe("welcome screen", () => {
 		const onImportFiles = vi.fn()
 		const container = makeContainer()
 		new BpmnCanvas({ container, plugins: [createTabsPlugin({ onImportFiles })] })
-		const host = container.querySelector(".bpmn-canvas-host")
-		const btn = host?.querySelector(".bpmn-welcome-btn.secondary") as HTMLButtonElement | null
+		const host = container.querySelector(".bpmnkit-canvas-host")
+		const btn = host?.querySelector(".bpmnkit-welcome-btn.secondary") as HTMLButtonElement | null
 		if (!btn) throw new Error("Import files button not found")
 		btn.dispatchEvent(new MouseEvent("click", { bubbles: true }))
 		expect(onImportFiles).toHaveBeenCalledOnce()
@@ -115,33 +115,33 @@ describe("grouped tabs", () => {
 	it("creates one group tab for two BPMN files", () => {
 		plugin.api.openTab({ type: "bpmn", xml: "", name: "A" })
 		plugin.api.openTab({ type: "bpmn", xml: "", name: "B" })
-		const host = container.querySelector(".bpmn-canvas-host")
-		const tabs = host?.querySelectorAll(".bpmn-tab")
+		const host = container.querySelector(".bpmnkit-canvas-host")
+		const tabs = host?.querySelectorAll(".bpmnkit-tab")
 		expect(tabs?.length).toBe(1)
 	})
 
 	it("shows chevron when a group has multiple files", () => {
 		plugin.api.openTab({ type: "bpmn", xml: "", name: "A" })
 		plugin.api.openTab({ type: "bpmn", xml: "", name: "B" })
-		const host = container.querySelector(".bpmn-canvas-host")
-		const chevron = host?.querySelector(".bpmn-tab-chevron")
+		const host = container.querySelector(".bpmnkit-canvas-host")
+		const chevron = host?.querySelector(".bpmnkit-tab-chevron")
 		expect(chevron).not.toBeNull()
 	})
 
 	it("shows close button when a group has exactly one file", () => {
 		plugin.api.openTab({ type: "bpmn", xml: "", name: "A" })
-		const host = container.querySelector(".bpmn-canvas-host")
-		const closeBtn = host?.querySelector(".bpmn-tab-close")
+		const host = container.querySelector(".bpmnkit-canvas-host")
+		const closeBtn = host?.querySelector(".bpmnkit-tab-close")
 		expect(closeBtn).not.toBeNull()
 	})
 
 	it("hides close button when a group has multiple files", () => {
 		plugin.api.openTab({ type: "bpmn", xml: "", name: "A" })
 		plugin.api.openTab({ type: "bpmn", xml: "", name: "B" })
-		const host = container.querySelector(".bpmn-canvas-host")
+		const host = container.querySelector(".bpmnkit-canvas-host")
 		// Close button is not on the group tab itself when multi-file
-		const tab = host?.querySelector(".bpmn-tab")
-		const closeBtn = tab?.querySelector(".bpmn-tab-close")
+		const tab = host?.querySelector(".bpmnkit-tab")
+		const closeBtn = tab?.querySelector(".bpmnkit-tab-close")
 		expect(closeBtn).toBeNull()
 	})
 
@@ -149,8 +149,8 @@ describe("grouped tabs", () => {
 		plugin.api.openTab({ type: "bpmn", xml: "", name: "Diagram" })
 		plugin.api.openTab({ type: "dmn", defs: DMN_DEFS, name: "Decision" })
 		plugin.api.openTab({ type: "form", form: FORM_DEF, name: "MyForm" })
-		const host = container.querySelector(".bpmn-canvas-host")
-		const tabs = host?.querySelectorAll(".bpmn-tab")
+		const host = container.querySelector(".bpmnkit-canvas-host")
+		const tabs = host?.querySelectorAll(".bpmnkit-tab")
 		expect(tabs?.length).toBe(3)
 	})
 
@@ -158,8 +158,8 @@ describe("grouped tabs", () => {
 		const idA = plugin.api.openTab({ type: "bpmn", xml: "", name: "Alpha" })
 		plugin.api.openTab({ type: "bpmn", xml: "", name: "Beta" })
 		plugin.api.setActiveTab(idA)
-		const host = container.querySelector(".bpmn-canvas-host")
-		const nameEl = host?.querySelector(".bpmn-tab-name")
+		const host = container.querySelector(".bpmnkit-canvas-host")
+		const nameEl = host?.querySelector(".bpmnkit-tab-name")
 		expect(nameEl?.textContent).toBe("Alpha")
 	})
 
@@ -167,13 +167,13 @@ describe("grouped tabs", () => {
 		plugin.api.openTab({ type: "bpmn", xml: "", name: "Alpha" })
 		const idB = plugin.api.openTab({ type: "bpmn", xml: "", name: "Beta" })
 		plugin.api.setActiveTab(idB)
-		const host = container.querySelector(".bpmn-canvas-host")
-		const nameEl = host?.querySelector(".bpmn-tab-name")
+		const host = container.querySelector(".bpmnkit-canvas-host")
+		const nameEl = host?.querySelector(".bpmnkit-tab-name")
 		expect(nameEl?.textContent).toBe("Beta")
 	})
 
 	it("dropdown is created and appended to document.body", () => {
-		const dropdown = document.body.querySelector(".bpmn-tab-dropdown")
+		const dropdown = document.body.querySelector(".bpmnkit-tab-dropdown")
 		expect(dropdown).not.toBeNull()
 	})
 
@@ -194,17 +194,17 @@ describe("grouped tabs", () => {
 		const id1 = plugin.api.openTab({ type: "bpmn", xml: "", name: "A" })
 		plugin.api.openTab({ type: "bpmn", xml: "", name: "B" })
 		plugin.api.closeTab(id1)
-		const host = container.querySelector(".bpmn-canvas-host")
-		const tab = host?.querySelector(".bpmn-tab")
-		expect(tab?.querySelector(".bpmn-tab-chevron")).toBeNull()
-		expect(tab?.querySelector(".bpmn-tab-close")).not.toBeNull()
+		const host = container.querySelector(".bpmnkit-canvas-host")
+		const tab = host?.querySelector(".bpmnkit-tab")
+		expect(tab?.querySelector(".bpmnkit-tab-chevron")).toBeNull()
+		expect(tab?.querySelector(".bpmnkit-tab-close")).not.toBeNull()
 	})
 
 	it("removes the dropdown on uninstall", () => {
 		const canvas = new BpmnCanvas({ container: makeContainer(), plugins: [plugin] })
 		canvas.destroy()
 		// After destroy, the dropdown appended to body should be removed
-		const dropdown = document.body.querySelector(".bpmn-tab-dropdown")
+		const dropdown = document.body.querySelector(".bpmnkit-tab-dropdown")
 		// May still exist from other test instances; just verify no error thrown
 		expect(true).toBe(true)
 	})

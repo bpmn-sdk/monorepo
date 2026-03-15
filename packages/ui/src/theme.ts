@@ -1,6 +1,6 @@
 export type Theme = "light" | "dark" | "auto"
 
-const STORAGE_KEY = "bpmn-theme"
+const STORAGE_KEY = "bpmnkit-theme"
 
 /** Resolves "auto" to the OS preference; returns "light" or "dark". */
 export function resolveTheme(theme: Theme): "light" | "dark" {

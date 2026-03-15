@@ -60,12 +60,12 @@ export function createWatermarkPlugin(options: WatermarkOptions = {}): CanvasPlu
 			injectWatermarkStyles()
 
 			host = document.createElement("div")
-			host.className = "bpmn-watermark"
+			host.className = "bpmnkit-watermark"
 			host.setAttribute("aria-label", "Attribution")
 
 			for (const link of options.links ?? []) {
 				const a = document.createElement("a")
-				a.className = "bpmn-watermark-link"
+				a.className = "bpmnkit-watermark-link"
 				a.href = link.url
 				a.target = "_blank"
 				a.rel = "noopener noreferrer"
@@ -75,7 +75,7 @@ export function createWatermarkPlugin(options: WatermarkOptions = {}): CanvasPlu
 
 			if (options.logo) {
 				const logoDiv = document.createElement("div")
-				logoDiv.className = "bpmn-watermark-logo"
+				logoDiv.className = "bpmnkit-watermark-logo"
 				logoDiv.innerHTML = options.logo
 				host.appendChild(logoDiv)
 			}

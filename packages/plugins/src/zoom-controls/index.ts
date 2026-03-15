@@ -89,12 +89,12 @@ export function createZoomControlsPlugin(): CanvasPlugin {
 			}
 
 			const controls = document.createElement("div")
-			controls.className = "bpmn-controls"
+			controls.className = "bpmnkit-controls"
 			controls.setAttribute("aria-label", "Zoom controls")
 
 			const makeBtn = (label: string, title: string, onClick: () => void): HTMLButtonElement => {
 				const btn = document.createElement("button")
-				btn.className = "bpmn-control-btn"
+				btn.className = "bpmnkit-control-btn"
 				btn.type = "button"
 				btn.textContent = label
 				btn.setAttribute("aria-label", title)

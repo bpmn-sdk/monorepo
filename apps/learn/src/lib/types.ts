@@ -42,14 +42,14 @@ export interface CliCommand {
 export type ValidationConfig =
 	| { type: "manual"; successMessage: string; errorMessage?: string }
 	| {
-			type: "bpmn-element-count"
+			type: "bpmnkit-element-count"
 			elementType: string
 			min: number
 			successMessage: string
 			errorMessage: string
 	  }
-	| { type: "bpmn-has-connection"; successMessage: string; errorMessage: string }
-	| { type: "bpmn-element-labeled"; successMessage: string; errorMessage: string }
+	| { type: "bpmnkit-has-connection"; successMessage: string; errorMessage: string }
+	| { type: "bpmnkit-element-labeled"; successMessage: string; errorMessage: string }
 
 export interface Prerequisite {
 	id: string

@@ -5,7 +5,7 @@ description: Fluent process builder, BPMN 2.0 parser/serializer, auto-layout, an
 
 ## Overview
 
-`@bpmn-sdk/core` is the foundation of BPMN SDK. It provides everything needed to work with
+`@bpmn-sdk/core` is the foundation of BPMN Kit. It provides everything needed to work with
 BPMN 2.0 programmatically:
 
 - **Fluent builder** — chain method calls to construct any process shape

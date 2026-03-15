@@ -44,19 +44,19 @@ export function createFilterTable<T>(options: {
 
 	// Table wrap
 	const tableWrap = document.createElement("div")
-	tableWrap.className = "bpmn-table-wrap"
+	tableWrap.className = "bpmnkit-table-wrap"
 	el.appendChild(tableWrap)
 
 	// Header with sort support
 	const headerEl = document.createElement("div")
-	headerEl.className = "bpmn-table-header"
+	headerEl.className = "bpmnkit-table-header"
 	const headerCells: HTMLElement[] = []
 
 	for (let i = 0; i < options.columns.length; i++) {
 		const col = options.columns[i]
 		if (!col) continue
 		const th = document.createElement("div")
-		th.className = "bpmn-table-th"
+		th.className = "bpmnkit-table-th"
 		if (col.width) th.style.width = col.width
 
 		if (col.sortValue) {
@@ -88,7 +88,7 @@ export function createFilterTable<T>(options: {
 	tableWrap.appendChild(headerEl)
 
 	const bodyEl = document.createElement("div")
-	bodyEl.className = "bpmn-table-body"
+	bodyEl.className = "bpmnkit-table-body"
 	tableWrap.appendChild(bodyEl)
 
 	// Pagination bar (outside scroll area, always visible)
@@ -199,7 +199,7 @@ export function createFilterTable<T>(options: {
 		bodyEl.innerHTML = ""
 		if (total === 0) {
 			const empty = document.createElement("div")
-			empty.className = "bpmn-table-empty"
+			empty.className = "bpmnkit-table-empty"
 			empty.textContent = searchQuery ? "No results" : (options.emptyText ?? "No data")
 			bodyEl.appendChild(empty)
 			renderPagination(0, 0, 0, 1)
@@ -207,14 +207,14 @@ export function createFilterTable<T>(options: {
 		}
 		for (const row of pageRows) {
 			const tr = document.createElement("div")
-			tr.className = "bpmn-table-row"
+			tr.className = "bpmnkit-table-row"
 			if (options.onRowClick) {
-				tr.classList.add("bpmn-table-row--clickable")
+				tr.classList.add("bpmnkit-table-row--clickable")
 				tr.addEventListener("click", () => options.onRowClick?.(row))
 			}
 			for (const col of options.columns) {
 				const td = document.createElement("div")
-				td.className = "bpmn-table-td"
+				td.className = "bpmnkit-table-td"
 				if (col.width) td.style.width = col.width
 				const content = col.render(row)
 				if (typeof content === "string") td.textContent = content

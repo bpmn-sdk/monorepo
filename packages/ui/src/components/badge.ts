@@ -1,7 +1,7 @@
-/** Returns a status badge element styled via shared bpmn-badge CSS classes. */
+/** Returns a status badge element styled via shared bpmnkit-badge CSS classes. */
 export function badge(state: string): HTMLElement {
 	const el = document.createElement("span")
-	el.className = `bpmn-badge bpmn-badge--${state.toLowerCase()}`
+	el.className = `bpmnkit-badge bpmnkit-badge--${state.toLowerCase()}`
 	el.textContent = state
 	return el
 }

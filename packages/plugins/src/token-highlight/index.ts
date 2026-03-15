@@ -70,12 +70,12 @@ export function createTokenHighlightPlugin(): CanvasPlugin & { api: TokenHighlig
 	// ── Helpers ──────────────────────────────────────────────────────────────
 
 	function shapeEl(id: string): SVGGElement | undefined {
-		const el = canvasApi?.viewportEl.querySelector(`[data-bpmn-id="${id}"]`)
+		const el = canvasApi?.viewportEl.querySelector(`[data-bpmnkit-id="${id}"]`)
 		return el instanceof SVGGElement ? el : undefined
 	}
 
 	function edgeEl(id: string): SVGGElement | undefined {
-		const el = canvasApi?.viewportEl.querySelector(`[data-bpmn-id="${id}"]`)
+		const el = canvasApi?.viewportEl.querySelector(`[data-bpmnkit-id="${id}"]`)
 		return el instanceof SVGGElement ? el : undefined
 	}
 
@@ -86,25 +86,27 @@ export function createTokenHighlightPlugin(): CanvasPlugin & { api: TokenHighlig
 		// Strip all plugin classes — query the viewport so subprocess children are included
 		const vp = api.viewportEl
 		for (const el of vp.querySelectorAll(
-			".bpmn-token-active,.bpmn-token-visited,.bpmn-token-error",
+			".bpmnkit-token-active,.bpmnkit-token-visited,.bpmnkit-token-error",
 		)) {
-			el.classList.remove("bpmn-token-active", "bpmn-token-visited", "bpmn-token-error")
+			el.classList.remove("bpmnkit-token-active", "bpmnkit-token-visited", "bpmnkit-token-error")
 		}
-		for (const el of vp.querySelectorAll(".bpmn-token-edge-active,.bpmn-token-edge-visited")) {
-			el.classList.remove("bpmn-token-edge-active", "bpmn-token-edge-visited")
+		for (const el of vp.querySelectorAll(
+			".bpmnkit-token-edge-active,.bpmnkit-token-edge-visited",
+		)) {
+			el.classList.remove("bpmnkit-token-edge-active", "bpmnkit-token-edge-visited")
 		}
 
 		// Visited shapes
 		for (const id of visitedIds) {
-			shapeEl(id)?.classList.add("bpmn-token-visited")
+			shapeEl(id)?.classList.add("bpmnkit-token-visited")
 		}
 
 		// Active shapes (added after visited so they override on the same element)
 		for (const id of activeIds) {
 			const el = shapeEl(id)
 			if (el !== undefined) {
-				el.classList.remove("bpmn-token-visited")
-				el.classList.add("bpmn-token-active")
+				el.classList.remove("bpmnkit-token-visited")
+				el.classList.add("bpmnkit-token-active")
 			}
 		}
 
@@ -112,8 +114,8 @@ export function createTokenHighlightPlugin(): CanvasPlugin & { api: TokenHighlig
 		for (const id of errorIds) {
 			const el = shapeEl(id)
 			if (el !== undefined) {
-				el.classList.remove("bpmn-token-active", "bpmn-token-visited")
-				el.classList.add("bpmn-token-error")
+				el.classList.remove("bpmnkit-token-active", "bpmnkit-token-visited")
+				el.classList.add("bpmnkit-token-error")
 			}
 		}
 
@@ -128,9 +130,9 @@ export function createTokenHighlightPlugin(): CanvasPlugin & { api: TokenHighlig
 			const srcVisited = visitedIds.has(sourceRef)
 			if (!srcVisited) continue
 			if (activeIds.has(targetRef)) {
-				el.classList.add("bpmn-token-edge-active")
+				el.classList.add("bpmnkit-token-edge-active")
 			} else if (visitedIds.has(targetRef)) {
-				el.classList.add("bpmn-token-edge-visited")
+				el.classList.add("bpmnkit-token-edge-visited")
 			}
 		}
 	}

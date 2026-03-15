@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="https://raw.githubusercontent.com/bpmn-sdk/monorepo/main/doc/logos/logo-2-gateway.svg" width="72" height="72" alt="BPMN SDK logo">
+  <img src="https://raw.githubusercontent.com/bpmn-sdk/monorepo/main/doc/logos/logo-2-gateway.svg" width="72" height="72" alt="BPMN Kit logo">
   <h1>@bpmn-sdk/ui</h1>
   <p>Shared design tokens, theme management, and UI components for bpmn-sdk frontends</p>
 
@@ -25,7 +25,7 @@ No runtime dependencies. Works in any browser environment or bundler.
 
 ## Features
 
-- **Design tokens** — `--bpmn-*` CSS custom properties for surfaces, borders, typography, accent, semantic colours (success/warn/danger), radius, and navigation chrome
+- **Design tokens** — `--bpmnkit-*` CSS custom properties for surfaces, borders, typography, accent, semantic colours (success/warn/danger), radius, and navigation chrome
 - **Unified blue accent** — `#1a56db` (light) / `#4c8ef7` (dark), consistent across editor, canvas, and operate
 - **Light / dark / auto theming** — light defaults on `:root`; `[data-theme="dark"]` override matches any element with that attribute
 - **`createThemeSwitcher()`** — standalone Dark / Light / System button + dropdown; persists to `localStorage`
@@ -147,18 +147,18 @@ createThemeSwitcher(options): { el: HTMLElement; setTheme(t: Theme): void }
 
 | Token | Light | Dark |
 |-------|-------|------|
-| `--bpmn-bg` | `#f4f4f8` | `#0f0f1a` |
-| `--bpmn-surface` | `#ffffff` | `#1a1a2e` |
-| `--bpmn-surface-2` | `#f0f0f8` | `#222240` |
-| `--bpmn-border` | `#d8d8e8` | `#2e2e4e` |
-| `--bpmn-fg` | `#1a1a2e` | `#e0e0f0` |
-| `--bpmn-fg-muted` | `#6666a0` | `#8888a8` |
-| `--bpmn-accent` | `#1a56db` | `#4c8ef7` |
-| `--bpmn-success` | `#22c55e` | `#22c55e` |
-| `--bpmn-warn` | `#f59e0b` | `#f59e0b` |
-| `--bpmn-danger` | `#ef4444` | `#ef4444` |
-| `--bpmn-radius` | `6px` | `6px` |
-| `--bpmn-nav-bg` | `#1e2030` | `#14141f` |
+| `--bpmnkit-bg` | `#f4f4f8` | `#0f0f1a` |
+| `--bpmnkit-surface` | `#ffffff` | `#1a1a2e` |
+| `--bpmnkit-surface-2` | `#f0f0f8` | `#222240` |
+| `--bpmnkit-border` | `#d8d8e8` | `#2e2e4e` |
+| `--bpmnkit-fg` | `#1a1a2e` | `#e0e0f0` |
+| `--bpmnkit-fg-muted` | `#6666a0` | `#8888a8` |
+| `--bpmnkit-accent` | `#1a56db` | `#4c8ef7` |
+| `--bpmnkit-success` | `#22c55e` | `#22c55e` |
+| `--bpmnkit-warn` | `#f59e0b` | `#f59e0b` |
+| `--bpmnkit-danger` | `#ef4444` | `#ef4444` |
+| `--bpmnkit-radius` | `6px` | `6px` |
+| `--bpmnkit-nav-bg` | `#1e2030` | `#14141f` |
 
 ### Icons (`IC_UI`)
 

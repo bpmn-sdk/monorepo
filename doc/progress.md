@@ -42,7 +42,7 @@
 
 - `packages/plugins/src/tabs/tabs-plugin.ts`: `showWelcomeScreen` now hides `tabBar` and adds `bpmn-welcome-active` class to container; `hideWelcomeScreen` restores both
 - `packages/editor/src/css.ts`: added `.bpmn-welcome-active #hud-bottom-center { display: none !important; }` — hides bottom center HUD toolbar on welcome screen
-- `CLAUDE.md`: added Brand Tokens section documenting `packages/ui` as token authority, all `--bpmn-*` tokens with light/dark values, and usage rules
+- `CLAUDE.md`: added Brand Tokens section documenting `packages/ui` as token authority, all `--bpmnkit-*` tokens with light/dark values, and usage rules
 
 ## 2026-03-13 — Brand token system: full build verified, formatting fix
 
@@ -58,10 +58,10 @@
 - `bpmn-sim-active` class moved from `document.body` to `editor.container`; `data-bpmn-hud-theme` kept on `document.body` for external elements (dock, modal)
 
 ### Brand token system (`packages/ui`, `packages/astro-shared`, `packages/canvas`, `packages/editor`, `packages/plugins`)
-- **`packages/ui`**: expanded as brand token authority; new neon dark palette, new tokens (`--bpmn-accent-bright`, `--bpmn-accent-subtle`, `--bpmn-teal`, `--bpmn-panel-bg`, `--bpmn-panel-border`, `--bpmn-font-mono`); added `./tokens.css` CSS file export for Astro `@import` usage
-- **`packages/astro-shared`**: `tokens.css` now delegates to `@bpmn-sdk/ui/tokens.css` instead of duplicating palette; only adds Astro-specific layout tokens and `--* → --bpmn-*` alias mappings
-- **`packages/canvas`**: hardcoded highlight/accent/text colors replaced with `var(--bpmn-accent)`, `var(--bpmn-fg)` tokens
-- **`packages/editor`**: all hardcoded panel/accent colors in HUD_CSS and EDITOR_CSS replaced with `var(--bpmn-*)` tokens
+- **`packages/ui`**: expanded as brand token authority; new neon dark palette, new tokens (`--bpmnkit-accent-bright`, `--bpmnkit-accent-subtle`, `--bpmnkit-teal`, `--bpmnkit-panel-bg`, `--bpmnkit-panel-border`, `--bpmnkit-font-mono`); added `./tokens.css` CSS file export for Astro `@import` usage
+- **`packages/astro-shared`**: `tokens.css` now delegates to `@bpmn-sdk/ui/tokens.css` instead of duplicating palette; only adds Astro-specific layout tokens and `--* → --bpmnkit-*` alias mappings
+- **`packages/canvas`**: hardcoded highlight/accent/text colors replaced with `var(--bpmnkit-accent)`, `var(--bpmnkit-fg)` tokens
+- **`packages/editor`**: all hardcoded panel/accent colors in HUD_CSS and EDITOR_CSS replaced with `var(--bpmnkit-*)` tokens
 - **18 plugin CSS files** migrated: ai-bridge, tabs, config-panel, command-palette, history, main-menu, ascii-view, process-runner, dmn-editor, dmn-viewer, form-editor, form-viewer, minimap, zoom-controls; semantic colors (token-highlight amber/green, feel-playground syntax) unchanged
 
 ### Learn app fix
@@ -69,26 +69,26 @@
 
 ## 2026-03-13 — packages/plugins: CSS brand token migration (round 2)
 
-- Migrated hardcoded accent and panel colors to `var(--bpmn-*)` CSS custom properties in the remaining 7 plugin CSS files
-- `ai-bridge/css.ts`: `rgba(20,20,28,0.97)` → `var(--bpmn-panel-bg)`, border `rgba(255,255,255,0.1)` → `var(--bpmn-panel-border)`, preview border and light `border-bottom` also tokenized
-- `tabs/css.ts`: tab bar `--tabs-bg` default and theme values → `var(--bpmn-surface-2)`, active-tab border → `var(--bpmn-accent-bright)`, welcome icon/buttons, badge colors → corresponding `var(--bpmn-*)` tokens; dropdown bg/border → `var(--bpmn-surface-2)` / `var(--bpmn-border)`; close-dialog colors → `var(--bpmn-accent)` / `var(--bpmn-surface-2)`; raw-pane bg → `var(--bpmn-surface-2)`
-- `config-panel/css.ts`: `rgba(18,18,26,0.98)` → `var(--bpmn-panel-bg)`, all `#4c8ef7` → `var(--bpmn-accent)`, all `#1a56db` → `var(--bpmn-accent)`, `#f87171`/`#dc2626` → `var(--bpmn-danger)`, textarea/FEEL font → `var(--bpmn-font-mono)`, feel-mode-btn active states → `var(--bpmn-accent-subtle)` / `var(--bpmn-accent)`, toggle track checked → `var(--bpmn-accent)`, light panel bg → `var(--bpmn-panel-bg)` / `var(--bpmn-panel-border)`
-- `command-palette/css.ts`: panel bg `rgba(22,22,30,0.97)` → `var(--bpmn-panel-bg)`, border → `var(--bpmn-panel-border)`, caret `#4c8ef7` → `var(--bpmn-accent)`, light caret `#0066cc` → `var(--bpmn-accent)`, light border → `var(--bpmn-panel-border)`
-- `history/css.ts`: confirm panel `rgba(22,22,32,0.98)` → `var(--bpmn-panel-bg)`, restore button tints → `var(--bpmn-accent-subtle)`, confirm-ok button → `var(--bpmn-accent)`, light header border → `var(--bpmn-panel-border)`, light restore colors → `var(--bpmn-accent-subtle)` / `var(--bpmn-accent)`
-- `main-menu/css.ts`: dark panel bg `rgba(30,30,46,0.96)` → `var(--bpmn-panel-bg)`, dark border → `var(--bpmn-panel-border)`, dark sep → `var(--bpmn-panel-border)`, dark check color `#89b4fa` → `var(--bpmn-accent-bright)`, `#0066cc` → `var(--bpmn-accent)`, dark `#181825` bg → `var(--bpmn-surface-2)`
-- `ascii-view/css.ts`: panel bg `rgba(13,13,20,0.98)` → `var(--bpmn-panel-bg)`, border → `var(--bpmn-panel-border)`, light border overrides → `var(--bpmn-panel-border)`
+- Migrated hardcoded accent and panel colors to `var(--bpmnkit-*)` CSS custom properties in the remaining 7 plugin CSS files
+- `ai-bridge/css.ts`: `rgba(20,20,28,0.97)` → `var(--bpmnkit-panel-bg)`, border `rgba(255,255,255,0.1)` → `var(--bpmnkit-panel-border)`, preview border and light `border-bottom` also tokenized
+- `tabs/css.ts`: tab bar `--tabs-bg` default and theme values → `var(--bpmnkit-surface-2)`, active-tab border → `var(--bpmnkit-accent-bright)`, welcome icon/buttons, badge colors → corresponding `var(--bpmnkit-*)` tokens; dropdown bg/border → `var(--bpmnkit-surface-2)` / `var(--bpmnkit-border)`; close-dialog colors → `var(--bpmnkit-accent)` / `var(--bpmnkit-surface-2)`; raw-pane bg → `var(--bpmnkit-surface-2)`
+- `config-panel/css.ts`: `rgba(18,18,26,0.98)` → `var(--bpmnkit-panel-bg)`, all `#4c8ef7` → `var(--bpmnkit-accent)`, all `#1a56db` → `var(--bpmnkit-accent)`, `#f87171`/`#dc2626` → `var(--bpmnkit-danger)`, textarea/FEEL font → `var(--bpmnkit-font-mono)`, feel-mode-btn active states → `var(--bpmnkit-accent-subtle)` / `var(--bpmnkit-accent)`, toggle track checked → `var(--bpmnkit-accent)`, light panel bg → `var(--bpmnkit-panel-bg)` / `var(--bpmnkit-panel-border)`
+- `command-palette/css.ts`: panel bg `rgba(22,22,30,0.97)` → `var(--bpmnkit-panel-bg)`, border → `var(--bpmnkit-panel-border)`, caret `#4c8ef7` → `var(--bpmnkit-accent)`, light caret `#0066cc` → `var(--bpmnkit-accent)`, light border → `var(--bpmnkit-panel-border)`
+- `history/css.ts`: confirm panel `rgba(22,22,32,0.98)` → `var(--bpmnkit-panel-bg)`, restore button tints → `var(--bpmnkit-accent-subtle)`, confirm-ok button → `var(--bpmnkit-accent)`, light header border → `var(--bpmnkit-panel-border)`, light restore colors → `var(--bpmnkit-accent-subtle)` / `var(--bpmnkit-accent)`
+- `main-menu/css.ts`: dark panel bg `rgba(30,30,46,0.96)` → `var(--bpmnkit-panel-bg)`, dark border → `var(--bpmnkit-panel-border)`, dark sep → `var(--bpmnkit-panel-border)`, dark check color `#89b4fa` → `var(--bpmnkit-accent-bright)`, `#0066cc` → `var(--bpmnkit-accent)`, dark `#181825` bg → `var(--bpmnkit-surface-2)`
+- `ascii-view/css.ts`: panel bg `rgba(13,13,20,0.98)` → `var(--bpmnkit-panel-bg)`, border → `var(--bpmnkit-panel-border)`, light border overrides → `var(--bpmnkit-panel-border)`
 - typecheck and biome check pass with zero errors/warnings
 
 ## 2026-03-13 — packages/plugins: CSS brand token migration
 
-- Migrated hardcoded accent and panel colors to `var(--bpmn-*)` CSS custom properties across 8 plugin CSS files
-- `process-runner/css.ts`: `rgba(22,22,30,0.88)` → `var(--bpmn-panel-bg)`, `#4c8ef7` → `var(--bpmn-accent)`, `#1a56db` → `var(--bpmn-accent)`, `#dc2626`/`#f87171` → `var(--bpmn-danger)`
-- `dmn-editor/css.ts`: `--dme-accent` light → `var(--bpmn-accent, #1a56db)`, dark → `var(--bpmn-accent-bright, #89b4fa)`; `--dme-bg` dark → `var(--bpmn-surface-2, #1e1e2e)`; DRD bar/active-button colors migrated to `var(--bpmn-panel-bg)`, `var(--bpmn-accent-subtle)`, `var(--bpmn-panel-border)`; align guide and edge selection stroke → `var(--bpmn-accent)`
-- `dmn-viewer/css.ts`: `--dmn-bg` dark → `var(--bpmn-surface-2, #1e1e2e)`, `--dmn-header-bg` dark → `var(--bpmn-surface-2, #1e1e2e)` (syntax highlight colors left unchanged)
-- `form-editor/css.ts`: `--fe-accent` light → `var(--bpmn-accent, #1a56db)`, dark → `var(--bpmn-accent-bright, #89b4fa)`; `--fe-bg` dark → `var(--bpmn-surface-2, #1e1e2e)`; `--fe-panel-bg` dark → `var(--bpmn-surface-2, #1e1e2e)`
-- `form-viewer/css.ts`: `--fv-accent` and `--fv-btn-bg` light → `var(--bpmn-accent, #1a56db)`, dark → `var(--bpmn-accent, #6b9df7)`; `--fv-bg`/`--fv-input-bg`/`--fv-group-bg` dark → `var(--bpmn-surface-2, #1e1e2e)`; `--fv-tag-fg` dark → `var(--bpmn-accent)`
-- `minimap/css.ts`: viewport fill/stroke fallbacks replaced with `var(--bpmn-accent-subtle)` / `var(--bpmn-accent)`
-- `zoom-controls/css.ts`: `--bpmn-highlight` and `--bpmn-focus` fallbacks → `var(--bpmn-accent, #1a56db)`
+- Migrated hardcoded accent and panel colors to `var(--bpmnkit-*)` CSS custom properties across 8 plugin CSS files
+- `process-runner/css.ts`: `rgba(22,22,30,0.88)` → `var(--bpmnkit-panel-bg)`, `#4c8ef7` → `var(--bpmnkit-accent)`, `#1a56db` → `var(--bpmnkit-accent)`, `#dc2626`/`#f87171` → `var(--bpmnkit-danger)`
+- `dmn-editor/css.ts`: `--dme-accent` light → `var(--bpmnkit-accent, #1a56db)`, dark → `var(--bpmnkit-accent-bright, #89b4fa)`; `--dme-bg` dark → `var(--bpmnkit-surface-2, #1e1e2e)`; DRD bar/active-button colors migrated to `var(--bpmnkit-panel-bg)`, `var(--bpmnkit-accent-subtle)`, `var(--bpmnkit-panel-border)`; align guide and edge selection stroke → `var(--bpmnkit-accent)`
+- `dmn-viewer/css.ts`: `--dmn-bg` dark → `var(--bpmnkit-surface-2, #1e1e2e)`, `--dmn-header-bg` dark → `var(--bpmnkit-surface-2, #1e1e2e)` (syntax highlight colors left unchanged)
+- `form-editor/css.ts`: `--fe-accent` light → `var(--bpmnkit-accent, #1a56db)`, dark → `var(--bpmnkit-accent-bright, #89b4fa)`; `--fe-bg` dark → `var(--bpmnkit-surface-2, #1e1e2e)`; `--fe-panel-bg` dark → `var(--bpmnkit-surface-2, #1e1e2e)`
+- `form-viewer/css.ts`: `--fv-accent` and `--fv-btn-bg` light → `var(--bpmnkit-accent, #1a56db)`, dark → `var(--bpmnkit-accent, #6b9df7)`; `--fv-bg`/`--fv-input-bg`/`--fv-group-bg` dark → `var(--bpmnkit-surface-2, #1e1e2e)`; `--fv-tag-fg` dark → `var(--bpmnkit-accent)`
+- `minimap/css.ts`: viewport fill/stroke fallbacks replaced with `var(--bpmnkit-accent-subtle)` / `var(--bpmnkit-accent)`
+- `zoom-controls/css.ts`: `--bpmnkit-highlight` and `--bpmnkit-focus` fallbacks → `var(--bpmnkit-accent, #1a56db)`
 - `token-highlight/css.ts`: no changes (amber/green/red are semantic BPMN simulation state colors)
 - `feel-playground/css.ts`: no changes needed (all `--fp-*` vars, no substitution targets in UI chrome)
 - `watermark/css.ts`: no changes needed
@@ -96,9 +96,9 @@
 
 ## 2026-03-13 — packages/canvas, packages/editor: CSS brand token migration
 
-- Updated `packages/canvas/src/css.ts`: aligned dark theme `--bpmn-bg` to `#0d0d16`, `--bpmn-shape-fill` to `#1e1e2e`; switched `--bpmn-highlight` and `--bpmn-text` to use `var(--bpmn-accent*)` / `var(--bpmn-fg)` with fallbacks; added dark theme edge hover dot and waypoint ball rules using `var(--bpmn-accent)`
-- Updated `packages/editor/src/css.ts` (EDITOR_CSS): replaced all hardcoded accent colors (`#0066cc`, `#0052a3`, `#2563eb`, `#4c8ef7`) with `var(--bpmn-accent*)` vars; migrated `--bpmn-success` for edge split highlight, `--bpmn-warn` for dist/space guides
-- Updated `packages/editor/src/css.ts` (HUD_CSS): panel/dropdown/group-picker backgrounds and borders now use `var(--bpmn-panel-bg)` / `var(--bpmn-panel-border)`; HUD button colors use `var(--bpmn-fg)` / `var(--bpmn-fg-muted)`; search bar, onboarding overlay, shortcuts modal, drop separators, and ref-link buttons all migrated to brand tokens; ctx-ask-ai-btn uses `var(--bpmn-accent-bright)` / `var(--bpmn-accent-subtle)`
+- Updated `packages/canvas/src/css.ts`: aligned dark theme `--bpmnkit-bg` to `#0d0d16`, `--bpmnkit-shape-fill` to `#1e1e2e`; switched `--bpmnkit-highlight` and `--bpmnkit-text` to use `var(--bpmnkit-accent*)` / `var(--bpmnkit-fg)` with fallbacks; added dark theme edge hover dot and waypoint ball rules using `var(--bpmnkit-accent)`
+- Updated `packages/editor/src/css.ts` (EDITOR_CSS): replaced all hardcoded accent colors (`#0066cc`, `#0052a3`, `#2563eb`, `#4c8ef7`) with `var(--bpmnkit-accent*)` vars; migrated `--bpmnkit-success` for edge split highlight, `--bpmnkit-warn` for dist/space guides
+- Updated `packages/editor/src/css.ts` (HUD_CSS): panel/dropdown/group-picker backgrounds and borders now use `var(--bpmnkit-panel-bg)` / `var(--bpmnkit-panel-border)`; HUD button colors use `var(--bpmnkit-fg)` / `var(--bpmnkit-fg-muted)`; search bar, onboarding overlay, shortcuts modal, drop separators, and ref-link buttons all migrated to brand tokens; ctx-ask-ai-btn uses `var(--bpmnkit-accent-bright)` / `var(--bpmnkit-accent-subtle)`
 
 ## 2026-03-13 — apps/learn: fix JSON parse error in step page
 
@@ -689,7 +689,7 @@
 
 ### `packages/ui` (new package — `@bpmn-sdk/ui`)
 - New shared design-system package consumed by all frontends (operate, editor, canvas).
-- **Design tokens** (`UI_TOKENS_CSS`): CSS custom properties on `:root` (light default) + `[data-theme="dark"]` override. Namespace `--bpmn-*` for surfaces, typography, accent, semantic, radius, nav, header.
+- **Design tokens** (`UI_TOKENS_CSS`): CSS custom properties on `:root` (light default) + `[data-theme="dark"]` override. Namespace `--bpmnkit-*` for surfaces, typography, accent, semantic, radius, nav, header.
 - **Unified blue accent**: `#1a56db` (light) / `#4c8ef7` (dark) — replaces operate's purple `#7b61ff`.
 - **`injectUiStyles()`**: single call injects tokens + component CSS into `<head>`.
 - **`theme.ts`**: `resolveTheme`, `persistTheme`, `loadPersistedTheme`, `applyTheme` — shared logic for all frontends. Persists to `localStorage["bpmn-theme"]`.
@@ -698,7 +698,7 @@
 - **`IC_UI` icons**: SVG icon set for theme switcher (moon/sun/auto/check) and navigation (dashboard/processes/instances/incidents/jobs/tasks).
 
 ### `packages/operate` — visual unification with editor
-- Replaced all `--op-*` CSS variables with shared `--bpmn-*` tokens from `@bpmn-sdk/ui`.
+- Replaced all `--op-*` CSS variables with shared `--bpmnkit-*` tokens from `@bpmn-sdk/ui`.
 - Theme switcher button added to header (next to profile picker). Persists selection across sessions.
 - Theme persistence: `loadPersistedTheme()` on init — user choice survives page reload.
 - Nav icons: replaced emoji (`⊞ ◈ ▷ ⚠ ⚙ ☑`) with clean SVG icons from `IC_UI`.
@@ -1417,7 +1417,7 @@ Enhanced the landing page with two improvements:
 
 Replaced the hand-crafted hero SVG with a real `BpmnCanvas` rendering.
 
-- `apps/landing/src/neon-plugin.ts` — new `createNeonThemePlugin(): CanvasPlugin` that overrides CSS variables (`--bpmn-bg: transparent`, neon purple shape stroke, teal flow stroke) directly as inline styles on the `.bpmn-canvas-host` element, winning over any `[data-theme]` CSS rules.
+- `apps/landing/src/neon-plugin.ts` — new `createNeonThemePlugin(): CanvasPlugin` that overrides CSS variables (`--bpmnkit-bg: transparent`, neon purple shape stroke, teal flow stroke) directly as inline styles on the `.bpmn-canvas-host` element, winning over any `[data-theme]` CSS rules.
 - `apps/landing/index.html` — replaced static `<svg>` in hero with `<div id="diagram-hero" class="diagram-canvas-wrap">`.
 - `apps/landing/src/main.ts` — added `setupHeroDiagram()`: creates a BPMN approval flow programmatically via `Bpmn.createProcess().startEvent().serviceTask().exclusiveGateway().branch()…withAutoLayout().build()`, then renders it with `BpmnCanvas` + `createNeonThemePlugin()`.
 - `apps/landing/src/style.css` — `.diagram-canvas-wrap { height: 200px }` for the hero canvas.
@@ -2000,7 +2000,7 @@ Root cause: the HTTP connector rule was a short note buried at the end of the fo
 - **Collapse handle redesign**: replaced tab-strip button with a 20×52px pill handle anchored at `left: -20px; top: 50%` on the dock's left edge — always visible and accessible
 - **Collapse fix**: set `el.style.width` directly in `collapse()`/`expand()` to override inline style; `--collapsed` CSS class now only hides tab-strip + panes
 - **Resize fix**: disable `transition: width` on mousedown, restore on mouseup — instantaneous drag feedback
-- **Watermark fix**: set `--bpmn-dock-width` CSS variable on `document.body`; dock CSS overrides `.bpmn-watermark { right: calc(var(--bpmn-dock-width) + 8px) }` so watermark always stays left of dock
+- **Watermark fix**: set `--bpmnkit-dock-width` CSS variable on `document.body`; dock CSS overrides `.bpmn-watermark { right: calc(var(--bpmnkit-dock-width) + 8px) }` so watermark always stays left of dock
 - **Empty state info**: Properties pane shows File and Process name rows when no element is selected; `dock.setDiagramInfo(processName, fileName)` updates them; `dock.showPanel()`/`hidePanel()` replace direct `propertiesEmptyState` manipulation
 - `SideDock` API: removed `propertiesEmptyState`; added `showPanel()`, `hidePanel()`, `setDiagramInfo()`
 
@@ -2227,7 +2227,7 @@ Three root causes, three targeted fixes:
 
 2. **`packages/editor/src/hud.ts`** — `document.body.dataset.bpmnHudTheme` was set once at HUD init (always the initial theme) and never updated. Added a `MutationObserver` on `editor.container` that calls `syncHudTheme()` whenever `data-theme` changes. This keeps the HUD toolbars and config panel (which use `[data-bpmn-hud-theme]` selectors on body) in sync with the active theme.
 
-3. **`canvas-plugins/main-menu/src/css.ts`** — The main menu dropdown is `position: fixed` and appended directly to `document.body`, outside the `.bpmn-canvas-host` element. The CSS custom properties (`--bpmn-overlay-bg`, `--bpmn-text`, `--bpmn-overlay-border`, `--bpmn-highlight`) are defined on `.bpmn-canvas-host[data-theme="dark"]` and do not cascade to body-level elements. Added `[data-bpmn-hud-theme="dark"]` overrides for all dropdown elements with explicit Catppuccin dark palette colors.
+3. **`canvas-plugins/main-menu/src/css.ts`** — The main menu dropdown is `position: fixed` and appended directly to `document.body`, outside the `.bpmn-canvas-host` element. The CSS custom properties (`--bpmnkit-overlay-bg`, `--bpmnkit-text`, `--bpmnkit-overlay-border`, `--bpmnkit-highlight`) are defined on `.bpmn-canvas-host[data-theme="dark"]` and do not cascade to body-level elements. Added `[data-bpmn-hud-theme="dark"]` overrides for all dropdown elements with explicit Catppuccin dark palette colors.
 
 ### Feature: theme preference persisted to localStorage
 - **`apps/landing/src/editor.ts`** — Reads `"bpmn-theme"` from `localStorage` on startup (defaults to `"light"`) and passes it as the initial `theme` option to `BpmnEditor`. A `MutationObserver` on `editor.container` watches for `data-theme` changes and writes the resolved theme back to `localStorage`, so the preference survives page reloads.
@@ -3379,7 +3379,7 @@ Two new canvas plugin packages for schema-driven element property editing:
   - Minimap CSS extracted to `canvas-plugins/minimap/src/css.ts` with its own `injectMinimapStyles()` / `MINIMAP_STYLE_ID`
   - `createMinimapPlugin()` factory returns a `CanvasPlugin` that: installs minimap into `api.container`, subscribes to `diagram:load` / `viewport:change` / `diagram:clear`, navigates by calling `api.setViewport()`, and tears everything down on `uninstall()`
   - 9 tests in `canvas-plugins/minimap/tests/minimap-plugin.test.ts`
-- Removed from `packages/canvas`: `minimap.ts`, `CanvasOptions.minimap`, minimap CSS, `_minimap` field, `_showMinimap` field, `_syncMinimap()` method, minimap construction and update calls, `--bpmn-viewport-fill`/`--bpmn-viewport-stroke` CSS vars
+- Removed from `packages/canvas`: `minimap.ts`, `CanvasOptions.minimap`, minimap CSS, `_minimap` field, `_showMinimap` field, `_syncMinimap()` method, minimap construction and update calls, `--bpmnkit-viewport-fill`/`--bpmnkit-viewport-stroke` CSS vars
 - Landing page updated: imports `createMinimapPlugin` from `@bpmn-sdk/canvas-plugin-minimap`, passes it via `plugins: [createMinimapPlugin()]`; removed `minimap: true` option
 - Verification: `pnpm turbo build typecheck check test` — 15/15 tasks pass, zero errors
 

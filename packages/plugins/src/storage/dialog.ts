@@ -61,38 +61,38 @@ function injectStyles(): void {
 }
 .stor-dialog-btn--danger:hover { background: rgba(200,40,40,0.65); }
 /* Light theme */
-[data-bpmn-hud-theme="light"] .stor-dialog {
+[data-bpmnkit-hud-theme="light"] .stor-dialog {
   background: rgba(252,252,254,0.98);
   border-color: rgba(0,0,0,0.1);
   color: rgba(0,0,0,0.8);
   box-shadow: 0 8px 32px rgba(0,0,0,0.15);
 }
-[data-bpmn-hud-theme="light"] .stor-dialog-title { color: rgba(0,0,0,0.88); }
-[data-bpmn-hud-theme="light"] .stor-dialog-msg { color: rgba(0,0,0,0.55); }
-[data-bpmn-hud-theme="light"] .stor-dialog-input {
+[data-bpmnkit-hud-theme="light"] .stor-dialog-title { color: rgba(0,0,0,0.88); }
+[data-bpmnkit-hud-theme="light"] .stor-dialog-msg { color: rgba(0,0,0,0.55); }
+[data-bpmnkit-hud-theme="light"] .stor-dialog-input {
   background: rgba(0,0,0,0.04);
   border-color: rgba(0,0,0,0.15);
   color: rgba(0,0,0,0.9);
 }
-[data-bpmn-hud-theme="light"] .stor-dialog-input:focus { border-color: rgba(0,80,200,0.4); }
-[data-bpmn-hud-theme="light"] .stor-dialog-btn {
+[data-bpmnkit-hud-theme="light"] .stor-dialog-input:focus { border-color: rgba(0,80,200,0.4); }
+[data-bpmnkit-hud-theme="light"] .stor-dialog-btn {
   border-color: rgba(0,0,0,0.12);
   background: rgba(0,0,0,0.04);
   color: rgba(0,0,0,0.7);
 }
-[data-bpmn-hud-theme="light"] .stor-dialog-btn:hover { background: rgba(0,0,0,0.08); }
-[data-bpmn-hud-theme="light"] .stor-dialog-btn--primary {
+[data-bpmnkit-hud-theme="light"] .stor-dialog-btn:hover { background: rgba(0,0,0,0.08); }
+[data-bpmnkit-hud-theme="light"] .stor-dialog-btn--primary {
   background: rgba(0,80,200,0.85);
   border-color: rgba(0,80,200,0.9);
   color: #fff;
 }
-[data-bpmn-hud-theme="light"] .stor-dialog-btn--primary:hover { background: rgba(0,80,200,1); }
-[data-bpmn-hud-theme="light"] .stor-dialog-btn--danger {
+[data-bpmnkit-hud-theme="light"] .stor-dialog-btn--primary:hover { background: rgba(0,80,200,1); }
+[data-bpmnkit-hud-theme="light"] .stor-dialog-btn--danger {
   background: rgba(180,30,30,0.85);
   border-color: rgba(180,30,30,0.9);
   color: #fff;
 }
-[data-bpmn-hud-theme="light"] .stor-dialog-btn--danger:hover { background: rgba(180,30,30,1); }
+[data-bpmnkit-hud-theme="light"] .stor-dialog-btn--danger:hover { background: rgba(180,30,30,1); }
 `
 	document.head.appendChild(style)
 }
