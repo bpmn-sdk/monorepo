@@ -1,5 +1,5 @@
-import type { ViewportState } from "@bpmn-sdk/canvas"
-import type { BpmnBounds } from "@bpmn-sdk/core"
+import type { ViewportState } from "@bpmnkit/canvas"
+import type { BpmnBounds } from "@bpmnkit/core"
 
 /**
  * HTML `contenteditable` label editor positioned over the diagram element.
@@ -31,7 +31,7 @@ export class LabelEditor {
 		this._activeId = id
 
 		const div = document.createElement("div")
-		div.className = "bpmn-label-editor"
+		div.className = "bpmnkit-label-editor"
 		div.contentEditable = "true"
 		div.textContent = currentText
 

@@ -24,32 +24,32 @@ export const FORM_VIEWER_CSS = `
   --fv-placeholder: #9ca3af;
   --fv-badge-bg: #e2e8f0;
   --fv-badge-fg: #334155;
-  --fv-accent: var(--bpmn-accent, #1a56db);
+  --fv-accent: var(--bpmnkit-accent, #1a56db);
   --fv-tag-bg: #dbeafe;
   --fv-tag-fg: #1e40af;
   --fv-group-bg: #f9fafb;
   --fv-group-border: #e5e7eb;
   --fv-separator: #e5e7eb;
-  --fv-btn-bg: var(--bpmn-accent, #1a56db);
+  --fv-btn-bg: var(--bpmnkit-accent, #1a56db);
   --fv-btn-fg: #ffffff;
 }
 
 .form-viewer.dark {
-  --fv-bg: var(--bpmn-surface-2, #1e1e2e);
+  --fv-bg: var(--bpmnkit-surface-2, #1e1e2e);
   --fv-fg: #cdd6f4;
   --fv-border: #313244;
-  --fv-input-bg: var(--bpmn-surface-2, #1e1e2e);
+  --fv-input-bg: var(--bpmnkit-surface-2, #1e1e2e);
   --fv-label: #bac2de;
   --fv-placeholder: #6c7086;
   --fv-badge-bg: #313244;
   --fv-badge-fg: #bac2de;
-  --fv-accent: var(--bpmn-accent, #6b9df7);
+  --fv-accent: var(--bpmnkit-accent, #6b9df7);
   --fv-tag-bg: #1e1e3a;
-  --fv-tag-fg: var(--bpmn-accent, #6b9df7);
-  --fv-group-bg: var(--bpmn-surface-2, #1e1e2e);
+  --fv-tag-fg: var(--bpmnkit-accent, #6b9df7);
+  --fv-group-bg: var(--bpmnkit-surface-2, #1e1e2e);
   --fv-group-border: #313244;
   --fv-separator: #313244;
-  --fv-btn-bg: var(--bpmn-accent, #6b9df7);
+  --fv-btn-bg: var(--bpmnkit-accent, #6b9df7);
   --fv-btn-fg: #1e1e2e;
 }
 

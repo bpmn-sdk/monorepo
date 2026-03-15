@@ -6,14 +6,14 @@
  */
 export function createStatsCard(label: string, value: number | string, mod?: string): HTMLElement {
 	const el = document.createElement("div")
-	el.className = `bpmn-card${mod ? ` bpmn-card--${mod}` : ""}`
+	el.className = `bpmnkit-card${mod ? ` bpmnkit-card--${mod}` : ""}`
 
 	const num = document.createElement("div")
-	num.className = "bpmn-card-value"
+	num.className = "bpmnkit-card-value"
 	num.textContent = String(value)
 
 	const lbl = document.createElement("div")
-	lbl.className = "bpmn-card-label"
+	lbl.className = "bpmnkit-card-label"
 	lbl.textContent = label
 
 	el.appendChild(num)

@@ -1,5 +1,5 @@
-import { Bpmn } from "@bpmn-sdk/core"
-import type { BpmnDefinitions } from "@bpmn-sdk/core"
+import { Bpmn } from "@bpmnkit/core"
+import type { BpmnDefinitions } from "@bpmnkit/core"
 import { injectStyles } from "./css.js"
 import { KeyboardHandler } from "./keyboard.js"
 import { computeDiagramBounds, createDefs, createGrid, render } from "./renderer.js"
@@ -24,7 +24,7 @@ let _instanceCounter = 0
  *
  * ## Quick start
  * ```typescript
- * import { BpmnCanvas } from "@bpmn-sdk/canvas";
+ * import { BpmnCanvas } from "@bpmnkit/canvas";
  *
  * const canvas = new BpmnCanvas({
  *   container: document.getElementById("app")!,
@@ -106,7 +106,7 @@ export class BpmnCanvas {
 		container.innerHTML = ""
 
 		this._host = document.createElement("div")
-		this._host.className = "bpmn-canvas-host"
+		this._host.className = "bpmnkit-canvas-host"
 		this._host.setAttribute("role", "application")
 		this._host.setAttribute("aria-label", "BPMN Diagram")
 		this._host.setAttribute("tabindex", "0")
@@ -179,8 +179,9 @@ export class BpmnCanvas {
 			// to e.target for test environments where elementFromPoint isn't reliable.
 			const fromPoint = document.elementFromPoint(e.clientX, e.clientY)
 			const target =
-				fromPoint?.closest("[data-bpmn-id]") ?? (e.target as Element).closest("[data-bpmn-id]")
-			const id = target?.getAttribute("data-bpmn-id")
+				fromPoint?.closest("[data-bpmnkit-id]") ??
+				(e.target as Element).closest("[data-bpmnkit-id]")
+			const id = target?.getAttribute("data-bpmnkit-id")
 			if (id) this._emit("element:click", id, e as unknown as PointerEvent)
 		})
 
@@ -220,7 +221,7 @@ export class BpmnCanvas {
 
 	/**
 	 * Renders an already-parsed `BpmnDefinitions` model.
-	 * Use this when you already have the parsed model from `@bpmn-sdk/core`.
+	 * Use this when you already have the parsed model from `@bpmnkit/core`.
 	 */
 	loadDefinitions(defs: BpmnDefinitions): void {
 		// Clear previous content

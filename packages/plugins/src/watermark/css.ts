@@ -1,9 +1,9 @@
 /** ID used to prevent duplicate style injection. */
-export const WATERMARK_STYLE_ID = "bpmn-watermark-styles-v1"
+export const WATERMARK_STYLE_ID = "bpmnkit-watermark-styles-v1"
 
 /** CSS for the watermark plugin, injected once into `<head>`. */
 export const WATERMARK_CSS = `
-.bpmn-watermark {
+.bpmnkit-watermark {
   position: absolute;
   bottom: 8px;
   right: 8px;
@@ -13,26 +13,26 @@ export const WATERMARK_CSS = `
   pointer-events: auto;
   z-index: 10;
 }
-.bpmn-watermark-link {
+.bpmnkit-watermark-link {
   font-size: 11px;
-  color: var(--bpmn-overlay-text, rgba(60, 60, 60, 0.7));
+  color: var(--bpmnkit-overlay-text, rgba(60, 60, 60, 0.7));
   text-decoration: none;
   font-family: system-ui, sans-serif;
   opacity: 0.7;
   transition: opacity 0.15s;
 }
-.bpmn-watermark-link:hover {
+.bpmnkit-watermark-link:hover {
   opacity: 1;
   text-decoration: underline;
 }
-.bpmn-watermark-logo {
+.bpmnkit-watermark-logo {
   display: flex;
   align-items: center;
   width: 20px;
   height: 20px;
   flex-shrink: 0;
 }
-.bpmn-watermark-logo > svg {
+.bpmnkit-watermark-logo > svg {
   width: 100%;
   height: 100%;
   display: block;

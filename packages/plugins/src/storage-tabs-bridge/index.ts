@@ -1,5 +1,5 @@
 /**
- * @bpmn-sdk/canvas-plugin-storage-tabs-bridge
+ * @bpmnkit/canvas-plugin-storage-tabs-bridge
  *
  * Wires the storage plugin and tabs plugin together, handling:
  * - Tab ↔ storage file mapping
@@ -11,8 +11,8 @@
  * @packageDocumentation
  */
 
-import type { CanvasApi, CanvasPlugin } from "@bpmn-sdk/canvas"
-import { Bpmn, Dmn, Form } from "@bpmn-sdk/core"
+import type { CanvasApi, CanvasPlugin } from "@bpmnkit/canvas"
+import { Bpmn, Dmn, Form } from "@bpmnkit/core"
 import type { CommandPalettePlugin } from "../command-palette/index.js"
 import type { MainMenuApi } from "../main-menu/index.js"
 import { showInputDialog } from "../storage/index.js"
@@ -355,37 +355,37 @@ export function createStorageTabsBridge(
 		let isSearchMode = false
 
 		const overlay = document.createElement("div")
-		overlay.className = `bpmn-palette-overlay${isLight ? " bpmn-palette--light" : ""}`
+		overlay.className = `bpmnkit-palette-overlay${isLight ? " bpmnkit-palette--light" : ""}`
 		overlay.setAttribute("role", "dialog")
 		overlay.setAttribute("aria-modal", "true")
 		overlay.setAttribute("aria-label", "Switch to file")
 
 		const panel = document.createElement("div")
-		panel.className = "bpmn-palette-panel"
+		panel.className = "bpmnkit-palette-panel"
 
 		const searchRow = document.createElement("div")
-		searchRow.className = "bpmn-palette-search"
+		searchRow.className = "bpmnkit-palette-search"
 
 		const iconEl = document.createElement("span")
-		iconEl.className = "bpmn-palette-search-icon"
+		iconEl.className = "bpmnkit-palette-search-icon"
 		iconEl.innerHTML = FILE_ICON
 		searchRow.appendChild(iconEl)
 
 		const input = document.createElement("input")
 		input.type = "text"
-		input.className = "bpmn-palette-input"
+		input.className = "bpmnkit-palette-input"
 		input.placeholder = "Switch to file\u2026"
 		input.setAttribute("autocomplete", "off")
 		input.setAttribute("spellcheck", "false")
 		searchRow.appendChild(input)
 
 		const kbdHint = document.createElement("span")
-		kbdHint.className = "bpmn-palette-kbd"
+		kbdHint.className = "bpmnkit-palette-kbd"
 		kbdHint.innerHTML = "<kbd>E</kbd> cycle &nbsp;<kbd>Tab</kbd> search &nbsp;<kbd>Esc</kbd> close"
 		searchRow.appendChild(kbdHint)
 
 		const list = document.createElement("div")
-		list.className = "bpmn-palette-list"
+		list.className = "bpmnkit-palette-list"
 		list.setAttribute("role", "listbox")
 
 		panel.appendChild(searchRow)
@@ -422,7 +422,7 @@ export function createStorageTabsBridge(
 			const entries = getEntries(query)
 			if (entries.length === 0) {
 				const empty = document.createElement("div")
-				empty.className = "bpmn-palette-empty"
+				empty.className = "bpmnkit-palette-empty"
 				empty.textContent = "No files found"
 				list.appendChild(empty)
 				return
@@ -430,18 +430,18 @@ export function createStorageTabsBridge(
 			if (focusIdx >= entries.length) focusIdx = 0
 			entries.forEach((entry, i) => {
 				const item = document.createElement("div")
-				item.className = `bpmn-palette-item${i === focusIdx ? " bpmn-palette-focused" : ""}`
+				item.className = `bpmnkit-palette-item${i === focusIdx ? " bpmnkit-palette-focused" : ""}`
 				item.setAttribute("role", "option")
 				item.setAttribute("aria-selected", String(i === focusIdx))
 
 				const nameEl = document.createElement("span")
-				nameEl.className = "bpmn-palette-item-title"
+				nameEl.className = "bpmnkit-palette-item-title"
 				nameEl.textContent = entry.name
 				if (entry.isCurrent) nameEl.style.fontWeight = "600"
 				item.appendChild(nameEl)
 
 				const descEl = document.createElement("span")
-				descEl.className = "bpmn-palette-item-desc"
+				descEl.className = "bpmnkit-palette-item-desc"
 				descEl.textContent = entry.isCurrent
 					? `${entry.type.toUpperCase()} · current`
 					: entry.type.toUpperCase()
@@ -461,12 +461,12 @@ export function createStorageTabsBridge(
 		}
 
 		function updateFocus(): void {
-			const items = list.querySelectorAll<HTMLDivElement>(".bpmn-palette-item")
+			const items = list.querySelectorAll<HTMLDivElement>(".bpmnkit-palette-item")
 			items.forEach((item, i) => {
-				item.classList.toggle("bpmn-palette-focused", i === focusIdx)
+				item.classList.toggle("bpmnkit-palette-focused", i === focusIdx)
 				item.setAttribute("aria-selected", String(i === focusIdx))
 			})
-			list.querySelector<HTMLDivElement>(".bpmn-palette-focused")?.scrollIntoView({
+			list.querySelector<HTMLDivElement>(".bpmnkit-palette-focused")?.scrollIntoView({
 				block: "nearest",
 			})
 		}

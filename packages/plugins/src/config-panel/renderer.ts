@@ -1,6 +1,6 @@
-import type { RenderedEdge, RenderedShape } from "@bpmn-sdk/canvas"
-import type { BpmnDefinitions } from "@bpmn-sdk/core"
-import { parseExpression } from "@bpmn-sdk/feel"
+import type { RenderedEdge, RenderedShape } from "@bpmnkit/canvas"
+import type { BpmnDefinitions } from "@bpmnkit/core"
+import { parseExpression } from "@bpmnkit/feel"
 import type { FieldSchema, FieldValue, GroupSchema, PanelAdapter, PanelSchema } from "./types.js"
 
 const SVG_NS = "http://www.w3.org/2000/svg"
@@ -8,7 +8,7 @@ const SVG_NS = "http://www.w3.org/2000/svg"
 // Attribute set on the field wrapper div when the field has a condition, used
 // by _refreshConditionals to toggle visibility without a full re-render.
 const FIELD_WRAPPER_ATTR = "data-field-wrapper"
-const STORAGE_KEY_WIDTH = "bpmn-cfg-panel-width"
+const STORAGE_KEY_WIDTH = "bpmnkit-cfg-panel-width"
 
 /**
  * Validates a `feel-expression` field value using the real FEEL parser.
@@ -290,7 +290,7 @@ export class ConfigPanelRenderer {
 			const toggleBtn = container.querySelector<HTMLButtonElement>(`[data-feel-toggle="${key}"]`)
 			if (toggleBtn) {
 				toggleBtn.textContent = isFeelMode ? "FEEL" : "string"
-				toggleBtn.classList.toggle("bpmn-cfg-feel-mode-btn--active", isFeelMode)
+				toggleBtn.classList.toggle("bpmnkit-cfg-feel-mode-btn--active", isFeelMode)
 			}
 			// Show playground button only when in FEEL mode (fixed-FEEL buttons are always visible)
 			const playBtn = container.querySelector<HTMLButtonElement>(`[data-feel-playground="${key}"]`)
@@ -379,9 +379,9 @@ export class ConfigPanelRenderer {
 				)
 				if (!wrapper) continue
 				const err = this._fieldError(field, this._values[field.key])
-				wrapper.classList.toggle("bpmn-cfg-field--invalid", err !== null)
+				wrapper.classList.toggle("bpmnkit-cfg-field--invalid", err !== null)
 				// Update error message text
-				const errEl = wrapper.querySelector<HTMLElement>(".bpmn-cfg-field-error")
+				const errEl = wrapper.querySelector<HTMLElement>(".bpmnkit-cfg-field-error")
 				if (errEl) {
 					errEl.style.display = err !== null ? "" : "none"
 					if (err !== null) errEl.textContent = err
@@ -423,10 +423,10 @@ export class ConfigPanelRenderer {
 
 	private _activateTab(panel: HTMLElement, groupId: string): void {
 		this._activeTabId = groupId
-		for (const btn of panel.querySelectorAll<HTMLElement>(".bpmn-cfg-tab-btn")) {
+		for (const btn of panel.querySelectorAll<HTMLElement>(".bpmnkit-cfg-tab-btn")) {
 			btn.classList.remove("active")
 		}
-		for (const grp of panel.querySelectorAll<HTMLElement>(".bpmn-cfg-group")) {
+		for (const grp of panel.querySelectorAll<HTMLElement>(".bpmnkit-cfg-group")) {
 			grp.style.display = "none"
 		}
 		const tabBtn = panel.querySelector<HTMLElement>(`[data-tab-id="${groupId}"]`)
@@ -481,7 +481,7 @@ export class ConfigPanelRenderer {
 		// Create badge layer on first use
 		if (!this._badgeContainerEl) {
 			const g = document.createElementNS(SVG_NS, "g")
-			g.setAttribute("class", "bpmn-cfg-badge-layer")
+			g.setAttribute("class", "bpmnkit-cfg-badge-layer")
 			viewport.appendChild(g)
 			this._badgeContainerEl = g
 		}
@@ -518,7 +518,7 @@ export class ConfigPanelRenderer {
 			const { x, y, width } = shape.shape.bounds
 
 			const badge = document.createElementNS(SVG_NS, "g")
-			badge.setAttribute("class", "bpmn-cfg-badge")
+			badge.setAttribute("class", "bpmnkit-cfg-badge")
 			badge.setAttribute("transform", `translate(${x + width}, ${y})`)
 
 			// Tooltip: lists the specific missing fields on hover
@@ -573,7 +573,7 @@ export class ConfigPanelRenderer {
 		if (!panel) return
 		// Exit search mode so the field is visible
 		if (this._searchQuery.trim().length > 0) {
-			const searchInput = panel.querySelector<HTMLInputElement>(".bpmn-cfg-search-input")
+			const searchInput = panel.querySelector<HTMLInputElement>(".bpmnkit-cfg-search-input")
 			if (searchInput) {
 				searchInput.value = ""
 				this._setSearch("")
@@ -656,7 +656,7 @@ export class ConfigPanelRenderer {
 			totalMatches += matchingFields.length
 
 			const groupHeader = document.createElement("div")
-			groupHeader.className = "bpmn-cfg-search-group-label"
+			groupHeader.className = "bpmnkit-cfg-search-group-label"
 			groupHeader.textContent = group.label
 			searchResults.appendChild(groupHeader)
 
@@ -667,7 +667,7 @@ export class ConfigPanelRenderer {
 
 		if (totalMatches === 0) {
 			const empty = document.createElement("div")
-			empty.className = "bpmn-cfg-search-empty"
+			empty.className = "bpmnkit-cfg-search-empty"
 			empty.textContent = "No matching properties"
 			searchResults.appendChild(empty)
 		}
@@ -681,11 +681,11 @@ export class ConfigPanelRenderer {
 		this._searchQuery = ""
 
 		const panel = document.createElement("div")
-		panel.className = "bpmn-cfg-full"
+		panel.className = "bpmnkit-cfg-full"
 		if (this._container) {
-			panel.classList.add("bpmn-cfg-full--hosted")
+			panel.classList.add("bpmnkit-cfg-full--hosted")
 		} else if (this._collapsed) {
-			panel.classList.add("bpmn-cfg-full--collapsed")
+			panel.classList.add("bpmnkit-cfg-full--collapsed")
 		} else {
 			panel.style.width = `${this._panelWidth}px`
 		}
@@ -693,7 +693,7 @@ export class ConfigPanelRenderer {
 		// Resize handle — only in standalone mode; dock provides its own resize
 		if (!this._container) {
 			const resizeHandle = document.createElement("div")
-			resizeHandle.className = "bpmn-cfg-resize-handle"
+			resizeHandle.className = "bpmnkit-cfg-resize-handle"
 			resizeHandle.addEventListener("mousedown", (e) => {
 				if (this._collapsed) return
 				e.preventDefault()
@@ -721,26 +721,26 @@ export class ConfigPanelRenderer {
 
 		// Header
 		const header = document.createElement("div")
-		header.className = "bpmn-cfg-full-header"
+		header.className = "bpmnkit-cfg-full-header"
 
 		const info = document.createElement("div")
-		info.className = "bpmn-cfg-full-info"
+		info.className = "bpmnkit-cfg-full-info"
 
 		const typeLabel = document.createElement("div")
-		typeLabel.className = "bpmn-cfg-full-type"
+		typeLabel.className = "bpmnkit-cfg-full-type"
 		typeLabel.textContent = this._selectedType ?? ""
 
 		info.appendChild(typeLabel)
 
 		if (reg.schema.templateName) {
 			const templateLabel = document.createElement("div")
-			templateLabel.className = "bpmn-cfg-full-template"
+			templateLabel.className = "bpmnkit-cfg-full-template"
 			templateLabel.textContent = reg.schema.templateName
 			info.appendChild(templateLabel)
 		}
 
 		const nameLabel = document.createElement("div")
-		nameLabel.className = "bpmn-cfg-full-name"
+		nameLabel.className = "bpmnkit-cfg-full-name"
 		nameLabel.textContent = this._elementName || "(unnamed)"
 
 		info.appendChild(nameLabel)
@@ -749,7 +749,7 @@ export class ConfigPanelRenderer {
 		// Docs link — shown when the schema provides a documentation URL
 		if (reg.schema.docsUrl) {
 			const docsLink = document.createElement("a")
-			docsLink.className = "bpmn-cfg-docs-link"
+			docsLink.className = "bpmnkit-cfg-docs-link"
 			docsLink.href = reg.schema.docsUrl
 			docsLink.target = "_blank"
 			docsLink.rel = "noopener noreferrer"
@@ -761,12 +761,12 @@ export class ConfigPanelRenderer {
 		// Collapse button — only in standalone mode; dock provides its own collapse
 		if (!this._container) {
 			const collapseBtn = document.createElement("button")
-			collapseBtn.className = "bpmn-cfg-collapse-btn"
+			collapseBtn.className = "bpmnkit-cfg-collapse-btn"
 			collapseBtn.setAttribute("title", this._collapsed ? "Expand" : "Collapse")
 			collapseBtn.textContent = this._collapsed ? "›" : "‹"
 			collapseBtn.addEventListener("click", () => {
 				this._collapsed = !this._collapsed
-				panel.classList.toggle("bpmn-cfg-full--collapsed", this._collapsed)
+				panel.classList.toggle("bpmnkit-cfg-full--collapsed", this._collapsed)
 				if (this._collapsed) {
 					panel.style.width = ""
 				} else {
@@ -779,7 +779,7 @@ export class ConfigPanelRenderer {
 		}
 
 		const closeBtn = document.createElement("button")
-		closeBtn.className = "bpmn-cfg-full-close"
+		closeBtn.className = "bpmnkit-cfg-full-close"
 		closeBtn.setAttribute("title", "Close")
 		closeBtn.textContent = "×"
 		closeBtn.addEventListener("click", () => this._close())
@@ -788,18 +788,18 @@ export class ConfigPanelRenderer {
 
 		// Search bar
 		const searchBar = document.createElement("div")
-		searchBar.className = "bpmn-cfg-search-bar"
+		searchBar.className = "bpmnkit-cfg-search-bar"
 
 		const searchInput = document.createElement("input")
 		searchInput.type = "text"
-		searchInput.className = "bpmn-cfg-search-input"
+		searchInput.className = "bpmnkit-cfg-search-input"
 		searchInput.placeholder = "Search properties…"
 		searchInput.value = this._searchQuery
 		searchInput.setAttribute("spellcheck", "false")
 		searchInput.setAttribute("autocomplete", "off")
 
 		const clearBtn = document.createElement("button")
-		clearBtn.className = "bpmn-cfg-search-clear"
+		clearBtn.className = "bpmnkit-cfg-search-clear"
 		clearBtn.setAttribute("title", "Clear search")
 		clearBtn.textContent = "×"
 		clearBtn.style.display = this._searchQuery.trim().length > 0 ? "flex" : "none"
@@ -825,24 +825,24 @@ export class ConfigPanelRenderer {
 
 		// Guide bar — omnipresent (between search and tabs), hidden when no errors
 		const guideBar = document.createElement("div")
-		guideBar.className = "bpmn-cfg-guide-bar"
+		guideBar.className = "bpmnkit-cfg-guide-bar"
 
 		const guideInfo = document.createElement("div")
-		guideInfo.className = "bpmn-cfg-guide-info"
+		guideInfo.className = "bpmnkit-cfg-guide-info"
 
 		const guideIcon = document.createElement("span")
-		guideIcon.className = "bpmn-cfg-guide-icon"
+		guideIcon.className = "bpmnkit-cfg-guide-icon"
 		guideIcon.textContent = "!"
 		guideIcon.setAttribute("aria-hidden", "true")
 
 		const guideText = document.createElement("span")
-		guideText.className = "bpmn-cfg-guide-text"
+		guideText.className = "bpmnkit-cfg-guide-text"
 
 		guideInfo.appendChild(guideIcon)
 		guideInfo.appendChild(guideText)
 
 		const guideBtn = document.createElement("button")
-		guideBtn.className = "bpmn-cfg-guide-btn"
+		guideBtn.className = "bpmnkit-cfg-guide-btn"
 		guideBtn.textContent = "Start ›"
 		guideBtn.addEventListener("click", () => {
 			const missing = this._getMissingFields()
@@ -867,19 +867,19 @@ export class ConfigPanelRenderer {
 
 		// Tabs area: [prev arrow] [scrollable tabs] [next arrow]
 		const tabsArea = document.createElement("div")
-		tabsArea.className = "bpmn-cfg-tabs-area"
+		tabsArea.className = "bpmnkit-cfg-tabs-area"
 
 		const prevBtn = document.createElement("button")
-		prevBtn.className = "bpmn-cfg-tabs-scroll-btn bpmn-cfg-tabs-scroll-btn--prev"
+		prevBtn.className = "bpmnkit-cfg-tabs-scroll-btn bpmnkit-cfg-tabs-scroll-btn--prev"
 		prevBtn.setAttribute("aria-label", "Scroll tabs left")
 		prevBtn.textContent = "‹"
 		prevBtn.style.display = "none"
 
 		const tabs = document.createElement("div")
-		tabs.className = "bpmn-cfg-tabs"
+		tabs.className = "bpmnkit-cfg-tabs"
 
 		const nextBtn = document.createElement("button")
-		nextBtn.className = "bpmn-cfg-tabs-scroll-btn bpmn-cfg-tabs-scroll-btn--next"
+		nextBtn.className = "bpmnkit-cfg-tabs-scroll-btn bpmnkit-cfg-tabs-scroll-btn--next"
 		nextBtn.setAttribute("aria-label", "Scroll tabs right")
 		nextBtn.textContent = "›"
 		nextBtn.style.display = "none"
@@ -903,12 +903,12 @@ export class ConfigPanelRenderer {
 
 		// Scrollable body
 		const body = document.createElement("div")
-		body.className = "bpmn-cfg-full-body"
+		body.className = "bpmnkit-cfg-full-body"
 		this._bodyEl = body
 
 		// Search results pane (initially hidden)
 		const searchResults = document.createElement("div")
-		searchResults.className = "bpmn-cfg-search-results"
+		searchResults.className = "bpmnkit-cfg-search-results"
 		searchResults.style.display = "none"
 		this._searchResultsEl = searchResults
 
@@ -934,7 +934,7 @@ export class ConfigPanelRenderer {
 
 			// Tab button
 			const tabBtn = document.createElement("button")
-			tabBtn.className = "bpmn-cfg-tab-btn"
+			tabBtn.className = "bpmnkit-cfg-tab-btn"
 			tabBtn.textContent = group.label
 			tabBtn.setAttribute("data-tab-id", group.id)
 			if (!isVisible) tabBtn.style.display = "none"
@@ -944,7 +944,7 @@ export class ConfigPanelRenderer {
 
 			// Group content (visible only when this tab is active)
 			const groupEl = document.createElement("div")
-			groupEl.className = "bpmn-cfg-group"
+			groupEl.className = "bpmnkit-cfg-group"
 			groupEl.setAttribute("data-group-id", group.id)
 			if (!isActive) groupEl.style.display = "none"
 
@@ -984,7 +984,7 @@ export class ConfigPanelRenderer {
 
 	private _renderField(field: FieldSchema): HTMLElement {
 		const wrapper = document.createElement("div")
-		wrapper.className = "bpmn-cfg-field"
+		wrapper.className = "bpmnkit-cfg-field"
 
 		// Always stamp the key so _refreshConditionals and _refreshValidation can find the wrapper
 		wrapper.setAttribute(FIELD_WRAPPER_ATTR, field.key)
@@ -994,7 +994,7 @@ export class ConfigPanelRenderer {
 
 		// Initial error state (required-empty OR invalid FEEL expression)
 		if (this._fieldHasError(field, value)) {
-			wrapper.classList.add("bpmn-cfg-field--invalid")
+			wrapper.classList.add("bpmnkit-cfg-field--invalid")
 		}
 
 		if (field.type === "action") {
@@ -1003,13 +1003,13 @@ export class ConfigPanelRenderer {
 			wrapper.appendChild(this._renderToggle(field, value))
 		} else {
 			const labelRow = document.createElement("div")
-			labelRow.className = "bpmn-cfg-field-label"
+			labelRow.className = "bpmnkit-cfg-field-label"
 			labelRow.textContent = field.label
 			if (field.tooltip) labelRow.title = field.tooltip
 
 			if (field.required) {
 				const star = document.createElement("span")
-				star.className = "bpmn-cfg-required-star"
+				star.className = "bpmnkit-cfg-required-star"
 				star.textContent = "*"
 				star.setAttribute("aria-hidden", "true")
 				labelRow.appendChild(star)
@@ -1017,7 +1017,7 @@ export class ConfigPanelRenderer {
 
 			if (field.docsUrl) {
 				const link = document.createElement("a")
-				link.className = "bpmn-cfg-field-docs"
+				link.className = "bpmnkit-cfg-field-docs"
 				link.textContent = "docs"
 				link.href = field.docsUrl
 				link.target = "_blank"
@@ -1030,7 +1030,7 @@ export class ConfigPanelRenderer {
 				if (field.feelFixed) {
 					// Static "FEEL" badge — this field is always a FEEL expression
 					const badge = document.createElement("span")
-					badge.className = "bpmn-cfg-feel-mode-btn bpmn-cfg-feel-mode-btn--active"
+					badge.className = "bpmnkit-cfg-feel-mode-btn bpmnkit-cfg-feel-mode-btn--active"
 					badge.setAttribute("aria-label", "Always a FEEL expression")
 					badge.textContent = "FEEL"
 					labelRow.appendChild(badge)
@@ -1039,8 +1039,8 @@ export class ConfigPanelRenderer {
 					const isFeelMode = typeof value === "string" && value.startsWith("=")
 					const modeBtn = document.createElement("button")
 					modeBtn.type = "button"
-					modeBtn.className = "bpmn-cfg-feel-mode-btn"
-					if (isFeelMode) modeBtn.classList.add("bpmn-cfg-feel-mode-btn--active")
+					modeBtn.className = "bpmnkit-cfg-feel-mode-btn"
+					if (isFeelMode) modeBtn.classList.add("bpmnkit-cfg-feel-mode-btn--active")
 					modeBtn.setAttribute("data-feel-toggle", field.key)
 					modeBtn.setAttribute(
 						"title",
@@ -1084,7 +1084,7 @@ export class ConfigPanelRenderer {
 
 		if (field.hint) {
 			const hint = document.createElement("div")
-			hint.className = "bpmn-cfg-field-hint"
+			hint.className = "bpmnkit-cfg-field-hint"
 			// hint may contain safe HTML from template descriptions (e.g. <a> links)
 			hint.innerHTML = field.hint
 			wrapper.appendChild(hint)
@@ -1094,7 +1094,7 @@ export class ConfigPanelRenderer {
 		if (field.type !== "action" && field.type !== "toggle") {
 			const initialErr = this._fieldError(field, value)
 			const errDiv = document.createElement("div")
-			errDiv.className = "bpmn-cfg-field-error"
+			errDiv.className = "bpmnkit-cfg-field-error"
 			if (initialErr !== null) {
 				errDiv.textContent = initialErr
 			} else {
@@ -1119,10 +1119,10 @@ export class ConfigPanelRenderer {
 				: rawPlaceholder
 
 		const wrap = document.createElement("div")
-		wrap.className = "bpmn-cfg-feel-wrap"
+		wrap.className = "bpmnkit-cfg-feel-wrap"
 
 		const ta = document.createElement("textarea")
-		ta.className = "bpmn-cfg-feel-ta bpmn-cfg-textarea"
+		ta.className = "bpmnkit-cfg-feel-ta bpmnkit-cfg-textarea"
 		ta.placeholder = displayPlaceholder
 		ta.value = displayText
 		ta.setAttribute("data-field-key", field.key)
@@ -1150,7 +1150,7 @@ export class ConfigPanelRenderer {
 		if (field.openInPlayground ?? this._openInPlayground) {
 			const btn = document.createElement("button")
 			btn.type = "button"
-			btn.className = "bpmn-cfg-feel-playground-btn"
+			btn.className = "bpmnkit-cfg-feel-playground-btn"
 			btn.textContent = "Open in FEEL Playground ↗"
 			btn.setAttribute("data-feel-playground", field.key)
 			if (field.feelFixed) btn.setAttribute("data-feel-playground-fixed", "true")
@@ -1175,7 +1175,7 @@ export class ConfigPanelRenderer {
 	private _renderTextInput(field: FieldSchema, value: FieldValue): HTMLInputElement {
 		const input = document.createElement("input")
 		input.type = field.secret === true ? "password" : "text"
-		input.className = "bpmn-cfg-input"
+		input.className = "bpmnkit-cfg-input"
 		input.placeholder = field.placeholder ?? ""
 		input.value = typeof value === "string" ? value : ""
 		input.setAttribute("data-field-key", field.key)
@@ -1189,7 +1189,7 @@ export class ConfigPanelRenderer {
 
 	private _renderTextarea(field: FieldSchema, value: FieldValue): HTMLTextAreaElement {
 		const ta = document.createElement("textarea")
-		ta.className = "bpmn-cfg-textarea"
+		ta.className = "bpmnkit-cfg-textarea"
 		ta.placeholder = field.placeholder ?? ""
 		ta.value = typeof value === "string" ? value : ""
 		ta.setAttribute("data-field-key", field.key)
@@ -1203,7 +1203,7 @@ export class ConfigPanelRenderer {
 
 	private _renderSelect(field: FieldSchema, value: FieldValue): HTMLSelectElement {
 		const sel = document.createElement("select")
-		sel.className = "bpmn-cfg-select"
+		sel.className = "bpmnkit-cfg-select"
 		sel.setAttribute("data-field-key", field.key)
 		for (const opt of field.options ?? []) {
 			const option = document.createElement("option")
@@ -1222,10 +1222,10 @@ export class ConfigPanelRenderer {
 
 	private _renderToggle(field: FieldSchema, value: FieldValue): HTMLElement {
 		const row = document.createElement("div")
-		row.className = "bpmn-cfg-toggle-row"
+		row.className = "bpmnkit-cfg-toggle-row"
 
 		const lbl = document.createElement("label")
-		lbl.className = "bpmn-cfg-toggle"
+		lbl.className = "bpmnkit-cfg-toggle"
 
 		const input = document.createElement("input")
 		input.type = "checkbox"
@@ -1238,17 +1238,17 @@ export class ConfigPanelRenderer {
 		}
 
 		const track = document.createElement("span")
-		track.className = "bpmn-cfg-toggle-track"
+		track.className = "bpmnkit-cfg-toggle-track"
 
 		const thumb = document.createElement("span")
-		thumb.className = "bpmn-cfg-toggle-thumb"
+		thumb.className = "bpmnkit-cfg-toggle-thumb"
 
 		lbl.appendChild(input)
 		lbl.appendChild(track)
 		lbl.appendChild(thumb)
 
 		const labelText = document.createElement("span")
-		labelText.className = "bpmn-cfg-toggle-label"
+		labelText.className = "bpmnkit-cfg-toggle-label"
 		labelText.textContent = field.label
 		if (field.tooltip) labelText.title = field.tooltip
 
@@ -1260,7 +1260,7 @@ export class ConfigPanelRenderer {
 	private _renderActionButton(field: FieldSchema): HTMLElement {
 		const btn = document.createElement("button")
 		btn.type = "button"
-		btn.className = "bpmn-cfg-action-btn"
+		btn.className = "bpmnkit-cfg-action-btn"
 		btn.textContent = field.label
 		if (field.tooltip) btn.title = field.tooltip
 		if (this._readonly) {

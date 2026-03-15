@@ -11,9 +11,9 @@ const content = `\
 
 ---
 
-## What is BPMN SDK?
+## What is BPMN Kit?
 
-BPMN SDK is an open-source TypeScript monorepo that makes it possible to work
+BPMN Kit is an open-source TypeScript monorepo that makes it possible to work
 with BPMN 2.0 processes entirely in code. Instead of wrestling with hundreds of
 lines of raw XML and manual coordinates, you call a fluent TypeScript API and
 get back valid, auto-laid-out BPMN XML ready to deploy to Camunda 8.
@@ -39,7 +39,7 @@ ${featureList}
 
 ---
 
-## Core SDK (@bpmn-sdk/core)
+## Core SDK (@bpmnkit/core)
 
 ### Basic Process
 
@@ -61,7 +61,7 @@ ${CODE.parallelGateway}
 
 ---
 
-## Simulation Engine (@bpmn-sdk/engine)
+## Simulation Engine (@bpmnkit/engine)
 
 Run BPMN processes locally in the browser or Node.js. Zero external
 dependencies. Supports service tasks, user tasks, exclusive/parallel/event-based
@@ -73,7 +73,7 @@ ${CODE.deployRun}
 
 ---
 
-## REST API Client (@bpmn-sdk/api)
+## REST API Client (@bpmnkit/api)
 
 \`\`\`typescript
 ${CODE.apiClient}
@@ -116,7 +116,7 @@ Example — list deployed process definitions:
 ### 1. Install
 
 \`\`\`
-pnpm add @bpmn-sdk/core
+pnpm add @bpmnkit/core
 \`\`\`
 
 ### 2. Create a process

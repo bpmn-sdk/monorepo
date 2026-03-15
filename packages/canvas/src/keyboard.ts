@@ -57,13 +57,13 @@ export class KeyboardHandler {
 		if (!shape) return
 		this._focusIndex = index
 		shape.element.focus()
-		shape.element.classList.add("bpmn-selected")
+		shape.element.classList.add("bpmnkit-selected")
 		this._onFocus(shape.id)
 	}
 
 	private _clearFocus(): void {
 		if (this._focusIndex >= 0) {
-			this._shapes[this._focusIndex]?.element.classList.remove("bpmn-selected")
+			this._shapes[this._focusIndex]?.element.classList.remove("bpmnkit-selected")
 		}
 		this._focusIndex = -1
 		this._onBlur()

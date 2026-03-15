@@ -7,8 +7,8 @@ import type {
 	BpmnParticipant,
 	BpmnSequenceFlow,
 	BpmnTextAnnotation,
-} from "@bpmn-sdk/core"
-import { readDiColor } from "@bpmn-sdk/core"
+} from "@bpmnkit/core"
+import { readDiColor } from "@bpmnkit/core"
 import type { RenderedEdge, RenderedShape } from "./types.js"
 
 // ── SVG helpers ───────────────────────────────────────────────────────────────
@@ -64,7 +64,7 @@ function makeLabel(
 	cx: number,
 	cy: number,
 	maxWidth: number,
-	cls = "bpmn-label",
+	cls = "bpmnkit-label",
 	topAlign = false,
 ): SVGElement {
 	const lines = wrapText(text, maxWidth)
@@ -153,32 +153,32 @@ function taskIcon(type: string): string {
 	switch (type) {
 		case "manualTask":
 			// Hand icon
-			return `<path d="M3 8V4.5a1 1 0 012 0V8M5 7V3a1 1 0 012 0v4M7 6a1 1 0 012 0v1.5M9 7.5a1 1 0 012 0V9c0 2.5-1.5 4-4.5 4H5c-2.5 0-4-1.5-4-4V8" class="bpmn-icon"/>`
+			return `<path d="M3 8V4.5a1 1 0 012 0V8M5 7V3a1 1 0 012 0v4M7 6a1 1 0 012 0v1.5M9 7.5a1 1 0 012 0V9c0 2.5-1.5 4-4.5 4H5c-2.5 0-4-1.5-4-4V8" class="bpmnkit-icon"/>`
 		case "serviceTask":
 			// Gear: two concentric circles + 8 spokes
-			return `<circle cx="7" cy="7" r="5.5" class="bpmn-icon"/>
-<circle cx="7" cy="7" r="2" class="bpmn-icon"/>
-<path d="M7 1v2.5M7 10.5v2.5M1 7h2.5M10.5 7h2.5M2.8 2.8l1.7 1.7M9.5 9.5l1.7 1.7M11.2 2.8l-1.7 1.7M4.5 9.5l-1.7 1.7" class="bpmn-icon"/>`
+			return `<circle cx="7" cy="7" r="5.5" class="bpmnkit-icon"/>
+<circle cx="7" cy="7" r="2" class="bpmnkit-icon"/>
+<path d="M7 1v2.5M7 10.5v2.5M1 7h2.5M10.5 7h2.5M2.8 2.8l1.7 1.7M9.5 9.5l1.7 1.7M11.2 2.8l-1.7 1.7M4.5 9.5l-1.7 1.7" class="bpmnkit-icon"/>`
 		case "userTask":
 			// Person: head circle + shoulders arc
-			return `<circle cx="7" cy="4.5" r="2.5" class="bpmn-icon"/>
-<path d="M1.5 14Q1.5 9 7 9Q12.5 9 12.5 14" class="bpmn-icon"/>`
+			return `<circle cx="7" cy="4.5" r="2.5" class="bpmnkit-icon"/>
+<path d="M1.5 14Q1.5 9 7 9Q12.5 9 12.5 14" class="bpmnkit-icon"/>`
 		case "scriptTask":
 			// Document with three text lines
-			return `<rect x="2" y="0.5" width="10" height="13" rx="1" class="bpmn-icon"/>
-<path d="M4 4h6M4 7h6M4 10h4" class="bpmn-icon"/>`
+			return `<rect x="2" y="0.5" width="10" height="13" rx="1" class="bpmnkit-icon"/>
+<path d="M4 4h6M4 7h6M4 10h4" class="bpmnkit-icon"/>`
 		case "sendTask":
 			// Filled envelope
-			return `<path d="M1.5 3.5h11v8h-11z" class="bpmn-icon-solid"/>
-<path d="M1.5 3.5l5.5 4.5 5.5-4.5M1.5 11.5l4-3.5M12.5 11.5l-4-3.5" style="fill:none;stroke:var(--bpmn-shape-fill,#fff);stroke-width:1.5"/>`
+			return `<path d="M1.5 3.5h11v8h-11z" class="bpmnkit-icon-solid"/>
+<path d="M1.5 3.5l5.5 4.5 5.5-4.5M1.5 11.5l4-3.5M12.5 11.5l-4-3.5" style="fill:none;stroke:var(--bpmnkit-shape-fill,#fff);stroke-width:1.5"/>`
 		case "receiveTask":
 			// Outlined envelope
-			return `<rect x="1.5" y="3.5" width="11" height="8" class="bpmn-icon"/>
-<path d="M1.5 3.5l5.5 4.5 5.5-4.5" class="bpmn-icon"/>`
+			return `<rect x="1.5" y="3.5" width="11" height="8" class="bpmnkit-icon"/>
+<path d="M1.5 3.5l5.5 4.5 5.5-4.5" class="bpmnkit-icon"/>`
 		case "businessRuleTask":
 			// Table grid
-			return `<rect x="1" y="1" width="12" height="12" class="bpmn-icon"/>
-<path d="M1 4.5h12M4 1v12" class="bpmn-icon"/>`
+			return `<rect x="1" y="1" width="12" height="12" class="bpmnkit-icon"/>
+<path d="M1 4.5h12M4 1v12" class="bpmnkit-icon"/>`
 		default:
 			return ""
 	}
@@ -187,14 +187,14 @@ function taskIcon(type: string): string {
 // ── Event definition markers (centred at 0,0, ~10×10) ────────────────────────
 
 function eventMarker(defType: string, filled: boolean): string {
-	const cls = filled ? "bpmn-icon-solid" : "bpmn-icon"
+	const cls = filled ? "bpmnkit-icon-solid" : "bpmnkit-icon"
 	switch (defType) {
 		case "timer":
 			return `<circle cx="0" cy="0" r="5" class="${cls}"/>
-<path d="M0 -3.5v3.5l2 2" class="bpmn-icon"/>`
+<path d="M0 -3.5v3.5l2 2" class="bpmnkit-icon"/>`
 		case "message":
 			return `<rect x="-5" y="-3.5" width="10" height="7" class="${cls}"/>
-<path d="M-5 -3.5l5 4 5-4" class="${filled ? "bpmn-icon" : "bpmn-icon"}" style="${filled ? "stroke:var(--bpmn-shape-fill,#fff)" : ""}"/>`
+<path d="M-5 -3.5l5 4 5-4" class="${filled ? "bpmnkit-icon" : "bpmnkit-icon"}" style="${filled ? "stroke:var(--bpmnkit-shape-fill,#fff)" : ""}"/>`
 		case "signal":
 			return `<path d="M0 -5.5l5.5 10h-11z" class="${cls}"/>`
 		case "error":
@@ -205,13 +205,13 @@ function eventMarker(defType: string, filled: boolean): string {
 			return `<path d="M1 -3.5l-5 3.5 5 3.5zM6 -3.5l-5 3.5 5 3.5z" class="${cls}"/>`
 		case "conditional":
 			return `<rect x="-4.5" y="-5.5" width="9" height="11" rx="1" class="${cls}"/>
-<path d="M-2.5 -2.5h5M-2.5 0h5M-2.5 2.5h3" class="bpmn-icon"/>`
+<path d="M-2.5 -2.5h5M-2.5 0h5M-2.5 2.5h3" class="bpmnkit-icon"/>`
 		case "link":
-			return `<path d="M-2 -3.5v7l5.5-3.5z" class="${cls}"/><path d="M-6 0h4" class="bpmn-icon"/>`
+			return `<path d="M-2 -3.5v7l5.5-3.5z" class="${cls}"/><path d="M-6 0h4" class="bpmnkit-icon"/>`
 		case "cancel":
 			return `<path d="M-4 -4l8 8M4 -4l-8 8" class="${cls}"/>`
 		case "terminate":
-			return `<circle cx="0" cy="0" r="5" class="bpmn-icon-solid"/>`
+			return `<circle cx="0" cy="0" r="5" class="bpmnkit-icon-solid"/>`
 		default:
 			return ""
 	}
@@ -222,17 +222,17 @@ function eventMarker(defType: string, filled: boolean): string {
 function gatewayMarker(type: string): string {
 	switch (type) {
 		case "exclusiveGateway":
-			return `<path d="M-6 -6l12 12M6 -6l-12 12" class="bpmn-gw-marker-stroke"/>`
+			return `<path d="M-6 -6l12 12M6 -6l-12 12" class="bpmnkit-gw-marker-stroke"/>`
 		case "parallelGateway":
-			return `<path d="M0 -8v16M-8 0h16" class="bpmn-gw-marker-stroke"/>`
+			return `<path d="M0 -8v16M-8 0h16" class="bpmnkit-gw-marker-stroke"/>`
 		case "inclusiveGateway":
-			return `<circle cx="0" cy="0" r="6" class="bpmn-gw-marker-stroke"/>`
+			return `<circle cx="0" cy="0" r="6" class="bpmnkit-gw-marker-stroke"/>`
 		case "eventBasedGateway":
-			return `<circle cx="0" cy="0" r="7" class="bpmn-gw-marker-stroke"/>
-<circle cx="0" cy="0" r="5" class="bpmn-gw-marker-stroke"/>
-<path d="M0 -4L3.8 1.8H-3.8Z" class="bpmn-gw-marker"/>`
+			return `<circle cx="0" cy="0" r="7" class="bpmnkit-gw-marker-stroke"/>
+<circle cx="0" cy="0" r="5" class="bpmnkit-gw-marker-stroke"/>
+<path d="M0 -4L3.8 1.8H-3.8Z" class="bpmnkit-gw-marker"/>`
 		case "complexGateway":
-			return `<path d="M0 -8v16M-8 0h16M-5.7 -5.7l11.4 11.4M5.7 -5.7l-11.4 11.4" class="bpmn-gw-marker-stroke"/>`
+			return `<path d="M0 -8v16M-8 0h16M-5.7 -5.7l11.4 11.4M5.7 -5.7l-11.4 11.4" class="bpmnkit-gw-marker-stroke"/>`
 		default:
 			return ""
 	}
@@ -243,11 +243,11 @@ function gatewayMarker(type: string): string {
 function subProcessMarker(type: string): string {
 	if (type === "adHocSubProcess") {
 		// Tilde (~) for ad-hoc
-		return `<path d="M-7 0Q-4 -4 0 0Q4 4 7 0" class="bpmn-icon"/>`
+		return `<path d="M-7 0Q-4 -4 0 0Q4 4 7 0" class="bpmnkit-icon"/>`
 	}
 	// Standard expand marker: + in a small box
-	return `<rect x="-7" y="-7" width="14" height="14" rx="1" class="bpmn-icon"/>
-<path d="M0 -4v8M-4 0h8" class="bpmn-icon"/>`
+	return `<rect x="-7" y="-7" width="14" height="14" rx="1" class="bpmnkit-icon"/>
+<path d="M0 -4v8M-4 0h8" class="bpmnkit-icon"/>`
 }
 
 // ── Model index helpers ───────────────────────────────────────────────────────
@@ -372,7 +372,7 @@ function renderEvent(
 		cx,
 		cy,
 		r,
-		class: isEnd ? "bpmn-end-body" : "bpmn-event-body",
+		class: isEnd ? "bpmnkit-end-body" : "bpmnkit-event-body",
 	})
 	applyColor(outer, shape)
 	g.appendChild(outer)
@@ -385,7 +385,7 @@ function renderEvent(
 			cx,
 			cy,
 			r: r - 3,
-			class: isNonInterrupting ? "bpmn-event-inner-dashed" : "bpmn-event-inner",
+			class: isNonInterrupting ? "bpmnkit-event-inner-dashed" : "bpmnkit-event-inner",
 		})
 		g.appendChild(inner)
 	}
@@ -405,12 +405,12 @@ function renderEvent(
 	// Accessibility
 	const label = el?.name ?? el?.type ?? "event"
 	attr(g, {
-		class: "bpmn-shape",
+		class: "bpmnkit-shape",
 		tabindex: "-1",
 		role: "button",
 		"aria-label": label,
-		"data-bpmn-id": shape.bpmnElement,
-		"data-bpmn-instance": instanceId,
+		"data-bpmnkit-id": shape.bpmnElement,
+		"data-bpmnkit-instance": instanceId,
 	})
 
 	return g
@@ -429,12 +429,12 @@ function renderTask(
 	const body = svgEl("rect")
 	const bodyClass =
 		el?.type === "callActivity"
-			? "bpmn-callactivity-body"
+			? "bpmnkit-callactivity-body"
 			: el?.type === "eventSubProcess"
-				? "bpmn-eventsubprocess-body"
+				? "bpmnkit-eventsubprocess-body"
 				: el?.type === "subProcess" || el?.type === "adHocSubProcess"
-					? "bpmn-shape-body"
-					: "bpmn-shape-body"
+					? "bpmnkit-shape-body"
+					: "bpmnkit-shape-body"
 	attr(body, { x: 0, y: 0, width, height, rx: 10, class: bodyClass })
 	applyColor(body, shape)
 	g.appendChild(body)
@@ -442,7 +442,7 @@ function renderTask(
 	// Transaction: double inner border
 	if (el?.type === "transaction") {
 		const inner = svgEl("rect")
-		attr(inner, { x: 3, y: 3, width: width - 6, height: height - 6, rx: 8, class: "bpmn-icon" })
+		attr(inner, { x: 3, y: 3, width: width - 6, height: height - 6, rx: 8, class: "bpmnkit-icon" })
 		g.appendChild(inner)
 	}
 
@@ -491,12 +491,12 @@ function renderTask(
 
 	const label = el?.name ?? el?.type ?? "task"
 	attr(g, {
-		class: "bpmn-shape",
+		class: "bpmnkit-shape",
 		tabindex: "-1",
 		role: "button",
 		"aria-label": label,
-		"data-bpmn-id": shape.bpmnElement,
-		"data-bpmn-instance": instanceId,
+		"data-bpmnkit-id": shape.bpmnElement,
+		"data-bpmnkit-instance": instanceId,
 	})
 
 	return g
@@ -517,7 +517,7 @@ function renderGateway(
 	const diamond = svgEl("polygon")
 	attr(diamond, {
 		points: `${cx},0 ${width},${cy} ${cx},${height} 0,${cy}`,
-		class: "bpmn-gw-body",
+		class: "bpmnkit-gw-body",
 	})
 	applyColor(diamond, shape)
 	g.appendChild(diamond)
@@ -533,12 +533,12 @@ function renderGateway(
 
 	const label = el?.name ?? el?.type ?? "gateway"
 	attr(g, {
-		class: "bpmn-shape",
+		class: "bpmnkit-shape",
 		tabindex: "-1",
 		role: "button",
 		"aria-label": label,
-		"data-bpmn-id": shape.bpmnElement,
-		"data-bpmn-instance": instanceId,
+		"data-bpmnkit-id": shape.bpmnElement,
+		"data-bpmnkit-instance": instanceId,
 	})
 
 	return g
@@ -554,19 +554,19 @@ function renderPool(
 
 	// Pool body
 	const bg = svgEl("rect")
-	attr(bg, { x: 0, y: 0, width, height, class: "bpmn-pool-body" })
+	attr(bg, { x: 0, y: 0, width, height, class: "bpmnkit-pool-body" })
 	g.appendChild(bg)
 
 	// Title bar (left column, 30px wide)
 	const titleBar = svgEl("rect")
-	attr(titleBar, { x: 0, y: 0, width: 30, height, class: "bpmn-pool-header" })
+	attr(titleBar, { x: 0, y: 0, width: 30, height, class: "bpmnkit-pool-header" })
 	g.appendChild(titleBar)
 
 	// Pool name (rotated in title bar)
 	if (participant?.name) {
 		const text = svgEl("text")
 		attr(text, {
-			class: "bpmn-label",
+			class: "bpmnkit-label",
 			transform: `translate(15 ${height / 2}) rotate(-90)`,
 		})
 		text.textContent = participant.name
@@ -574,12 +574,12 @@ function renderPool(
 	}
 
 	attr(g, {
-		class: "bpmn-shape bpmn-pool",
+		class: "bpmnkit-shape bpmnkit-pool",
 		tabindex: "-1",
 		role: "region",
 		"aria-label": participant?.name ?? "Pool",
-		"data-bpmn-id": shape.bpmnElement,
-		"data-bpmn-instance": instanceId,
+		"data-bpmnkit-id": shape.bpmnElement,
+		"data-bpmnkit-instance": instanceId,
 	})
 	return g
 }
@@ -594,19 +594,19 @@ function renderLane(
 
 	// Lane body
 	const bg = svgEl("rect")
-	attr(bg, { x: 0, y: 0, width, height, class: "bpmn-lane-body" })
+	attr(bg, { x: 0, y: 0, width, height, class: "bpmnkit-lane-body" })
 	g.appendChild(bg)
 
 	// Title bar (left column, 30px wide)
 	const titleBar = svgEl("rect")
-	attr(titleBar, { x: 0, y: 0, width: 30, height, class: "bpmn-lane-header" })
+	attr(titleBar, { x: 0, y: 0, width: 30, height, class: "bpmnkit-lane-header" })
 	g.appendChild(titleBar)
 
 	// Lane name (rotated in title bar)
 	if (lane?.name) {
 		const text = svgEl("text")
 		attr(text, {
-			class: "bpmn-label",
+			class: "bpmnkit-label",
 			transform: `translate(15 ${height / 2}) rotate(-90)`,
 		})
 		text.textContent = lane.name
@@ -614,12 +614,12 @@ function renderLane(
 	}
 
 	attr(g, {
-		class: "bpmn-shape bpmn-lane",
+		class: "bpmnkit-shape bpmnkit-lane",
 		tabindex: "-1",
 		role: "region",
 		"aria-label": lane?.name ?? "Lane",
-		"data-bpmn-id": shape.bpmnElement,
-		"data-bpmn-instance": instanceId,
+		"data-bpmnkit-id": shape.bpmnElement,
+		"data-bpmnkit-instance": instanceId,
 	})
 	return g
 }
@@ -641,7 +641,7 @@ function renderAnnotation(
 	const path = svgEl("path")
 	attr(path, {
 		d: `M${width} 0 L0 0 L0 ${height} L${width} ${height}`,
-		class: "bpmn-icon",
+		class: "bpmnkit-icon",
 	})
 	g.appendChild(path)
 
@@ -652,11 +652,11 @@ function renderAnnotation(
 	}
 
 	attr(g, {
-		class: "bpmn-shape",
+		class: "bpmnkit-shape",
 		tabindex: "-1",
 		role: "note",
-		"data-bpmn-id": shape.bpmnElement,
-		"data-bpmn-instance": instanceId,
+		"data-bpmnkit-id": shape.bpmnElement,
+		"data-bpmnkit-instance": instanceId,
 	})
 	return g
 }
@@ -679,7 +679,7 @@ function renderExternalLabel(
 ): SVGGElement {
 	const g = svgEl("g")
 	attr(g, { transform: `translate(${absX} ${absY})` })
-	const labelEl = makeLabel(text, labelW / 2, labelH / 2, labelW - 4, "bpmn-label", topAlign)
+	const labelEl = makeLabel(text, labelW / 2, labelH / 2, labelW - 4, "bpmnkit-label", topAlign)
 	g.appendChild(labelEl)
 	return g
 }
@@ -694,8 +694,8 @@ function renderEdge(
 ): SVGGElement {
 	const g = svgEl("g")
 	attr(g, {
-		class: "bpmn-edge",
-		"data-bpmn-id": edge.bpmnElement,
+		class: "bpmnkit-edge",
+		"data-bpmnkit-id": edge.bpmnElement,
 	})
 
 	if (edge.waypoints.length < 2) return g
@@ -703,7 +703,7 @@ function renderEdge(
 	const path = svgEl("path")
 	attr(path, {
 		d: waypointsToRoundedPath(edge.waypoints),
-		class: "bpmn-edge-path",
+		class: "bpmnkit-edge-path",
 		"marker-end": `url(#${markerId})`,
 	})
 	g.appendChild(path)
@@ -740,7 +740,7 @@ function renderEdge(
 					y1: cy + nx * s,
 					x2: cx + ny * s,
 					y2: cy - nx * s,
-					class: "bpmn-edge-default-slash",
+					class: "bpmnkit-edge-default-slash",
 				})
 				g.appendChild(slash)
 			}
@@ -759,10 +759,10 @@ function renderEdge(
 
 function renderAssociation(edge: BpmnDiEdge): SVGGElement {
 	const g = svgEl("g")
-	attr(g, { class: "bpmn-edge", "data-bpmn-id": edge.bpmnElement })
+	attr(g, { class: "bpmnkit-edge", "data-bpmnkit-id": edge.bpmnElement })
 
 	const path = svgEl("path")
-	attr(path, { d: waypointsToRoundedPath(edge.waypoints), class: "bpmn-edge-assoc" })
+	attr(path, { d: waypointsToRoundedPath(edge.waypoints), class: "bpmnkit-edge-assoc" })
 	g.appendChild(path)
 	return g
 }
@@ -775,12 +775,12 @@ function renderAssociation(edge: BpmnDiEdge): SVGGElement {
  * conflicts when multiple canvases are mounted on the same page.
  */
 export function createDefs(svg: SVGSVGElement, instanceId: string): string {
-	const markerId = `bpmn-arrow-${instanceId}`
+	const markerId = `bpmnkit-arrow-${instanceId}`
 	const defs = svgEl("defs")
 	defs.innerHTML = `
     <marker id="${markerId}" markerWidth="8" markerHeight="6"
             refX="7" refY="3" orient="auto" markerUnits="strokeWidth">
-      <path d="M0,0 L8,3 L0,6 Z" class="bpmn-arrow-fill"/>
+      <path d="M0,0 L8,3 L0,6 Z" class="bpmnkit-arrow-fill"/>
     </marker>
   `
 	svg.appendChild(defs)
@@ -796,7 +796,7 @@ export function createDefs(svg: SVGSVGElement, instanceId: string): string {
  * viewport controller can keep `patternTransform` in sync.
  */
 export function createGrid(svg: SVGSVGElement, instanceId: string): SVGPatternElement {
-	const patternId = `bpmn-grid-${instanceId}`
+	const patternId = `bpmnkit-grid-${instanceId}`
 
 	const defs = svg.querySelector("defs") ?? svgEl("defs")
 	const pattern = svgEl("pattern")
@@ -807,7 +807,7 @@ export function createGrid(svg: SVGSVGElement, instanceId: string): SVGPatternEl
 		patternUnits: "userSpaceOnUse",
 	})
 	const dot = svgEl("circle")
-	attr(dot, { cx: 1, cy: 1, r: 1, fill: "var(--bpmn-grid, rgba(0,0,0,0.14))" })
+	attr(dot, { cx: 1, cy: 1, r: 1, fill: "var(--bpmnkit-grid, rgba(0,0,0,0.14))" })
 	pattern.appendChild(dot)
 	defs.appendChild(pattern)
 	if (!svg.contains(defs)) svg.insertBefore(defs, svg.firstChild)
@@ -867,12 +867,12 @@ export function render(
 		} else if (index.messageFlowIds.has(edge.bpmnElement)) {
 			// Message flow — dashed arrow between pools
 			g = svgEl("g")
-			attr(g, { class: "bpmn-edge", "data-bpmn-id": edge.bpmnElement })
+			attr(g, { class: "bpmnkit-edge", "data-bpmnkit-id": edge.bpmnElement })
 			if (edge.waypoints.length >= 2) {
 				const path = svgEl("path")
 				attr(path, {
 					d: waypointsToRoundedPath(edge.waypoints),
-					class: "bpmn-msgflow-path",
+					class: "bpmnkit-msgflow-path",
 					"marker-end": `url(#${markerId})`,
 				})
 				g.appendChild(path)
@@ -936,7 +936,7 @@ export function render(
 			}
 			// Unknown shape — invisible placeholder
 			g = svgEl("g")
-			attr(g, { "data-bpmn-id": shape.bpmnElement, "data-bpmn-instance": instanceId })
+			attr(g, { "data-bpmnkit-id": shape.bpmnElement, "data-bpmnkit-instance": instanceId })
 			attr(g, { transform: `translate(${x} ${y})` })
 			shapesLayer.appendChild(g)
 			shapes.push({ id: shape.bpmnElement, element: g, shape, flowElement: el })

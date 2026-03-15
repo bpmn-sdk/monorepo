@@ -1,4 +1,4 @@
-import { IC_UI } from "@bpmn-sdk/ui"
+import { IC_UI } from "@bpmnkit/ui"
 
 export interface NavItem {
 	id: string
@@ -28,8 +28,8 @@ export function createNav(onNavigate: (path: string) => void): {
 	logo.className = "op-nav-logo"
 	logo.innerHTML = `<svg width="20" height="20" viewBox="0 0 100 100" aria-hidden="true">
     <polygon points="50,8 92,50 50,92 8,50" fill="currentColor"/>
-    <line x1="50" y1="28" x2="50" y2="72" stroke="var(--bpmn-nav-bg)" stroke-width="12" stroke-linecap="round"/>
-    <line x1="28" y1="50" x2="72" y2="50" stroke="var(--bpmn-nav-bg)" stroke-width="12" stroke-linecap="round"/>
+    <line x1="50" y1="28" x2="50" y2="72" stroke="var(--bpmnkit-nav-bg)" stroke-width="12" stroke-linecap="round"/>
+    <line x1="28" y1="50" x2="72" y2="50" stroke="var(--bpmnkit-nav-bg)" stroke-width="12" stroke-linecap="round"/>
   </svg>
   <span>Operate</span>`
 	el.appendChild(logo)

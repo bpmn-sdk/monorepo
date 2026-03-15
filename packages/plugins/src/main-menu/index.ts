@@ -1,5 +1,5 @@
 /**
- * @bpmn-sdk/canvas-plugin-main-menu — main menu plugin for `@bpmn-sdk/canvas`.
+ * @bpmnkit/canvas-plugin-main-menu — main menu plugin for `@bpmnkit/canvas`.
  *
  * Adds a panel in the top-right corner of the canvas with an optional title
  * and a menu button. The menu lets users switch between light, dark, and
@@ -9,7 +9,7 @@
  * @packageDocumentation
  */
 
-import type { CanvasPlugin, Theme } from "@bpmn-sdk/canvas"
+import type { CanvasPlugin, Theme } from "@bpmnkit/canvas"
 import { injectMainMenuStyles } from "./css.js"
 
 export { MAIN_MENU_CSS, MAIN_MENU_STYLE_ID, injectMainMenuStyles } from "./css.js"
@@ -152,17 +152,17 @@ export function createMainMenuPlugin(
 
 	function buildLevelContent(dropdown: HTMLDivElement): HTMLDivElement {
 		const slot = document.createElement("div")
-		slot.className = "bpmn-menu-level"
+		slot.className = "bpmnkit-menu-level"
 
 		const level = navStack[navStack.length - 1]
 		if (!level) return slot
 
 		if (navStack.length > 1) {
 			const backRow = document.createElement("div")
-			backRow.className = "bpmn-menu-back-row"
+			backRow.className = "bpmnkit-menu-back-row"
 
 			const backBtn = document.createElement("button")
-			backBtn.className = "bpmn-menu-back-btn"
+			backBtn.className = "bpmnkit-menu-back-btn"
 			backBtn.type = "button"
 			backBtn.innerHTML = BACK_ICON
 			backBtn.addEventListener("click", () => {
@@ -171,14 +171,14 @@ export function createMainMenuPlugin(
 			})
 
 			const levelTitle = document.createElement("span")
-			levelTitle.className = "bpmn-menu-level-title"
+			levelTitle.className = "bpmnkit-menu-level-title"
 			levelTitle.textContent = level.title ?? ""
 
 			backRow.append(backBtn, levelTitle)
 			slot.appendChild(backRow)
 
 			const sep = document.createElement("div")
-			sep.className = "bpmn-menu-drop-sep"
+			sep.className = "bpmnkit-menu-drop-sep"
 			slot.appendChild(sep)
 		}
 
@@ -198,7 +198,7 @@ export function createMainMenuPlugin(
 			return
 		}
 
-		const oldSlot = dropdown.querySelector<HTMLElement>(".bpmn-menu-level")
+		const oldSlot = dropdown.querySelector<HTMLElement>(".bpmnkit-menu-level")
 
 		// Freeze width so the dropdown doesn't shrink/grow during animation
 		dropdown.style.minWidth = `${dropdown.offsetWidth}px`
@@ -207,19 +207,19 @@ export function createMainMenuPlugin(
 		if (oldSlot) {
 			oldSlot.style.cssText = "position:absolute;inset:0;pointer-events:none;z-index:0;"
 			oldSlot.classList.add(
-				direction === "forward" ? "bpmn-menu-level--out-left" : "bpmn-menu-level--out-right",
+				direction === "forward" ? "bpmnkit-menu-level--out-left" : "bpmnkit-menu-level--out-right",
 			)
 		}
 
 		// Enter: on top, drives height
 		newSlot.classList.add(
-			direction === "forward" ? "bpmn-menu-level--in-right" : "bpmn-menu-level--in-left",
+			direction === "forward" ? "bpmnkit-menu-level--in-right" : "bpmnkit-menu-level--in-left",
 		)
 		dropdown.appendChild(newSlot)
 
 		setTimeout(() => {
 			oldSlot?.remove()
-			newSlot.classList.remove("bpmn-menu-level--in-right", "bpmn-menu-level--in-left")
+			newSlot.classList.remove("bpmnkit-menu-level--in-right", "bpmnkit-menu-level--in-left")
 			dropdown.style.minWidth = ""
 		}, 200)
 	}
@@ -227,22 +227,22 @@ export function createMainMenuPlugin(
 	function buildItemEl(item: MenuItem, dropdown: HTMLDivElement): HTMLElement {
 		if ("type" in item && item.type === "separator") {
 			const sep = document.createElement("div")
-			sep.className = "bpmn-menu-drop-sep"
+			sep.className = "bpmnkit-menu-drop-sep"
 			return sep
 		}
 
 		if ("type" in item && item.type === "info") {
 			const row = document.createElement("div")
-			row.className = "bpmn-menu-info-row"
+			row.className = "bpmnkit-menu-info-row"
 
 			const textSpan = document.createElement("span")
-			textSpan.className = "bpmn-menu-info-text"
+			textSpan.className = "bpmnkit-menu-info-text"
 			textSpan.textContent = item.text
 			row.appendChild(textSpan)
 
 			if (item.actionLabel && item.onAction) {
 				const actionBtn = document.createElement("button")
-				actionBtn.className = "bpmn-menu-info-action"
+				actionBtn.className = "bpmnkit-menu-info-action"
 				actionBtn.type = "button"
 				actionBtn.textContent = item.actionLabel
 				const onAction = item.onAction
@@ -257,25 +257,25 @@ export function createMainMenuPlugin(
 
 		if ("type" in item && item.type === "drill") {
 			const btn = document.createElement("button")
-			btn.className = "bpmn-menu-item"
+			btn.className = "bpmnkit-menu-item"
 			btn.type = "button"
 
 			const checkSpan = document.createElement("span")
-			checkSpan.className = "bpmn-menu-item-check"
+			checkSpan.className = "bpmnkit-menu-item-check"
 			btn.appendChild(checkSpan)
 
 			const iconSpan = document.createElement("span")
-			iconSpan.className = "bpmn-menu-item-icon"
+			iconSpan.className = "bpmnkit-menu-item-icon"
 			if (item.icon) iconSpan.innerHTML = item.icon
 			btn.appendChild(iconSpan)
 
 			const labelSpan = document.createElement("span")
-			labelSpan.className = "bpmn-menu-item-label"
+			labelSpan.className = "bpmnkit-menu-item-label"
 			labelSpan.textContent = item.label
 			btn.appendChild(labelSpan)
 
 			const arrowSpan = document.createElement("span")
-			arrowSpan.className = "bpmn-menu-item-arrow"
+			arrowSpan.className = "bpmnkit-menu-item-arrow"
 			arrowSpan.innerHTML = ARROW_ICON
 			btn.appendChild(arrowSpan)
 
@@ -290,11 +290,11 @@ export function createMainMenuPlugin(
 		// MenuAction
 		const action = item as MenuAction
 		const btn = document.createElement("button")
-		btn.className = "bpmn-menu-item"
+		btn.className = "bpmnkit-menu-item"
 		btn.type = "button"
 
 		const checkSpan = document.createElement("span")
-		checkSpan.className = "bpmn-menu-item-check"
+		checkSpan.className = "bpmnkit-menu-item-check"
 		// Show check mark for active theme when inside a drill level
 		const themeMatch = THEMES.find((t) => t.label === action.label)
 		if (themeMatch && themeMatch.value === currentTheme) {
@@ -303,12 +303,12 @@ export function createMainMenuPlugin(
 		btn.appendChild(checkSpan)
 
 		const iconSpan = document.createElement("span")
-		iconSpan.className = "bpmn-menu-item-icon"
+		iconSpan.className = "bpmnkit-menu-item-icon"
 		if (action.icon) iconSpan.innerHTML = action.icon
 		btn.appendChild(iconSpan)
 
 		const labelSpan = document.createElement("span")
-		labelSpan.className = "bpmn-menu-item-label"
+		labelSpan.className = "bpmnkit-menu-item-label"
 		labelSpan.textContent = action.label
 		btn.appendChild(labelSpan)
 
@@ -331,22 +331,22 @@ export function createMainMenuPlugin(
 
 			// ── Panel ────────────────────────────────────────────────────
 			const panel = document.createElement("div")
-			panel.className = "bpmn-main-menu-panel"
+			panel.className = "bpmnkit-main-menu-panel"
 
 			if (options.title) {
 				const title = document.createElement("span")
-				title.className = "bpmn-main-menu-title"
+				title.className = "bpmnkit-main-menu-title"
 				title.textContent = options.title
 				panel.appendChild(title)
 				titleEl = title
 
 				const sep = document.createElement("div")
-				sep.className = "bpmn-main-menu-sep"
+				sep.className = "bpmnkit-main-menu-sep"
 				panel.appendChild(sep)
 			}
 
 			const menuBtn = document.createElement("button")
-			menuBtn.className = "bpmn-menu-btn"
+			menuBtn.className = "bpmnkit-menu-btn"
 			menuBtn.type = "button"
 			menuBtn.setAttribute("aria-label", "Main menu")
 			menuBtn.title = "Main menu"
@@ -358,7 +358,7 @@ export function createMainMenuPlugin(
 
 			// ── Dropdown ─────────────────────────────────────────────────
 			const dropdown = document.createElement("div")
-			dropdown.className = "bpmn-menu-dropdown"
+			dropdown.className = "bpmnkit-menu-dropdown"
 			document.body.appendChild(dropdown)
 			dropdownEl = dropdown
 

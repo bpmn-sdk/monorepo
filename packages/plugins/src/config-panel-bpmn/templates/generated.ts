@@ -1541,7 +1541,7 @@ export const CAMUNDA_CONNECTOR_TEMPLATES: ElementTemplate[] = [
       },
       {
         "label": "Error expression",
-        "description": "Expression to handle errors. Details in the <a href=\"https://docs.camunda.io/docs/components/connectors/use-connectors/#bpmn-errors\" target=\"_blank\">documentation</a>",
+        "description": "Expression to handle errors. Details in the <a href=\"https://docs.camunda.io/docs/components/connectors/use-connectors/#bpmnkit-errors\" target=\"_blank\">documentation</a>",
         "group": "errors",
         "type": "Text",
         "feel": "required",
@@ -4437,7 +4437,7 @@ export const CAMUNDA_CONNECTOR_TEMPLATES: ElementTemplate[] = [
       },
       {
         "label": "Error expression",
-        "description": "Expression to handle errors. Details in the <a href=\"https://docs.camunda.io/docs/components/connectors/use-connectors/#bpmn-errors\" target=\"_blank\">documentation</a>",
+        "description": "Expression to handle errors. Details in the <a href=\"https://docs.camunda.io/docs/components/connectors/use-connectors/#bpmnkit-errors\" target=\"_blank\">documentation</a>",
         "group": "errors",
         "type": "Text",
         "feel": "required",
@@ -5390,7 +5390,7 @@ export const CAMUNDA_CONNECTOR_TEMPLATES: ElementTemplate[] = [
       },
       {
         "label": "Error expression",
-        "description": "Expression to handle errors. Details in the <a href=\"https://docs.camunda.io/docs/components/connectors/use-connectors/#bpmn-errors\" target=\"_blank\">documentation</a>",
+        "description": "Expression to handle errors. Details in the <a href=\"https://docs.camunda.io/docs/components/connectors/use-connectors/#bpmnkit-errors\" target=\"_blank\">documentation</a>",
         "group": "errors",
         "type": "Text",
         "feel": "required",
@@ -5793,7 +5793,7 @@ export const CAMUNDA_CONNECTOR_TEMPLATES: ElementTemplate[] = [
       },
       {
         "label": "Error expression",
-        "description": "Expression to handle errors. Details in the <a href=\"https://docs.camunda.io/docs/components/connectors/use-connectors/#bpmn-errors\" target=\"_blank\">documentation</a>",
+        "description": "Expression to handle errors. Details in the <a href=\"https://docs.camunda.io/docs/components/connectors/use-connectors/#bpmnkit-errors\" target=\"_blank\">documentation</a>",
         "group": "errors",
         "type": "Text",
         "feel": "required",
@@ -6718,7 +6718,7 @@ export const CAMUNDA_CONNECTOR_TEMPLATES: ElementTemplate[] = [
       },
       {
         "label": "Error expression",
-        "description": "Expression to handle errors. Details in the <a href=\"https://docs.camunda.io/docs/components/connectors/use-connectors/#bpmn-errors\" target=\"_blank\">documentation</a>",
+        "description": "Expression to handle errors. Details in the <a href=\"https://docs.camunda.io/docs/components/connectors/use-connectors/#bpmnkit-errors\" target=\"_blank\">documentation</a>",
         "group": "errors",
         "type": "Text",
         "feel": "required",
@@ -8461,7 +8461,7 @@ export const CAMUNDA_CONNECTOR_TEMPLATES: ElementTemplate[] = [
       },
       {
         "label": "Error expression",
-        "description": "Expression to handle errors. Details in the <a href=\"https://docs.camunda.io/docs/components/connectors/use-connectors/#bpmn-errors\" target=\"_blank\">documentation</a>",
+        "description": "Expression to handle errors. Details in the <a href=\"https://docs.camunda.io/docs/components/connectors/use-connectors/#bpmnkit-errors\" target=\"_blank\">documentation</a>",
         "group": "errors",
         "type": "Text",
         "feel": "required",
@@ -8965,7 +8965,7 @@ export const CAMUNDA_CONNECTOR_TEMPLATES: ElementTemplate[] = [
       },
       {
         "label": "Error expression",
-        "description": "Expression to handle errors. Details in the <a href=\"https://docs.camunda.io/docs/components/connectors/use-connectors/#bpmn-errors\" target=\"_blank\">documentation</a>",
+        "description": "Expression to handle errors. Details in the <a href=\"https://docs.camunda.io/docs/components/connectors/use-connectors/#bpmnkit-errors\" target=\"_blank\">documentation</a>",
         "group": "errors",
         "type": "Text",
         "feel": "required",
@@ -18712,7 +18712,7 @@ export const CAMUNDA_CONNECTOR_TEMPLATES: ElementTemplate[] = [
       },
       {
         "label": "Error expression",
-        "description": "Expression to handle errors. Details in the <a href=\"https://docs.camunda.io/docs/components/connectors/use-connectors/#bpmn-errors\" target=\"_blank\">documentation</a>",
+        "description": "Expression to handle errors. Details in the <a href=\"https://docs.camunda.io/docs/components/connectors/use-connectors/#bpmnkit-errors\" target=\"_blank\">documentation</a>",
         "group": "errors",
         "type": "Text",
         "feel": "required",
@@ -25939,7 +25939,7 @@ export const CAMUNDA_CONNECTOR_TEMPLATES: ElementTemplate[] = [
       },
       {
         "label": "Error expression",
-        "description": "Expression to handle errors. Details in the <a href=\"https://docs.camunda.io/docs/components/connectors/use-connectors/#bpmn-errors\" target=\"_blank\">documentation</a>",
+        "description": "Expression to handle errors. Details in the <a href=\"https://docs.camunda.io/docs/components/connectors/use-connectors/#bpmnkit-errors\" target=\"_blank\">documentation</a>",
         "group": "errors",
         "type": "Text",
         "feel": "required",
@@ -26321,7 +26321,7 @@ export const CAMUNDA_CONNECTOR_TEMPLATES: ElementTemplate[] = [
       },
       {
         "label": "Error expression",
-        "description": "Expression to handle errors. Details in the <a href=\"https://docs.camunda.io/docs/components/connectors/use-connectors/#bpmn-errors\" target=\"_blank\">documentation</a>",
+        "description": "Expression to handle errors. Details in the <a href=\"https://docs.camunda.io/docs/components/connectors/use-connectors/#bpmnkit-errors\" target=\"_blank\">documentation</a>",
         "group": "errors",
         "type": "Text",
         "feel": "required",
@@ -27069,7 +27069,7 @@ export const CAMUNDA_CONNECTOR_TEMPLATES: ElementTemplate[] = [
       },
       {
         "label": "Error expression",
-        "description": "Expression to handle errors. Details in the <a href=\"https://docs.camunda.io/docs/components/connectors/use-connectors/#bpmn-errors\" target=\"_blank\">documentation</a>",
+        "description": "Expression to handle errors. Details in the <a href=\"https://docs.camunda.io/docs/components/connectors/use-connectors/#bpmnkit-errors\" target=\"_blank\">documentation</a>",
         "group": "errors",
         "type": "Text",
         "feel": "required",
@@ -27572,7 +27572,7 @@ export const CAMUNDA_CONNECTOR_TEMPLATES: ElementTemplate[] = [
       },
       {
         "label": "Error expression",
-        "description": "Expression to handle errors. Details in the <a href=\"https://docs.camunda.io/docs/components/connectors/use-connectors/#bpmn-errors\" target=\"_blank\">documentation</a>",
+        "description": "Expression to handle errors. Details in the <a href=\"https://docs.camunda.io/docs/components/connectors/use-connectors/#bpmnkit-errors\" target=\"_blank\">documentation</a>",
         "group": "errors",
         "type": "Text",
         "feel": "required",
@@ -27841,7 +27841,7 @@ export const CAMUNDA_CONNECTOR_TEMPLATES: ElementTemplate[] = [
       },
       {
         "label": "Error expression",
-        "description": "Expression to handle errors. Details in the <a href=\"https://docs.camunda.io/docs/components/connectors/use-connectors/#bpmn-errors\" target=\"_blank\">documentation</a>",
+        "description": "Expression to handle errors. Details in the <a href=\"https://docs.camunda.io/docs/components/connectors/use-connectors/#bpmnkit-errors\" target=\"_blank\">documentation</a>",
         "group": "errors",
         "type": "Text",
         "feel": "required",
@@ -30173,7 +30173,7 @@ export const CAMUNDA_CONNECTOR_TEMPLATES: ElementTemplate[] = [
       },
       {
         "label": "Error expression",
-        "description": "Expression to handle errors. Details in the <a href=\"https://docs.camunda.io/docs/components/connectors/use-connectors/#bpmn-errors\" target=\"_blank\">documentation</a>",
+        "description": "Expression to handle errors. Details in the <a href=\"https://docs.camunda.io/docs/components/connectors/use-connectors/#bpmnkit-errors\" target=\"_blank\">documentation</a>",
         "group": "errors",
         "type": "Text",
         "feel": "required",
@@ -31618,7 +31618,7 @@ export const CAMUNDA_CONNECTOR_TEMPLATES: ElementTemplate[] = [
       },
       {
         "label": "Error expression",
-        "description": "Expression to handle errors. Details in the <a href=\"https://docs.camunda.io/docs/components/connectors/use-connectors/#bpmn-errors\" target=\"_blank\">documentation</a>",
+        "description": "Expression to handle errors. Details in the <a href=\"https://docs.camunda.io/docs/components/connectors/use-connectors/#bpmnkit-errors\" target=\"_blank\">documentation</a>",
         "group": "errors",
         "type": "Text",
         "feel": "required",
@@ -32935,7 +32935,7 @@ export const CAMUNDA_CONNECTOR_TEMPLATES: ElementTemplate[] = [
       },
       {
         "label": "Error expression",
-        "description": "Expression to handle errors. Details in the <a href=\"https://docs.camunda.io/docs/components/connectors/use-connectors/#bpmn-errors\" target=\"_blank\">documentation</a>",
+        "description": "Expression to handle errors. Details in the <a href=\"https://docs.camunda.io/docs/components/connectors/use-connectors/#bpmnkit-errors\" target=\"_blank\">documentation</a>",
         "group": "errors",
         "type": "Text",
         "feel": "required",
@@ -34625,7 +34625,7 @@ export const CAMUNDA_CONNECTOR_TEMPLATES: ElementTemplate[] = [
       },
       {
         "label": "Error expression",
-        "description": "Expression to handle errors. Details in the <a href=\"https://docs.camunda.io/docs/components/connectors/use-connectors/#bpmn-errors\" target=\"_blank\">documentation</a>",
+        "description": "Expression to handle errors. Details in the <a href=\"https://docs.camunda.io/docs/components/connectors/use-connectors/#bpmnkit-errors\" target=\"_blank\">documentation</a>",
         "group": "errors",
         "type": "Text",
         "feel": "required",
@@ -37023,7 +37023,7 @@ export const CAMUNDA_CONNECTOR_TEMPLATES: ElementTemplate[] = [
       },
       {
         "label": "Error expression",
-        "description": "Expression to handle errors. Details in the <a href=\"https://docs.camunda.io/docs/components/connectors/use-connectors/#bpmn-errors\" target=\"_blank\">documentation</a>",
+        "description": "Expression to handle errors. Details in the <a href=\"https://docs.camunda.io/docs/components/connectors/use-connectors/#bpmnkit-errors\" target=\"_blank\">documentation</a>",
         "group": "errors",
         "type": "Text",
         "feel": "required",
@@ -38157,7 +38157,7 @@ export const CAMUNDA_CONNECTOR_TEMPLATES: ElementTemplate[] = [
       },
       {
         "label": "Error expression",
-        "description": "Expression to handle errors. Details in the <a href=\"https://docs.camunda.io/docs/components/connectors/use-connectors/#bpmn-errors\" target=\"_blank\">documentation</a>",
+        "description": "Expression to handle errors. Details in the <a href=\"https://docs.camunda.io/docs/components/connectors/use-connectors/#bpmnkit-errors\" target=\"_blank\">documentation</a>",
         "group": "errors",
         "type": "Text",
         "feel": "required",
@@ -40533,7 +40533,7 @@ export const CAMUNDA_CONNECTOR_TEMPLATES: ElementTemplate[] = [
       },
       {
         "label": "Error expression",
-        "description": "Expression to handle errors. Details in the <a href=\"https://docs.camunda.io/docs/components/connectors/use-connectors/#bpmn-errors\" target=\"_blank\">documentation</a>",
+        "description": "Expression to handle errors. Details in the <a href=\"https://docs.camunda.io/docs/components/connectors/use-connectors/#bpmnkit-errors\" target=\"_blank\">documentation</a>",
         "group": "errors",
         "type": "Text",
         "feel": "required",
@@ -43003,7 +43003,7 @@ export const CAMUNDA_CONNECTOR_TEMPLATES: ElementTemplate[] = [
       },
       {
         "label": "Error expression",
-        "description": "Expression to handle errors. Details in the <a href=\"https://docs.camunda.io/docs/components/connectors/use-connectors/#bpmn-errors\" target=\"_blank\">documentation</a>",
+        "description": "Expression to handle errors. Details in the <a href=\"https://docs.camunda.io/docs/components/connectors/use-connectors/#bpmnkit-errors\" target=\"_blank\">documentation</a>",
         "group": "errors",
         "type": "Text",
         "feel": "required",
@@ -46810,7 +46810,7 @@ export const CAMUNDA_CONNECTOR_TEMPLATES: ElementTemplate[] = [
       },
       {
         "label": "Error expression",
-        "description": "Expression to handle errors. Details in the <a href=\"https://docs.camunda.io/docs/components/connectors/use-connectors/#bpmn-errors\" target=\"_blank\">documentation</a>",
+        "description": "Expression to handle errors. Details in the <a href=\"https://docs.camunda.io/docs/components/connectors/use-connectors/#bpmnkit-errors\" target=\"_blank\">documentation</a>",
         "group": "errors",
         "type": "Text",
         "feel": "required",
@@ -47973,7 +47973,7 @@ export const CAMUNDA_CONNECTOR_TEMPLATES: ElementTemplate[] = [
       },
       {
         "label": "Error expression",
-        "description": "Expression to handle errors. Details in the <a href=\"https://docs.camunda.io/docs/components/connectors/use-connectors/#bpmn-errors\" target=\"_blank\">documentation</a>",
+        "description": "Expression to handle errors. Details in the <a href=\"https://docs.camunda.io/docs/components/connectors/use-connectors/#bpmnkit-errors\" target=\"_blank\">documentation</a>",
         "group": "errors",
         "type": "Text",
         "feel": "required",
@@ -48925,7 +48925,7 @@ export const CAMUNDA_CONNECTOR_TEMPLATES: ElementTemplate[] = [
       },
       {
         "label": "Error expression",
-        "description": "Expression to handle errors. Details in the <a href=\"https://docs.camunda.io/docs/components/connectors/use-connectors/#bpmn-errors\" target=\"_blank\">documentation</a>",
+        "description": "Expression to handle errors. Details in the <a href=\"https://docs.camunda.io/docs/components/connectors/use-connectors/#bpmnkit-errors\" target=\"_blank\">documentation</a>",
         "group": "errors",
         "type": "Text",
         "feel": "required",
@@ -49103,7 +49103,7 @@ export const CAMUNDA_CONNECTOR_TEMPLATES: ElementTemplate[] = [
       },
       {
         "label": "Error expression",
-        "description": "Expression to handle errors. Details in the <a href=\"https://docs.camunda.io/docs/components/connectors/use-connectors/#bpmn-errors\" target=\"_blank\">documentation</a>",
+        "description": "Expression to handle errors. Details in the <a href=\"https://docs.camunda.io/docs/components/connectors/use-connectors/#bpmnkit-errors\" target=\"_blank\">documentation</a>",
         "group": "errors",
         "type": "Text",
         "feel": "required",
@@ -57550,7 +57550,7 @@ export const CAMUNDA_CONNECTOR_TEMPLATES: ElementTemplate[] = [
       },
       {
         "label": "Error expression",
-        "description": "Expression to handle errors. Details in the <a href=\"https://docs.camunda.io/docs/components/connectors/use-connectors/#bpmn-errors\" target=\"_blank\">documentation</a>",
+        "description": "Expression to handle errors. Details in the <a href=\"https://docs.camunda.io/docs/components/connectors/use-connectors/#bpmnkit-errors\" target=\"_blank\">documentation</a>",
         "group": "errors",
         "type": "Text",
         "feel": "required",
@@ -57851,7 +57851,7 @@ export const CAMUNDA_CONNECTOR_TEMPLATES: ElementTemplate[] = [
       },
       {
         "label": "Error expression",
-        "description": "Expression to handle errors. Details in the <a href=\"https://docs.camunda.io/docs/components/connectors/use-connectors/#bpmn-errors\" target=\"_blank\">documentation</a>",
+        "description": "Expression to handle errors. Details in the <a href=\"https://docs.camunda.io/docs/components/connectors/use-connectors/#bpmnkit-errors\" target=\"_blank\">documentation</a>",
         "group": "errors",
         "type": "Text",
         "feel": "required",

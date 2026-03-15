@@ -1,4 +1,4 @@
-import type { CanvasApi } from "@bpmn-sdk/canvas"
+import type { CanvasApi } from "@bpmnkit/canvas"
 
 // ── Theme resolution ─────────────────────────────────────────────────────────
 
@@ -37,24 +37,24 @@ function resolveColors(api: CanvasApi): Colors {
 
 function buildInlineCss(c: Colors): string {
 	return `
-.bpmn-shape-body,.bpmn-event-body,.bpmn-gw-body{fill:${c.shapeFill};stroke:${c.shapeStroke};stroke-width:1.5}
-.bpmn-end-body{fill:${c.shapeFill};stroke:${c.shapeStroke};stroke-width:3}
-.bpmn-event-inner{fill:none;stroke:${c.shapeStroke};stroke-width:1.5}
-.bpmn-event-inner-dashed{fill:none;stroke:${c.shapeStroke};stroke-width:1.5;stroke-dasharray:4 2}
-.bpmn-eventsubprocess-body{fill:${c.shapeFill};stroke:${c.shapeStroke};stroke-width:1.5;stroke-dasharray:5 3}
-.bpmn-callactivity-body{fill:${c.shapeFill};stroke:${c.shapeStroke};stroke-width:3}
-.bpmn-icon{fill:none;stroke:${c.shapeStroke};stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
-.bpmn-icon-solid{fill:${c.shapeStroke};stroke:none}
-.bpmn-gw-marker{fill:${c.shapeStroke};stroke:none}
-.bpmn-gw-marker-stroke{fill:none;stroke:${c.shapeStroke};stroke-width:2.5;stroke-linecap:round}
-.bpmn-pool-body,.bpmn-lane-body{fill:${c.shapeFill};stroke:${c.shapeStroke};stroke-width:1.5}
-.bpmn-pool-header,.bpmn-lane-header{fill:rgba(0,0,0,0.04);stroke:${c.shapeStroke};stroke-width:1.5}
-.bpmn-edge-path{fill:none;stroke:${c.flowStroke};stroke-width:1.5}
-.bpmn-edge-assoc{fill:none;stroke:${c.flowStroke};stroke-width:1.5;stroke-dasharray:5 3}
-.bpmn-edge-default-slash{stroke:${c.flowStroke};stroke-width:1.5}
-.bpmn-msgflow-path{fill:none;stroke:${c.flowStroke};stroke-width:1.5;stroke-dasharray:6 3}
-.bpmn-arrow-fill{fill:${c.flowStroke}}
-.bpmn-label{fill:${c.text};font-family:system-ui,-apple-system,sans-serif;font-size:11px;text-anchor:middle;dominant-baseline:central;paint-order:stroke;stroke:${c.bg};stroke-width:4px;stroke-linejoin:round}
+.bpmnkit-shape-body,.bpmnkit-event-body,.bpmnkit-gw-body{fill:${c.shapeFill};stroke:${c.shapeStroke};stroke-width:1.5}
+.bpmnkit-end-body{fill:${c.shapeFill};stroke:${c.shapeStroke};stroke-width:3}
+.bpmnkit-event-inner{fill:none;stroke:${c.shapeStroke};stroke-width:1.5}
+.bpmnkit-event-inner-dashed{fill:none;stroke:${c.shapeStroke};stroke-width:1.5;stroke-dasharray:4 2}
+.bpmnkit-eventsubprocess-body{fill:${c.shapeFill};stroke:${c.shapeStroke};stroke-width:1.5;stroke-dasharray:5 3}
+.bpmnkit-callactivity-body{fill:${c.shapeFill};stroke:${c.shapeStroke};stroke-width:3}
+.bpmnkit-icon{fill:none;stroke:${c.shapeStroke};stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+.bpmnkit-icon-solid{fill:${c.shapeStroke};stroke:none}
+.bpmnkit-gw-marker{fill:${c.shapeStroke};stroke:none}
+.bpmnkit-gw-marker-stroke{fill:none;stroke:${c.shapeStroke};stroke-width:2.5;stroke-linecap:round}
+.bpmnkit-pool-body,.bpmnkit-lane-body{fill:${c.shapeFill};stroke:${c.shapeStroke};stroke-width:1.5}
+.bpmnkit-pool-header,.bpmnkit-lane-header{fill:rgba(0,0,0,0.04);stroke:${c.shapeStroke};stroke-width:1.5}
+.bpmnkit-edge-path{fill:none;stroke:${c.flowStroke};stroke-width:1.5}
+.bpmnkit-edge-assoc{fill:none;stroke:${c.flowStroke};stroke-width:1.5;stroke-dasharray:5 3}
+.bpmnkit-edge-default-slash{stroke:${c.flowStroke};stroke-width:1.5}
+.bpmnkit-msgflow-path{fill:none;stroke:${c.flowStroke};stroke-width:1.5;stroke-dasharray:6 3}
+.bpmnkit-arrow-fill{fill:${c.flowStroke}}
+.bpmnkit-label{fill:${c.text};font-family:system-ui,-apple-system,sans-serif;font-size:11px;text-anchor:middle;dominant-baseline:central;paint-order:stroke;stroke:${c.bg};stroke-width:4px;stroke-linejoin:round}
 `
 }
 
@@ -87,9 +87,9 @@ function buildExportSvg(api: CanvasApi, title: string): ExportSvg {
 	// Deep-clone the live SVG
 	const clone = api.svg.cloneNode(true) as SVGSVGElement
 
-	// Remove the dot-grid background rect (fill="url(#bpmn-grid-…)")
+	// Remove the dot-grid background rect (fill="url(#bpmnkit-grid-…)")
 	for (const rect of clone.querySelectorAll<SVGRectElement>("rect")) {
-		if (rect.getAttribute("fill")?.startsWith("url(#bpmn-grid")) {
+		if (rect.getAttribute("fill")?.startsWith("url(#bpmnkit-grid")) {
 			rect.remove()
 			break
 		}
@@ -97,7 +97,7 @@ function buildExportSvg(api: CanvasApi, title: string): ExportSvg {
 
 	// Remove the grid <pattern> from <defs> (no longer needed)
 	for (const pat of clone.querySelectorAll<SVGPatternElement>("pattern")) {
-		if (pat.id.startsWith("bpmn-grid-")) {
+		if (pat.id.startsWith("bpmnkit-grid-")) {
 			pat.remove()
 			break
 		}
@@ -110,20 +110,20 @@ function buildExportSvg(api: CanvasApi, title: string): ExportSvg {
 	viewportG?.setAttribute("transform", "")
 
 	// Remove editor-only elements that exist solely for interactivity
-	for (const el of clone.querySelectorAll(".bpmn-edge-hitarea")) {
+	for (const el of clone.querySelectorAll(".bpmnkit-edge-hitarea")) {
 		el.remove()
 	}
 
 	// Remove interactive state classes that shouldn't appear in static exports
 	for (const el of clone.querySelectorAll(
-		".bpmn-selected,.bpmn-token-active,.bpmn-token-visited,.bpmn-token-edge-active,.bpmn-token-edge-visited",
+		".bpmnkit-selected,.bpmnkit-token-active,.bpmnkit-token-visited,.bpmnkit-token-edge-active,.bpmnkit-token-edge-visited",
 	)) {
 		for (const cls of [
-			"bpmn-selected",
-			"bpmn-token-active",
-			"bpmn-token-visited",
-			"bpmn-token-edge-active",
-			"bpmn-token-edge-visited",
+			"bpmnkit-selected",
+			"bpmnkit-token-active",
+			"bpmnkit-token-visited",
+			"bpmnkit-token-edge-active",
+			"bpmnkit-token-edge-visited",
 		]) {
 			el.classList.remove(cls)
 		}
@@ -136,14 +136,14 @@ function buildExportSvg(api: CanvasApi, title: string): ExportSvg {
 	// CSS inside <style> may not apply reliably when SVG is rendered via
 	// <img> for canvas-based PNG conversion, so we set the attributes directly.
 	for (const el of clone.querySelectorAll<SVGElement>(
-		".bpmn-edge-path,.bpmn-edge-assoc,.bpmn-msgflow-path,.bpmn-edge-default-slash,.bpmn-icon,.bpmn-event-inner,.bpmn-event-inner-dashed,.bpmn-gw-marker-stroke",
+		".bpmnkit-edge-path,.bpmnkit-edge-assoc,.bpmnkit-msgflow-path,.bpmnkit-edge-default-slash,.bpmnkit-icon,.bpmnkit-event-inner,.bpmnkit-event-inner-dashed,.bpmnkit-gw-marker-stroke",
 	)) {
 		el.setAttribute("fill", "none")
 	}
-	for (const el of clone.querySelectorAll<SVGElement>(".bpmn-arrow-fill")) {
+	for (const el of clone.querySelectorAll<SVGElement>(".bpmnkit-arrow-fill")) {
 		el.setAttribute("fill", colors.flowStroke)
 	}
-	for (const el of clone.querySelectorAll<SVGElement>(".bpmn-gw-marker,.bpmn-icon-solid")) {
+	for (const el of clone.querySelectorAll<SVGElement>(".bpmnkit-gw-marker,.bpmnkit-icon-solid")) {
 		el.setAttribute("fill", colors.shapeStroke)
 	}
 

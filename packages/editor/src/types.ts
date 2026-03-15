@@ -1,5 +1,5 @@
-import type { CanvasEvents, CanvasOptions } from "@bpmn-sdk/canvas"
-import type { BpmnDefinitions } from "@bpmn-sdk/core"
+import type { CanvasEvents, CanvasOptions } from "@bpmnkit/canvas"
+import type { BpmnDefinitions } from "@bpmnkit/core"
 
 export type CreateShapeType =
 	| "startEvent"
@@ -70,8 +70,8 @@ export type PortDir = "top" | "right" | "bottom" | "left"
 export type EditorOptions = CanvasOptions & {
 	/**
 	 * When true, the editor reads the initial theme from
-	 * `localStorage.getItem("bpmn-theme")` and persists theme changes back to
-	 * localStorage automatically. The stored key is `"bpmn-theme"`.
+	 * `localStorage.getItem("bpmnkit-theme")` and persists theme changes back to
+	 * localStorage automatically. The stored key is `"bpmnkit-theme"`.
 	 */
 	persistTheme?: boolean
 }

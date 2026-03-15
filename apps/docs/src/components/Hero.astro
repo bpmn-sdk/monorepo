@@ -47,7 +47,7 @@ const hero = Astro.props.entry?.data?.hero
 				<path d="M2.5 11.5H1.5a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v1"
 				></path>
 			</svg>
-			<code>pnpm add @bpmn-sdk/core</code>
+			<code>pnpm add @bpmnkit/core</code>
 			<span class="sl-copied" aria-hidden="true">Copied!</span>
 		</button>
 
@@ -57,7 +57,7 @@ const hero = Astro.props.entry?.data?.hero
 				Get Started
 				<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 8h10M9 4l4 4-4 4"/></svg>
 			</a>
-			<a href="https://github.com/bpmn-sdk/monorepo" class="sl-hero-btn sl-hero-btn--minimal" target="_blank" rel="noopener">
+			<a href="https://github.com/bpmnkit/monorepo" class="sl-hero-btn sl-hero-btn--minimal" target="_blank" rel="noopener">
 				GitHub →
 			</a>
 		</div>
@@ -67,7 +67,7 @@ const hero = Astro.props.entry?.data?.hero
 <script>
 	const btn = document.getElementById("sl-install-btn");
 	btn?.addEventListener("click", () => {
-		navigator.clipboard.writeText("pnpm add @bpmn-sdk/core").then(() => {
+		navigator.clipboard.writeText("pnpm add @bpmnkit/core").then(() => {
 			btn.classList.add("sl-install-btn--copied");
 			setTimeout(() => btn.classList.remove("sl-install-btn--copied"), 1800);
 		});

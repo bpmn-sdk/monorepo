@@ -98,7 +98,7 @@ Don't worry about connecting it yet — we'll do that next!
 
 > 💡 **BPMN tip:** Tasks represent human work, system actions, or service calls. They're the building blocks of every process.`,
 			validation: {
-				type: "bpmn-element-count",
+				type: "bpmnkit-element-count",
 				elementType: "task",
 				min: 3,
 				successMessage: "You added a new task — the process is growing!",
@@ -130,7 +130,7 @@ The arrow becomes a sequence flow — the backbone of any BPMN process.
 
 > 💡 **Think of it like a flowchart:** the arrows show "after this step, do that step."`,
 			validation: {
-				type: "bpmn-has-connection",
+				type: "bpmnkit-has-connection",
 				successMessage: "You drew a sequence flow — that's how BPMN shows the order of work!",
 				errorMessage:
 					"Try hovering over a shape until you see the blue arrow appear, then drag to connect it.",
@@ -159,7 +159,7 @@ A task without a name is a mystery — what does it do? Good BPMN processes are 
 
 > 💡 **Best practice:** Use verb + noun for task names: "Validate order", "Process payment", "Send email". This makes the process readable to anyone.`,
 			validation: {
-				type: "bpmn-element-labeled",
+				type: "bpmnkit-element-labeled",
 				successMessage: "Your task now has a name — the process tells a story!",
 				errorMessage: "Try double-clicking on the task shape you added to edit its label.",
 			},

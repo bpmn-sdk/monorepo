@@ -178,35 +178,35 @@ biome.json         # Biome configuration
 
 ## Brand Tokens
 
-All brand colors and design tokens are defined in **`packages/ui`** (`@bpmn-sdk/ui`).
+All brand colors and design tokens are defined in **`packages/ui`** (`@bpmnkit/ui`).
 
 - **Single source of truth**: edit `packages/ui/src/tokens.css` (CSS file) or `packages/ui/src/css.ts` (`UI_TOKENS_CSS` string) — both must stay in sync
-- **Token namespace**: all public tokens use `--bpmn-*` prefix
-- **Usage in packages**: call `injectUiStyles()` at runtime (editor, canvas, plugins), or `@import "@bpmn-sdk/ui/tokens.css"` in Astro apps via `packages/astro-shared`
-- **Never hardcode brand colors** — always use `var(--bpmn-*, <fallback>)` with a hex fallback so packages work standalone
+- **Token namespace**: all public tokens use `--bpmnkit-*` prefix
+- **Usage in packages**: call `injectUiStyles()` at runtime (editor, canvas, plugins), or `@import "@bpmnkit/ui/tokens.css"` in Astro apps via `packages/astro-shared`
+- **Never hardcode brand colors** — always use `var(--bpmnkit-*, <fallback>)` with a hex fallback so packages work standalone
 - **Semantic colors are exempt**: execution-state colors (token-highlight amber/green), syntax highlighting (feel-playground, dmn-viewer), and DMN semantic section colors must not be replaced with brand tokens
 
 ### Key tokens
 
 | Token | Light | Dark | Purpose |
 |---|---|---|---|
-| `--bpmn-bg` | `#f4f4f8` | `#0d0d16` | Page background |
-| `--bpmn-surface` | `#ffffff` | `#161626` | Card / panel surface |
-| `--bpmn-surface-2` | `#eeeef8` | `#1e1e2e` | Elevated surface |
-| `--bpmn-border` | `#d0d0e8` | `#2a2a42` | Borders |
-| `--bpmn-fg` | `#1a1a2e` | `#cdd6f4` | Primary text |
-| `--bpmn-fg-muted` | `#6666a0` | `#8888a8` | Secondary text |
-| `--bpmn-accent` | `#1a56db` | `#6b9df7` | Primary accent / interactive |
-| `--bpmn-accent-bright` | `#3b82f6` | `#89b4fa` | Bright accent / links |
-| `--bpmn-accent-subtle` | `rgba(26,86,219,0.12)` | `rgba(107,157,247,0.15)` | Accent tint / hover bg |
-| `--bpmn-teal` | `#0d9488` | `#2dd4bf` | Secondary accent |
-| `--bpmn-panel-bg` | `rgba(255,255,255,0.92)` | `rgba(13,13,22,0.92)` | Floating panels |
-| `--bpmn-panel-border` | `rgba(0,0,0,0.08)` | `rgba(255,255,255,0.08)` | Panel borders |
-| `--bpmn-success` | `#16a34a` | `#22c55e` | Success state |
-| `--bpmn-warn` | `#d97706` | `#f59e0b` | Warning state |
-| `--bpmn-danger` | `#dc2626` | `#f87171` | Error / danger state |
-| `--bpmn-font` | `system-ui, -apple-system, sans-serif` | same | UI font |
-| `--bpmn-font-mono` | `ui-monospace, "Cascadia Code", "JetBrains Mono", monospace` | same | Monospace font |
+| `--bpmnkit-bg` | `#f4f4f8` | `#0d0d16` | Page background |
+| `--bpmnkit-surface` | `#ffffff` | `#161626` | Card / panel surface |
+| `--bpmnkit-surface-2` | `#eeeef8` | `#1e1e2e` | Elevated surface |
+| `--bpmnkit-border` | `#d0d0e8` | `#2a2a42` | Borders |
+| `--bpmnkit-fg` | `#1a1a2e` | `#cdd6f4` | Primary text |
+| `--bpmnkit-fg-muted` | `#6666a0` | `#8888a8` | Secondary text |
+| `--bpmnkit-accent` | `#1a56db` | `#6b9df7` | Primary accent / interactive |
+| `--bpmnkit-accent-bright` | `#3b82f6` | `#89b4fa` | Bright accent / links |
+| `--bpmnkit-accent-subtle` | `rgba(26,86,219,0.12)` | `rgba(107,157,247,0.15)` | Accent tint / hover bg |
+| `--bpmnkit-teal` | `#0d9488` | `#2dd4bf` | Secondary accent |
+| `--bpmnkit-panel-bg` | `rgba(255,255,255,0.92)` | `rgba(13,13,22,0.92)` | Floating panels |
+| `--bpmnkit-panel-border` | `rgba(0,0,0,0.08)` | `rgba(255,255,255,0.08)` | Panel borders |
+| `--bpmnkit-success` | `#16a34a` | `#22c55e` | Success state |
+| `--bpmnkit-warn` | `#d97706` | `#f59e0b` | Warning state |
+| `--bpmnkit-danger` | `#dc2626` | `#f87171` | Error / danger state |
+| `--bpmnkit-font` | `system-ui, -apple-system, sans-serif` | same | UI font |
+| `--bpmnkit-font-mono` | `ui-monospace, "Cascadia Code", "JetBrains Mono", monospace` | same | Monospace font |
 
 ## TypeScript Practices
 

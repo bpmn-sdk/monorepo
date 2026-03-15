@@ -1,5 +1,5 @@
-import { renderBpmnAscii } from "@bpmn-sdk/ascii"
-import type { CanvasPlugin } from "@bpmn-sdk/canvas"
+import { renderBpmnAscii } from "@bpmnkit/ascii"
+import type { CanvasPlugin } from "@bpmnkit/canvas"
 import { injectAsciiViewStyles } from "./css.js"
 
 export { ASCII_VIEW_CSS, ASCII_VIEW_STYLE_ID, injectAsciiViewStyles } from "./css.js"
@@ -15,40 +15,40 @@ function showAsciiDialog(xml: string): void {
 	const ascii = renderBpmnAscii(xml, { title: false })
 
 	const overlay = document.createElement("div")
-	overlay.className = "bpmn-ascii-overlay"
+	overlay.className = "bpmnkit-ascii-overlay"
 	overlay.addEventListener("click", (e) => {
 		if (e.target === overlay) overlay.remove()
 	})
 
 	const panel = document.createElement("div")
-	panel.className = "bpmn-ascii-panel"
+	panel.className = "bpmnkit-ascii-panel"
 
 	const header = document.createElement("div")
-	header.className = "bpmn-ascii-header"
+	header.className = "bpmnkit-ascii-header"
 
 	const title = document.createElement("div")
-	title.className = "bpmn-ascii-title"
+	title.className = "bpmnkit-ascii-title"
 	title.textContent = "ASCII Diagram"
 
 	const actions = document.createElement("div")
-	actions.className = "bpmn-ascii-actions"
+	actions.className = "bpmnkit-ascii-actions"
 
 	const copyBtn = document.createElement("button")
-	copyBtn.className = "bpmn-ascii-btn"
+	copyBtn.className = "bpmnkit-ascii-btn"
 	copyBtn.textContent = "Copy"
 	copyBtn.addEventListener("click", () => {
 		void navigator.clipboard.writeText(ascii).then(() => {
 			copyBtn.textContent = "Copied!"
-			copyBtn.classList.add("bpmn-ascii-btn-copied")
+			copyBtn.classList.add("bpmnkit-ascii-btn-copied")
 			setTimeout(() => {
 				copyBtn.textContent = "Copy"
-				copyBtn.classList.remove("bpmn-ascii-btn-copied")
+				copyBtn.classList.remove("bpmnkit-ascii-btn-copied")
 			}, 1500)
 		})
 	})
 
 	const closeBtn = document.createElement("button")
-	closeBtn.className = "bpmn-ascii-btn"
+	closeBtn.className = "bpmnkit-ascii-btn"
 	closeBtn.textContent = "Close"
 	closeBtn.addEventListener("click", () => overlay.remove())
 
@@ -56,10 +56,10 @@ function showAsciiDialog(xml: string): void {
 	header.append(title, actions)
 
 	const body = document.createElement("div")
-	body.className = "bpmn-ascii-body"
+	body.className = "bpmnkit-ascii-body"
 
 	const pre = document.createElement("pre")
-	pre.className = "bpmn-ascii-pre"
+	pre.className = "bpmnkit-ascii-pre"
 	pre.textContent = ascii
 
 	body.append(pre)

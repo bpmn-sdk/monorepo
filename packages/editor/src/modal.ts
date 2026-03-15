@@ -1,16 +1,16 @@
-const MODAL_STYLE_ID = "bpmn-hud-modal-styles"
+const MODAL_STYLE_ID = "bpmnkit-hud-modal-styles"
 
 function injectModalStyles(): void {
 	if (document.getElementById(MODAL_STYLE_ID)) return
 	const style = document.createElement("style")
 	style.id = MODAL_STYLE_ID
 	style.textContent = `
-.bpmn-hud-modal-overlay {
+.bpmnkit-hud-modal-overlay {
   position: fixed; inset: 0; z-index: 300;
   background: rgba(0,0,0,0.5);
   display: flex; align-items: center; justify-content: center;
 }
-.bpmn-hud-modal {
+.bpmnkit-hud-modal {
   background: rgba(22, 22, 30, 0.97);
   border: 1px solid rgba(255,255,255,0.12);
   border-radius: 10px;
@@ -21,11 +21,11 @@ function injectModalStyles(): void {
   box-shadow: 0 16px 48px rgba(0,0,0,0.6);
   display: flex; flex-direction: column; gap: 12px;
 }
-.bpmn-hud-modal-title {
+.bpmnkit-hud-modal-title {
   font-size: 14px; font-weight: 600;
   color: rgba(255,255,255,0.95);
 }
-.bpmn-hud-modal-input {
+.bpmnkit-hud-modal-input {
   width: 100%; padding: 6px 10px;
   background: rgba(255,255,255,0.08);
   border: 1px solid rgba(255,255,255,0.15);
@@ -35,48 +35,48 @@ function injectModalStyles(): void {
   outline: none;
   box-sizing: border-box;
 }
-.bpmn-hud-modal-input:focus { border-color: rgba(60,120,220,0.6); }
-.bpmn-hud-modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
-.bpmn-hud-modal-btn {
+.bpmnkit-hud-modal-input:focus { border-color: rgba(60,120,220,0.6); }
+.bpmnkit-hud-modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
+.bpmnkit-hud-modal-btn {
   font-size: 13px; padding: 6px 14px; border-radius: 6px;
   cursor: pointer; font-weight: 500;
   border: 1px solid rgba(255,255,255,0.12);
   background: rgba(255,255,255,0.06);
   color: rgba(255,255,255,0.8);
 }
-.bpmn-hud-modal-btn:hover { background: rgba(255,255,255,0.1); }
-.bpmn-hud-modal-btn--primary {
+.bpmnkit-hud-modal-btn:hover { background: rgba(255,255,255,0.1); }
+.bpmnkit-hud-modal-btn--primary {
   background: rgba(60,120,220,0.5);
   border-color: rgba(60,120,220,0.7);
   color: #fff;
 }
-.bpmn-hud-modal-btn--primary:hover { background: rgba(60,120,220,0.65); }
+.bpmnkit-hud-modal-btn--primary:hover { background: rgba(60,120,220,0.65); }
 /* Light theme */
-[data-bpmn-hud-theme="light"] .bpmn-hud-modal {
+[data-bpmnkit-hud-theme="light"] .bpmnkit-hud-modal {
   background: rgba(252,252,254,0.98);
   border-color: rgba(0,0,0,0.1);
   color: rgba(0,0,0,0.8);
   box-shadow: 0 8px 32px rgba(0,0,0,0.15);
 }
-[data-bpmn-hud-theme="light"] .bpmn-hud-modal-title { color: rgba(0,0,0,0.88); }
-[data-bpmn-hud-theme="light"] .bpmn-hud-modal-input {
+[data-bpmnkit-hud-theme="light"] .bpmnkit-hud-modal-title { color: rgba(0,0,0,0.88); }
+[data-bpmnkit-hud-theme="light"] .bpmnkit-hud-modal-input {
   background: rgba(0,0,0,0.04);
   border-color: rgba(0,0,0,0.15);
   color: rgba(0,0,0,0.9);
 }
-[data-bpmn-hud-theme="light"] .bpmn-hud-modal-input:focus { border-color: rgba(0,80,200,0.4); }
-[data-bpmn-hud-theme="light"] .bpmn-hud-modal-btn {
+[data-bpmnkit-hud-theme="light"] .bpmnkit-hud-modal-input:focus { border-color: rgba(0,80,200,0.4); }
+[data-bpmnkit-hud-theme="light"] .bpmnkit-hud-modal-btn {
   border-color: rgba(0,0,0,0.12);
   background: rgba(0,0,0,0.04);
   color: rgba(0,0,0,0.7);
 }
-[data-bpmn-hud-theme="light"] .bpmn-hud-modal-btn:hover { background: rgba(0,0,0,0.08); }
-[data-bpmn-hud-theme="light"] .bpmn-hud-modal-btn--primary {
+[data-bpmnkit-hud-theme="light"] .bpmnkit-hud-modal-btn:hover { background: rgba(0,0,0,0.08); }
+[data-bpmnkit-hud-theme="light"] .bpmnkit-hud-modal-btn--primary {
   background: rgba(0,80,200,0.85);
   border-color: rgba(0,80,200,0.9);
   color: #fff;
 }
-[data-bpmn-hud-theme="light"] .bpmn-hud-modal-btn--primary:hover { background: rgba(0,80,200,1); }
+[data-bpmnkit-hud-theme="light"] .bpmnkit-hud-modal-btn--primary:hover { background: rgba(0,80,200,1); }
 `
 	document.head.appendChild(style)
 }
@@ -93,29 +93,29 @@ export function showHudInputModal(
 	injectModalStyles()
 
 	const overlay = document.createElement("div")
-	overlay.className = "bpmn-hud-modal-overlay"
+	overlay.className = "bpmnkit-hud-modal-overlay"
 
 	const dialog = document.createElement("div")
-	dialog.className = "bpmn-hud-modal"
+	dialog.className = "bpmnkit-hud-modal"
 
 	const titleEl = document.createElement("div")
-	titleEl.className = "bpmn-hud-modal-title"
+	titleEl.className = "bpmnkit-hud-modal-title"
 	titleEl.textContent = title
 
 	const input = document.createElement("input")
 	input.type = "text"
-	input.className = "bpmn-hud-modal-input"
+	input.className = "bpmnkit-hud-modal-input"
 	input.value = defaultValue
 
 	const actions = document.createElement("div")
-	actions.className = "bpmn-hud-modal-actions"
+	actions.className = "bpmnkit-hud-modal-actions"
 
 	const cancelBtn = document.createElement("button")
-	cancelBtn.className = "bpmn-hud-modal-btn"
+	cancelBtn.className = "bpmnkit-hud-modal-btn"
 	cancelBtn.textContent = "Cancel"
 
 	const confirmBtn = document.createElement("button")
-	confirmBtn.className = "bpmn-hud-modal-btn bpmn-hud-modal-btn--primary"
+	confirmBtn.className = "bpmnkit-hud-modal-btn bpmnkit-hud-modal-btn--primary"
 	confirmBtn.textContent = "Confirm"
 
 	function close(): void {

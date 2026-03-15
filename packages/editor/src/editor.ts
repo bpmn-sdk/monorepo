@@ -6,7 +6,7 @@ import {
 	createGrid,
 	injectStyles,
 	render,
-} from "@bpmn-sdk/canvas"
+} from "@bpmnkit/canvas"
 import type {
 	CanvasApi,
 	CanvasEvents,
@@ -15,15 +15,15 @@ import type {
 	RenderedEdge,
 	RenderedShape,
 	Theme,
-} from "@bpmn-sdk/canvas"
-import { Bpmn, applyAutoLayout } from "@bpmn-sdk/core"
+} from "@bpmnkit/canvas"
+import { Bpmn, applyAutoLayout } from "@bpmnkit/core"
 import type {
 	BpmnBounds,
 	BpmnDefinitions,
 	BpmnFlowElement,
 	BpmnSequenceFlow,
 	DiColor,
-} from "@bpmn-sdk/core"
+} from "@bpmnkit/core"
 import { CommandStack } from "./command-stack.js"
 import { injectEditorStyles } from "./css.js"
 import {
@@ -320,7 +320,7 @@ export class BpmnEditor {
 		let initialTheme = options.theme ?? "auto"
 		if (options.persistTheme) {
 			try {
-				const stored = localStorage.getItem("bpmn-theme")
+				const stored = localStorage.getItem("bpmnkit-theme")
 				if (stored === "dark" || stored === "light" || stored === "auto") {
 					initialTheme = stored
 				}
@@ -336,7 +336,7 @@ export class BpmnEditor {
 		container.innerHTML = ""
 
 		this._host = document.createElement("div")
-		this._host.className = "bpmn-canvas-host"
+		this._host.className = "bpmnkit-canvas-host"
 		this._host.setAttribute("role", "application")
 		this._host.setAttribute("aria-label", "BPMN Editor")
 		this._host.setAttribute("tabindex", "0")
@@ -559,7 +559,7 @@ export class BpmnEditor {
 		if (options.persistTheme) {
 			new MutationObserver(() => {
 				try {
-					localStorage.setItem("bpmn-theme", this._host.getAttribute("data-theme") ?? "light")
+					localStorage.setItem("bpmnkit-theme", this._host.getAttribute("data-theme") ?? "light")
 				} catch {
 					// ignore
 				}
@@ -831,7 +831,7 @@ export class BpmnEditor {
 		}
 		if (!this._warningBanner) {
 			this._warningBanner = document.createElement("div")
-			this._warningBanner.className = "bpmn-editor-warning-banner"
+			this._warningBanner.className = "bpmnkit-editor-warning-banner"
 			this._host.appendChild(this._warningBanner)
 		}
 		this._warningBanner.textContent = `⚠ Duplicate element IDs: ${duplicateIds.join(", ")}. Editing may produce unexpected results.`
@@ -861,8 +861,8 @@ export class BpmnEditor {
 			if (waypoints.length < 2) continue
 			const points = waypoints.map((wp) => `${wp.x},${wp.y}`).join(" ")
 			const hitArea = document.createElementNS(NS, "polyline") as SVGPolylineElement
-			hitArea.setAttribute("class", "bpmn-edge-hitarea")
-			hitArea.setAttribute("data-bpmn-edge-hit", edge.id)
+			hitArea.setAttribute("class", "bpmnkit-edge-hitarea")
+			hitArea.setAttribute("data-bpmnkit-edge-hit", edge.id)
 			hitArea.setAttribute("points", points)
 			edge.element.appendChild(hitArea)
 		}
@@ -1487,12 +1487,12 @@ export class BpmnEditor {
 	private _setEdgeDropHighlight(edgeId: string | null): void {
 		if (this._edgeDropTarget) {
 			const prev = this._edges.find((e) => e.id === this._edgeDropTarget)
-			prev?.element.classList.remove("bpmn-edge-split-highlight")
+			prev?.element.classList.remove("bpmnkit-edge-split-highlight")
 		}
 		this._edgeDropTarget = edgeId
 		if (edgeId) {
 			const edge = this._edges.find((e) => e.id === edgeId)
-			edge?.element.classList.add("bpmn-edge-split-highlight")
+			edge?.element.classList.add("bpmnkit-edge-split-highlight")
 		}
 	}
 
@@ -1890,12 +1890,12 @@ export class BpmnEditor {
 		if (this._createEdgeDropTarget === edgeId) return
 		if (this._createEdgeDropTarget) {
 			const prev = this._edges.find((e) => e.id === this._createEdgeDropTarget)
-			prev?.element.classList.remove("bpmn-edge-split-highlight")
+			prev?.element.classList.remove("bpmnkit-edge-split-highlight")
 		}
 		this._createEdgeDropTarget = edgeId
 		if (edgeId) {
 			const edge = this._edges.find((e) => e.id === edgeId)
-			edge?.element.classList.add("bpmn-edge-split-highlight")
+			edge?.element.classList.add("bpmnkit-edge-split-highlight")
 		}
 	}
 
@@ -2005,31 +2005,31 @@ export class BpmnEditor {
 		const el = document.elementFromPoint(clientX, clientY)
 		if (!el) return { type: "canvas" }
 
-		const handleEl = el.closest("[data-bpmn-handle]")
+		const handleEl = el.closest("[data-bpmnkit-handle]")
 		if (handleEl) {
-			const shapeId = handleEl.getAttribute("data-bpmn-id")
-			const handle = handleEl.getAttribute("data-bpmn-handle") as HandleDir | null
+			const shapeId = handleEl.getAttribute("data-bpmnkit-id")
+			const handle = handleEl.getAttribute("data-bpmnkit-handle") as HandleDir | null
 			if (shapeId && handle) return { type: "handle", shapeId, handle }
 		}
 
-		const portEl = el.closest("[data-bpmn-port]")
+		const portEl = el.closest("[data-bpmnkit-port]")
 		if (portEl) {
-			const shapeId = portEl.getAttribute("data-bpmn-id")
-			const port = portEl.getAttribute("data-bpmn-port") as PortDir | null
+			const shapeId = portEl.getAttribute("data-bpmnkit-id")
+			const port = portEl.getAttribute("data-bpmnkit-port") as PortDir | null
 			if (shapeId && port) return { type: "port", shapeId, port }
 		}
 
-		const endpointEl = el.closest("[data-bpmn-endpoint]")
+		const endpointEl = el.closest("[data-bpmnkit-endpoint]")
 		if (endpointEl) {
-			const edgeId = endpointEl.getAttribute("data-bpmn-id")
-			const ep = endpointEl.getAttribute("data-bpmn-endpoint")
+			const edgeId = endpointEl.getAttribute("data-bpmnkit-id")
+			const ep = endpointEl.getAttribute("data-bpmnkit-endpoint")
 			if (edgeId && ep) return { type: "edge-endpoint", edgeId, isStart: ep === "start" }
 		}
 
-		const waypointEl = el.closest("[data-bpmn-waypoint]")
+		const waypointEl = el.closest("[data-bpmnkit-waypoint]")
 		if (waypointEl) {
-			const id = waypointEl.getAttribute("data-bpmn-id")
-			const wpIdxStr = waypointEl.getAttribute("data-bpmn-waypoint-idx")
+			const id = waypointEl.getAttribute("data-bpmnkit-id")
+			const wpIdxStr = waypointEl.getAttribute("data-bpmnkit-waypoint-idx")
 			if (id && wpIdxStr !== null) {
 				const wpIdx = Number(wpIdxStr)
 				const rect = this._svg.getBoundingClientRect()
@@ -2038,7 +2038,7 @@ export class BpmnEditor {
 			}
 		}
 
-		const edgeHitEl = el.closest("[data-bpmn-edge-hit]")
+		const edgeHitEl = el.closest("[data-bpmnkit-edge-hit]")
 		if (edgeHitEl) {
 			const rect = this._svg.getBoundingClientRect()
 			const diag = screenToDiagram(clientX, clientY, this._viewport.state, rect)
@@ -2056,9 +2056,9 @@ export class BpmnEditor {
 				}
 		}
 
-		const shapeEl = el.closest("[data-bpmn-id]")
+		const shapeEl = el.closest("[data-bpmnkit-id]")
 		if (shapeEl && (this._shapesG.contains(shapeEl) || this._containersG.contains(shapeEl))) {
-			const id = shapeEl.getAttribute("data-bpmn-id")
+			const id = shapeEl.getAttribute("data-bpmnkit-id")
 			if (id) return { type: "shape", id }
 		}
 

@@ -1,4 +1,4 @@
-import type { CanvasApi } from "@bpmn-sdk/canvas"
+import type { CanvasApi } from "@bpmnkit/canvas"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { createCommandPalettePlugin } from "../../src/command-palette/index.js"
 
@@ -28,7 +28,7 @@ function ctrlK(): void {
 }
 
 function pressEscape(): void {
-	const overlay = document.querySelector(".bpmn-palette-overlay")
+	const overlay = document.querySelector(".bpmnkit-palette-overlay")
 	overlay?.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }))
 }
 
@@ -65,51 +65,51 @@ describe("createCommandPalettePlugin", () => {
 
 	it("opens palette on Ctrl+K after install", () => {
 		install()
-		expect(document.querySelector(".bpmn-palette-overlay")).toBeNull()
+		expect(document.querySelector(".bpmnkit-palette-overlay")).toBeNull()
 		ctrlK()
-		expect(document.querySelector(".bpmn-palette-overlay")).not.toBeNull()
+		expect(document.querySelector(".bpmnkit-palette-overlay")).not.toBeNull()
 	})
 
 	it("closes palette on second Ctrl+K", () => {
 		install()
 		ctrlK()
-		expect(document.querySelector(".bpmn-palette-overlay")).not.toBeNull()
+		expect(document.querySelector(".bpmnkit-palette-overlay")).not.toBeNull()
 		ctrlK()
-		expect(document.querySelector(".bpmn-palette-overlay")).toBeNull()
+		expect(document.querySelector(".bpmnkit-palette-overlay")).toBeNull()
 	})
 
 	it("closes palette on Escape", () => {
 		install()
 		ctrlK()
-		expect(document.querySelector(".bpmn-palette-overlay")).not.toBeNull()
+		expect(document.querySelector(".bpmnkit-palette-overlay")).not.toBeNull()
 		pressEscape()
-		expect(document.querySelector(".bpmn-palette-overlay")).toBeNull()
+		expect(document.querySelector(".bpmnkit-palette-overlay")).toBeNull()
 	})
 
 	it("closes palette on backdrop click", () => {
 		install()
 		ctrlK()
-		const overlay = document.querySelector(".bpmn-palette-overlay")
+		const overlay = document.querySelector(".bpmnkit-palette-overlay")
 		if (!overlay) throw new Error("overlay not found")
 		overlay.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }))
-		expect(document.querySelector(".bpmn-palette-overlay")).toBeNull()
+		expect(document.querySelector(".bpmnkit-palette-overlay")).toBeNull()
 	})
 
 	it("shows built-in commands when open", () => {
 		install()
 		ctrlK()
-		const items = document.querySelectorAll(".bpmn-palette-item")
+		const items = document.querySelectorAll(".bpmnkit-palette-item")
 		expect(items.length).toBeGreaterThanOrEqual(5) // 5 built-in commands
 	})
 
 	it("filters commands by query", () => {
 		install()
 		ctrlK()
-		const input = document.querySelector<HTMLInputElement>(".bpmn-palette-input")
+		const input = document.querySelector<HTMLInputElement>(".bpmnkit-palette-input")
 		if (!input) throw new Error("input not found")
 		input.value = "zoom"
 		input.dispatchEvent(new Event("input", { bubbles: true }))
-		const items = document.querySelectorAll(".bpmn-palette-item")
+		const items = document.querySelectorAll(".bpmnkit-palette-item")
 		// "Zoom to 100%" and "Zoom to Fit" match
 		expect(items.length).toBe(2)
 	})
@@ -117,11 +117,11 @@ describe("createCommandPalettePlugin", () => {
 	it("shows empty message for unmatched query", () => {
 		install()
 		ctrlK()
-		const input = document.querySelector<HTMLInputElement>(".bpmn-palette-input")
+		const input = document.querySelector<HTMLInputElement>(".bpmnkit-palette-input")
 		if (!input) throw new Error("input not found")
 		input.value = "xyzzy-no-match"
 		input.dispatchEvent(new Event("input", { bubbles: true }))
-		const empty = document.querySelector(".bpmn-palette-empty")
+		const empty = document.querySelector(".bpmnkit-palette-empty")
 		expect(empty).not.toBeNull()
 	})
 
@@ -129,11 +129,11 @@ describe("createCommandPalettePlugin", () => {
 		const plugin = install()
 		plugin.addCommands([{ id: "custom", title: "Custom Action", action: vi.fn() }])
 		ctrlK()
-		const input = document.querySelector<HTMLInputElement>(".bpmn-palette-input")
+		const input = document.querySelector<HTMLInputElement>(".bpmnkit-palette-input")
 		if (!input) throw new Error("input not found")
 		input.value = "custom"
 		input.dispatchEvent(new Event("input", { bubbles: true }))
-		const items = document.querySelectorAll(".bpmn-palette-item")
+		const items = document.querySelectorAll(".bpmnkit-palette-item")
 		expect(items.length).toBe(1)
 		expect(items[0]?.textContent).toContain("Custom Action")
 	})
@@ -145,11 +145,11 @@ describe("createCommandPalettePlugin", () => {
 		])
 		deregister()
 		ctrlK()
-		const input = document.querySelector<HTMLInputElement>(".bpmn-palette-input")
+		const input = document.querySelector<HTMLInputElement>(".bpmnkit-palette-input")
 		if (!input) throw new Error("input not found")
 		input.value = "custom"
 		input.dispatchEvent(new Event("input", { bubbles: true }))
-		expect(document.querySelector(".bpmn-palette-empty")).not.toBeNull()
+		expect(document.querySelector(".bpmnkit-palette-empty")).not.toBeNull()
 	})
 
 	it("zen mode toggles container class and calls onZenModeChange", () => {
@@ -159,39 +159,39 @@ describe("createCommandPalettePlugin", () => {
 		plugin.install(api)
 		installed.push(plugin)
 		ctrlK()
-		const input = document.querySelector<HTMLInputElement>(".bpmn-palette-input")
+		const input = document.querySelector<HTMLInputElement>(".bpmnkit-palette-input")
 		if (!input) throw new Error("input not found")
 		input.value = "zen"
 		input.dispatchEvent(new Event("input", { bubbles: true }))
-		const zenItem = document.querySelector<HTMLDivElement>(".bpmn-palette-item")
+		const zenItem = document.querySelector<HTMLDivElement>(".bpmnkit-palette-item")
 		if (!zenItem) throw new Error("zen item not found")
 		zenItem.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }))
-		expect(api.container.classList.contains("bpmn-zen-mode")).toBe(true)
+		expect(api.container.classList.contains("bpmnkit-zen-mode")).toBe(true)
 		expect(onZenModeChange).toHaveBeenCalledWith(true)
 	})
 
 	it("injects styles into document.head", () => {
 		install()
-		expect(document.getElementById("bpmn-command-palette-styles-v1")).not.toBeNull()
+		expect(document.getElementById("bpmnkit-command-palette-styles-v1")).not.toBeNull()
 	})
 
 	it("applies light theme class when theme is light", () => {
 		install("light")
 		ctrlK()
-		const overlay = document.querySelector(".bpmn-palette-overlay")
-		expect(overlay?.classList.contains("bpmn-palette--light")).toBe(true)
+		const overlay = document.querySelector(".bpmnkit-palette-overlay")
+		expect(overlay?.classList.contains("bpmnkit-palette--light")).toBe(true)
 	})
 
 	it("uninstall closes open palette and cleans up", () => {
 		const plugin = install()
 		ctrlK()
-		expect(document.querySelector(".bpmn-palette-overlay")).not.toBeNull()
+		expect(document.querySelector(".bpmnkit-palette-overlay")).not.toBeNull()
 		plugin.uninstall?.()
 		// remove from installed so afterEach doesn't double-uninstall
 		installed = installed.filter((p) => p !== plugin)
-		expect(document.querySelector(".bpmn-palette-overlay")).toBeNull()
+		expect(document.querySelector(".bpmnkit-palette-overlay")).toBeNull()
 		// Ctrl+K should no longer open palette after uninstall
 		ctrlK()
-		expect(document.querySelector(".bpmn-palette-overlay")).toBeNull()
+		expect(document.querySelector(".bpmnkit-palette-overlay")).toBeNull()
 	})
 })

@@ -1,163 +1,163 @@
-import type { CanvasPlugin } from "@bpmn-sdk/canvas"
-import type { BpmnFlowElement } from "@bpmn-sdk/core"
+import type { CanvasPlugin } from "@bpmnkit/canvas"
+import type { BpmnFlowElement } from "@bpmnkit/core"
 import { CATEGORIES, ENTRIES } from "./content.js"
 
 // ── Styles ──────────────────────────────────────────────────────────────────
 
-const STYLE_ID = "bpmn-element-docs-styles"
+const STYLE_ID = "bpmnkit-element-docs-styles"
 
 const CSS = `
-.bpmn-edocs {
+.bpmnkit-edocs {
   display: flex; flex-direction: column; height: 100%; overflow: hidden;
   font-family: system-ui, -apple-system, sans-serif;
   color: rgba(255,255,255,0.85);
   font-size: 13px;
 }
-.bpmn-edocs__search {
+.bpmnkit-edocs__search {
   padding: 10px 12px 8px;
   flex-shrink: 0;
 }
-.bpmn-edocs__search input {
+.bpmnkit-edocs__search input {
   width: 100%; box-sizing: border-box;
   background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.12);
   border-radius: 6px; padding: 6px 10px;
   color: rgba(255,255,255,0.85); font-size: 12px; outline: none;
   font-family: inherit;
 }
-.bpmn-edocs__search input::placeholder { color: rgba(255,255,255,0.3); }
-.bpmn-edocs__search input:focus { border-color: #4c8ef7; background: rgba(76,142,247,0.08); }
-.bpmn-edocs__body { flex: 1; overflow-y: auto; padding: 0 0 16px; }
+.bpmnkit-edocs__search input::placeholder { color: rgba(255,255,255,0.3); }
+.bpmnkit-edocs__search input:focus { border-color: #4c8ef7; background: rgba(76,142,247,0.08); }
+.bpmnkit-edocs__body { flex: 1; overflow-y: auto; padding: 0 0 16px; }
 /* ── Category ── */
-.bpmn-edocs__cat-label {
+.bpmnkit-edocs__cat-label {
   font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em;
   color: rgba(255,255,255,0.3); padding: 12px 12px 4px; position: sticky; top: 0;
   background: rgba(18,18,26,0.98); z-index: 1;
 }
 /* ── Index items ── */
-.bpmn-edocs__item {
+.bpmnkit-edocs__item {
   display: flex; flex-direction: column; gap: 2px;
   padding: 7px 12px; cursor: pointer;
   border-left: 2px solid transparent;
   transition: background 0.1s, border-color 0.1s;
 }
-.bpmn-edocs__item:hover { background: rgba(255,255,255,0.05); border-left-color: #4c8ef7; }
-.bpmn-edocs__item.active { background: rgba(76,142,247,0.1); border-left-color: #4c8ef7; }
-.bpmn-edocs__item-title { font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.85); }
-.bpmn-edocs__item-brief { font-size: 11px; color: rgba(255,255,255,0.35); }
+.bpmnkit-edocs__item:hover { background: rgba(255,255,255,0.05); border-left-color: #4c8ef7; }
+.bpmnkit-edocs__item.active { background: rgba(76,142,247,0.1); border-left-color: #4c8ef7; }
+.bpmnkit-edocs__item-title { font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.85); }
+.bpmnkit-edocs__item-brief { font-size: 11px; color: rgba(255,255,255,0.35); }
 /* ── Detail view ── */
-.bpmn-edocs__detail { display: flex; flex-direction: column; height: 100%; }
-.bpmn-edocs__detail-header {
+.bpmnkit-edocs__detail { display: flex; flex-direction: column; height: 100%; }
+.bpmnkit-edocs__detail-header {
   display: flex; align-items: center; gap: 8px;
   padding: 10px 12px 10px; flex-shrink: 0;
   border-bottom: 1px solid rgba(255,255,255,0.07);
 }
-.bpmn-edocs__back {
+.bpmnkit-edocs__back {
   background: none; border: none; cursor: pointer;
   color: #4c8ef7; font-size: 18px; line-height: 1;
   padding: 0 4px 0 0; display: flex; align-items: center;
   flex-shrink: 0;
 }
-.bpmn-edocs__back:hover { color: #7db0ff; }
-.bpmn-edocs__detail-title {
+.bpmnkit-edocs__back:hover { color: #7db0ff; }
+.bpmnkit-edocs__detail-title {
   font-size: 13px; font-weight: 700; color: rgba(255,255,255,0.9); flex: 1; min-width: 0;
 }
-.bpmn-edocs__detail-subtitle { font-size: 10px; color: rgba(255,255,255,0.3); margin-top: 1px; }
-.bpmn-edocs__shape-icon {
+.bpmnkit-edocs__detail-subtitle { font-size: 10px; color: rgba(255,255,255,0.3); margin-top: 1px; }
+.bpmnkit-edocs__shape-icon {
   flex-shrink: 0; display: flex; align-items: center; justify-content: center;
   width: 36px; height: 36px; color: rgba(255,255,255,0.6);
 }
-.bpmn-edocs__detail-body {
+.bpmnkit-edocs__detail-body {
   flex: 1; overflow-y: auto;
   padding: 14px 14px 24px;
   line-height: 1.6;
 }
 /* ── Markdown rendered content ── */
-.bpmn-edocs__md h2 {
+.bpmnkit-edocs__md h2 {
   font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em;
   color: rgba(255,255,255,0.4); margin: 18px 0 6px; padding: 0;
 }
-.bpmn-edocs__md h3 {
+.bpmnkit-edocs__md h3 {
   font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.7);
   margin: 14px 0 4px;
 }
-.bpmn-edocs__md p { margin: 0 0 8px; color: rgba(255,255,255,0.75); font-size: 12.5px; }
-.bpmn-edocs__md ul, .bpmn-edocs__md ol {
+.bpmnkit-edocs__md p { margin: 0 0 8px; color: rgba(255,255,255,0.75); font-size: 12.5px; }
+.bpmnkit-edocs__md ul, .bpmnkit-edocs__md ol {
   margin: 0 0 8px; padding-left: 18px; color: rgba(255,255,255,0.75); font-size: 12.5px;
 }
-.bpmn-edocs__md li { margin-bottom: 3px; }
-.bpmn-edocs__md code {
+.bpmnkit-edocs__md li { margin-bottom: 3px; }
+.bpmnkit-edocs__md code {
   font-family: ui-monospace, "Cascadia Code", "SF Mono", monospace;
   font-size: 11px; background: rgba(255,255,255,0.08);
   border-radius: 3px; padding: 1px 5px; color: #a5d6ff;
 }
-.bpmn-edocs__md pre {
+.bpmnkit-edocs__md pre {
   background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.08);
   border-radius: 6px; padding: 10px 12px; overflow-x: auto; margin: 0 0 10px;
 }
-.bpmn-edocs__md pre code {
+.bpmnkit-edocs__md pre code {
   background: none; padding: 0; font-size: 11px; color: #c9d1d9;
 }
-.bpmn-edocs__md blockquote {
+.bpmnkit-edocs__md blockquote {
   border-left: 3px solid #4c8ef7; margin: 0 0 10px; padding: 6px 10px;
   background: rgba(76,142,247,0.08); border-radius: 0 4px 4px 0;
   color: rgba(255,255,255,0.65); font-size: 12px;
 }
-.bpmn-edocs__md blockquote p { margin: 0; color: inherit; font-size: inherit; }
-.bpmn-edocs__md table {
+.bpmnkit-edocs__md blockquote p { margin: 0; color: inherit; font-size: inherit; }
+.bpmnkit-edocs__md table {
   width: 100%; border-collapse: collapse; font-size: 11.5px; margin: 0 0 10px;
 }
-.bpmn-edocs__md th {
+.bpmnkit-edocs__md th {
   text-align: left; padding: 5px 8px;
   background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.5);
   font-weight: 600; border-bottom: 1px solid rgba(255,255,255,0.08);
 }
-.bpmn-edocs__md td {
+.bpmnkit-edocs__md td {
   padding: 5px 8px; border-bottom: 1px solid rgba(255,255,255,0.05);
   color: rgba(255,255,255,0.75);
 }
-.bpmn-edocs__md strong { color: rgba(255,255,255,0.92); font-weight: 600; }
-.bpmn-edocs__md em { color: rgba(255,255,255,0.75); font-style: italic; }
-.bpmn-edocs__md hr {
+.bpmnkit-edocs__md strong { color: rgba(255,255,255,0.92); font-weight: 600; }
+.bpmnkit-edocs__md em { color: rgba(255,255,255,0.75); font-style: italic; }
+.bpmnkit-edocs__md hr {
   border: none; border-top: 1px solid rgba(255,255,255,0.08); margin: 14px 0;
 }
 /* Light theme */
-[data-bpmn-hud-theme="light"] .bpmn-edocs {
+[data-bpmnkit-hud-theme="light"] .bpmnkit-edocs {
   color: rgba(0,0,0,0.8);
 }
-[data-bpmn-hud-theme="light"] .bpmn-edocs__search input {
+[data-bpmnkit-hud-theme="light"] .bpmnkit-edocs__search input {
   background: rgba(0,0,0,0.05); border-color: rgba(0,0,0,0.12);
   color: rgba(0,0,0,0.8);
 }
-[data-bpmn-hud-theme="light"] .bpmn-edocs__search input::placeholder { color: rgba(0,0,0,0.3); }
-[data-bpmn-hud-theme="light"] .bpmn-edocs__search input:focus { border-color: #1a56db; background: rgba(26,86,219,0.05); }
-[data-bpmn-hud-theme="light"] .bpmn-edocs__cat-label { color: rgba(0,0,0,0.3); background: rgba(248,248,252,0.99); }
-[data-bpmn-hud-theme="light"] .bpmn-edocs__item:hover { background: rgba(0,0,0,0.04); border-left-color: #1a56db; }
-[data-bpmn-hud-theme="light"] .bpmn-edocs__item.active { background: rgba(26,86,219,0.07); border-left-color: #1a56db; }
-[data-bpmn-hud-theme="light"] .bpmn-edocs__item-title { color: rgba(0,0,0,0.8); }
-[data-bpmn-hud-theme="light"] .bpmn-edocs__item-brief { color: rgba(0,0,0,0.35); }
-[data-bpmn-hud-theme="light"] .bpmn-edocs__back { color: #1a56db; }
-[data-bpmn-hud-theme="light"] .bpmn-edocs__back:hover { color: #1247b8; }
-[data-bpmn-hud-theme="light"] .bpmn-edocs__detail-title { color: rgba(0,0,0,0.85); }
-[data-bpmn-hud-theme="light"] .bpmn-edocs__detail-subtitle { color: rgba(0,0,0,0.3); }
-[data-bpmn-hud-theme="light"] .bpmn-edocs__md h2 { color: rgba(0,0,0,0.35); }
-[data-bpmn-hud-theme="light"] .bpmn-edocs__md h3 { color: rgba(0,0,0,0.65); }
-[data-bpmn-hud-theme="light"] .bpmn-edocs__md p,
-[data-bpmn-hud-theme="light"] .bpmn-edocs__md ul,
-[data-bpmn-hud-theme="light"] .bpmn-edocs__md ol,
-[data-bpmn-hud-theme="light"] .bpmn-edocs__md li { color: rgba(0,0,0,0.75); }
-[data-bpmn-hud-theme="light"] .bpmn-edocs__md code { background: rgba(0,0,0,0.07); color: #0055aa; }
-[data-bpmn-hud-theme="light"] .bpmn-edocs__md pre { background: rgba(0,0,0,0.04); border-color: rgba(0,0,0,0.08); }
-[data-bpmn-hud-theme="light"] .bpmn-edocs__md pre code { color: #24292e; }
-[data-bpmn-hud-theme="light"] .bpmn-edocs__md blockquote {
+[data-bpmnkit-hud-theme="light"] .bpmnkit-edocs__search input::placeholder { color: rgba(0,0,0,0.3); }
+[data-bpmnkit-hud-theme="light"] .bpmnkit-edocs__search input:focus { border-color: #1a56db; background: rgba(26,86,219,0.05); }
+[data-bpmnkit-hud-theme="light"] .bpmnkit-edocs__cat-label { color: rgba(0,0,0,0.3); background: rgba(248,248,252,0.99); }
+[data-bpmnkit-hud-theme="light"] .bpmnkit-edocs__item:hover { background: rgba(0,0,0,0.04); border-left-color: #1a56db; }
+[data-bpmnkit-hud-theme="light"] .bpmnkit-edocs__item.active { background: rgba(26,86,219,0.07); border-left-color: #1a56db; }
+[data-bpmnkit-hud-theme="light"] .bpmnkit-edocs__item-title { color: rgba(0,0,0,0.8); }
+[data-bpmnkit-hud-theme="light"] .bpmnkit-edocs__item-brief { color: rgba(0,0,0,0.35); }
+[data-bpmnkit-hud-theme="light"] .bpmnkit-edocs__back { color: #1a56db; }
+[data-bpmnkit-hud-theme="light"] .bpmnkit-edocs__back:hover { color: #1247b8; }
+[data-bpmnkit-hud-theme="light"] .bpmnkit-edocs__detail-title { color: rgba(0,0,0,0.85); }
+[data-bpmnkit-hud-theme="light"] .bpmnkit-edocs__detail-subtitle { color: rgba(0,0,0,0.3); }
+[data-bpmnkit-hud-theme="light"] .bpmnkit-edocs__md h2 { color: rgba(0,0,0,0.35); }
+[data-bpmnkit-hud-theme="light"] .bpmnkit-edocs__md h3 { color: rgba(0,0,0,0.65); }
+[data-bpmnkit-hud-theme="light"] .bpmnkit-edocs__md p,
+[data-bpmnkit-hud-theme="light"] .bpmnkit-edocs__md ul,
+[data-bpmnkit-hud-theme="light"] .bpmnkit-edocs__md ol,
+[data-bpmnkit-hud-theme="light"] .bpmnkit-edocs__md li { color: rgba(0,0,0,0.75); }
+[data-bpmnkit-hud-theme="light"] .bpmnkit-edocs__md code { background: rgba(0,0,0,0.07); color: #0055aa; }
+[data-bpmnkit-hud-theme="light"] .bpmnkit-edocs__md pre { background: rgba(0,0,0,0.04); border-color: rgba(0,0,0,0.08); }
+[data-bpmnkit-hud-theme="light"] .bpmnkit-edocs__md pre code { color: #24292e; }
+[data-bpmnkit-hud-theme="light"] .bpmnkit-edocs__md blockquote {
   border-left-color: #1a56db; background: rgba(26,86,219,0.06); color: rgba(0,0,0,0.65);
 }
-[data-bpmn-hud-theme="light"] .bpmn-edocs__md th { background: rgba(0,0,0,0.04); color: rgba(0,0,0,0.5); }
-[data-bpmn-hud-theme="light"] .bpmn-edocs__md td { color: rgba(0,0,0,0.75); }
-[data-bpmn-hud-theme="light"] .bpmn-edocs__md strong { color: rgba(0,0,0,0.88); }
-[data-bpmn-hud-theme="light"] .bpmn-edocs__md em { color: rgba(0,0,0,0.65); }
-[data-bpmn-hud-theme="light"] .bpmn-edocs__md hr { border-top-color: rgba(0,0,0,0.08); }
-[data-bpmn-hud-theme="light"] .bpmn-edocs__detail-header { border-bottom-color: rgba(0,0,0,0.07); }
-[data-bpmn-hud-theme="light"] .bpmn-edocs__shape-icon { color: rgba(0,0,0,0.55); }
+[data-bpmnkit-hud-theme="light"] .bpmnkit-edocs__md th { background: rgba(0,0,0,0.04); color: rgba(0,0,0,0.5); }
+[data-bpmnkit-hud-theme="light"] .bpmnkit-edocs__md td { color: rgba(0,0,0,0.75); }
+[data-bpmnkit-hud-theme="light"] .bpmnkit-edocs__md strong { color: rgba(0,0,0,0.88); }
+[data-bpmnkit-hud-theme="light"] .bpmnkit-edocs__md em { color: rgba(0,0,0,0.65); }
+[data-bpmnkit-hud-theme="light"] .bpmnkit-edocs__md hr { border-top-color: rgba(0,0,0,0.08); }
+[data-bpmnkit-hud-theme="light"] .bpmnkit-edocs__detail-header { border-bottom-color: rgba(0,0,0,0.07); }
+[data-bpmnkit-hud-theme="light"] .bpmnkit-edocs__shape-icon { color: rgba(0,0,0,0.55); }
 `
 
 function injectStyles(): void {
@@ -554,11 +554,11 @@ export function createElementDocsPlugin(options: ElementDocsOptions): CanvasPlug
 
 	// ── Root UI ──────────────────────────────────────────────────────────────
 	const root = document.createElement("div")
-	root.className = "bpmn-edocs"
+	root.className = "bpmnkit-edocs"
 
 	// Search bar (only shown in index view)
 	const searchWrap = document.createElement("div")
-	searchWrap.className = "bpmn-edocs__search"
+	searchWrap.className = "bpmnkit-edocs__search"
 	const searchInput = document.createElement("input")
 	searchInput.type = "search"
 	searchInput.placeholder = "Search elements…"
@@ -567,7 +567,7 @@ export function createElementDocsPlugin(options: ElementDocsOptions): CanvasPlug
 
 	// Scrollable body
 	const body = document.createElement("div")
-	body.className = "bpmn-edocs__body"
+	body.className = "bpmnkit-edocs__body"
 
 	root.appendChild(searchWrap)
 	root.appendChild(body)
@@ -593,22 +593,22 @@ export function createElementDocsPlugin(options: ElementDocsOptions): CanvasPlug
 			if (filtered.length === 0) continue
 
 			const catLabel = document.createElement("div")
-			catLabel.className = "bpmn-edocs__cat-label"
+			catLabel.className = "bpmnkit-edocs__cat-label"
 			catLabel.textContent = cat.label
 			body.appendChild(catLabel)
 
 			for (const item of filtered) {
 				const row = document.createElement("div")
-				row.className = `bpmn-edocs__item${_currentKey === item.key ? " active" : ""}`
+				row.className = `bpmnkit-edocs__item${_currentKey === item.key ? " active" : ""}`
 				row.setAttribute("role", "button")
 				row.setAttribute("tabindex", "0")
 
 				const titleEl = document.createElement("div")
-				titleEl.className = "bpmn-edocs__item-title"
+				titleEl.className = "bpmnkit-edocs__item-title"
 				titleEl.textContent = item.title
 
 				const briefEl = document.createElement("div")
-				briefEl.className = "bpmn-edocs__item-brief"
+				briefEl.className = "bpmnkit-edocs__item-brief"
 				briefEl.textContent = item.brief
 
 				row.appendChild(titleEl)
@@ -643,14 +643,14 @@ export function createElementDocsPlugin(options: ElementDocsOptions): CanvasPlug
 		body.innerHTML = ""
 
 		const detail = document.createElement("div")
-		detail.className = "bpmn-edocs__detail"
+		detail.className = "bpmnkit-edocs__detail"
 
 		// Header: back button + icon + title
 		const header = document.createElement("div")
-		header.className = "bpmn-edocs__detail-header"
+		header.className = "bpmnkit-edocs__detail-header"
 
 		const backBtn = document.createElement("button")
-		backBtn.className = "bpmn-edocs__back"
+		backBtn.className = "bpmnkit-edocs__back"
 		backBtn.title = "Back to index"
 		backBtn.setAttribute("aria-label", "Back to element list")
 		backBtn.innerHTML = "‹"
@@ -660,17 +660,17 @@ export function createElementDocsPlugin(options: ElementDocsOptions): CanvasPlug
 		})
 
 		const iconEl = document.createElement("div")
-		iconEl.className = "bpmn-edocs__shape-icon"
+		iconEl.className = "bpmnkit-edocs__shape-icon"
 		iconEl.innerHTML = getShapeIcon(key)
 
 		const titles = document.createElement("div")
 		titles.style.flex = "1"
 		titles.style.minWidth = "0"
 		const titleEl = document.createElement("div")
-		titleEl.className = "bpmn-edocs__detail-title"
+		titleEl.className = "bpmnkit-edocs__detail-title"
 		titleEl.textContent = entry.title
 		const subEl = document.createElement("div")
-		subEl.className = "bpmn-edocs__detail-subtitle"
+		subEl.className = "bpmnkit-edocs__detail-subtitle"
 		subEl.textContent = entry.subtitle
 		titles.appendChild(titleEl)
 		titles.appendChild(subEl)
@@ -681,9 +681,9 @@ export function createElementDocsPlugin(options: ElementDocsOptions): CanvasPlug
 
 		// Body: rendered markdown
 		const mdBody = document.createElement("div")
-		mdBody.className = "bpmn-edocs__detail-body"
+		mdBody.className = "bpmnkit-edocs__detail-body"
 		const mdContent = document.createElement("div")
-		mdContent.className = "bpmn-edocs__md"
+		mdContent.className = "bpmnkit-edocs__md"
 		mdContent.innerHTML = renderMarkdown(entry.body)
 		mdBody.appendChild(mdContent)
 

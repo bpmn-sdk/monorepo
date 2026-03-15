@@ -31,11 +31,11 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build docs
-        run: pnpm turbo build --filter @bpmn-sdk/docs
+        run: pnpm turbo build --filter @bpmnkit/docs
 
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy apps/docs/dist --project-name=bpmn-sdk-docs
+          command: pages deploy apps/docs/dist --project-name=bpmnkit-docs

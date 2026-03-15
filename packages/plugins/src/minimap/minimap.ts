@@ -1,5 +1,5 @@
-import type { ViewportState } from "@bpmn-sdk/canvas"
-import type { BpmnDefinitions } from "@bpmn-sdk/core"
+import type { ViewportState } from "@bpmnkit/canvas"
+import type { BpmnDefinitions } from "@bpmnkit/core"
 
 const NS = "http://www.w3.org/2000/svg"
 
@@ -39,7 +39,7 @@ export class Minimap {
 		private readonly _onNavigate: (diagX: number, diagY: number) => void,
 	) {
 		this._host = document.createElement("div")
-		this._host.className = "bpmn-minimap"
+		this._host.className = "bpmnkit-minimap"
 		this._host.setAttribute("aria-hidden", "true")
 
 		this._svg = document.createElementNS(NS, "svg") as SVGSVGElement
@@ -52,7 +52,7 @@ export class Minimap {
 		this._edgesG = svgEl("g")
 		this._shapesG = svgEl("g")
 		this._viewportRect = svgEl("rect")
-		attr(this._viewportRect, { class: "bpmn-minimap-viewport", rx: 1 })
+		attr(this._viewportRect, { class: "bpmnkit-minimap-viewport", rx: 1 })
 
 		this._svg.appendChild(this._edgesG)
 		this._svg.appendChild(this._shapesG)
@@ -117,7 +117,7 @@ export class Minimap {
 					cx: x + w / 2,
 					cy: y + h / 2,
 					r: Math.max(w / 2, 2),
-					class: "bpmn-minimap-shape",
+					class: "bpmnkit-minimap-shape",
 				})
 				this._shapesG.appendChild(circle)
 			} else {
@@ -128,7 +128,7 @@ export class Minimap {
 					width: Math.max(w, 1),
 					height: Math.max(h, 1),
 					rx: 1,
-					class: "bpmn-minimap-shape",
+					class: "bpmnkit-minimap-shape",
 				})
 				this._shapesG.appendChild(rect)
 			}
@@ -141,7 +141,7 @@ export class Minimap {
 				.map((wp) => `${wp.x * this._scale + this._offsetX},${wp.y * this._scale + this._offsetY}`)
 				.join(" ")
 			const poly = svgEl("polyline")
-			attr(poly, { points: pts, class: "bpmn-minimap-edge" })
+			attr(poly, { points: pts, class: "bpmnkit-minimap-edge" })
 			this._edgesG.appendChild(poly)
 		}
 	}

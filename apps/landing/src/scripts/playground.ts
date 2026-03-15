@@ -1,5 +1,5 @@
-import { BpmnCanvas } from "@bpmn-sdk/canvas"
-import { Bpmn, Dmn, Form } from "@bpmn-sdk/core"
+import { BpmnCanvas } from "@bpmnkit/canvas"
+import { Bpmn, Dmn, Form } from "@bpmnkit/core"
 import { createNeonThemePlugin } from "./neon-plugin.js"
 
 // ── DMN section tabs ─────────────────────────────────────────────────────────
@@ -26,7 +26,7 @@ function setupDmnTabs(): void {
 
 let _dmnBpmnCanvas: BpmnCanvas | null = null
 function renderDmnBpmnPreview(): void {
-	const container = document.getElementById("dmn-bpmn-preview")
+	const container = document.getElementById("dmn-bpmnkit-preview")
 	if (!container || _dmnBpmnCanvas) return
 
 	const xml = Bpmn.export(

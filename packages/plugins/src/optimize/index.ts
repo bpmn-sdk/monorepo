@@ -1,5 +1,5 @@
-import { Bpmn, optimize } from "@bpmn-sdk/core"
-import type { BpmnDefinitions, OptimizationFinding } from "@bpmn-sdk/core"
+import { Bpmn, optimize } from "@bpmnkit/core"
+import type { BpmnDefinitions, OptimizationFinding } from "@bpmnkit/core"
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 
@@ -105,37 +105,37 @@ function injectStyles(): void {
 }
 .opt-btn-primary:hover:not(:disabled) { background: rgba(60,120,220,0.65); }
 /* Light theme */
-[data-bpmn-hud-theme="light"] .opt-panel {
+[data-bpmnkit-hud-theme="light"] .opt-panel {
   background: rgba(252,252,254,0.98);
   border-color: rgba(0,0,0,0.1);
   color: rgba(0,0,0,0.8);
   box-shadow: 0 8px 32px rgba(0,0,0,0.15);
 }
-[data-bpmn-hud-theme="light"] .opt-header { border-bottom-color: rgba(0,0,0,0.08); }
-[data-bpmn-hud-theme="light"] .opt-title  { color: rgba(0,0,0,0.88); }
-[data-bpmn-hud-theme="light"] .opt-subtitle { color: rgba(0,0,0,0.4); }
-[data-bpmn-hud-theme="light"] .opt-finding { border-bottom-color: rgba(0,0,0,0.05); }
-[data-bpmn-hud-theme="light"] .opt-badge-error   { background: rgba(220,50,50,0.1);   color: #c00; }
-[data-bpmn-hud-theme="light"] .opt-badge-warning { background: rgba(200,130,0,0.12);  color: #a60; }
-[data-bpmn-hud-theme="light"] .opt-badge-info    { background: rgba(0,80,200,0.1);    color: #05c; }
-[data-bpmn-hud-theme="light"] .opt-finding-msg { color: rgba(0,0,0,0.78); }
-[data-bpmn-hud-theme="light"] .opt-finding-sug { color: rgba(0,0,0,0.42); }
-[data-bpmn-hud-theme="light"] .opt-empty { color: rgba(0,0,0,0.35); }
-[data-bpmn-hud-theme="light"] .opt-result { border-bottom-color: rgba(0,0,0,0.05); }
-[data-bpmn-hud-theme="light"] .opt-result-desc { color: rgba(0,0,0,0.75); }
-[data-bpmn-hud-theme="light"] .opt-result-open {
+[data-bpmnkit-hud-theme="light"] .opt-header { border-bottom-color: rgba(0,0,0,0.08); }
+[data-bpmnkit-hud-theme="light"] .opt-title  { color: rgba(0,0,0,0.88); }
+[data-bpmnkit-hud-theme="light"] .opt-subtitle { color: rgba(0,0,0,0.4); }
+[data-bpmnkit-hud-theme="light"] .opt-finding { border-bottom-color: rgba(0,0,0,0.05); }
+[data-bpmnkit-hud-theme="light"] .opt-badge-error   { background: rgba(220,50,50,0.1);   color: #c00; }
+[data-bpmnkit-hud-theme="light"] .opt-badge-warning { background: rgba(200,130,0,0.12);  color: #a60; }
+[data-bpmnkit-hud-theme="light"] .opt-badge-info    { background: rgba(0,80,200,0.1);    color: #05c; }
+[data-bpmnkit-hud-theme="light"] .opt-finding-msg { color: rgba(0,0,0,0.78); }
+[data-bpmnkit-hud-theme="light"] .opt-finding-sug { color: rgba(0,0,0,0.42); }
+[data-bpmnkit-hud-theme="light"] .opt-empty { color: rgba(0,0,0,0.35); }
+[data-bpmnkit-hud-theme="light"] .opt-result { border-bottom-color: rgba(0,0,0,0.05); }
+[data-bpmnkit-hud-theme="light"] .opt-result-desc { color: rgba(0,0,0,0.75); }
+[data-bpmnkit-hud-theme="light"] .opt-result-open {
   background: rgba(0,80,200,0.08); border-color: rgba(0,80,200,0.25); color: #05c;
 }
-[data-bpmn-hud-theme="light"] .opt-result-open:hover { background: rgba(0,80,200,0.14); }
-[data-bpmn-hud-theme="light"] .opt-footer { border-top-color: rgba(0,0,0,0.08); }
-[data-bpmn-hud-theme="light"] .opt-btn {
+[data-bpmnkit-hud-theme="light"] .opt-result-open:hover { background: rgba(0,80,200,0.14); }
+[data-bpmnkit-hud-theme="light"] .opt-footer { border-top-color: rgba(0,0,0,0.08); }
+[data-bpmnkit-hud-theme="light"] .opt-btn {
   border-color: rgba(0,0,0,0.12); background: rgba(0,0,0,0.04); color: rgba(0,0,0,0.7);
 }
-[data-bpmn-hud-theme="light"] .opt-btn:hover:not(:disabled) { background: rgba(0,0,0,0.08); }
-[data-bpmn-hud-theme="light"] .opt-btn-primary {
+[data-bpmnkit-hud-theme="light"] .opt-btn:hover:not(:disabled) { background: rgba(0,0,0,0.08); }
+[data-bpmnkit-hud-theme="light"] .opt-btn-primary {
   background: rgba(0,80,200,0.85); border-color: rgba(0,80,200,0.9); color: #fff;
 }
-[data-bpmn-hud-theme="light"] .opt-btn-primary:hover:not(:disabled) { background: rgba(0,80,200,1); }
+[data-bpmnkit-hud-theme="light"] .opt-btn-primary:hover:not(:disabled) { background: rgba(0,80,200,1); }
 `
 	document.head.appendChild(style)
 }

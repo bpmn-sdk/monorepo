@@ -11,7 +11,7 @@ export interface ThemeSwitcherOptions {
 	initial?: Theme
 	/** Called whenever the user selects a theme. */
 	onChange: (theme: Theme, resolved: "light" | "dark") => void
-	/** If true, persists the selection to localStorage under "bpmn-theme". */
+	/** If true, persists the selection to localStorage under "bpmnkit-theme". */
 	persist?: boolean
 }
 
@@ -28,7 +28,7 @@ export function createThemeSwitcher(options: ThemeSwitcherOptions): {
 	let isOpen = false
 
 	const btn = document.createElement("button")
-	btn.className = "bpmn-theme-btn"
+	btn.className = "bpmnkit-theme-btn"
 	btn.type = "button"
 	btn.setAttribute("aria-label", "Switch theme")
 	btn.title = "Switch theme"
@@ -47,22 +47,22 @@ export function createThemeSwitcher(options: ThemeSwitcherOptions): {
 
 	function openDropdown(): void {
 		const dropdown = document.createElement("div")
-		dropdown.className = "bpmn-theme-dropdown"
+		dropdown.className = "bpmnkit-theme-dropdown"
 		// Mirror resolved theme onto the dropdown so its own CSS variables apply
 		dropdown.setAttribute("data-theme", resolveTheme(current))
 
 		for (const opt of THEME_OPTIONS) {
 			const item = document.createElement("button")
-			item.className = "bpmn-theme-item"
+			item.className = "bpmnkit-theme-item"
 			item.type = "button"
 
 			const check = document.createElement("span")
-			check.className = "bpmn-theme-item-check"
+			check.className = "bpmnkit-theme-item-check"
 			if (opt.value === current) check.innerHTML = IC_UI.check
 			item.appendChild(check)
 
 			const icon = document.createElement("span")
-			icon.className = "bpmn-theme-item-icon"
+			icon.className = "bpmnkit-theme-item-icon"
 			icon.innerHTML = opt.icon
 			item.appendChild(icon)
 

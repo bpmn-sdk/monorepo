@@ -1,4 +1,4 @@
-import { Bpmn } from "@bpmn-sdk/core"
+import { Bpmn } from "@bpmnkit/core"
 // @vitest-environment happy-dom
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { BpmnCanvas } from "../src/canvas.js"
@@ -74,18 +74,18 @@ describe("BpmnCanvas", () => {
 	})
 
 	it("mounts a host element inside the container", () => {
-		const host = container.querySelector(".bpmn-canvas-host")
+		const host = container.querySelector(".bpmnkit-canvas-host")
 		expect(host).not.toBeNull()
 	})
 
 	it("renders shapes for all BPMN elements", () => {
-		const shapes = container.querySelectorAll("[data-bpmn-id]")
+		const shapes = container.querySelectorAll("[data-bpmnkit-id]")
 		// start, task, end = 3 shapes
 		expect(shapes.length).toBeGreaterThanOrEqual(3)
 	})
 
 	it("renders edges for sequence flows", () => {
-		const edges = container.querySelectorAll(".bpmn-edge")
+		const edges = container.querySelectorAll(".bpmnkit-edge")
 		expect(edges.length).toBe(2)
 	})
 
@@ -101,7 +101,7 @@ describe("BpmnCanvas", () => {
 		const cb = vi.fn()
 		canvas.on("element:click", cb)
 
-		const taskShape = container.querySelector<SVGGElement>('[data-bpmn-id="task"]')
+		const taskShape = container.querySelector<SVGGElement>('[data-bpmnkit-id="task"]')
 		expect(taskShape).not.toBeNull()
 		// Dispatch on a child element to test .closest() lookup
 		if (!taskShape) throw new Error("shape not found")
@@ -112,7 +112,7 @@ describe("BpmnCanvas", () => {
 
 	it("clears the canvas on clear()", () => {
 		canvas.clear()
-		const shapes = container.querySelectorAll("[data-bpmn-id]")
+		const shapes = container.querySelectorAll("[data-bpmnkit-id]")
 		expect(shapes.length).toBe(0)
 	})
 
@@ -138,14 +138,14 @@ describe("BpmnCanvas", () => {
 
 	it("applies dark theme via data-theme attribute", () => {
 		canvas.setTheme("dark")
-		const host = container.querySelector(".bpmn-canvas-host")
+		const host = container.querySelector(".bpmnkit-canvas-host")
 		expect(host?.getAttribute("data-theme")).toBe("dark")
 	})
 
 	it("removes data-theme in light mode", () => {
 		canvas.setTheme("dark")
 		canvas.setTheme("light")
-		const host = container.querySelector(".bpmn-canvas-host")
+		const host = container.querySelector(".bpmnkit-canvas-host")
 		expect(host?.hasAttribute("data-theme")).toBe(false)
 	})
 
@@ -159,7 +159,7 @@ describe("BpmnCanvas", () => {
 
 	it("removes the host on destroy()", () => {
 		canvas.destroy()
-		expect(container.querySelector(".bpmn-canvas-host")).toBeNull()
+		expect(container.querySelector(".bpmnkit-canvas-host")).toBeNull()
 	})
 })
 
@@ -206,7 +206,7 @@ describe("computeDiagramBounds", () => {
 		const c = new BpmnCanvas({ container: iconContainer, grid: false })
 		c.loadDefinitions(defs)
 
-		const taskShape = iconContainer.querySelector('[data-bpmn-id="task"]')
+		const taskShape = iconContainer.querySelector('[data-bpmnkit-id="task"]')
 		if (!taskShape) throw new Error("task shape not found")
 		const img = taskShape.querySelector("image")
 		expect(img).not.toBeNull()

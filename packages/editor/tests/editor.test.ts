@@ -1,4 +1,4 @@
-import { Bpmn } from "@bpmn-sdk/core"
+import { Bpmn } from "@bpmnkit/core"
 // @vitest-environment happy-dom
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { BpmnEditor } from "../src/editor.js"
@@ -70,18 +70,18 @@ describe("BpmnEditor", () => {
 	})
 
 	it("mounts a host element inside the container", () => {
-		const host = container.querySelector(".bpmn-canvas-host")
+		const host = container.querySelector(".bpmnkit-canvas-host")
 		expect(host).not.toBeNull()
 	})
 
 	it("renders shapes for all BPMN elements", () => {
-		const shapes = container.querySelectorAll("[data-bpmn-id]")
+		const shapes = container.querySelectorAll("[data-bpmnkit-id]")
 		expect(shapes.length).toBeGreaterThanOrEqual(3)
 	})
 
 	it("constructor without xml mounts an empty canvas", () => {
 		const c = new BpmnEditor({ container: makeContainer(), grid: false })
-		const host = c.container ?? container.querySelector(".bpmn-canvas-host")
+		const host = c.container ?? container.querySelector(".bpmnkit-canvas-host")
 		expect(host).not.toBeNull()
 		c.destroy()
 	})
@@ -188,7 +188,7 @@ describe("BpmnEditor", () => {
 
 	it("destroy() removes the host element", () => {
 		editor.destroy()
-		expect(container.querySelector(".bpmn-canvas-host")).toBeNull()
+		expect(container.querySelector(".bpmnkit-canvas-host")).toBeNull()
 	})
 })
 

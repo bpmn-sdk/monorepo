@@ -1,4 +1,4 @@
-import { BpmnCanvas } from "@bpmn-sdk/canvas"
+import { BpmnCanvas } from "@bpmnkit/canvas"
 import { afterEach, describe, expect, it } from "vitest"
 import { WATERMARK_STYLE_ID, createWatermarkPlugin } from "../../src/watermark/index.js"
 
@@ -28,11 +28,11 @@ describe("createWatermarkPlugin", () => {
 		expect(document.getElementById(WATERMARK_STYLE_ID)).not.toBeNull()
 	})
 
-	it("mounts .bpmn-watermark inside the canvas host", () => {
+	it("mounts .bpmnkit-watermark inside the canvas host", () => {
 		const container = makeContainer()
 		new BpmnCanvas({ container, plugins: [createWatermarkPlugin()] })
-		const host = container.querySelector(".bpmn-canvas-host")
-		expect(host?.querySelector(".bpmn-watermark")).not.toBeNull()
+		const host = container.querySelector(".bpmnkit-canvas-host")
+		expect(host?.querySelector(".bpmnkit-watermark")).not.toBeNull()
 	})
 
 	it("renders configured links", () => {
@@ -48,7 +48,7 @@ describe("createWatermarkPlugin", () => {
 				}),
 			],
 		})
-		const links = container.querySelectorAll<HTMLAnchorElement>(".bpmn-watermark-link")
+		const links = container.querySelectorAll<HTMLAnchorElement>(".bpmnkit-watermark-link")
 		expect(links.length).toBe(2)
 		expect(links[0]?.textContent).toBe("GitHub")
 		expect(links[1]?.textContent).toBe("Docs")
@@ -65,22 +65,22 @@ describe("createWatermarkPlugin", () => {
 				}),
 			],
 		})
-		const watermark = container.querySelector(".bpmn-watermark")
-		if (!watermark) throw new Error(".bpmn-watermark not found")
+		const watermark = container.querySelector(".bpmnkit-watermark")
+		if (!watermark) throw new Error(".bpmnkit-watermark not found")
 		const children = Array.from(watermark.children)
-		expect(children.at(-1)?.classList.contains("bpmn-watermark-logo")).toBe(true)
+		expect(children.at(-1)?.classList.contains("bpmnkit-watermark-logo")).toBe(true)
 	})
 
 	it("renders no links when links option is omitted", () => {
 		const container = makeContainer()
 		new BpmnCanvas({ container, plugins: [createWatermarkPlugin()] })
-		expect(container.querySelectorAll(".bpmn-watermark-link").length).toBe(0)
+		expect(container.querySelectorAll(".bpmnkit-watermark-link").length).toBe(0)
 	})
 
-	it("removes .bpmn-watermark on uninstall", () => {
+	it("removes .bpmnkit-watermark on uninstall", () => {
 		const container = makeContainer()
 		const canvas = new BpmnCanvas({ container, plugins: [createWatermarkPlugin()] })
 		canvas.destroy()
-		expect(container.querySelector(".bpmn-watermark")).toBeNull()
+		expect(container.querySelector(".bpmnkit-watermark")).toBeNull()
 	})
 })

@@ -1,4 +1,4 @@
-import type { CanvasApi, CanvasPlugin } from "@bpmn-sdk/canvas"
+import type { CanvasApi, CanvasPlugin } from "@bpmnkit/canvas"
 import {
 	Bpmn,
 	type BpmnDefinitions,
@@ -6,7 +6,7 @@ import {
 	type DmnDefinitions,
 	Form,
 	type FormDefinition,
-} from "@bpmn-sdk/core"
+} from "@bpmnkit/core"
 import { DmnEditor } from "../dmn-editor/index.js"
 import { buildFeelPlaygroundPanel, injectPlaygroundStyles } from "../feel-playground/index.js"
 import { FormEditor } from "../form-editor/index.js"
@@ -348,23 +348,23 @@ export function createTabsPlugin(options: TabsPluginOptions = {}): CanvasPlugin 
 		onClose: () => void,
 	): void {
 		const overlay = document.createElement("div")
-		overlay.className = "bpmn-close-overlay"
+		overlay.className = "bpmnkit-close-overlay"
 
 		const dialog = document.createElement("div")
-		dialog.className = "bpmn-close-dialog"
+		dialog.className = "bpmnkit-close-dialog"
 		dialog.dataset.theme = theme
 
 		const titleEl = document.createElement("div")
-		titleEl.className = "bpmn-close-dialog-title"
+		titleEl.className = "bpmnkit-close-dialog-title"
 		titleEl.textContent = `Close "${tabName}"?`
 
 		const bodyEl = document.createElement("div")
-		bodyEl.className = "bpmn-close-dialog-body"
+		bodyEl.className = "bpmnkit-close-dialog-body"
 		bodyEl.textContent =
 			"This file only exists in memory and will be lost. Download a copy before closing?"
 
 		const actionsEl = document.createElement("div")
-		actionsEl.className = "bpmn-close-dialog-actions"
+		actionsEl.className = "bpmnkit-close-dialog-actions"
 
 		function dismiss(): void {
 			overlay.remove()
@@ -373,13 +373,13 @@ export function createTabsPlugin(options: TabsPluginOptions = {}): CanvasPlugin 
 
 		const cancelBtn = document.createElement("button")
 		cancelBtn.type = "button"
-		cancelBtn.className = "bpmn-close-dialog-btn ghost"
+		cancelBtn.className = "bpmnkit-close-dialog-btn ghost"
 		cancelBtn.textContent = "Cancel"
 		cancelBtn.addEventListener("click", dismiss)
 
 		const discardBtn = document.createElement("button")
 		discardBtn.type = "button"
-		discardBtn.className = "bpmn-close-dialog-btn secondary"
+		discardBtn.className = "bpmnkit-close-dialog-btn secondary"
 		discardBtn.textContent = "Close without saving"
 		discardBtn.addEventListener("click", () => {
 			dismiss()
@@ -392,7 +392,7 @@ export function createTabsPlugin(options: TabsPluginOptions = {}): CanvasPlugin 
 		if (onDownload) {
 			const downloadBtn = document.createElement("button")
 			downloadBtn.type = "button"
-			downloadBtn.className = "bpmn-close-dialog-btn primary"
+			downloadBtn.className = "bpmnkit-close-dialog-btn primary"
 			downloadBtn.textContent = "Download & Close"
 			downloadBtn.addEventListener("click", () => {
 				dismiss()
@@ -420,15 +420,15 @@ export function createTabsPlugin(options: TabsPluginOptions = {}): CanvasPlugin 
 
 	function createWelcomeEl(): HTMLDivElement {
 		const el = document.createElement("div")
-		el.className = "bpmn-welcome"
+		el.className = "bpmnkit-welcome"
 		el.dataset.theme = theme
 		el.style.display = "none"
 
 		const inner = document.createElement("div")
-		inner.className = "bpmn-welcome-inner"
+		inner.className = "bpmnkit-welcome-inner"
 
 		const iconEl = document.createElement("div")
-		iconEl.className = "bpmn-welcome-icon"
+		iconEl.className = "bpmnkit-welcome-icon"
 		iconEl.innerHTML =
 			'<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">' +
 			'<polygon points="50,10 90,50 50,90 10,50" fill="currentColor"/>' +
@@ -438,27 +438,27 @@ export function createTabsPlugin(options: TabsPluginOptions = {}): CanvasPlugin 
 		inner.appendChild(iconEl)
 
 		const title = document.createElement("h2")
-		title.className = "bpmn-welcome-title"
+		title.className = "bpmnkit-welcome-title"
 		title.textContent = "BPMN Editor"
 		inner.appendChild(title)
 
 		const sub = document.createElement("p")
-		sub.className = "bpmn-welcome-sub"
+		sub.className = "bpmnkit-welcome-sub"
 		sub.textContent = "Open a diagram or start fresh to get going."
 		inner.appendChild(sub)
 
 		const actions = document.createElement("div")
-		actions.className = "bpmn-welcome-actions"
+		actions.className = "bpmnkit-welcome-actions"
 
 		const newBtn = document.createElement("button")
 		newBtn.type = "button"
-		newBtn.className = "bpmn-welcome-btn primary"
+		newBtn.className = "bpmnkit-welcome-btn primary"
 		newBtn.textContent = "New diagram"
 		newBtn.addEventListener("click", () => options.onNewDiagram?.())
 
 		const importBtn = document.createElement("button")
 		importBtn.type = "button"
-		importBtn.className = "bpmn-welcome-btn secondary"
+		importBtn.className = "bpmnkit-welcome-btn secondary"
 		importBtn.textContent = "Import files\u2026"
 		importBtn.addEventListener("click", () => {
 			if (options.onImportFiles) {
@@ -475,12 +475,12 @@ export function createTabsPlugin(options: TabsPluginOptions = {}): CanvasPlugin 
 		if (options.getRecentProjects) {
 			const recentBtn = document.createElement("button")
 			recentBtn.type = "button"
-			recentBtn.className = "bpmn-welcome-btn secondary"
+			recentBtn.className = "bpmnkit-welcome-btn secondary"
 			recentBtn.disabled = true
 			recentBtnEl = recentBtn
 
 			const recentList = document.createElement("div")
-			recentList.className = "bpmn-welcome-recent-list"
+			recentList.className = "bpmnkit-welcome-recent-list"
 			recentList.style.display = "none"
 			recentListEl = recentList
 
@@ -497,40 +497,40 @@ export function createTabsPlugin(options: TabsPluginOptions = {}): CanvasPlugin 
 
 		if (options.examples && options.examples.length > 0) {
 			const divider = document.createElement("div")
-			divider.className = "bpmn-welcome-divider"
+			divider.className = "bpmnkit-welcome-divider"
 			inner.appendChild(divider)
 
 			const examplesLabel = document.createElement("div")
-			examplesLabel.className = "bpmn-welcome-examples-label"
+			examplesLabel.className = "bpmnkit-welcome-examples-label"
 			examplesLabel.textContent = "Examples"
 			inner.appendChild(examplesLabel)
 
 			const list = document.createElement("div")
-			list.className = "bpmn-welcome-examples"
+			list.className = "bpmnkit-welcome-examples"
 			for (const example of options.examples) {
 				const item = document.createElement("button")
 				item.type = "button"
-				item.className = "bpmn-welcome-example"
+				item.className = "bpmnkit-welcome-example"
 				item.addEventListener("click", () => example.onOpen())
 
 				if (example.badge) {
 					const badge = document.createElement("span")
-					badge.className = `bpmn-welcome-example-badge ${example.badge.toLowerCase()}`
+					badge.className = `bpmnkit-welcome-example-badge ${example.badge.toLowerCase()}`
 					badge.textContent = example.badge
 					item.appendChild(badge)
 				}
 
 				const text = document.createElement("span")
-				text.className = "bpmn-welcome-example-text"
+				text.className = "bpmnkit-welcome-example-text"
 
 				const labelEl = document.createElement("span")
-				labelEl.className = "bpmn-welcome-example-label"
+				labelEl.className = "bpmnkit-welcome-example-label"
 				labelEl.textContent = example.label
 				text.appendChild(labelEl)
 
 				if (example.description) {
 					const descEl = document.createElement("span")
-					descEl.className = "bpmn-welcome-example-desc"
+					descEl.className = "bpmnkit-welcome-example-desc"
 					descEl.textContent = example.description
 					text.appendChild(descEl)
 				}
@@ -538,7 +538,7 @@ export function createTabsPlugin(options: TabsPluginOptions = {}): CanvasPlugin 
 				item.appendChild(text)
 
 				const arrow = document.createElement("span")
-				arrow.className = "bpmn-welcome-example-arrow"
+				arrow.className = "bpmnkit-welcome-example-arrow"
 				arrow.innerHTML =
 					'<svg viewBox="0 0 8 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="1,1 7,6 1,11"/></svg>'
 				item.appendChild(arrow)
@@ -551,7 +551,7 @@ export function createTabsPlugin(options: TabsPluginOptions = {}): CanvasPlugin 
 		// Placeholder for dynamic sections (e.g. projects) — populated on each show
 		if (options.getWelcomeSections) {
 			const sectionsContainer = document.createElement("div")
-			sectionsContainer.className = "bpmn-welcome-dynamic-sections"
+			sectionsContainer.className = "bpmnkit-welcome-dynamic-sections"
 			inner.appendChild(sectionsContainer)
 			dynamicSectionsEl = sectionsContainer
 		}
@@ -569,41 +569,41 @@ export function createTabsPlugin(options: TabsPluginOptions = {}): CanvasPlugin 
 			const items = section.getItems()
 
 			const divider = document.createElement("div")
-			divider.className = "bpmn-welcome-divider"
+			divider.className = "bpmnkit-welcome-divider"
 			container.appendChild(divider)
 
 			const sectionLabel = document.createElement("div")
-			sectionLabel.className = "bpmn-welcome-examples-label"
+			sectionLabel.className = "bpmnkit-welcome-examples-label"
 			sectionLabel.textContent = section.label
 			container.appendChild(sectionLabel)
 
 			if (items.length === 0 && section.emptyText) {
 				const empty = document.createElement("div")
-				empty.className = "bpmn-welcome-empty"
+				empty.className = "bpmnkit-welcome-empty"
 				empty.textContent = section.emptyText
 				container.appendChild(empty)
 				continue
 			}
 
 			const list = document.createElement("div")
-			list.className = "bpmn-welcome-examples"
+			list.className = "bpmnkit-welcome-examples"
 			for (const item of items) {
 				const btn = document.createElement("button")
 				btn.type = "button"
-				btn.className = "bpmn-welcome-example"
+				btn.className = "bpmnkit-welcome-example"
 				btn.addEventListener("click", () => item.onOpen())
 
 				const text = document.createElement("span")
-				text.className = "bpmn-welcome-example-text"
+				text.className = "bpmnkit-welcome-example-text"
 
 				const labelEl = document.createElement("span")
-				labelEl.className = "bpmn-welcome-example-label"
+				labelEl.className = "bpmnkit-welcome-example-label"
 				labelEl.textContent = item.label
 				text.appendChild(labelEl)
 
 				if (item.description) {
 					const descEl = document.createElement("span")
-					descEl.className = "bpmn-welcome-example-desc"
+					descEl.className = "bpmnkit-welcome-example-desc"
 					descEl.textContent = item.description
 					text.appendChild(descEl)
 				}
@@ -611,7 +611,7 @@ export function createTabsPlugin(options: TabsPluginOptions = {}): CanvasPlugin 
 				btn.appendChild(text)
 
 				const arrow = document.createElement("span")
-				arrow.className = "bpmn-welcome-example-arrow"
+				arrow.className = "bpmnkit-welcome-example-arrow"
 				arrow.innerHTML =
 					'<svg viewBox="0 0 8 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="1,1 7,6 1,11"/></svg>'
 				btn.appendChild(arrow)
@@ -640,23 +640,23 @@ export function createTabsPlugin(options: TabsPluginOptions = {}): CanvasPlugin 
 		for (const item of items) {
 			const btn = document.createElement("button")
 			btn.type = "button"
-			btn.className = "bpmn-welcome-example"
+			btn.className = "bpmnkit-welcome-example"
 			btn.addEventListener("click", () => {
 				if (recentListEl) recentListEl.style.display = "none"
 				item.onOpen()
 			})
 
 			const text = document.createElement("span")
-			text.className = "bpmn-welcome-example-text"
+			text.className = "bpmnkit-welcome-example-text"
 
 			const labelEl = document.createElement("span")
-			labelEl.className = "bpmn-welcome-example-label"
+			labelEl.className = "bpmnkit-welcome-example-label"
 			labelEl.textContent = item.label
 			text.appendChild(labelEl)
 
 			if (item.description) {
 				const descEl = document.createElement("span")
-				descEl.className = "bpmn-welcome-example-desc"
+				descEl.className = "bpmnkit-welcome-example-desc"
 				descEl.textContent = item.description
 				text.appendChild(descEl)
 			}
@@ -664,7 +664,7 @@ export function createTabsPlugin(options: TabsPluginOptions = {}): CanvasPlugin 
 			btn.appendChild(text)
 
 			const arrow = document.createElement("span")
-			arrow.className = "bpmn-welcome-example-arrow"
+			arrow.className = "bpmnkit-welcome-example-arrow"
 			arrow.innerHTML =
 				'<svg viewBox="0 0 8 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="1,1 7,6 1,11"/></svg>'
 			btn.appendChild(arrow)
@@ -676,7 +676,7 @@ export function createTabsPlugin(options: TabsPluginOptions = {}): CanvasPlugin 
 	function showWelcomeScreen(): void {
 		if (welcomeEl) welcomeEl.style.display = ""
 		if (tabBar) tabBar.style.display = "none"
-		canvasApi?.container.classList.add("bpmn-welcome-active")
+		canvasApi?.container.classList.add("bpmnkit-welcome-active")
 		renderDynamicSections()
 		renderRecentProjects()
 		// Defer so the callback runs after all synchronous plugin/HUD initialization
@@ -688,7 +688,7 @@ export function createTabsPlugin(options: TabsPluginOptions = {}): CanvasPlugin 
 	function hideWelcomeScreen(): void {
 		if (welcomeEl) welcomeEl.style.display = "none"
 		if (tabBar) tabBar.style.display = ""
-		canvasApi?.container.classList.remove("bpmn-welcome-active")
+		canvasApi?.container.classList.remove("bpmnkit-welcome-active")
 	}
 
 	// --- Group dropdown ---
@@ -705,17 +705,17 @@ export function createTabsPlugin(options: TabsPluginOptions = {}): CanvasPlugin 
 
 		for (const tab of group) {
 			const item = document.createElement("div")
-			item.className = "bpmn-tab-drop-item"
+			item.className = "bpmnkit-tab-drop-item"
 			if (tab.id === groupActiveId.get(type)) item.classList.add("active")
 
 			const nameSpan = document.createElement("span")
-			nameSpan.className = "bpmn-tab-drop-name"
+			nameSpan.className = "bpmnkit-tab-drop-name"
 			nameSpan.textContent = tab.config.name ?? tab.id
 			item.appendChild(nameSpan)
 
 			if (!isProjectMode) {
 				const closeBtn = document.createElement("span")
-				closeBtn.className = "bpmn-tab-close"
+				closeBtn.className = "bpmnkit-tab-close"
 				closeBtn.textContent = "×"
 				closeBtn.addEventListener("click", (e) => {
 					e.stopPropagation()
@@ -796,11 +796,11 @@ export function createTabsPlugin(options: TabsPluginOptions = {}): CanvasPlugin 
 		isGroupActive: boolean,
 	): void {
 		const el = document.createElement("div")
-		el.className = `bpmn-tab${isGroupActive ? " active" : ""}`
+		el.className = `bpmnkit-tab${isGroupActive ? " active" : ""}`
 
 		// Type badge
 		const typeBadge = document.createElement("span")
-		typeBadge.className = `bpmn-tab-type ${type}`
+		typeBadge.className = `bpmnkit-tab-type ${type}`
 		typeBadge.textContent = type.toUpperCase()
 		el.appendChild(typeBadge)
 
@@ -808,14 +808,14 @@ export function createTabsPlugin(options: TabsPluginOptions = {}): CanvasPlugin 
 		const activeTabId = groupActiveId.get(type)
 		const activeTab = group.find((t) => t.id === activeTabId) ?? group[0]
 		const nameEl = document.createElement("span")
-		nameEl.className = "bpmn-tab-name"
+		nameEl.className = "bpmnkit-tab-name"
 		nameEl.textContent = activeTab?.config.name ?? type
 		el.appendChild(nameEl)
 
 		// Warn indicator — shown if the group's active tab has a warning
 		if (activeTab?.hasWarning) {
 			const warnEl = document.createElement("span")
-			warnEl.className = "bpmn-tab-warn"
+			warnEl.className = "bpmnkit-tab-warn"
 			warnEl.textContent = "⚠"
 			warnEl.title = "Referenced file not found in registry"
 			el.appendChild(warnEl)
@@ -824,7 +824,7 @@ export function createTabsPlugin(options: TabsPluginOptions = {}): CanvasPlugin 
 		if (group.length > 1) {
 			// Chevron — opens the group dropdown listing all files of this type
 			const chevron = document.createElement("span")
-			chevron.className = "bpmn-tab-chevron"
+			chevron.className = "bpmnkit-tab-chevron"
 			chevron.innerHTML =
 				'<svg viewBox="0 0 10 6" fill="currentColor"><path d="M0 0l5 6 5-6z"/></svg>'
 			el.appendChild(chevron)
@@ -833,7 +833,7 @@ export function createTabsPlugin(options: TabsPluginOptions = {}): CanvasPlugin 
 			const tab = group[0]
 			if (tab) {
 				const closeBtn = document.createElement("span")
-				closeBtn.className = "bpmn-tab-close"
+				closeBtn.className = "bpmnkit-tab-close"
 				closeBtn.textContent = "×"
 				closeBtn.addEventListener("click", (e) => {
 					e.stopPropagation()
@@ -860,7 +860,7 @@ export function createTabsPlugin(options: TabsPluginOptions = {}): CanvasPlugin 
 
 	function mountTabContent(tab: TabState): void {
 		const pane = document.createElement("div")
-		pane.className = "bpmn-tab-pane hidden"
+		pane.className = "bpmnkit-tab-pane hidden"
 		contentArea?.appendChild(pane)
 		tab.pane = pane
 
@@ -1174,9 +1174,9 @@ export function createTabsPlugin(options: TabsPluginOptions = {}): CanvasPlugin 
 		setPlayMode(enabled: boolean): void {
 			if (tabBar === null) return
 			if (enabled) {
-				tabBar.classList.add("bpmn-play-mode")
+				tabBar.classList.add("bpmnkit-play-mode")
 			} else {
-				tabBar.classList.remove("bpmn-play-mode")
+				tabBar.classList.remove("bpmnkit-play-mode")
 			}
 		},
 
@@ -1264,20 +1264,20 @@ export function createTabsPlugin(options: TabsPluginOptions = {}): CanvasPlugin 
 
 			// Create tab bar
 			tabBar = document.createElement("div")
-			tabBar.className = "bpmn-tabs"
+			tabBar.className = "bpmnkit-tabs"
 			tabBar.dataset.theme = theme
 			container.appendChild(tabBar)
 
 			if (options.centerSlot) {
 				centerSlotEl = document.createElement("div")
-				centerSlotEl.className = "bpmn-tabs-center"
+				centerSlotEl.className = "bpmnkit-tabs-center"
 				centerSlotEl.appendChild(options.centerSlot)
 				tabBar.appendChild(centerSlotEl)
 			}
 
 			// Create content area (below tab bar)
 			contentArea = document.createElement("div")
-			contentArea.className = "bpmn-tab-content"
+			contentArea.className = "bpmnkit-tab-content"
 			container.appendChild(contentArea)
 
 			// Create welcome screen (shown until the first tab opens)
@@ -1287,12 +1287,12 @@ export function createTabsPlugin(options: TabsPluginOptions = {}): CanvasPlugin 
 
 			// Create raw source pane (overlaid on top of content when raw mode is on)
 			rawPaneEl = document.createElement("div")
-			rawPaneEl.className = "bpmn-raw-pane"
+			rawPaneEl.className = "bpmnkit-raw-pane"
 			rawPaneEl.dataset.theme = theme
 			rawPaneEl.style.display = "none"
 			const rawCopyBtn = document.createElement("button")
 			rawCopyBtn.type = "button"
-			rawCopyBtn.className = "bpmn-raw-copy-btn"
+			rawCopyBtn.className = "bpmnkit-raw-copy-btn"
 			rawCopyBtn.textContent = "Copy"
 			rawCopyBtn.addEventListener("click", () => {
 				const text = rawPreEl?.textContent ?? ""
@@ -1305,7 +1305,7 @@ export function createTabsPlugin(options: TabsPluginOptions = {}): CanvasPlugin 
 			})
 			rawPaneEl.appendChild(rawCopyBtn)
 			rawPreEl = document.createElement("pre")
-			rawPreEl.className = "bpmn-raw-content"
+			rawPreEl.className = "bpmnkit-raw-content"
 			rawPaneEl.appendChild(rawPreEl)
 			contentArea.appendChild(rawPaneEl)
 
@@ -1328,7 +1328,7 @@ export function createTabsPlugin(options: TabsPluginOptions = {}): CanvasPlugin 
 
 			// Create body-level dropdown for groups with multiple files
 			dropdownEl = document.createElement("div")
-			dropdownEl.className = "bpmn-tab-dropdown"
+			dropdownEl.className = "bpmnkit-tab-dropdown"
 			dropdownEl.dataset.theme = theme
 			document.body.appendChild(dropdownEl)
 

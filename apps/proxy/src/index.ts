@@ -4,16 +4,16 @@ import http from "node:http"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
-import { Bpmn, expand, optimize } from "@bpmn-sdk/core"
-import type { CompactDiagram } from "@bpmn-sdk/core"
-import { createClientFromProfile } from "@bpmn-sdk/profiles"
+import { Bpmn, expand, optimize } from "@bpmnkit/core"
+import type { CompactDiagram } from "@bpmnkit/core"
+import { createClientFromProfile } from "@bpmnkit/profiles"
 import {
 	getActiveName,
 	getActiveProfile,
 	getAuthHeader,
 	getProfile,
 	listProfiles,
-} from "@bpmn-sdk/profiles"
+} from "@bpmnkit/profiles"
 import * as claude from "./adapters/claude.js"
 import * as copilot from "./adapters/copilot.js"
 import * as gemini from "./adapters/gemini.js"
@@ -218,7 +218,7 @@ const server = http.createServer(async (req, res) => {
 		let outputFile: string | null = null
 
 		if (detected.adapter.supportsMcp) {
-			tmpDir = mkdtempSync(join(tmpdir(), "bpmn-mcp-"))
+			tmpDir = mkdtempSync(join(tmpdir(), "bpmnkit-mcp-"))
 			const inputFile = join(tmpDir, "input.json")
 			outputFile = join(tmpDir, "output.json")
 			mcpConfigFile = join(tmpDir, "mcp.json")
@@ -697,6 +697,6 @@ const server = http.createServer(async (req, res) => {
 })
 
 server.listen(PORT, () => {
-	console.log(`BPMN SDK AI Server running at http://localhost:${PORT}`)
+	console.log(`BPMN Kit AI Server running at http://localhost:${PORT}`)
 	console.log("Press Ctrl+C to stop")
 })

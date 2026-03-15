@@ -1,5 +1,5 @@
-import type { ViewportState } from "@bpmn-sdk/canvas"
-import { readDiColor } from "@bpmn-sdk/core"
+import type { ViewportState } from "@bpmnkit/canvas"
+import { readDiColor } from "@bpmnkit/core"
 import { injectHudStyles } from "./css.js"
 import type { BpmnEditor } from "./editor.js"
 import {
@@ -315,60 +315,60 @@ export function initEditorHud(
 
 	// Simulation active banner
 	const simBannerEl = document.createElement("div")
-	simBannerEl.id = "bpmn-sim-banner"
+	simBannerEl.id = "bpmnkit-sim-banner"
 	simBannerEl.className = "hidden"
 	const simBannerText = document.createElement("span")
 	simBannerText.textContent = "Simulation active — editing is disabled"
 	const simBannerExit = document.createElement("button")
-	simBannerExit.id = "bpmn-sim-banner-exit"
+	simBannerExit.id = "bpmnkit-sim-banner-exit"
 	simBannerExit.textContent = "Exit simulation"
 	simBannerExit.addEventListener("click", () => options.onExitSimulation?.())
 	simBannerEl.append(simBannerText, simBannerExit)
 
 	// Right-click context menu
 	const ctxMenuEl = document.createElement("div")
-	ctxMenuEl.id = "bpmn-ctx-menu"
+	ctxMenuEl.id = "bpmnkit-ctx-menu"
 	ctxMenuEl.className = "dropdown"
 
 	// Element search bar
 	const searchBarEl = document.createElement("div")
-	searchBarEl.id = "bpmn-search-bar"
+	searchBarEl.id = "bpmnkit-search-bar"
 	searchBarEl.className = "hidden"
 	const searchInput = document.createElement("input")
-	searchInput.id = "bpmn-search-input"
+	searchInput.id = "bpmnkit-search-input"
 	searchInput.type = "text"
 	searchInput.placeholder = "Search elements…"
 	searchInput.setAttribute("aria-label", "Search diagram elements")
 	const searchCount = document.createElement("span")
-	searchCount.id = "bpmn-search-count"
+	searchCount.id = "bpmnkit-search-count"
 	const searchClose = document.createElement("button")
-	searchClose.id = "bpmn-search-close"
+	searchClose.id = "bpmnkit-search-close"
 	searchClose.textContent = "×"
 	searchClose.title = "Close search (Escape)"
 	searchBarEl.append(searchInput, searchCount, searchClose)
 
 	// Keyboard shortcuts modal
 	const shortcutsModal = document.createElement("div")
-	shortcutsModal.id = "bpmn-shortcuts-modal"
+	shortcutsModal.id = "bpmnkit-shortcuts-modal"
 	shortcutsModal.className = "hidden"
 	const shortcutsInner = document.createElement("div")
-	shortcutsInner.id = "bpmn-shortcuts-inner"
+	shortcutsInner.id = "bpmnkit-shortcuts-inner"
 	const shortcutsTitle = document.createElement("h3")
 	shortcutsTitle.textContent = "Keyboard shortcuts"
 	shortcutsInner.appendChild(shortcutsTitle)
 	for (const [key, desc] of SHORTCUTS) {
 		const row = document.createElement("div")
-		row.className = "bpmn-sc-row"
+		row.className = "bpmnkit-sc-row"
 		const descEl = document.createElement("span")
 		descEl.textContent = desc
 		const keyEl = document.createElement("kbd")
-		keyEl.className = "bpmn-sc-key"
+		keyEl.className = "bpmnkit-sc-key"
 		keyEl.textContent = key
 		row.append(descEl, keyEl)
 		shortcutsInner.appendChild(row)
 	}
 	const shortcutsClose = document.createElement("button")
-	shortcutsClose.id = "bpmn-shortcuts-close"
+	shortcutsClose.id = "bpmnkit-shortcuts-close"
 	shortcutsClose.textContent = "Close"
 	shortcutsClose.addEventListener("click", () => shortcutsModal.classList.add("hidden"))
 	shortcutsModal.addEventListener("click", (e) => {
@@ -602,8 +602,8 @@ export function initEditorHud(
 		const clearSwatch = document.createElement("button")
 		const isDefault = !currentFill
 		clearSwatch.className = isDefault
-			? "bpmn-color-swatch bpmn-color-swatch--default active"
-			: "bpmn-color-swatch bpmn-color-swatch--default"
+			? "bpmnkit-color-swatch bpmnkit-color-swatch--default active"
+			: "bpmnkit-color-swatch bpmnkit-color-swatch--default"
 		clearSwatch.title = "Default color"
 		clearSwatch.addEventListener("click", (e) => {
 			e.stopPropagation()
@@ -615,7 +615,7 @@ export function initEditorHud(
 		for (const { fill, stroke } of COLOR_PALETTE) {
 			const isActive = currentFill === fill
 			const swatch = document.createElement("button")
-			swatch.className = isActive ? "bpmn-color-swatch active" : "bpmn-color-swatch"
+			swatch.className = isActive ? "bpmnkit-color-swatch active" : "bpmnkit-color-swatch"
 			swatch.style.background = fill
 			swatch.style.outlineColor = stroke
 			swatch.title = "Apply color"
@@ -1071,8 +1071,8 @@ export function initEditorHud(
 
 			const singleSwatch = document.createElement("button")
 			singleSwatch.className = currentFill
-				? "bpmn-color-swatch active"
-				: "bpmn-color-swatch bpmn-color-swatch--default"
+				? "bpmnkit-color-swatch active"
+				: "bpmnkit-color-swatch bpmnkit-color-swatch--default"
 			if (currentFill) {
 				singleSwatch.style.background = currentFill
 				const palette = COLOR_PALETTE.find((p) => p.fill === currentFill)
@@ -1574,21 +1574,21 @@ export function initEditorHud(
 		onClick?: () => void,
 	): HTMLButtonElement {
 		const btn = document.createElement("button")
-		btn.className = `bpmn-onboard-btn${extraClass ? ` ${extraClass}` : ""}`
+		btn.className = `bpmnkit-onboard-btn${extraClass ? ` ${extraClass}` : ""}`
 
 		const iconEl = document.createElement("div")
-		iconEl.className = "bpmn-onboard-btn-icon"
+		iconEl.className = "bpmnkit-onboard-btn-icon"
 		iconEl.innerHTML = iconHtml
 
 		const labelEl = document.createElement("div")
-		labelEl.className = "bpmn-onboard-btn-label"
+		labelEl.className = "bpmnkit-onboard-btn-label"
 
 		const titleEl = document.createElement("p")
-		titleEl.className = "bpmn-onboard-btn-title"
+		titleEl.className = "bpmnkit-onboard-btn-title"
 		titleEl.textContent = title
 
 		const descEl = document.createElement("p")
-		descEl.className = "bpmn-onboard-btn-desc"
+		descEl.className = "bpmnkit-onboard-btn-desc"
 		descEl.textContent = desc
 
 		labelEl.append(titleEl, descEl)
@@ -1598,18 +1598,18 @@ export function initEditorHud(
 	}
 
 	const onboardEl = document.createElement("div")
-	onboardEl.id = "bpmn-empty-state"
+	onboardEl.id = "bpmnkit-empty-state"
 	onboardEl.style.display = "none"
 
 	const onboardInner = document.createElement("div")
-	onboardInner.className = "bpmn-onboard-inner"
+	onboardInner.className = "bpmnkit-onboard-inner"
 
 	const onboardHeader = document.createElement("div")
-	onboardHeader.className = "bpmn-onboard-header"
-	onboardHeader.innerHTML = `<p class="bpmn-onboard-title">How do you want to start?</p><p class="bpmn-onboard-sub">Choose an option to begin designing your process</p>`
+	onboardHeader.className = "bpmnkit-onboard-header"
+	onboardHeader.innerHTML = `<p class="bpmnkit-onboard-title">How do you want to start?</p><p class="bpmnkit-onboard-sub">Choose an option to begin designing your process</p>`
 
 	const onboardActions = document.createElement("div")
-	onboardActions.className = "bpmn-onboard-actions"
+	onboardActions.className = "bpmnkit-onboard-actions"
 
 	const scratchBtn = makeOnboardBtn(
 		IC.startEvent,
@@ -1639,7 +1639,7 @@ export function initEditorHud(
 		IC.sparkle,
 		"Ask AI",
 		"Describe your process and let AI build the diagram",
-		"bpmn-onboard-btn--ai",
+		"bpmnkit-onboard-btn--ai",
 		() => {
 			hideOnboarding()
 			options.onStartFromScratch?.()
@@ -1691,7 +1691,7 @@ export function initEditorHud(
 
 	function setSimulationActive(active: boolean): void {
 		simBannerEl.classList.toggle("hidden", !active)
-		editor.container.classList.toggle("bpmn-sim-active", active)
+		editor.container.classList.toggle("bpmnkit-sim-active", active)
 	}
 
 	// ── Editor event subscriptions ─────────────────────────────────────────────

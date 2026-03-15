@@ -1,26 +1,23 @@
-import type { CanvasApi, CanvasPlugin } from "@bpmn-sdk/canvas"
-import { Bpmn, Dmn, Form } from "@bpmn-sdk/core"
-import { BpmnEditor, createSideDock, initEditorHud } from "@bpmn-sdk/editor"
-import type { Tool } from "@bpmn-sdk/editor"
-import { Engine } from "@bpmn-sdk/engine"
-import { createAiBridgePlugin } from "@bpmn-sdk/plugins/ai-bridge"
-import { createAsciiViewPlugin } from "@bpmn-sdk/plugins/ascii-view"
-import { createCommandPalettePlugin } from "@bpmn-sdk/plugins/command-palette"
-import { createCommandPaletteEditorPlugin } from "@bpmn-sdk/plugins/command-palette-editor"
-import { createConfigPanelPlugin } from "@bpmn-sdk/plugins/config-panel"
-import { createConfigPanelBpmnPlugin } from "@bpmn-sdk/plugins/config-panel-bpmn"
-import { createElementDocsPlugin } from "@bpmn-sdk/plugins/element-docs"
-import { createHistoryPanel, saveCheckpoint } from "@bpmn-sdk/plugins/history"
-import { createMainMenuPlugin } from "@bpmn-sdk/plugins/main-menu"
-import { createOptimizePlugin } from "@bpmn-sdk/plugins/optimize"
-import { createProcessRunnerPlugin } from "@bpmn-sdk/plugins/process-runner"
-import {
-	InMemoryFileResolver,
-	createStorageTabsBridge,
-} from "@bpmn-sdk/plugins/storage-tabs-bridge"
-import { createTokenHighlightPlugin } from "@bpmn-sdk/plugins/token-highlight"
-import { createWatermarkPlugin } from "@bpmn-sdk/plugins/watermark"
-import { createZoomControlsPlugin } from "@bpmn-sdk/plugins/zoom-controls"
+import type { CanvasApi, CanvasPlugin } from "@bpmnkit/canvas"
+import { Bpmn, Dmn, Form } from "@bpmnkit/core"
+import { BpmnEditor, createSideDock, initEditorHud } from "@bpmnkit/editor"
+import type { Tool } from "@bpmnkit/editor"
+import { Engine } from "@bpmnkit/engine"
+import { createAiBridgePlugin } from "@bpmnkit/plugins/ai-bridge"
+import { createAsciiViewPlugin } from "@bpmnkit/plugins/ascii-view"
+import { createCommandPalettePlugin } from "@bpmnkit/plugins/command-palette"
+import { createCommandPaletteEditorPlugin } from "@bpmnkit/plugins/command-palette-editor"
+import { createConfigPanelPlugin } from "@bpmnkit/plugins/config-panel"
+import { createConfigPanelBpmnPlugin } from "@bpmnkit/plugins/config-panel-bpmn"
+import { createElementDocsPlugin } from "@bpmnkit/plugins/element-docs"
+import { createHistoryPanel, saveCheckpoint } from "@bpmnkit/plugins/history"
+import { createMainMenuPlugin } from "@bpmnkit/plugins/main-menu"
+import { createOptimizePlugin } from "@bpmnkit/plugins/optimize"
+import { createProcessRunnerPlugin } from "@bpmnkit/plugins/process-runner"
+import { InMemoryFileResolver, createStorageTabsBridge } from "@bpmnkit/plugins/storage-tabs-bridge"
+import { createTokenHighlightPlugin } from "@bpmnkit/plugins/token-highlight"
+import { createWatermarkPlugin } from "@bpmnkit/plugins/watermark"
+import { createZoomControlsPlugin } from "@bpmnkit/plugins/zoom-controls"
 import { makeExamples } from "./examples.js"
 import { savePng, saveSvg } from "./export.js"
 
@@ -82,7 +79,7 @@ function setHudVisible(visible: boolean): void {
 	for (const el of document.querySelectorAll<HTMLElement>(".hud")) {
 		el.style.display = visible ? "" : "none"
 	}
-	const menuPanel = document.querySelector<HTMLElement>(".bpmn-main-menu-panel")
+	const menuPanel = document.querySelector<HTMLElement>(".bpmnkit-main-menu-panel")
 	if (menuPanel) menuPanel.style.display = visible ? "" : "none"
 }
 
@@ -94,7 +91,7 @@ document.body.appendChild(dock.el)
 // ── Main menu ─────────────────────────────────────────────────────────────────
 
 const mainMenuPlugin = createMainMenuPlugin({
-	title: "BPMN SDK",
+	title: "BPMN Kit",
 	menuItems: [
 		{
 			type: "drill",
@@ -234,7 +231,7 @@ const processRunnerPlugin = createProcessRunnerPlugin({
 		const el = document.getElementById("hud-bottom-center")
 		if (el) el.style.display = "none"
 		processRunnerPlugin.toolbar.style.display = ""
-		dock.propertiesPane.classList.add("bpmn-props-readonly")
+		dock.propertiesPane.classList.add("bpmnkit-props-readonly")
 		bridge.tabsPlugin.api.setPlayMode(true)
 		hudRef?.setSimulationActive(true)
 	},
@@ -242,7 +239,7 @@ const processRunnerPlugin = createProcessRunnerPlugin({
 		const el = document.getElementById("hud-bottom-center")
 		if (el) el.style.display = currentFileName !== null ? "" : "none"
 		processRunnerPlugin.toolbar.style.display = "none"
-		dock.propertiesPane.classList.remove("bpmn-props-readonly")
+		dock.propertiesPane.classList.remove("bpmnkit-props-readonly")
 		bridge.tabsPlugin.api.setPlayMode(false)
 		hudRef?.setSimulationActive(false)
 	},
@@ -250,7 +247,7 @@ const processRunnerPlugin = createProcessRunnerPlugin({
 })
 
 // Position runner toolbar at bottom center, hidden until play mode activates
-processRunnerPlugin.toolbar.classList.add("bpmn-runner-toolbar--hud-bottom")
+processRunnerPlugin.toolbar.classList.add("bpmnkit-runner-toolbar--hud-bottom")
 processRunnerPlugin.toolbar.style.display = "none"
 document.body.appendChild(processRunnerPlugin.toolbar)
 
@@ -260,7 +257,7 @@ const bridge = createStorageTabsBridge({
 	mainMenu: mainMenuPlugin,
 	resolver,
 	getExamples: (api) => makeExamples(api, resolver),
-	initialTitle: "BPMN SDK",
+	initialTitle: "BPMN Kit",
 	palette,
 	enableFileImport: true,
 	sideDock: dock,
@@ -437,7 +434,7 @@ const editor = new BpmnEditor({
 		exportCapturePlugin,
 		createZoomControlsPlugin(),
 		createWatermarkPlugin({
-			links: [{ label: "Github", url: "https://github.com/bpmn-sdk/monorepo" }],
+			links: [{ label: "Github", url: "https://github.com/bpmnkit/monorepo" }],
 			logo: LOGO_SVG,
 		}),
 		bridge.tabsPlugin,

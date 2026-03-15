@@ -1,10 +1,10 @@
 /**
- * @bpmn-sdk/canvas-plugin-command-palette — Ctrl+K / ⌘K command palette for
- * `@bpmn-sdk/canvas` and `@bpmn-sdk/editor`.
+ * @bpmnkit/canvas-plugin-command-palette — Ctrl+K / ⌘K command palette for
+ * `@bpmnkit/canvas` and `@bpmnkit/editor`.
  *
  * ## Usage
  * ```typescript
- * import { createCommandPalettePlugin } from "@bpmn-sdk/canvas-plugin-command-palette";
+ * import { createCommandPalettePlugin } from "@bpmnkit/canvas-plugin-command-palette";
  *
  * const palette = createCommandPalettePlugin({
  *   onZenModeChange: (active) => {
@@ -20,10 +20,10 @@
  * @packageDocumentation
  */
 
-import { computeDiagramBounds } from "@bpmn-sdk/canvas"
-import type { CanvasApi, CanvasPlugin, Theme } from "@bpmn-sdk/canvas"
-import { Bpmn } from "@bpmn-sdk/core"
-import type { BpmnDefinitions } from "@bpmn-sdk/core"
+import { computeDiagramBounds } from "@bpmnkit/canvas"
+import type { CanvasApi, CanvasPlugin, Theme } from "@bpmnkit/canvas"
+import { Bpmn } from "@bpmnkit/core"
+import type { BpmnDefinitions } from "@bpmnkit/core"
 import { injectCommandPaletteStyles } from "./css.js"
 
 export {
@@ -192,8 +192,8 @@ export function createCommandPalettePlugin(
 	function toggleZenMode(): void {
 		if (!_api) return
 		_isZenMode = !_isZenMode
-		_api.container.classList.toggle("bpmn-zen-mode", _isZenMode)
-		const gridRects = _api.svg.querySelectorAll<SVGRectElement>('rect[fill^="url(#bpmn-grid"]')
+		_api.container.classList.toggle("bpmnkit-zen-mode", _isZenMode)
+		const gridRects = _api.svg.querySelectorAll<SVGRectElement>('rect[fill^="url(#bpmnkit-grid"]')
 		for (const rect of gridRects) {
 			rect.style.visibility = _isZenMode ? "hidden" : ""
 		}
@@ -212,33 +212,35 @@ export function createCommandPalettePlugin(
 		const isDark = resolveTheme(_api.getTheme()) === "dark"
 
 		const overlay = document.createElement("div")
-		overlay.className = isDark ? "bpmn-palette-overlay" : "bpmn-palette-overlay bpmn-palette--light"
+		overlay.className = isDark
+			? "bpmnkit-palette-overlay"
+			: "bpmnkit-palette-overlay bpmnkit-palette--light"
 		overlay.setAttribute("role", "dialog")
 		overlay.setAttribute("aria-modal", "true")
 		overlay.setAttribute("aria-label", "Command palette")
 
 		const panel = document.createElement("div")
-		panel.className = "bpmn-palette-panel"
+		panel.className = "bpmnkit-palette-panel"
 
 		// Search row
 		const searchRow = document.createElement("div")
-		searchRow.className = "bpmn-palette-search"
+		searchRow.className = "bpmnkit-palette-search"
 
 		const iconEl = document.createElement("span")
-		iconEl.className = "bpmn-palette-search-icon"
+		iconEl.className = "bpmnkit-palette-search-icon"
 		iconEl.innerHTML = SEARCH_ICON
 		searchRow.appendChild(iconEl)
 
 		const input = document.createElement("input")
 		input.type = "text"
-		input.className = "bpmn-palette-input"
+		input.className = "bpmnkit-palette-input"
 		input.placeholder = "Search commands\u2026"
 		input.setAttribute("autocomplete", "off")
 		input.setAttribute("spellcheck", "false")
 		searchRow.appendChild(input)
 
 		const kbdHint = document.createElement("span")
-		kbdHint.className = "bpmn-palette-kbd"
+		kbdHint.className = "bpmnkit-palette-kbd"
 		const kbdKey = document.createElement("kbd")
 		kbdKey.textContent = "Esc"
 		kbdHint.appendChild(kbdKey)
@@ -248,7 +250,7 @@ export function createCommandPalettePlugin(
 
 		// List
 		const list = document.createElement("div")
-		list.className = "bpmn-palette-list"
+		list.className = "bpmnkit-palette-list"
 		list.setAttribute("role", "listbox")
 		panel.appendChild(list)
 
@@ -301,7 +303,7 @@ export function createCommandPalettePlugin(
 
 		if (cmds.length === 0) {
 			const empty = document.createElement("div")
-			empty.className = "bpmn-palette-empty"
+			empty.className = "bpmnkit-palette-empty"
 			empty.textContent = "No commands found"
 			_listEl.appendChild(empty)
 			return
@@ -313,18 +315,20 @@ export function createCommandPalettePlugin(
 			if (!_listEl) return
 			const item = document.createElement("div")
 			item.className =
-				i === _focusedIndex ? "bpmn-palette-item bpmn-palette-focused" : "bpmn-palette-item"
+				i === _focusedIndex
+					? "bpmnkit-palette-item bpmnkit-palette-focused"
+					: "bpmnkit-palette-item"
 			item.setAttribute("role", "option")
 			item.setAttribute("aria-selected", String(i === _focusedIndex))
 
 			const titleEl = document.createElement("span")
-			titleEl.className = "bpmn-palette-item-title"
+			titleEl.className = "bpmnkit-palette-item-title"
 			titleEl.textContent = cmd.title
 			item.appendChild(titleEl)
 
 			if (cmd.description) {
 				const descEl = document.createElement("span")
-				descEl.className = "bpmn-palette-item-desc"
+				descEl.className = "bpmnkit-palette-item-desc"
 				descEl.textContent = cmd.description
 				item.appendChild(descEl)
 			}
@@ -344,17 +348,17 @@ export function createCommandPalettePlugin(
 
 	function updateFocus(): void {
 		if (!_listEl) return
-		const items = _listEl.querySelectorAll<HTMLDivElement>(".bpmn-palette-item")
+		const items = _listEl.querySelectorAll<HTMLDivElement>(".bpmnkit-palette-item")
 		items.forEach((item, i) => {
 			const focused = i === _focusedIndex
-			item.classList.toggle("bpmn-palette-focused", focused)
+			item.classList.toggle("bpmnkit-palette-focused", focused)
 			item.setAttribute("aria-selected", String(focused))
 		})
 	}
 
 	function scrollFocusedIntoView(): void {
 		if (!_listEl) return
-		const items = _listEl.querySelectorAll<HTMLDivElement>(".bpmn-palette-item")
+		const items = _listEl.querySelectorAll<HTMLDivElement>(".bpmnkit-palette-item")
 		const item = items[_focusedIndex]
 		item?.scrollIntoView({ block: "nearest" })
 	}
@@ -419,8 +423,10 @@ export function createCommandPalettePlugin(
 			document.removeEventListener("keydown", onDocKeyDown)
 			if (_isOpen) closePalette()
 			if (_isZenMode && _api) {
-				_api.container.classList.remove("bpmn-zen-mode")
-				const gridRects = _api.svg.querySelectorAll<SVGRectElement>('rect[fill^="url(#bpmn-grid"]')
+				_api.container.classList.remove("bpmnkit-zen-mode")
+				const gridRects = _api.svg.querySelectorAll<SVGRectElement>(
+					'rect[fill^="url(#bpmnkit-grid"]',
+				)
 				for (const rect of gridRects) {
 					rect.style.visibility = ""
 				}

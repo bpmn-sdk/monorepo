@@ -1,4 +1,4 @@
-const DB_NAME = "bpmn-sdk-ai"
+const DB_NAME = "bpmnkit-ai"
 const STORE = "checkpoints"
 const MAX_TODAY = 50
 const HISTORICAL_DAYS = 10

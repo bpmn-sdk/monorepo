@@ -1,4 +1,4 @@
-import { BpmnCanvas } from "@bpmn-sdk/canvas"
+import { BpmnCanvas } from "@bpmnkit/canvas"
 // @vitest-environment happy-dom
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { MINIMAP_STYLE_ID, createMinimapPlugin } from "../../src/minimap/index.js"
@@ -71,16 +71,16 @@ describe("createMinimapPlugin", () => {
 	it("mounts the minimap DOM inside the canvas host", () => {
 		const container = makeContainer()
 		new BpmnCanvas({ container, plugins: [createMinimapPlugin()] })
-		const host = container.querySelector(".bpmn-canvas-host")
-		expect(host?.querySelector(".bpmn-minimap")).not.toBeNull()
+		const host = container.querySelector(".bpmnkit-canvas-host")
+		expect(host?.querySelector(".bpmnkit-minimap")).not.toBeNull()
 	})
 
 	it("updates minimap shapes on diagram:load", () => {
 		const container = makeContainer()
 		const canvas = new BpmnCanvas({ container, plugins: [createMinimapPlugin()] })
 		canvas.load(SIMPLE_XML)
-		const host = container.querySelector(".bpmn-canvas-host")
-		const shapes = host?.querySelectorAll(".bpmn-minimap-shape")
+		const host = container.querySelector(".bpmnkit-canvas-host")
+		const shapes = host?.querySelectorAll(".bpmnkit-minimap-shape")
 		expect(shapes?.length).toBeGreaterThanOrEqual(3)
 	})
 
@@ -89,8 +89,8 @@ describe("createMinimapPlugin", () => {
 		const canvas = new BpmnCanvas({ container, plugins: [createMinimapPlugin()] })
 		canvas.load(SIMPLE_XML)
 		canvas.clear()
-		const host = container.querySelector(".bpmn-canvas-host")
-		const shapes = host?.querySelectorAll(".bpmn-minimap-shape")
+		const host = container.querySelector(".bpmnkit-canvas-host")
+		const shapes = host?.querySelectorAll(".bpmnkit-minimap-shape")
 		expect(shapes?.length).toBe(0)
 	})
 
@@ -99,7 +99,7 @@ describe("createMinimapPlugin", () => {
 		const canvas = new BpmnCanvas({ container, plugins: [createMinimapPlugin()] })
 		canvas.destroy()
 		// container.innerHTML was cleared by destroy, so just verify no minimap exists
-		expect(container.querySelector(".bpmn-minimap")).toBeNull()
+		expect(container.querySelector(".bpmnkit-minimap")).toBeNull()
 	})
 
 	it("each plugin instance is independent", () => {
@@ -107,8 +107,8 @@ describe("createMinimapPlugin", () => {
 		const c2 = makeContainer()
 		new BpmnCanvas({ container: c1, plugins: [createMinimapPlugin()] })
 		new BpmnCanvas({ container: c2, plugins: [createMinimapPlugin()] })
-		const mm1 = c1.querySelector(".bpmn-minimap")
-		const mm2 = c2.querySelector(".bpmn-minimap")
+		const mm1 = c1.querySelector(".bpmnkit-minimap")
+		const mm2 = c2.querySelector(".bpmnkit-minimap")
 		expect(mm1).not.toBeNull()
 		expect(mm2).not.toBeNull()
 		expect(mm1).not.toBe(mm2)
@@ -126,21 +126,21 @@ describe("Minimap", () => {
 		minimap = new Minimap(container, navigateCb)
 	})
 
-	it("appends .bpmn-minimap to the container", () => {
-		expect(container.querySelector(".bpmn-minimap")).not.toBeNull()
+	it("appends .bpmnkit-minimap to the container", () => {
+		expect(container.querySelector(".bpmnkit-minimap")).not.toBeNull()
 	})
 
 	it("clear() removes rendered shapes and edges", async () => {
-		const { Bpmn } = await import("@bpmn-sdk/core")
+		const { Bpmn } = await import("@bpmnkit/core")
 		const defs = Bpmn.parse(SIMPLE_XML)
 		minimap.update(defs)
 		minimap.clear()
-		expect(container.querySelectorAll(".bpmn-minimap-shape").length).toBe(0)
-		expect(container.querySelectorAll(".bpmn-minimap-edge").length).toBe(0)
+		expect(container.querySelectorAll(".bpmnkit-minimap-shape").length).toBe(0)
+		expect(container.querySelectorAll(".bpmnkit-minimap-edge").length).toBe(0)
 	})
 
 	it("destroy() removes the minimap from the DOM", () => {
 		minimap.destroy()
-		expect(container.querySelector(".bpmn-minimap")).toBeNull()
+		expect(container.querySelector(".bpmnkit-minimap")).toBeNull()
 	})
 })
