@@ -62,7 +62,7 @@ export const RESIZABLE_TYPES: ReadonlySet<string> = new Set([
 	"textAnnotation",
 ])
 
-export type Tool = "select" | "pan" | "space" | `create:${CreateShapeType}`
+export type Tool = "default" | "select" | "pan" | "space" | `create:${CreateShapeType}`
 
 export type HandleDir = "nw" | "n" | "ne" | "e" | "se" | "s" | "sw" | "w"
 export type PortDir = "top" | "right" | "bottom" | "left"

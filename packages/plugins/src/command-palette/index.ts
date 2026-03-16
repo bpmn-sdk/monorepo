@@ -12,6 +12,7 @@
  *       (el) => { (el as HTMLElement).style.display = active ? "none" : ""; }
  *     );
  *   },
+ *   onAskAI: (query) => aiBridgePlugin.ask(query),
  * });
  *
  * const editor = new BpmnEditor({ container, xml, plugins: [palette] });
@@ -51,6 +52,21 @@ export interface CommandPaletteOptions {
 	onZenModeChange?: (active: boolean) => void
 	/** Filename for exported BPMN XML downloads. Defaults to `"diagram.bpmn"`. */
 	exportFilename?: string
+	/**
+	 * Called when the user submits a free-text AI query from the palette.
+	 * If not provided, the "Ask AI" item is hidden.
+	 */
+	onAskAI?: (query: string) => void
+	/**
+	 * URL of the proxy / AI server used to check whether the AI feature is
+	 * available. Defaults to `http://localhost:3033`.
+	 */
+	aiServerUrl?: string
+	/**
+	 * Base URL for documentation links.
+	 * Defaults to `https://docs.bpmnkit.com`.
+	 */
+	docsBaseUrl?: string
 }
 
 /**
@@ -63,6 +79,195 @@ export interface CommandPalettePlugin extends CanvasPlugin {
 	 * Returns a function that, when called, deregisters those commands.
 	 */
 	addCommands(cmds: Command[]): () => void
+	/**
+	 * Pushes a new view onto the palette's navigation stack.
+	 * Pressing Escape pops back to the previous view (or closes if at root).
+	 * Calling this while the palette is closed is a no-op.
+	 *
+	 * When `onConfirm` is provided the view acts as a free-text input step:
+	 * the item list is empty and pressing Enter calls `onConfirm(inputValue)`
+	 * then closes the palette.
+	 */
+	pushView(
+		cmds: Command[],
+		opts?: { placeholder?: string; onConfirm?: (value: string) => void },
+	): void
+}
+
+// ── Matching ──────────────────────────────────────────────────────────────────
+
+/**
+ * Returns true when every whitespace-separated word in `query` appears
+ * somewhere in `text` (case-insensitive). This lets "add gateway" match
+ * "Add Exclusive Gateway" even though it is not a contiguous substring.
+ */
+function wordsMatch(text: string, query: string): boolean {
+	const target = text.toLowerCase()
+	return query
+		.toLowerCase()
+		.split(/\s+/)
+		.filter(Boolean)
+		.every((w) => target.includes(w))
+}
+
+// ── Docs registry ─────────────────────────────────────────────────────────────
+
+const DOCS_BASE_DEFAULT = "https://docs.bpmnkit.com"
+
+interface DocEntry {
+	title: string
+	path: string
+	keywords: string[]
+}
+
+const DOC_ENTRIES: DocEntry[] = [
+	{
+		title: "Quick Start",
+		path: "/getting-started/quick-start/",
+		keywords: ["start", "install", "begin", "setup", "first", "hello", "quickstart"],
+	},
+	{
+		title: "Installation",
+		path: "/getting-started/installation/",
+		keywords: ["install", "npm", "pnpm", "yarn", "add", "package", "require"],
+	},
+	{
+		title: "Concepts",
+		path: "/getting-started/concepts/",
+		keywords: ["concept", "bpmn", "process", "element", "overview", "intro", "what"],
+	},
+	{
+		title: "Building Processes",
+		path: "/guides/building-processes/",
+		keywords: ["build", "create", "process", "task", "flow", "sequence", "diagram", "guide"],
+	},
+	{
+		title: "Gateways",
+		path: "/guides/gateways/",
+		keywords: [
+			"gateway",
+			"exclusive",
+			"parallel",
+			"inclusive",
+			"split",
+			"merge",
+			"xor",
+			"condition",
+			"branch",
+			"fork",
+		],
+	},
+	{
+		title: "Simulation",
+		path: "/guides/simulation/",
+		keywords: ["simulate", "run", "test", "engine", "execute", "play", "simulation"],
+	},
+	{
+		title: "Deployment",
+		path: "/guides/deployment/",
+		keywords: ["deploy", "camunda", "cluster", "zeebe", "publish", "production", "upload"],
+	},
+	{
+		title: "AI Guide",
+		path: "/guides/ai/",
+		keywords: [
+			"ai",
+			"artificial",
+			"intelligence",
+			"llm",
+			"claude",
+			"copilot",
+			"gemini",
+			"assist",
+			"chat",
+			"improve",
+		],
+	},
+	{
+		title: "@bpmnkit/core",
+		path: "/packages/core/",
+		keywords: [
+			"core",
+			"parser",
+			"builder",
+			"xml",
+			"export",
+			"import",
+			"layout",
+			"compact",
+			"serialize",
+		],
+	},
+	{
+		title: "@bpmnkit/editor",
+		path: "/packages/editor/",
+		keywords: ["editor", "edit", "modeler", "interactive", "canvas", "plugin"],
+	},
+	{
+		title: "@bpmnkit/engine",
+		path: "/packages/engine/",
+		keywords: ["engine", "execute", "run", "simulate", "worker", "job", "token", "fire"],
+	},
+	{
+		title: "@bpmnkit/api",
+		path: "/packages/api/",
+		keywords: ["api", "client", "camunda", "rest", "http", "zeebe", "operate", "instance"],
+	},
+	{
+		title: "@bpmnkit/canvas",
+		path: "/packages/canvas/",
+		keywords: ["canvas", "viewer", "svg", "render", "view", "display", "embed"],
+	},
+	{
+		title: "Connector Generator",
+		path: "/packages/connector-gen/",
+		keywords: ["connector", "openapi", "swagger", "template", "generate", "rest", "http", "api"],
+	},
+	{
+		title: "casen CLI",
+		path: "/cli/casen/",
+		keywords: [
+			"cli",
+			"command",
+			"terminal",
+			"casen",
+			"tui",
+			"profile",
+			"job",
+			"incident",
+			"process",
+			"mcp",
+		],
+	},
+	{
+		title: "casen connector",
+		path: "/cli/connector/",
+		keywords: ["connector", "cli", "generate", "api", "catalog", "swagger", "openapi"],
+	},
+]
+
+// Shown when the query is empty
+const FEATURED_DOC_PATHS = new Set([
+	"/getting-started/quick-start/",
+	"/guides/building-processes/",
+	"/guides/ai/",
+	"/cli/casen/",
+])
+
+// ── Internal item types ───────────────────────────────────────────────────────
+
+interface PaletteItem {
+	title: string
+	description?: string
+	kind: "command" | "doc" | "ai"
+	/** Shown but not executable — used for the AI item when the proxy is down. */
+	disabled?: boolean
+	action: () => void
+}
+
+interface PaletteSection {
+	label?: string
+	items: PaletteItem[]
 }
 
 // ── Module-level singleton — only one palette open at a time ──────────────────
@@ -73,6 +278,12 @@ let _closeCurrent: (() => void) | null = null
 
 const SEARCH_ICON =
 	'<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="6.5" cy="6.5" r="4"/><line x1="10" y1="10" x2="14" y2="14"/></svg>'
+
+const EXTERNAL_ICON =
+	'<svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 2H2a1 1 0 0 0-1 1v7a1 1 0 0 0 1 1h7a1 1 0 0 0 1-1V7.5"/><polyline points="7.5 1 11 1 11 4.5"/><line x1="11" y1="1" x2="5.5" y2="6.5"/></svg>'
+
+const AI_ICON =
+	'<svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 0a.5.5 0 0 1 .46.31l1.46 3.46 3.46 1.46a.5.5 0 0 1 0 .94l-3.46 1.46L8.46 11.1a.5.5 0 0 1-.92 0L6.08 7.63 2.62 6.17a.5.5 0 0 1 0-.94l3.46-1.46L7.54.31A.5.5 0 0 1 8 0zm0 2.08L6.96 4.54a.5.5 0 0 1-.28.28L4.22 5.7l2.46 1.04a.5.5 0 0 1 .28.28L8 9.48l1.04-2.46a.5.5 0 0 1 .28-.28L11.78 5.7 9.32 4.82a.5.5 0 0 1-.28-.28L8 2.08zm5 8.42a.5.5 0 0 1 .46.31l.6 1.43 1.43.6a.5.5 0 0 1 0 .92l-1.43.6-.6 1.43a.5.5 0 0 1-.92 0l-.6-1.43-1.43-.6a.5.5 0 0 1 0-.92l1.43-.6.6-1.43A.5.5 0 0 1 13 10.5zm0 1.79-.27.63a.5.5 0 0 1-.28.28l-.63.27.63.27a.5.5 0 0 1 .28.28l.27.63.27-.63a.5.5 0 0 1 .28-.28l.63-.27-.63-.27a.5.5 0 0 1-.28-.28L13 12.29z"/></svg>'
 
 // ── Theme helper ──────────────────────────────────────────────────────────────
 
@@ -95,6 +306,19 @@ export function createCommandPalettePlugin(
 	let _isZenMode = false
 	let _focusedIndex = 0
 	let _lastDefs: BpmnDefinitions | null = null
+	let _focusableItems: PaletteItem[] = []
+	// null = unknown/checking, true = running, false = not running
+	let _proxyReady: boolean | null = null
+	// incremented on each palette open to discard stale fetch results
+	let _proxyCheckId = 0
+
+	interface PushedView {
+		cmds: Command[]
+		placeholder: string
+		onConfirm?: (value: string) => void
+	}
+	// navigation stack — each pushView() adds one level, Escape pops
+	const _viewStack: PushedView[] = []
 	const _extraCommands: Command[] = []
 	const _unsubs: Array<() => void> = []
 
@@ -200,6 +424,127 @@ export function createCommandPalettePlugin(
 		options.onZenModeChange?.(_isZenMode)
 	}
 
+	// ── Proxy check ───────────────────────────────────────────────────────────
+
+	function startProxyCheck(): void {
+		if (!options.onAskAI) return
+		_proxyReady = null
+		const checkId = ++_proxyCheckId
+		const serverUrl = options.aiServerUrl ?? "http://localhost:3033"
+		fetch(`${serverUrl}/status`, { signal: AbortSignal.timeout(3000) })
+			.then((res) => res.json())
+			.then((data: unknown) => {
+				if (checkId !== _proxyCheckId) return
+				_proxyReady = Boolean((data as Record<string, unknown>)?.ready)
+				if (_isOpen && _inputEl) renderList(_inputEl.value)
+			})
+			.catch(() => {
+				if (checkId !== _proxyCheckId) return
+				_proxyReady = false
+				if (_isOpen && _inputEl) renderList(_inputEl.value)
+			})
+	}
+
+	// ── Section builders ──────────────────────────────────────────────────────
+
+	function buildCommandItems(query: string): PaletteItem[] {
+		const all = [...builtinCommands(), ..._extraCommands]
+		const cmds = query
+			? all.filter(
+					(c) =>
+						wordsMatch(c.title, query) ||
+						(c.description != null && wordsMatch(c.description, query)),
+				)
+			: all
+		return cmds.map((c) => ({
+			kind: "command" as const,
+			title: c.title,
+			description: c.description,
+			action: c.action,
+		}))
+	}
+
+	function buildDocItems(query: string): PaletteItem[] {
+		const baseUrl = options.docsBaseUrl ?? DOCS_BASE_DEFAULT
+		const entries = query.trim()
+			? DOC_ENTRIES.filter((e) => {
+					const q = query.toLowerCase()
+					return e.title.toLowerCase().includes(q) || e.keywords.some((k) => k.includes(q))
+				}).slice(0, 4)
+			: DOC_ENTRIES.filter((e) => FEATURED_DOC_PATHS.has(e.path))
+		return entries.map((e) => ({
+			kind: "doc" as const,
+			title: e.title,
+			description: "docs ↗",
+			action() {
+				window.open(baseUrl + e.path, "_blank", "noopener")
+				closePalette()
+			},
+		}))
+	}
+
+	function buildAiItem(query: string): PaletteItem {
+		const ready = _proxyReady
+		const description =
+			ready === null
+				? "Checking server…"
+				: ready
+					? "Send to AI assistant  ↵"
+					: "npx @bpmnkit/proxy  —  then reopen"
+		return {
+			kind: "ai" as const,
+			title: `Ask AI: "${query.trim()}"`,
+			description,
+			disabled: ready !== true,
+			action() {
+				if (ready !== true) return
+				options.onAskAI?.(query.trim())
+				closePalette()
+			},
+		}
+	}
+
+	function buildSections(query: string): PaletteSection[] {
+		// Pushed view: show only the pushed commands, no docs/AI
+		const activeView = _viewStack[_viewStack.length - 1]
+		if (activeView) {
+			const items = activeView.cmds
+				.filter(
+					(c) =>
+						!query ||
+						wordsMatch(c.title, query) ||
+						(c.description != null && wordsMatch(c.description, query)),
+				)
+				.map((c) => ({
+					kind: "command" as const,
+					title: c.title,
+					description: c.description,
+					action: c.action,
+				}))
+			return items.length > 0 ? [{ items }] : []
+		}
+
+		const sections: PaletteSection[] = []
+
+		const cmdItems = buildCommandItems(query)
+		if (cmdItems.length > 0) sections.push({ items: cmdItems })
+
+		const docItems = buildDocItems(query)
+		if (docItems.length > 0) sections.push({ label: "Documentation", items: docItems })
+
+		if (options.onAskAI && query.trim().length > 0) {
+			sections.push({ label: "AI", items: [buildAiItem(query)] })
+		}
+
+		// Show "Commands" label only when there are other sections too
+		const first = sections[0]
+		if (sections.length > 1 && first && !first.label && first.items.length > 0) {
+			first.label = "Commands"
+		}
+
+		return sections
+	}
+
 	// ── Palette open / close ──────────────────────────────────────────────────
 
 	function openPalette(): void {
@@ -208,6 +553,8 @@ export function createCommandPalettePlugin(
 		_closeCurrent = closePalette
 		_isOpen = true
 		_focusedIndex = 0
+
+		startProxyCheck()
 
 		const isDark = resolveTheme(_api.getTheme()) === "dark"
 
@@ -234,7 +581,7 @@ export function createCommandPalettePlugin(
 		const input = document.createElement("input")
 		input.type = "text"
 		input.className = "bpmnkit-palette-input"
-		input.placeholder = "Search commands\u2026"
+		input.placeholder = "Search commands or docs\u2026"
 		input.setAttribute("autocomplete", "off")
 		input.setAttribute("spellcheck", "false")
 		searchRow.appendChild(input)
@@ -278,82 +625,121 @@ export function createCommandPalettePlugin(
 	function closePalette(): void {
 		if (!_isOpen) return
 		_isOpen = false
+		_proxyCheckId++ // invalidate any pending fetch
+		_proxyReady = null
+		_viewStack.length = 0
 		if (_closeCurrent === closePalette) _closeCurrent = null
 		_overlayEl?.remove()
 		_overlayEl = null
 		_inputEl = null
 		_listEl = null
+		_focusableItems = []
+	}
+
+	function popView(): void {
+		_viewStack.pop()
+		const prev = _viewStack[_viewStack.length - 1]
+		if (_inputEl) {
+			_inputEl.value = ""
+			_inputEl.placeholder = prev?.placeholder ?? "Search commands or docs\u2026"
+		}
+		_focusedIndex = 0
+		renderList("")
 	}
 
 	// ── List rendering ────────────────────────────────────────────────────────
 
-	function filteredCommands(query: string): Command[] {
-		const all = [...builtinCommands(), ..._extraCommands]
-		if (!query) return all
-		const q = query.toLowerCase()
-		return all.filter(
-			(c) => c.title.toLowerCase().includes(q) || c.description?.toLowerCase().includes(q),
-		)
-	}
-
 	function renderList(query: string): void {
 		if (!_listEl) return
 		_listEl.innerHTML = ""
-		const cmds = filteredCommands(query)
+		_focusableItems = []
 
-		if (cmds.length === 0) {
+		const sections = buildSections(query)
+		const totalItems = sections.reduce((n, s) => n + s.items.length, 0)
+
+		if (totalItems === 0) {
 			const empty = document.createElement("div")
 			empty.className = "bpmnkit-palette-empty"
-			empty.textContent = "No commands found"
+			const activeView = _viewStack[_viewStack.length - 1]
+			empty.textContent = activeView?.onConfirm
+				? "Press \u21b5 to confirm, Esc to go back"
+				: "No commands found"
 			_listEl.appendChild(empty)
 			return
 		}
 
-		if (_focusedIndex >= cmds.length) _focusedIndex = 0
+		if (_focusedIndex >= totalItems) _focusedIndex = 0
 
-		cmds.forEach((cmd, i) => {
-			if (!_listEl) return
-			const item = document.createElement("div")
-			item.className =
-				i === _focusedIndex
-					? "bpmnkit-palette-item bpmnkit-palette-focused"
-					: "bpmnkit-palette-item"
-			item.setAttribute("role", "option")
-			item.setAttribute("aria-selected", String(i === _focusedIndex))
-
-			const titleEl = document.createElement("span")
-			titleEl.className = "bpmnkit-palette-item-title"
-			titleEl.textContent = cmd.title
-			item.appendChild(titleEl)
-
-			if (cmd.description) {
-				const descEl = document.createElement("span")
-				descEl.className = "bpmnkit-palette-item-desc"
-				descEl.textContent = cmd.description
-				item.appendChild(descEl)
+		for (const section of sections) {
+			if (section.label) {
+				const labelEl = document.createElement("div")
+				labelEl.className = "bpmnkit-palette-section"
+				labelEl.textContent = section.label
+				_listEl.appendChild(labelEl)
 			}
 
-			item.addEventListener("pointerenter", () => {
-				_focusedIndex = i
-				updateFocus()
-			})
-			item.addEventListener("pointerdown", (e) => {
-				e.preventDefault()
-				cmd.action()
-			})
+			for (const item of section.items) {
+				const focusableIdx = _focusableItems.length
+				_focusableItems.push(item)
 
-			_listEl.appendChild(item)
-		})
+				const el = document.createElement("div")
+				el.className = buildItemClass(item, focusableIdx)
+				el.setAttribute("role", "option")
+				el.setAttribute("aria-selected", String(focusableIdx === _focusedIndex))
+				el.setAttribute("aria-disabled", String(item.disabled ?? false))
+
+				// Leading icon
+				if (item.kind === "doc" || item.kind === "ai") {
+					const iconSpan = document.createElement("span")
+					iconSpan.className = "bpmnkit-palette-item-icon"
+					iconSpan.innerHTML = item.kind === "doc" ? EXTERNAL_ICON : AI_ICON
+					el.appendChild(iconSpan)
+				}
+
+				const titleEl = document.createElement("span")
+				titleEl.className = "bpmnkit-palette-item-title"
+				titleEl.textContent = item.title
+				el.appendChild(titleEl)
+
+				if (item.description) {
+					const descEl = document.createElement("span")
+					descEl.className = "bpmnkit-palette-item-desc"
+					descEl.textContent = item.description
+					el.appendChild(descEl)
+				}
+
+				el.addEventListener("pointerenter", () => {
+					_focusedIndex = focusableIdx
+					updateFocus()
+				})
+				el.addEventListener("pointerdown", (e) => {
+					e.preventDefault()
+					if (!item.disabled) item.action()
+				})
+
+				_listEl.appendChild(el)
+			}
+		}
+	}
+
+	function buildItemClass(item: PaletteItem, idx: number): string {
+		const classes = ["bpmnkit-palette-item"]
+		if (item.kind !== "command") classes.push(`bpmnkit-palette-item--${item.kind}`)
+		if (item.disabled) classes.push("bpmnkit-palette-item--disabled")
+		if (idx === _focusedIndex) classes.push("bpmnkit-palette-focused")
+		return classes.join(" ")
 	}
 
 	function updateFocus(): void {
 		if (!_listEl) return
 		const items = _listEl.querySelectorAll<HTMLDivElement>(".bpmnkit-palette-item")
-		items.forEach((item, i) => {
-			const focused = i === _focusedIndex
-			item.classList.toggle("bpmnkit-palette-focused", focused)
-			item.setAttribute("aria-selected", String(focused))
-		})
+		let focusableIdx = 0
+		for (const el of items) {
+			const focused = focusableIdx === _focusedIndex
+			el.classList.toggle("bpmnkit-palette-focused", focused)
+			el.setAttribute("aria-selected", String(focused))
+			focusableIdx++
+		}
 	}
 
 	function scrollFocusedIntoView(): void {
@@ -367,8 +753,7 @@ export function createCommandPalettePlugin(
 
 	function onPaletteKeyDown(e: KeyboardEvent): void {
 		if (!_listEl || !_inputEl) return
-		const cmds = filteredCommands(_inputEl.value)
-		const count = cmds.length
+		const count = _focusableItems.length
 
 		if (e.key === "ArrowDown") {
 			e.preventDefault()
@@ -386,11 +771,18 @@ export function createCommandPalettePlugin(
 			}
 		} else if (e.key === "Enter") {
 			e.preventDefault()
-			const cmd = cmds[_focusedIndex]
-			if (cmd) cmd.action()
+			const activeView = _viewStack[_viewStack.length - 1]
+			if (activeView?.onConfirm) {
+				activeView.onConfirm(_inputEl.value)
+				closePalette()
+				return
+			}
+			const item = _focusableItems[_focusedIndex]
+			if (item && !item.disabled) item.action()
 		} else if (e.key === "Escape") {
 			e.preventDefault()
-			closePalette()
+			if (_viewStack.length > 0) popView()
+			else closePalette()
 		}
 	}
 
@@ -447,6 +839,25 @@ export function createCommandPalettePlugin(
 					if (idx !== -1) _extraCommands.splice(idx, 1)
 				}
 			}
+		},
+
+		pushView(
+			cmds: Command[],
+			opts: { placeholder?: string; onConfirm?: (value: string) => void } = {},
+		): void {
+			if (!_isOpen) return
+			const view: PushedView = {
+				cmds,
+				placeholder: opts.placeholder ?? "Select\u2026",
+				onConfirm: opts.onConfirm,
+			}
+			_viewStack.push(view)
+			if (_inputEl) {
+				_inputEl.value = ""
+				_inputEl.placeholder = view.placeholder
+			}
+			_focusedIndex = 0
+			renderList("")
 		},
 	}
 }

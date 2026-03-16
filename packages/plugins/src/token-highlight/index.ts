@@ -120,19 +120,57 @@ export function createTokenHighlightPlugin(): CanvasPlugin & { api: TokenHighlig
 		}
 
 		// Edge highlights
-		// • active edge  : source visited, target active  (token just left source, entering target)
-		// • visited edge : source visited, target visited (token has fully traversed this edge)
-		// This correctly handles exclusive gateways: only the taken branch's target enters
-		// visited/active, so only the taken edge is highlighted.
-		for (const [flowId, { sourceRef, targetRef }] of flowIndex) {
-			const el = edgeEl(flowId)
-			if (el === undefined) continue
-			const srcVisited = visitedIds.has(sourceRef)
-			if (!srcVisited) continue
-			if (activeIds.has(targetRef)) {
-				el.classList.add("bpmnkit-token-edge-active")
-			} else if (visitedIds.has(targetRef)) {
-				el.classList.add("bpmnkit-token-edge-visited")
+		// Prefer direct sequence-flow tracking: Camunda's element-instances API returns
+		// sequence flow element instances (with their flow ID), so visitedIds/activeIds
+		// will contain the actual flow IDs that were traversed.
+		// Fallback to source/target heuristic only when no flow IDs are present (older
+		// engines or environments that don't track sequence flows as element instances).
+		// The heuristic is deliberately disabled when direct tracking is available because
+		// it over-highlights: when a gateway's default path leads to a node that was
+		// reached via a different branch, both edges appear highlighted incorrectly.
+		let hasFlowTracking = false
+		for (const flowId of flowIndex.keys()) {
+			if (visitedIds.has(flowId) || activeIds.has(flowId)) {
+				hasFlowTracking = true
+				break
+			}
+		}
+
+		if (hasFlowTracking) {
+			// Direct mode: flow IDs are in visitedIds/activeIds — highlight exactly what was traversed.
+			for (const [flowId] of flowIndex) {
+				const el = edgeEl(flowId)
+				if (el === undefined) continue
+				if (activeIds.has(flowId)) {
+					el.classList.add("bpmnkit-token-edge-active")
+				} else if (visitedIds.has(flowId)) {
+					el.classList.add("bpmnkit-token-edge-visited")
+				}
+			}
+		} else {
+			// Heuristic fallback for engines that don't return sequence-flow element instances.
+			//
+			// "Unique winner" rule: group outgoing flows by source and only highlight an
+			// edge when it is the SOLE outgoing flow from that source whose target is
+			// visited/active. If multiple candidates exist we cannot determine which path
+			// was actually taken (e.g. both branches of an exclusive gateway converge on
+			// the same downstream node), so we highlight none to avoid false positives.
+			const bySource = new Map<string, Array<{ flowId: string; isActive: boolean }>>()
+			for (const [flowId, { sourceRef, targetRef }] of flowIndex) {
+				if (!visitedIds.has(sourceRef)) continue
+				const isActive = activeIds.has(targetRef)
+				if (!isActive && !visitedIds.has(targetRef)) continue
+				const list = bySource.get(sourceRef) ?? []
+				list.push({ flowId, isActive })
+				bySource.set(sourceRef, list)
+			}
+			for (const candidates of bySource.values()) {
+				if (candidates.length !== 1) continue
+				for (const { flowId, isActive } of candidates) {
+					const el = edgeEl(flowId)
+					if (el === undefined) continue
+					el.classList.add(isActive ? "bpmnkit-token-edge-active" : "bpmnkit-token-edge-visited")
+				}
 			}
 		}
 	}

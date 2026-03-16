@@ -139,6 +139,75 @@ export const COMMAND_PALETTE_CSS = `
 }
 .bpmnkit-palette--light .bpmnkit-palette-item-desc { color: rgba(0, 0, 0, 0.4); }
 
+/* ── Section labels ───────────────────────────────────────────────────────── */
+.bpmnkit-palette-section {
+  padding: 6px 12px 3px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.28);
+  user-select: none;
+}
+
+/* ── Item leading icon (doc / ai) ─────────────────────────────────────────── */
+.bpmnkit-palette-item-icon {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+  opacity: 0.55;
+}
+.bpmnkit-palette-item-icon svg { width: 14px; height: 14px; }
+
+/* ── Doc items ────────────────────────────────────────────────────────────── */
+.bpmnkit-palette-item--doc .bpmnkit-palette-item-title {
+  color: var(--bpmnkit-accent-bright, #89b4fa);
+}
+.bpmnkit-palette-item--doc:hover .bpmnkit-palette-item-icon,
+.bpmnkit-palette-item--doc.bpmnkit-palette-focused .bpmnkit-palette-item-icon {
+  opacity: 0.85;
+}
+
+/* ── AI item ──────────────────────────────────────────────────────────────── */
+.bpmnkit-palette-item--ai .bpmnkit-palette-item-icon {
+  color: var(--bpmnkit-accent, #6b9df7);
+  opacity: 0.8;
+}
+.bpmnkit-palette-item--ai .bpmnkit-palette-item-title {
+  color: var(--bpmnkit-accent, #6b9df7);
+  font-style: italic;
+}
+.bpmnkit-palette-item--ai:not(.bpmnkit-palette-item--disabled):hover .bpmnkit-palette-item-icon,
+.bpmnkit-palette-item--ai:not(.bpmnkit-palette-item--disabled).bpmnkit-palette-focused .bpmnkit-palette-item-icon {
+  opacity: 1;
+}
+
+/* ── Disabled items ───────────────────────────────────────────────────────── */
+.bpmnkit-palette-item--disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.bpmnkit-palette-item--disabled:hover,
+.bpmnkit-palette-item--disabled.bpmnkit-palette-focused {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+/* ── Light overrides for new additions ───────────────────────────────────── */
+.bpmnkit-palette--light .bpmnkit-palette-section { color: rgba(0, 0, 0, 0.3); }
+.bpmnkit-palette--light .bpmnkit-palette-item--doc .bpmnkit-palette-item-title {
+  color: var(--bpmnkit-accent-bright, #3b82f6);
+}
+.bpmnkit-palette--light .bpmnkit-palette-item--ai .bpmnkit-palette-item-icon,
+.bpmnkit-palette--light .bpmnkit-palette-item--ai .bpmnkit-palette-item-title {
+  color: var(--bpmnkit-accent, #1a56db);
+}
+.bpmnkit-palette--light .bpmnkit-palette-item--disabled:hover,
+.bpmnkit-palette--light .bpmnkit-palette-item--disabled.bpmnkit-palette-focused {
+  background: rgba(0, 0, 0, 0.03);
+}
+
 /* ── Zen mode: hide internal canvas controls ──────────────────────────────── */
 .bpmnkit-zen-mode .bpmnkit-zoom-controls,
 .bpmnkit-zen-mode .bpmnkit-main-menu-panel {

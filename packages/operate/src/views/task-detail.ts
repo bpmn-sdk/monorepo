@@ -7,7 +7,7 @@ interface Config {
 	proxyUrl: string
 	profile: string | null
 	mock: boolean
-	theme: "light" | "dark"
+	theme: "light" | "dark" | "neon"
 }
 
 function relTime(iso: string | null | undefined): string {
@@ -118,7 +118,11 @@ export function createTaskDetailView(
 		const formContainer = document.createElement("div")
 		formContainer.className = "op-task-form-container"
 		formWrap.appendChild(formContainer)
-		editor = new FormEditor({ container: formContainer, theme: cfg.theme, readonly: true })
+		editor = new FormEditor({
+			container: formContainer,
+			theme: cfg.theme === "neon" ? "dark" : cfg.theme,
+			readonly: true,
+		})
 		editor.loadSchema(schema).catch(() => {})
 	}
 

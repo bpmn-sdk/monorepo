@@ -15,6 +15,7 @@ const NAV_ITEMS: NavItem[] = [
 	{ id: "/jobs", label: "Jobs", icon: IC_UI.jobs },
 	{ id: "/tasks", label: "Tasks", icon: IC_UI.tasks },
 	{ id: "/messages", label: "Messages", icon: IC_UI.messages },
+	{ id: "/search", label: "Search", icon: IC_UI.search },
 ]
 
 export function createNav(onNavigate: (path: string) => void): {

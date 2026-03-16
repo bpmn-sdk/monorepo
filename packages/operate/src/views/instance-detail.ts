@@ -23,7 +23,7 @@ interface Config {
 	profile: string | null
 	interval: number
 	mock: boolean
-	theme: "light" | "dark"
+	theme: "light" | "dark" | "neon"
 	navigate?: (path: string) => void
 }
 
@@ -144,7 +144,7 @@ export function createInstanceDetailView(
 	onBack: () => void,
 ): {
 	el: HTMLElement
-	setTheme(t: "light" | "dark"): void
+	setTheme(t: "light" | "dark" | "neon"): void
 	destroy(): void
 } {
 	const el = document.createElement("div")
@@ -188,7 +188,7 @@ export function createInstanceDetailView(
 	// Sidebar pane
 	const sidebar = document.createElement("div")
 	sidebar.className = "op-detail-sidebar"
-	sidebar.dataset.bpmnHudTheme = cfg.theme
+	sidebar.dataset.bpmnkitHudTheme = cfg.theme
 	layout.appendChild(sidebar)
 
 	// Tabs in sidebar
@@ -780,9 +780,9 @@ export function createInstanceDetailView(
 
 	return {
 		el,
-		setTheme(t: "light" | "dark"): void {
+		setTheme(t: "light" | "dark" | "neon"): void {
 			canvas?.setTheme(t)
-			sidebar.dataset.bpmnHudTheme = t
+			sidebar.dataset.bpmnkitHudTheme = t
 		},
 		destroy(): void {
 			canvas?.destroy()

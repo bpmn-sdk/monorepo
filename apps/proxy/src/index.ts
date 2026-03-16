@@ -24,6 +24,7 @@ import {
 	buildMcpExplainPrompt,
 	buildMcpImprovePrompt,
 	buildMcpSystemPrompt,
+	buildSearchSystemPrompt,
 	buildSystemPrompt,
 } from "./prompt.js"
 
@@ -632,6 +633,183 @@ const server = http.createServer(async (req, res) => {
 
 		res.write(`data: ${JSON.stringify({ type: "done" })}\n\n`)
 		res.end()
+		return
+	}
+
+	// ── POST /operate/ai-search ────────────────────────────────────────────────
+	// Translates a plain-text query to a Camunda API filter, executes the search,
+	// and returns results as JSON.  AI is only called when the quick-parser cannot
+	// resolve the query deterministically (saves tokens for simple queries).
+	if (url.pathname === "/operate/ai-search" && req.method === "POST") {
+		const body = await readBody(req)
+		let query: string
+		try {
+			const parsed = JSON.parse(body) as { query?: string }
+			query = parsed.query?.trim() ?? ""
+			if (!query) throw new Error("empty")
+		} catch {
+			res.writeHead(400, { "Content-Type": "application/json" })
+			res.end(JSON.stringify({ error: "{ query: string } required" }))
+			return
+		}
+
+		const profileName = req.headers["x-profile"] as string | undefined
+		const profile = profileName ? getProfile(profileName) : getActiveProfile()
+		if (!profile?.config.baseUrl) {
+			res.writeHead(401, { "Content-Type": "application/json" })
+			res.end(JSON.stringify({ error: "No active profile" }))
+			return
+		}
+
+		let authHeader: string
+		try {
+			authHeader = await getAuthHeader(profile.config)
+		} catch (err) {
+			res.writeHead(502, { "Content-Type": "application/json" })
+			res.end(JSON.stringify({ error: `Auth failed: ${String(err)}` }))
+			return
+		}
+
+		const baseUrl = profile.config.baseUrl.replace(/\/$/, "")
+		const apiHeaders = {
+			authorization: authHeader,
+			"content-type": "application/json",
+			accept: "application/json",
+		}
+
+		// Step 1: Quick deterministic parse — avoids AI entirely for simple queries.
+		// Equivalent to the code-mode "pre-check" that runs optimize() before calling AI.
+		type SearchSpec = { endpoint: "instances" | "variables"; filter: Record<string, unknown> }
+
+		function tryQuickParse(q: string): SearchSpec | null {
+			const trimmed = q.trim()
+			// Pure numeric string → instance key lookup
+			if (/^\d+$/.test(trimmed)) {
+				return { endpoint: "instances", filter: { processInstanceKey: trimmed } }
+			}
+			// Single state keyword
+			const stateMap: Record<string, string> = {
+				active: "ACTIVE",
+				completed: "COMPLETED",
+				terminated: "TERMINATED",
+			}
+			const lower = trimmed.toLowerCase()
+			if (stateMap[lower]) {
+				return { endpoint: "instances", filter: { state: stateMap[lower] } }
+			}
+			return null
+		}
+
+		function extractSearchSpec(text: string): SearchSpec | null {
+			// Try raw JSON first, then a ```json block, then any {...} substring
+			const candidates = [
+				text.trim(),
+				(/```(?:json)?\s*\n?([\s\S]*?)\n?```/.exec(text) ?? [])[1] ?? "",
+				(/(\{[\s\S]*\})/.exec(text) ?? [])[1] ?? "",
+			]
+			for (const candidate of candidates) {
+				if (!candidate) continue
+				try {
+					const parsed = JSON.parse(candidate) as unknown
+					if (
+						typeof parsed === "object" &&
+						parsed !== null &&
+						"endpoint" in parsed &&
+						"filter" in parsed
+					) {
+						return parsed as SearchSpec
+					}
+				} catch {
+					/* try next */
+				}
+			}
+			return null
+		}
+
+		let spec = tryQuickParse(query)
+		console.log(
+			`[server] /operate/ai-search → query: "${query}", quick-parse: ${spec ? "hit" : "miss"}`,
+		)
+
+		// Step 2: AI translation — only when quick-parse has no answer
+		if (!spec) {
+			const available = await detectAll()
+			const detected = available[0]
+			if (!detected) {
+				res.writeHead(503, { "Content-Type": "application/json" })
+				res.end(JSON.stringify({ error: "No AI adapter available" }))
+				return
+			}
+			console.log(`[server] /operate/ai-search → adapter: ${detected.name}`)
+			const tokens: string[] = []
+			try {
+				await detected.adapter.stream(
+					[{ role: "user", content: query }],
+					buildSearchSystemPrompt(),
+					null,
+					(t) => tokens.push(t),
+				)
+			} catch (err) {
+				res.writeHead(500, { "Content-Type": "application/json" })
+				res.end(JSON.stringify({ error: String(err) }))
+				return
+			}
+			spec = extractSearchSpec(tokens.join(""))
+			if (!spec) {
+				res.writeHead(422, { "Content-Type": "application/json" })
+				res.end(JSON.stringify({ error: "Could not interpret search query" }))
+				return
+			}
+		}
+
+		// Step 3: Execute search against Camunda
+		const finalSpec = spec
+		let items: unknown[] = []
+		let total = 0
+		try {
+			if (finalSpec.endpoint === "variables") {
+				const r = await fetch(`${baseUrl}/variables/search`, {
+					method: "POST",
+					headers: apiHeaders,
+					body: JSON.stringify({ filter: finalSpec.filter, page: { limit: 100 } }),
+				})
+				if (r.ok) {
+					const result = (await r.json()) as {
+						items?: unknown[]
+						page?: { totalItems?: number }
+					}
+					items = result.items ?? []
+					total = result.page?.totalItems ?? items.length
+				}
+			} else {
+				const r = await fetch(`${baseUrl}/process-instances/search`, {
+					method: "POST",
+					headers: apiHeaders,
+					body: JSON.stringify({
+						filter: finalSpec.filter,
+						page: { limit: 100 },
+						sort: [{ field: "startDate", order: "DESC" }],
+					}),
+				})
+				if (r.ok) {
+					const result = (await r.json()) as {
+						items?: unknown[]
+						page?: { totalItems?: number }
+					}
+					items = result.items ?? []
+					total = result.page?.totalItems ?? items.length
+				}
+			}
+		} catch (err) {
+			res.writeHead(502, { "Content-Type": "application/json" })
+			res.end(JSON.stringify({ error: `Search failed: ${String(err)}` }))
+			return
+		}
+
+		res.writeHead(200, { "Content-Type": "application/json" })
+		res.end(
+			JSON.stringify({ endpoint: finalSpec.endpoint, filter: finalSpec.filter, items, total }),
+		)
 		return
 	}
 

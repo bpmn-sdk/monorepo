@@ -1,5 +1,49 @@
 # Progress
 
+## 2026-03-16 — AI Search tab in `@bpmnkit/operate`
+
+- **`apps/proxy/src/prompt.ts`**: Added `buildSearchSystemPrompt()` — a minimal system prompt that instructs the AI to output **only** a JSON object `{ endpoint, filter }`, keeping token usage low (no prose, no markdown).
+- **`apps/proxy/src/index.ts`**: Added `POST /operate/ai-search` endpoint.
+  - **Token-saving pre-check**: Before calling AI, `tryQuickParse()` handles deterministic patterns (bare numeric string → instance key lookup; single state keyword → state filter). AI is bypassed entirely for these cases.
+  - **AI translation**: For complex queries, uses the available adapter to produce a `{ endpoint, filter }` JSON spec; `extractSearchSpec()` handles raw JSON, ```json blocks, or embedded objects.
+  - **Search execution**: Calls `POST /process-instances/search` or `POST /variables/search` on the Camunda API and returns `{ endpoint, filter, items, total }` as plain JSON.
+- **`packages/operate/src/views/search.ts`**: Added "AI Search" tab.
+  - Tab is **hidden by default**; revealed asynchronously after `GET /status` confirms the proxy is running with an AI backend (`ready: true && backend !== null`). Not shown in mock mode.
+  - Single-line text input with Enter-key support, "▶ Search" button, loading/error feedback.
+  - Results display with "Interpreted as: `{filter}`" transparency line, then instance or variable table depending on what the AI chose.
+- **`packages/operate/src/css.ts`**: Added `.op-search-tab--ai` (accent-colored tab), `.op-ai-search-row`, `.op-ai-search-input`, `.op-ai-search-hint`, `.op-ai-search-filter`.
+
+## 2026-03-16 — Fix exclusive-gateway edge over-highlighting in `@bpmnkit/plugins`
+
+- **`packages/plugins/src/token-highlight/index.ts`**: Replaced the heuristic edge-highlighting fallback with a "unique winner" rule.
+  - **Root cause**: The old heuristic highlighted any edge where source AND target were both visited. On convergent structures (e.g. both branches of an exclusive gateway leading to the same downstream node), all outgoing edges were highlighted even though only one branch was taken.
+  - **Fix**: Outgoing flows are now grouped by source. An edge is highlighted only if it is the **sole** outgoing flow from its source whose target is visited/active. When multiple candidates exist (ambiguous), none are highlighted — preventing false positives at the cost of not highlighting edges whose path cannot be unambiguously determined from shape-level data alone.
+  - Direct sequence-flow tracking mode (when Camunda returns flow element-instance IDs) is unchanged and remains fully accurate.
+
+## 2026-03-16 — Instance Search view in `@bpmnkit/operate`
+
+- **`packages/ui/src/icons.ts`**: Added `search` magnifying-glass icon to `IC_UI`.
+- **`packages/operate/src/views/nav.ts`**: Added "Search" entry (icon: `IC_UI.search`, path: `/search`) to nav.
+- **`packages/operate/src/views/search.ts`**: New view — dynamic condition builder with 12 searchable fields:
+  - Server-side filters (sent to stream API): `state`, `processDefinitionKey`
+  - Client-side post-filters: `processDefinitionId`, `processDefinitionName`, `processInstanceKey`, `businessId`, `hasIncident`, `startDateFrom`, `startDateTo`, `endDateFrom`, `endDateTo`, `parentProcessInstanceKey`
+  - `state` and `hasIncident` use select inputs; date fields use `<input type="date">`; all others use text inputs
+  - Template management: save/load/delete named templates persisted to `localStorage` under `"bpmnkit-operate:search-templates"`
+  - Results rendered via `createFilterTable` with sortable columns; clicking a row navigates to instance detail
+  - One-shot search: polling disconnected after first result
+- **`packages/operate/src/css.ts`**: Added `op-search-*` CSS classes for the search view layout.
+- **`packages/operate/src/operate.ts`**: Registered `/search` route.
+
+## 2026-03-16 — `connector-gen` user-facing docs in `apps/docs`
+
+- **`apps/docs/src/content/docs/cli/connector.md`**: New Starlight page under the CLI section documenting `casen connector generate` and `casen connector catalog` — all flags, auth types, common workflows (dry-run, filter, expand-body, array format, base-url override), what gets generated, and the full 30-entry catalog table.
+- **`apps/docs/src/content/docs/packages/connector-gen.md`**: New Starlight page under the Packages section documenting `@bpmnkit/connector-gen` — overview, quick start, `generate()` / `generateFromUrl()` / `generateFromCatalog()` with examples, `GeneratorOptions` and `WriteOptions` tables, auth block reference, body expansion, lower-level API (`parseOpenApi`, `getOperations`, `buildTemplates`, `writeTemplates`), catalog reference with `CATALOG` / `getCatalogEntry`, and the full 30-entry catalog table.
+
+## 2026-03-16 — `connector-gen` catalog expanded to 30 entries
+
+- **`packages/connector-gen/src/catalog.ts`**: Added 10 new catalog entries: Anthropic, Shopify Admin, Datadog, Sentry, Intercom, Contentful Management, Airtable, Twitch Helix, Klaviyo, Brex — bringing the total to 30 built-in APIs.
+- **`packages/connector-gen/README.md`**: Rewrote CLI usage section with full flag reference table; added full catalog table (30 entries) with auth types; added auth type reference; documented all three high-level API functions (`generate`, `generateFromUrl`, `generateFromCatalog`) and the lower-level primitives.
+
 ## 2026-03-14 — `@bpmnkit/connector-gen` + `casen connector` command
 
 ### New package: `packages/connector-gen` (`@bpmnkit/connector-gen`)

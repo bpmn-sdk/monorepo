@@ -22,6 +22,7 @@ import { createInstancesView } from "./views/instances.js"
 import { createJobsView } from "./views/jobs.js"
 import { createMessagesView } from "./views/messages.js"
 import { createNav } from "./views/nav.js"
+import { createSearchView } from "./views/search.js"
 import { createTaskDetailView } from "./views/task-detail.js"
 import { createTasksView } from "./views/tasks.js"
 
@@ -37,7 +38,7 @@ export function createOperate(options: OperateOptions): OperateApi {
 	} = options
 
 	let profile: string | null = options.profile ?? null
-	const initialTheme: Theme = loadPersistedTheme() ?? options.theme ?? "auto"
+	const initialTheme: Theme = loadPersistedTheme() ?? options.theme ?? "neon"
 
 	// ── Root element ──────────────────────────────────────────────────────────
 
@@ -116,7 +117,7 @@ export function createOperate(options: OperateOptions): OperateApi {
 		(theme, resolved) => {
 			el.setAttribute("data-theme", resolved)
 			currentTheme = theme
-			currentViewSetTheme?.(resolved as "light" | "dark")
+			currentViewSetTheme?.(resolved)
 		},
 		initialTheme,
 	)
@@ -131,12 +132,12 @@ export function createOperate(options: OperateOptions): OperateApi {
 
 	let destroyView: (() => void) | null = null
 	let currentTheme: Theme = initialTheme
-	let currentViewSetTheme: ((t: "light" | "dark") => void) | null = null
+	let currentViewSetTheme: ((t: "light" | "dark" | "neon") => void) | null = null
 
 	function showView(
 		viewEl: HTMLElement,
 		destroy: () => void,
-		setTheme?: (t: "light" | "dark") => void,
+		setTheme?: (t: "light" | "dark" | "neon") => void,
 	): void {
 		destroyView?.()
 		destroyView = destroy
@@ -145,8 +146,10 @@ export function createOperate(options: OperateOptions): OperateApi {
 		content.appendChild(viewEl)
 	}
 
-	function getTheme(): "light" | "dark" {
-		return el.getAttribute("data-theme") === "light" ? "light" : "dark"
+	function getTheme(): "light" | "dark" | "neon" {
+		const t = el.getAttribute("data-theme")
+		if (t === "light" || t === "neon") return t
+		return "dark"
 	}
 
 	router.on("/", () => {
@@ -362,6 +365,19 @@ export function createOperate(options: OperateOptions): OperateApi {
 		header.setTitle("Messages & Signals")
 		nav.setActive("/messages")
 		const { el: vEl, destroy } = createMessagesView({ proxyUrl, profile, mock })
+		showView(vEl, destroy)
+	})
+
+	router.on("/search", () => {
+		reconnectCurrent = () => {
+			disconnectAll()
+		}
+		reconnectCurrent()
+		header.setTitle("Search")
+		nav.setActive("/search")
+		const { el: vEl, destroy } = createSearchView({ proxyUrl, profile, mock }, (path) =>
+			router.navigate(path),
+		)
 		showView(vEl, destroy)
 	})
 

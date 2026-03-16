@@ -317,11 +317,11 @@ export class BpmnEditor {
 		this._id = String(_instanceCounter++)
 
 		// Resolve initial theme — localStorage overrides the options.theme when persistTheme is on
-		let initialTheme = options.theme ?? "auto"
+		let initialTheme = options.theme ?? "neon"
 		if (options.persistTheme) {
 			try {
 				const stored = localStorage.getItem("bpmnkit-theme")
-				if (stored === "dark" || stored === "light" || stored === "auto") {
+				if (stored === "dark" || stored === "light" || stored === "auto" || stored === "neon") {
 					initialTheme = stored
 				}
 			} catch {
@@ -614,7 +614,7 @@ export class BpmnEditor {
 			this._ghostSnapCenter = null
 			this._stateMachine.setMode({ mode: "pan" })
 		} else {
-			this.setTool("select")
+			this.setTool("default")
 		}
 	}
 
@@ -626,7 +626,9 @@ export class BpmnEditor {
 		this._overlay.setAlignmentGuides([])
 		this._setCreateEdgeDropHighlight(null)
 		this._ghostSnapCenter = null
-		if (tool === "select") {
+		if (tool === "default") {
+			this._stateMachine.setMode({ mode: "default", sub: { name: "idle", hoveredId: null } })
+		} else if (tool === "select") {
 			this._stateMachine.setMode({ mode: "select", sub: { name: "idle", hoveredId: null } })
 		} else if (tool === "pan") {
 			this._stateMachine.setMode({ mode: "pan" })
@@ -709,8 +711,10 @@ export class BpmnEditor {
 		return this._host
 	}
 
-	getTheme(): "light" | "dark" {
-		return this._host.getAttribute("data-theme") === "dark" ? "dark" : "light"
+	getTheme(): "light" | "dark" | "neon" {
+		const t = this._host.getAttribute("data-theme")
+		if (t === "dark" || t === "neon") return t
+		return "light"
 	}
 
 	setTheme(theme: Theme): void {
@@ -1221,7 +1225,7 @@ export class BpmnEditor {
 	 * using smart placement (right → bottom → top, avoids overlaps).
 	 * Returns the new element's id.
 	 */
-	addConnectedElement(sourceId: string, type: CreateShapeType): string | null {
+	addConnectedElement(sourceId: string, type: CreateShapeType, name?: string): string | null {
 		if (!this._defs) return null
 		const srcShape = this._shapes.find((s) => s.id === sourceId)
 		if (!srcShape) return null
@@ -1244,7 +1248,7 @@ export class BpmnEditor {
 
 		const newBounds = this._smartPlaceBounds(srcBounds, sourceId, w, h)
 		const obstacles = this._shapes.filter((s) => s.id !== sourceId).map((s) => s.shape.bounds)
-		const r1 = createShape(this._defs, type, newBounds)
+		const r1 = createShape(this._defs, type, newBounds, name)
 		const waypoints = computeWaypointsAvoiding(srcBounds, newBounds, obstacles)
 		const r2 = createConnection(r1.defs, sourceId, r1.id, waypoints)
 
@@ -2169,10 +2173,10 @@ export class BpmnEditor {
 					? "dark"
 					: "light"
 				: theme
-		if (resolved === "dark") {
-			this._host.setAttribute("data-theme", "dark")
-		} else {
+		if (resolved === "light") {
 			this._host.removeAttribute("data-theme")
+		} else {
+			this._host.setAttribute("data-theme", resolved)
 		}
 	}
 

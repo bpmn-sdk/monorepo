@@ -134,6 +134,11 @@ export interface HudOptions {
 	 * Called when the user clicks "Exit" in the simulation active banner.
 	 */
 	onExitSimulation?: () => void
+	/**
+	 * Called when the user presses the sidebar toggle shortcut (Ctrl+\).
+	 * Typically toggles the side dock open/closed.
+	 */
+	onToggleSidebar?: () => void
 }
 
 const GATEWAY_TYPES = new Set([
@@ -155,6 +160,7 @@ const SHORTCUTS: ReadonlyArray<[string, string]> = [
 	["Ctrl+F", "Find element"],
 	["Ctrl+K", "Command palette"],
 	["Ctrl+E", "File switcher"],
+	["Ctrl+\\", "Toggle sidebar"],
 	["H", "Hand tool"],
 	["V", "Select tool"],
 	["Escape", "Deselect / cancel"],
@@ -270,7 +276,6 @@ export function initEditorHud(
 
 	// Tool selector — bottom center
 	const btnSelect = hudBtn("btn-select", "Select (V)")
-	btnSelect.classList.add("active")
 	const btnPan = hudBtn("btn-pan", "Hand (H)")
 	const btnSpace = hudBtn("btn-space", "Space tool")
 
@@ -396,7 +401,7 @@ export function initEditorHud(
 	// ── Theme ──────────────────────────────────────────────────────────────────
 
 	const syncHudTheme = (): void => {
-		document.body.dataset.bpmnHudTheme = editor.getTheme()
+		document.body.dataset.bpmnkitHudTheme = editor.getTheme()
 	}
 	syncHudTheme()
 	const themeObs = new MutationObserver(syncHudTheme)
@@ -741,12 +746,17 @@ export function initEditorHud(
 		}
 	}
 
+	let _currentTool: Tool = "default"
+	editor.on("editor:tool", (tool: Tool) => {
+		_currentTool = tool
+	})
+
 	btnSelect.addEventListener("click", () => {
-		editor.setTool("select")
+		editor.setTool(_currentTool === "select" ? "default" : "select")
 		collapseOnMobile(hudBottomCenter)
 	})
 	btnPan.addEventListener("click", () => {
-		editor.setTool("pan")
+		editor.setTool(_currentTool === "pan" ? "default" : "pan")
 		collapseOnMobile(hudBottomCenter)
 	})
 	btnSpace.addEventListener("click", () => {
@@ -1948,6 +1958,10 @@ export function initEditorHud(
 		if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "?") {
 			e.preventDefault()
 			shortcutsModal.classList.remove("hidden")
+		}
+		if ((e.ctrlKey || e.metaKey) && e.key === "\\") {
+			e.preventDefault()
+			options.onToggleSidebar?.()
 		}
 	})
 

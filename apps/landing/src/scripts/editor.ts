@@ -17,7 +17,6 @@ import { createProcessRunnerPlugin } from "@bpmnkit/plugins/process-runner"
 import { InMemoryFileResolver, createStorageTabsBridge } from "@bpmnkit/plugins/storage-tabs-bridge"
 import { createTokenHighlightPlugin } from "@bpmnkit/plugins/token-highlight"
 import { createWatermarkPlugin } from "@bpmnkit/plugins/watermark"
-import { createZoomControlsPlugin } from "@bpmnkit/plugins/zoom-controls"
 import { makeExamples } from "./examples.js"
 import { savePng, saveSvg } from "./export.js"
 
@@ -176,6 +175,9 @@ const mainMenuPlugin = createMainMenuPlugin({
 
 // ── Plugins ───────────────────────────────────────────────────────────────────
 
+// Forward ref — aiBridgePlugin is created below but onAskAI fires only at runtime
+let _aiPlugin: { ask(q: string): void } | null = null
+
 const palette = createCommandPalettePlugin({
 	onZenModeChange(active) {
 		for (const el of document.querySelectorAll<HTMLElement>(".hud")) {
@@ -183,11 +185,10 @@ const palette = createCommandPalettePlugin({
 		}
 		editorRef?.setReadOnly(active)
 	},
+	onAskAI: (query) => _aiPlugin?.ask(query),
 })
 
-const paletteEditor = createCommandPaletteEditorPlugin(palette, (tool) => {
-	editorRef?.setTool(tool as Tool)
-})
+const paletteEditor = createCommandPaletteEditorPlugin(palette, () => editorRef)
 
 const configPanel = createConfigPanelPlugin({
 	getDefinitions: () => editorRef?.getDefinitions() ?? null,
@@ -383,6 +384,7 @@ const aiBridgePlugin = createAiBridgePlugin({
 		}
 	},
 })
+_aiPlugin = aiBridgePlugin
 
 // Wire AI tab click to initialize+open the panel (it's lazily created on first use)
 dock.setAiTabClickHandler(() => {
@@ -427,7 +429,6 @@ const editor = new BpmnEditor({
 	plugins: [
 		mainMenuPlugin,
 		exportCapturePlugin,
-		createZoomControlsPlugin(),
 		createWatermarkPlugin({
 			links: [{ label: "Github", url: "https://github.com/bpmnkit/monorepo" }],
 			logo: LOGO_SVG,
@@ -502,5 +503,9 @@ hudRef = initEditorHud(editor, {
 	},
 	onExitSimulation: () => {
 		processRunnerPlugin.exitPlayMode()
+	},
+	onToggleSidebar: () => {
+		if (dock.collapsed) dock.expand()
+		else dock.collapse()
 	},
 })
