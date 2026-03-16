@@ -1,5 +1,12 @@
 # Progress
 
+## 2026-03-16 — Fix exclusive-gateway edge over-highlighting in `@bpmnkit/plugins`
+
+- **`packages/plugins/src/token-highlight/index.ts`**: Replaced the heuristic edge-highlighting fallback with a "unique winner" rule.
+  - **Root cause**: The old heuristic highlighted any edge where source AND target were both visited. On convergent structures (e.g. both branches of an exclusive gateway leading to the same downstream node), all outgoing edges were highlighted even though only one branch was taken.
+  - **Fix**: Outgoing flows are now grouped by source. An edge is highlighted only if it is the **sole** outgoing flow from its source whose target is visited/active. When multiple candidates exist (ambiguous), none are highlighted — preventing false positives at the cost of not highlighting edges whose path cannot be unambiguously determined from shape-level data alone.
+  - Direct sequence-flow tracking mode (when Camunda returns flow element-instance IDs) is unchanged and remains fully accurate.
+
 ## 2026-03-16 — Instance Search view in `@bpmnkit/operate`
 
 - **`packages/ui/src/icons.ts`**: Added `search` magnifying-glass icon to `IC_UI`.

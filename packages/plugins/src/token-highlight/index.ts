@@ -136,22 +136,40 @@ export function createTokenHighlightPlugin(): CanvasPlugin & { api: TokenHighlig
 			}
 		}
 
-		for (const [flowId, { sourceRef, targetRef }] of flowIndex) {
-			const el = edgeEl(flowId)
-			if (el === undefined) continue
-			if (hasFlowTracking) {
+		if (hasFlowTracking) {
+			// Direct mode: flow IDs are in visitedIds/activeIds — highlight exactly what was traversed.
+			for (const [flowId] of flowIndex) {
+				const el = edgeEl(flowId)
+				if (el === undefined) continue
 				if (activeIds.has(flowId)) {
 					el.classList.add("bpmnkit-token-edge-active")
 				} else if (visitedIds.has(flowId)) {
 					el.classList.add("bpmnkit-token-edge-visited")
 				}
-			} else {
-				// Heuristic fallback: highlight if source was visited and target is active/visited
+			}
+		} else {
+			// Heuristic fallback for engines that don't return sequence-flow element instances.
+			//
+			// "Unique winner" rule: group outgoing flows by source and only highlight an
+			// edge when it is the SOLE outgoing flow from that source whose target is
+			// visited/active. If multiple candidates exist we cannot determine which path
+			// was actually taken (e.g. both branches of an exclusive gateway converge on
+			// the same downstream node), so we highlight none to avoid false positives.
+			const bySource = new Map<string, Array<{ flowId: string; isActive: boolean }>>()
+			for (const [flowId, { sourceRef, targetRef }] of flowIndex) {
 				if (!visitedIds.has(sourceRef)) continue
-				if (activeIds.has(targetRef)) {
-					el.classList.add("bpmnkit-token-edge-active")
-				} else if (visitedIds.has(targetRef)) {
-					el.classList.add("bpmnkit-token-edge-visited")
+				const isActive = activeIds.has(targetRef)
+				if (!isActive && !visitedIds.has(targetRef)) continue
+				const list = bySource.get(sourceRef) ?? []
+				list.push({ flowId, isActive })
+				bySource.set(sourceRef, list)
+			}
+			for (const candidates of bySource.values()) {
+				if (candidates.length !== 1) continue
+				for (const { flowId, isActive } of candidates) {
+					const el = edgeEl(flowId)
+					if (el === undefined) continue
+					el.classList.add(isActive ? "bpmnkit-token-edge-active" : "bpmnkit-token-edge-visited")
 				}
 			}
 		}
