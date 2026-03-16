@@ -444,32 +444,44 @@ export function createSearchView(
 	varTabBtn.textContent = "Variables"
 	tabBar.appendChild(varTabBtn)
 
+	const aiTabBtn = document.createElement("button")
+	aiTabBtn.className = "op-search-tab op-search-tab--ai"
+	aiTabBtn.textContent = "AI Search"
+	aiTabBtn.style.display = "none" // revealed after proxy status check
+	tabBar.appendChild(aiTabBtn)
+
 	el.appendChild(tabBar)
 
-	// ── Instance tab pane ─────────────────────────────────────────────────────
+	// ── Panes ─────────────────────────────────────────────────────────────────
 	const instPane = document.createElement("div")
 	instPane.className = "op-search-pane"
 	el.appendChild(instPane)
 
-	// ── Variable tab pane ─────────────────────────────────────────────────────
 	const varPane = document.createElement("div")
 	varPane.className = "op-search-pane"
 	varPane.style.display = "none"
 	el.appendChild(varPane)
 
+	const aiPane = document.createElement("div")
+	aiPane.className = "op-search-pane"
+	aiPane.style.display = "none"
+	el.appendChild(aiPane)
+
 	// ── Tab switching ─────────────────────────────────────────────────────────
-	instTabBtn.addEventListener("click", () => {
-		instTabBtn.classList.add("op-search-tab--active")
-		varTabBtn.classList.remove("op-search-tab--active")
-		instPane.style.display = ""
-		varPane.style.display = "none"
-	})
-	varTabBtn.addEventListener("click", () => {
-		varTabBtn.classList.add("op-search-tab--active")
-		instTabBtn.classList.remove("op-search-tab--active")
-		varPane.style.display = ""
-		instPane.style.display = "none"
-	})
+	const allTabBtns = [instTabBtn, varTabBtn, aiTabBtn]
+	const allPanes = [instPane, varPane, aiPane]
+
+	function switchToTab(activeBtn: HTMLButtonElement): void {
+		allTabBtns.forEach((btn, i) => {
+			btn.classList.toggle("op-search-tab--active", btn === activeBtn)
+			const pane = allPanes[i]
+			if (pane) pane.style.display = btn === activeBtn ? "" : "none"
+		})
+	}
+
+	instTabBtn.addEventListener("click", () => switchToTab(instTabBtn))
+	varTabBtn.addEventListener("click", () => switchToTab(varTabBtn))
+	aiTabBtn.addEventListener("click", () => switchToTab(aiTabBtn))
 
 	// ════════════════════════════════════════════════════════════════════════
 	// INSTANCE SEARCH
@@ -986,11 +998,223 @@ export function createSearchView(
 
 	renderVarConditions()
 
+	// ════════════════════════════════════════════════════════════════════════
+	// AI SEARCH
+	// ════════════════════════════════════════════════════════════════════════
+
+	const aiBuilderSection = document.createElement("div")
+	aiBuilderSection.className = "op-search-builder"
+	aiPane.appendChild(aiBuilderSection)
+
+	const aiInputRow = document.createElement("div")
+	aiInputRow.className = "op-ai-search-row"
+	aiBuilderSection.appendChild(aiInputRow)
+
+	const aiInput = document.createElement("input")
+	aiInput.type = "text"
+	aiInput.className = "op-ai-search-input"
+	aiInput.placeholder =
+		'e.g. "active instances with incidents", "variable amount greater than 1000"'
+	aiInputRow.appendChild(aiInput)
+
+	const aiRunBtn = document.createElement("button")
+	aiRunBtn.className = "op-action-btn op-action-btn--primary"
+	aiRunBtn.textContent = "▶ Search"
+	aiInputRow.appendChild(aiRunBtn)
+
+	const aiHint = document.createElement("div")
+	aiHint.className = "op-ai-search-hint"
+	aiHint.textContent = "Ask in plain language — AI will translate your query to a Camunda search."
+	aiBuilderSection.appendChild(aiHint)
+
+	const aiStatusEl = document.createElement("div")
+	aiStatusEl.className = "op-search-status"
+	aiBuilderSection.appendChild(aiStatusEl)
+
+	const aiResultsSection = document.createElement("div")
+	aiResultsSection.className = "op-search-results"
+	aiResultsSection.style.display = "none"
+	aiPane.appendChild(aiResultsSection)
+
+	const aiResultsHeading = document.createElement("div")
+	aiResultsHeading.className = "op-search-results-heading"
+	aiResultsSection.appendChild(aiResultsHeading)
+
+	const aiFilterEl = document.createElement("div")
+	aiFilterEl.className = "op-ai-search-filter"
+	aiResultsSection.appendChild(aiFilterEl)
+
+	// Results are either instances or variables depending on what the AI decides
+	const { el: aiInstTableEl, setRows: setAiInstRows } = createFilterTable<ProcessInstanceResult>({
+		columns: [
+			{
+				label: "Key",
+				width: "140px",
+				render: (row) => row.processInstanceKey,
+				sortValue: (row) => row.processInstanceKey,
+			},
+			{
+				label: "Process",
+				render: (row) => row.processDefinitionName ?? row.processDefinitionId ?? "—",
+				sortValue: (row) => row.processDefinitionName ?? row.processDefinitionId ?? "",
+			},
+			{
+				label: "State",
+				width: "110px",
+				render: (row) => {
+					const wrap = document.createElement("div")
+					wrap.className = "bpmnkit-badge-wrap"
+					wrap.appendChild(badge(row.state))
+					return wrap
+				},
+				sortValue: (row) => row.state,
+			},
+			{
+				label: "Started",
+				width: "90px",
+				render: (row) => relTime(row.startDate),
+				sortValue: (row) => row.startDate ?? "",
+			},
+		],
+		searchFn: (row) =>
+			[row.processInstanceKey, row.processDefinitionId, row.processDefinitionName, row.state]
+				.filter(Boolean)
+				.join(" "),
+		onRowClick: (row) => onNavigate(`/instances/${row.processInstanceKey}`),
+		emptyText: "No instances found",
+	})
+	aiResultsSection.appendChild(aiInstTableEl)
+
+	const { el: aiVarTableEl, setRows: setAiVarRows } = createFilterTable<VarSearchResult>({
+		columns: [
+			{
+				label: "Name",
+				width: "160px",
+				render: (row) => {
+					const span = document.createElement("span")
+					span.className = "op-mono-cell"
+					span.textContent = row.name
+					return span
+				},
+				sortValue: (row) => row.name,
+			},
+			{
+				label: "Value",
+				render: (row) => {
+					const span = document.createElement("span")
+					span.className = "op-search-var-value"
+					span.textContent = row.value
+					return span
+				},
+				sortValue: (row) => row.value,
+			},
+			{
+				label: "Instance Key",
+				width: "140px",
+				render: (row) => {
+					const btn = document.createElement("button")
+					btn.className = "op-back-btn"
+					btn.textContent = row.processInstanceKey
+					btn.addEventListener("click", (e) => {
+						e.stopPropagation()
+						onNavigate(`/instances/${row.processInstanceKey}`)
+					})
+					return btn
+				},
+				sortValue: (row) => row.processInstanceKey,
+			},
+		],
+		searchFn: (row) => [row.name, row.value, row.processInstanceKey].join(" "),
+		emptyText: "No variables found",
+	})
+	aiResultsSection.appendChild(aiVarTableEl)
+	aiVarTableEl.style.display = "none"
+
+	let aiAbort = false
+
+	function runAiSearch(): void {
+		const query = aiInput.value.trim()
+		if (!query) return
+
+		aiRunBtn.disabled = true
+		aiRunBtn.textContent = "Searching…"
+		aiStatusEl.textContent = ""
+		aiResultsSection.style.display = "none"
+		aiAbort = false
+
+		const headers: Record<string, string> = { "Content-Type": "application/json" }
+		if (cfg.profile) headers["x-profile"] = cfg.profile
+
+		fetch(`${cfg.proxyUrl}/operate/ai-search`, {
+			method: "POST",
+			headers,
+			body: JSON.stringify({ query }),
+		})
+			.then((r) =>
+				r.ok ? r.json() : r.text().then((t) => Promise.reject(new Error(`${r.status}: ${t}`))),
+			)
+			.then(
+				(result: {
+					endpoint: "instances" | "variables"
+					filter: Record<string, unknown>
+					items: unknown[]
+					total: number
+				}) => {
+					if (aiAbort) return
+					const count = result.items.length
+					aiResultsHeading.textContent = `${count} result${count !== 1 ? "s" : ""} (${result.total} total)`
+					aiFilterEl.textContent = `Interpreted as: ${JSON.stringify(result.filter)}`
+
+					if (result.endpoint === "variables") {
+						aiInstTableEl.style.display = "none"
+						aiVarTableEl.style.display = ""
+						setAiVarRows(result.items as VarSearchResult[])
+					} else {
+						aiVarTableEl.style.display = "none"
+						aiInstTableEl.style.display = ""
+						setAiInstRows(result.items as ProcessInstanceResult[])
+					}
+					aiResultsSection.style.display = ""
+				},
+			)
+			.catch((err: unknown) => {
+				if (aiAbort) return
+				aiStatusEl.textContent = `Error: ${String(err)}`
+			})
+			.finally(() => {
+				if (aiAbort) return
+				aiRunBtn.disabled = false
+				aiRunBtn.textContent = "▶ Search"
+			})
+	}
+
+	aiRunBtn.addEventListener("click", runAiSearch)
+	aiInput.addEventListener("keydown", (e) => {
+		if (e.key === "Enter") runAiSearch()
+	})
+
+	// ── Check proxy for AI availability (async, non-blocking) ─────────────────
+	if (!cfg.mock) {
+		fetch(`${cfg.proxyUrl}/status`)
+			.then((r) =>
+				r.ok ? (r.json() as Promise<{ ready: boolean; backend: string | null }>) : null,
+			)
+			.then((status) => {
+				if (status?.ready && status.backend !== null) {
+					aiTabBtn.style.display = ""
+				}
+			})
+			.catch(() => {
+				/* proxy not running — AI tab stays hidden */
+			})
+	}
+
 	return {
 		el,
 		destroy(): void {
 			instStore?.destroy()
 			varSearchAbort?.()
+			aiAbort = true
 		},
 	}
 }

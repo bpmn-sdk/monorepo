@@ -215,6 +215,39 @@ export function buildIncidentUserMessage(
 	return lines.join("\n")
 }
 
+// ── Operate AI search prompt ───────────────────────────────────────────────────
+
+/**
+ * Minimal system prompt for the AI search endpoint.
+ * Instructs the model to output ONLY a JSON object (no prose) to keep token usage low.
+ */
+export function buildSearchSystemPrompt(): string {
+	return [
+		"You are a Camunda 8 search assistant.",
+		"Convert the user query into a JSON search request. Output ONLY a valid JSON object — no explanation, no markdown, no extra text.",
+		"",
+		'Schema: { "endpoint": "instances" | "variables", "filter": { ... } }',
+		"",
+		'Instance filter fields (endpoint "instances"):',
+		'  state: "ACTIVE" | "COMPLETED" | "TERMINATED"',
+		"  processDefinitionKey: string (numeric ID)",
+		"  processDefinitionId: string (BPMN process ID, substring)",
+		"  hasIncident: boolean",
+		"  processInstanceKey: string (numeric key)",
+		"  parentProcessInstanceKey: string",
+		"",
+		'Variable filter fields (endpoint "variables"):',
+		"  name: string (exact variable name)",
+		'  value: any (JSON-serialized: "hello", 42, true)',
+		"  processInstanceKey: string",
+		"  isTruncated: boolean",
+		"  tenantId: string",
+		"",
+		'Use "instances" for process instance queries. Use "variables" for variable/value queries.',
+		"Omit filter fields that are not relevant. Output ONLY the JSON object.",
+	].join("\n")
+}
+
 // ── Fallback prompt builders (for non-MCP adapters like Gemini) ───────────────
 
 /** Full system prompt for non-MCP adapters that must return a CompactDiagram JSON block. */

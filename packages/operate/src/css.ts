@@ -1264,6 +1264,37 @@ const OPERATE_CSS = `
   white-space: nowrap;
   max-width: 340px;
 }
+.op-search-tab--ai { color: var(--bpmnkit-accent); }
+.op-search-tab--ai:hover { color: var(--bpmnkit-accent-bright, #3b82f6); }
+.op-search-tab--ai.op-search-tab--active { color: var(--bpmnkit-accent); border-bottom-color: var(--bpmnkit-accent); }
+.op-ai-search-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.op-ai-search-input {
+  flex: 1;
+  background: var(--bpmnkit-surface-2);
+  border: 1px solid var(--bpmnkit-border);
+  border-radius: var(--bpmnkit-radius-sm);
+  padding: 7px 12px;
+  font-size: 13px;
+  color: var(--bpmnkit-fg);
+  outline: none;
+  font-family: var(--bpmnkit-font);
+}
+.op-ai-search-input:focus { border-color: var(--bpmnkit-accent); }
+.op-ai-search-input::placeholder { color: var(--bpmnkit-fg-muted); }
+.op-ai-search-hint {
+  font-size: 11px;
+  color: var(--bpmnkit-fg-muted);
+}
+.op-ai-search-filter {
+  font-size: 11px;
+  color: var(--bpmnkit-fg-muted);
+  font-family: var(--bpmnkit-font-mono);
+  padding: 2px 0 6px;
+}
 `
 
 export function injectOperateStyles(): void {

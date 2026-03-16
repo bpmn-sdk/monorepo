@@ -1,5 +1,18 @@
 # Progress
 
+## 2026-03-16 — AI Search tab in `@bpmnkit/operate`
+
+- **`apps/proxy/src/prompt.ts`**: Added `buildSearchSystemPrompt()` — a minimal system prompt that instructs the AI to output **only** a JSON object `{ endpoint, filter }`, keeping token usage low (no prose, no markdown).
+- **`apps/proxy/src/index.ts`**: Added `POST /operate/ai-search` endpoint.
+  - **Token-saving pre-check**: Before calling AI, `tryQuickParse()` handles deterministic patterns (bare numeric string → instance key lookup; single state keyword → state filter). AI is bypassed entirely for these cases.
+  - **AI translation**: For complex queries, uses the available adapter to produce a `{ endpoint, filter }` JSON spec; `extractSearchSpec()` handles raw JSON, ```json blocks, or embedded objects.
+  - **Search execution**: Calls `POST /process-instances/search` or `POST /variables/search` on the Camunda API and returns `{ endpoint, filter, items, total }` as plain JSON.
+- **`packages/operate/src/views/search.ts`**: Added "AI Search" tab.
+  - Tab is **hidden by default**; revealed asynchronously after `GET /status` confirms the proxy is running with an AI backend (`ready: true && backend !== null`). Not shown in mock mode.
+  - Single-line text input with Enter-key support, "▶ Search" button, loading/error feedback.
+  - Results display with "Interpreted as: `{filter}`" transparency line, then instance or variable table depending on what the AI chose.
+- **`packages/operate/src/css.ts`**: Added `.op-search-tab--ai` (accent-colored tab), `.op-ai-search-row`, `.op-ai-search-input`, `.op-ai-search-hint`, `.op-ai-search-filter`.
+
 ## 2026-03-16 — Fix exclusive-gateway edge over-highlighting in `@bpmnkit/plugins`
 
 - **`packages/plugins/src/token-highlight/index.ts`**: Replaced the heuristic edge-highlighting fallback with a "unique winner" rule.
