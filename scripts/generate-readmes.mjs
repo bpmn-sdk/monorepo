@@ -6,8 +6,7 @@ import { writeFileSync } from "node:fs"
 import { resolve } from "node:path"
 
 const ROOT = new URL("..", import.meta.url).pathname
-const LOGO_URL =
-	"https://raw.githubusercontent.com/bpmnkit/monorepo/main/doc/logos/logo-2-gateway.svg"
+const LOGO_URL = "https://bpmnkit.com/favicon.svg"
 const GITHUB = "https://github.com/bpmnkit/monorepo"
 const DOCS = "https://docs.bpmnkit.com"
 
@@ -17,7 +16,7 @@ function header({ name, description, extra = "", dir = "packages" }) {
 	const pkg = name.replace("@bpmnkit/", "")
 	const changelogPath = `${dir}/${pkg}/CHANGELOG.md`
 	return `<div align="center">
-  <img src="${LOGO_URL}" width="72" height="72" alt="BPMN Kit logo">
+  <a href="https://bpmnkit.com"><img src="${LOGO_URL}" width="72" height="72" alt="BPMN Kit logo"></a>
   <h1>${name}</h1>
   <p>${description}</p>
 
@@ -68,6 +67,10 @@ ${rows}
 ## License
 
 [MIT](${GITHUB}/blob/main/LICENSE) © BPMN Kit — made by [u11g](https://u11g.com)
+
+<div align="center">
+  <a href="https://bpmnkit.com"><img src="${LOGO_URL}" width="32" height="32" alt="BPMN Kit"></a>
+</div>
 `
 }
 

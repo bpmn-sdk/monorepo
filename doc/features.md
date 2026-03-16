@@ -7,7 +7,7 @@
 - **URL handling**: Hidden field for plain paths; FEEL expression (`="https://base/" + param + "/rest"`) for paths with `{param}` variables.
 - **Auth**: 5-type auth block (noAuth, API key, Basic, Bearer, OAuth2 Client Credentials) with conditions; auto-detected from `securitySchemes` or overrideable via `--auth`.
 - **Body expansion**: `--expand-body` decomposes top-level request body properties into individual typed fields (String / Number / Boolean).
-- **Catalog**: 6 built-in API entries — GitHub, Cloudflare, Stripe, Notion, Resend, OpenAI — with download URLs; `casen connector generate --api github`.
+- **Catalog**: 30 built-in API entries across payments, messaging, CRM, monitoring, AI, and more — `casen connector generate --api <id>`; `casen connector catalog` lists all entries.
 - **Output**: one file per operation (default) or all in one array file (`--format array`); `--dry-run` prints to stdout.
 - **CLI commands**: `casen connector generate` + `casen connector catalog`.
 

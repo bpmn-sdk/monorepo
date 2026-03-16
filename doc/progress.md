@@ -1,5 +1,15 @@
 # Progress
 
+## 2026-03-16 — `connector-gen` user-facing docs in `apps/docs`
+
+- **`apps/docs/src/content/docs/cli/connector.md`**: New Starlight page under the CLI section documenting `casen connector generate` and `casen connector catalog` — all flags, auth types, common workflows (dry-run, filter, expand-body, array format, base-url override), what gets generated, and the full 30-entry catalog table.
+- **`apps/docs/src/content/docs/packages/connector-gen.md`**: New Starlight page under the Packages section documenting `@bpmnkit/connector-gen` — overview, quick start, `generate()` / `generateFromUrl()` / `generateFromCatalog()` with examples, `GeneratorOptions` and `WriteOptions` tables, auth block reference, body expansion, lower-level API (`parseOpenApi`, `getOperations`, `buildTemplates`, `writeTemplates`), catalog reference with `CATALOG` / `getCatalogEntry`, and the full 30-entry catalog table.
+
+## 2026-03-16 — `connector-gen` catalog expanded to 30 entries
+
+- **`packages/connector-gen/src/catalog.ts`**: Added 10 new catalog entries: Anthropic, Shopify Admin, Datadog, Sentry, Intercom, Contentful Management, Airtable, Twitch Helix, Klaviyo, Brex — bringing the total to 30 built-in APIs.
+- **`packages/connector-gen/README.md`**: Rewrote CLI usage section with full flag reference table; added full catalog table (30 entries) with auth types; added auth type reference; documented all three high-level API functions (`generate`, `generateFromUrl`, `generateFromCatalog`) and the lower-level primitives.
+
 ## 2026-03-14 — `@bpmnkit/connector-gen` + `casen connector` command
 
 ### New package: `packages/connector-gen` (`@bpmnkit/connector-gen`)

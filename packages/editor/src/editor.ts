@@ -1221,7 +1221,7 @@ export class BpmnEditor {
 	 * using smart placement (right → bottom → top, avoids overlaps).
 	 * Returns the new element's id.
 	 */
-	addConnectedElement(sourceId: string, type: CreateShapeType): string | null {
+	addConnectedElement(sourceId: string, type: CreateShapeType, name?: string): string | null {
 		if (!this._defs) return null
 		const srcShape = this._shapes.find((s) => s.id === sourceId)
 		if (!srcShape) return null
@@ -1244,7 +1244,7 @@ export class BpmnEditor {
 
 		const newBounds = this._smartPlaceBounds(srcBounds, sourceId, w, h)
 		const obstacles = this._shapes.filter((s) => s.id !== sourceId).map((s) => s.shape.bounds)
-		const r1 = createShape(this._defs, type, newBounds)
+		const r1 = createShape(this._defs, type, newBounds, name)
 		const waypoints = computeWaypointsAvoiding(srcBounds, newBounds, obstacles)
 		const r2 = createConnection(r1.defs, sourceId, r1.id, waypoints)
 

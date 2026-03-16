@@ -185,9 +185,7 @@ const palette = createCommandPalettePlugin({
 	},
 })
 
-const paletteEditor = createCommandPaletteEditorPlugin(palette, (tool) => {
-	editorRef?.setTool(tool as Tool)
-})
+const paletteEditor = createCommandPaletteEditorPlugin(palette, () => editorRef)
 
 const configPanel = createConfigPanelPlugin({
 	getDefinitions: () => editorRef?.getDefinitions() ?? null,

@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="https://raw.githubusercontent.com/bpmnkit/monorepo/main/doc/logos/2026.svg" width="72" height="72" alt="BPMN Kit logo">
+  <a href="https://bpmnkit.com"><img src="https://bpmnkit.com/favicon.svg" width="72" height="72" alt="BPMN Kit logo"></a>
   <h1>@bpmnkit/engine</h1>
   <p>Lightweight BPMN 2.0 process execution engine for browsers and Node.js — zero dependencies</p>
 
@@ -125,3 +125,7 @@ const instance = engine.start("my-process", {}, {
 ## License
 
 [MIT](https://github.com/bpmnkit/monorepo/blob/main/LICENSE) © BPMN Kit — made by [u11g](https://u11g.com)
+
+<div align="center">
+  <a href="https://bpmnkit.com"><img src="https://bpmnkit.com/favicon.svg" width="32" height="32" alt="BPMN Kit"></a>
+</div>
