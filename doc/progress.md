@@ -1,5 +1,19 @@
 # Progress
 
+## 2026-03-16 — Instance Search view in `@bpmnkit/operate`
+
+- **`packages/ui/src/icons.ts`**: Added `search` magnifying-glass icon to `IC_UI`.
+- **`packages/operate/src/views/nav.ts`**: Added "Search" entry (icon: `IC_UI.search`, path: `/search`) to nav.
+- **`packages/operate/src/views/search.ts`**: New view — dynamic condition builder with 12 searchable fields:
+  - Server-side filters (sent to stream API): `state`, `processDefinitionKey`
+  - Client-side post-filters: `processDefinitionId`, `processDefinitionName`, `processInstanceKey`, `businessId`, `hasIncident`, `startDateFrom`, `startDateTo`, `endDateFrom`, `endDateTo`, `parentProcessInstanceKey`
+  - `state` and `hasIncident` use select inputs; date fields use `<input type="date">`; all others use text inputs
+  - Template management: save/load/delete named templates persisted to `localStorage` under `"bpmnkit-operate:search-templates"`
+  - Results rendered via `createFilterTable` with sortable columns; clicking a row navigates to instance detail
+  - One-shot search: polling disconnected after first result
+- **`packages/operate/src/css.ts`**: Added `op-search-*` CSS classes for the search view layout.
+- **`packages/operate/src/operate.ts`**: Registered `/search` route.
+
 ## 2026-03-16 — `connector-gen` user-facing docs in `apps/docs`
 
 - **`apps/docs/src/content/docs/cli/connector.md`**: New Starlight page under the CLI section documenting `casen connector generate` and `casen connector catalog` — all flags, auth types, common workflows (dry-run, filter, expand-body, array format, base-url override), what gets generated, and the full 30-entry catalog table.

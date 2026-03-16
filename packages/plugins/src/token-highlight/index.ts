@@ -120,19 +120,39 @@ export function createTokenHighlightPlugin(): CanvasPlugin & { api: TokenHighlig
 		}
 
 		// Edge highlights
-		// • active edge  : source visited, target active  (token just left source, entering target)
-		// • visited edge : source visited, target visited (token has fully traversed this edge)
-		// This correctly handles exclusive gateways: only the taken branch's target enters
-		// visited/active, so only the taken edge is highlighted.
+		// Prefer direct sequence-flow tracking: Camunda's element-instances API returns
+		// sequence flow element instances (with their flow ID), so visitedIds/activeIds
+		// will contain the actual flow IDs that were traversed.
+		// Fallback to source/target heuristic only when no flow IDs are present (older
+		// engines or environments that don't track sequence flows as element instances).
+		// The heuristic is deliberately disabled when direct tracking is available because
+		// it over-highlights: when a gateway's default path leads to a node that was
+		// reached via a different branch, both edges appear highlighted incorrectly.
+		let hasFlowTracking = false
+		for (const flowId of flowIndex.keys()) {
+			if (visitedIds.has(flowId) || activeIds.has(flowId)) {
+				hasFlowTracking = true
+				break
+			}
+		}
+
 		for (const [flowId, { sourceRef, targetRef }] of flowIndex) {
 			const el = edgeEl(flowId)
 			if (el === undefined) continue
-			const srcVisited = visitedIds.has(sourceRef)
-			if (!srcVisited) continue
-			if (activeIds.has(targetRef)) {
-				el.classList.add("bpmnkit-token-edge-active")
-			} else if (visitedIds.has(targetRef)) {
-				el.classList.add("bpmnkit-token-edge-visited")
+			if (hasFlowTracking) {
+				if (activeIds.has(flowId)) {
+					el.classList.add("bpmnkit-token-edge-active")
+				} else if (visitedIds.has(flowId)) {
+					el.classList.add("bpmnkit-token-edge-visited")
+				}
+			} else {
+				// Heuristic fallback: highlight if source was visited and target is active/visited
+				if (!visitedIds.has(sourceRef)) continue
+				if (activeIds.has(targetRef)) {
+					el.classList.add("bpmnkit-token-edge-active")
+				} else if (visitedIds.has(targetRef)) {
+					el.classList.add("bpmnkit-token-edge-visited")
+				}
 			}
 		}
 	}

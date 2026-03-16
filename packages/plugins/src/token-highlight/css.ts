@@ -14,6 +14,8 @@ const CSS = `
   animation: bpmnkit-token-pulse 1.4s ease-in-out infinite;
 }
 .bpmnkit-token-active .bpmnkit-shape-body,
+.bpmnkit-token-active .bpmnkit-callactivity-body,
+.bpmnkit-token-active .bpmnkit-eventsubprocess-body,
 .bpmnkit-token-active .bpmnkit-event-body,
 .bpmnkit-token-active .bpmnkit-end-body,
 .bpmnkit-token-active .bpmnkit-gw-body {
@@ -24,6 +26,8 @@ const CSS = `
 
 /* ── Visited shapes (token has passed through) ──────────────────────────── */
 .bpmnkit-token-visited .bpmnkit-shape-body,
+.bpmnkit-token-visited .bpmnkit-callactivity-body,
+.bpmnkit-token-visited .bpmnkit-eventsubprocess-body,
 .bpmnkit-token-visited .bpmnkit-event-body,
 .bpmnkit-token-visited .bpmnkit-end-body,
 .bpmnkit-token-visited .bpmnkit-gw-body {

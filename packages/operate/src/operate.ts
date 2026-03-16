@@ -22,6 +22,7 @@ import { createInstancesView } from "./views/instances.js"
 import { createJobsView } from "./views/jobs.js"
 import { createMessagesView } from "./views/messages.js"
 import { createNav } from "./views/nav.js"
+import { createSearchView } from "./views/search.js"
 import { createTaskDetailView } from "./views/task-detail.js"
 import { createTasksView } from "./views/tasks.js"
 
@@ -364,6 +365,19 @@ export function createOperate(options: OperateOptions): OperateApi {
 		header.setTitle("Messages & Signals")
 		nav.setActive("/messages")
 		const { el: vEl, destroy } = createMessagesView({ proxyUrl, profile, mock })
+		showView(vEl, destroy)
+	})
+
+	router.on("/search", () => {
+		reconnectCurrent = () => {
+			disconnectAll()
+		}
+		reconnectCurrent()
+		header.setTitle("Search")
+		nav.setActive("/search")
+		const { el: vEl, destroy } = createSearchView({ proxyUrl, profile, mock }, (path) =>
+			router.navigate(path),
+		)
 		showView(vEl, destroy)
 	})
 
