@@ -13,7 +13,7 @@ interface Config {
 	proxyUrl: string
 	profile: string | null
 	mock: boolean
-	theme: "light" | "dark"
+	theme: "light" | "dark" | "neon"
 	navigate?: (path: string) => void
 }
 
@@ -93,7 +93,7 @@ export function createIncidentDetailView(
 	// Sidebar pane
 	const sidebar = document.createElement("div")
 	sidebar.className = "op-detail-sidebar"
-	sidebar.dataset.bpmnHudTheme = cfg.theme
+	sidebar.dataset.bpmnkitHudTheme = cfg.theme
 	layout.appendChild(sidebar)
 
 	// Tabs

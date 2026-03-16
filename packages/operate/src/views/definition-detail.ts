@@ -11,7 +11,7 @@ interface Config {
 	proxyUrl: string
 	profile: string | null
 	mock: boolean
-	theme: "light" | "dark"
+	theme: "light" | "dark" | "neon"
 	navigate?: (path: string) => void
 }
 
@@ -36,7 +36,7 @@ export function createDefinitionDetailView(
 	onBack: () => void,
 ): {
 	el: HTMLElement
-	setTheme(t: "light" | "dark"): void
+	setTheme(t: "light" | "dark" | "neon"): void
 	destroy(): void
 } {
 	const el = document.createElement("div")
@@ -68,7 +68,7 @@ export function createDefinitionDetailView(
 
 	const sidebar = document.createElement("div")
 	sidebar.className = "op-detail-sidebar"
-	sidebar.dataset.bpmnHudTheme = cfg.theme
+	sidebar.dataset.bpmnkitHudTheme = cfg.theme
 	layout.appendChild(sidebar)
 
 	const tabBar = document.createElement("div")
@@ -380,9 +380,9 @@ export function createDefinitionDetailView(
 
 	return {
 		el,
-		setTheme(t: "light" | "dark"): void {
+		setTheme(t: "light" | "dark" | "neon"): void {
 			canvas?.setTheme(t)
-			sidebar.dataset.bpmnHudTheme = t
+			sidebar.dataset.bpmnkitHudTheme = t
 		},
 		destroy(): void {
 			canvas?.destroy()

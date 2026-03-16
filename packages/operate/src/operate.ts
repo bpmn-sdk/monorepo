@@ -116,7 +116,7 @@ export function createOperate(options: OperateOptions): OperateApi {
 		(theme, resolved) => {
 			el.setAttribute("data-theme", resolved)
 			currentTheme = theme
-			currentViewSetTheme?.(resolved as "light" | "dark")
+			currentViewSetTheme?.(resolved)
 		},
 		initialTheme,
 	)
@@ -131,12 +131,12 @@ export function createOperate(options: OperateOptions): OperateApi {
 
 	let destroyView: (() => void) | null = null
 	let currentTheme: Theme = initialTheme
-	let currentViewSetTheme: ((t: "light" | "dark") => void) | null = null
+	let currentViewSetTheme: ((t: "light" | "dark" | "neon") => void) | null = null
 
 	function showView(
 		viewEl: HTMLElement,
 		destroy: () => void,
-		setTheme?: (t: "light" | "dark") => void,
+		setTheme?: (t: "light" | "dark" | "neon") => void,
 	): void {
 		destroyView?.()
 		destroyView = destroy
@@ -145,8 +145,10 @@ export function createOperate(options: OperateOptions): OperateApi {
 		content.appendChild(viewEl)
 	}
 
-	function getTheme(): "light" | "dark" {
-		return el.getAttribute("data-theme") === "light" ? "light" : "dark"
+	function getTheme(): "light" | "dark" | "neon" {
+		const t = el.getAttribute("data-theme")
+		if (t === "light" || t === "neon") return t
+		return "dark"
 	}
 
 	router.on("/", () => {

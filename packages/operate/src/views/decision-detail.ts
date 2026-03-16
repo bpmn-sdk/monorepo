@@ -6,7 +6,7 @@ interface Config {
 	proxyUrl: string
 	profile: string | null
 	mock: boolean
-	theme: "light" | "dark"
+	theme: "light" | "dark" | "neon"
 	navigate?: (path: string) => void
 }
 
@@ -39,7 +39,7 @@ export function createDecisionDetailView(
 	onBack: () => void,
 ): {
 	el: HTMLElement
-	setTheme(t: "light" | "dark"): void
+	setTheme(t: "light" | "dark" | "neon"): void
 	destroy(): void
 } {
 	const el = document.createElement("div")
@@ -131,7 +131,10 @@ export function createDecisionDetailView(
 	function loadEditor(xml: string): void {
 		editor?.destroy()
 		editorWrap.innerHTML = ""
-		editor = new DmnEditor({ container: editorWrap, theme: cfg.theme })
+		editor = new DmnEditor({
+			container: editorWrap,
+			theme: cfg.theme === "neon" ? "dark" : cfg.theme,
+		})
 		editor.loadXML(xml).catch(() => {})
 	}
 
@@ -183,8 +186,8 @@ export function createDecisionDetailView(
 
 	return {
 		el,
-		setTheme(t: "light" | "dark"): void {
-			editor?.setTheme(t)
+		setTheme(t: "light" | "dark" | "neon"): void {
+			editor?.setTheme(t === "neon" ? "dark" : t)
 		},
 		destroy(): void {
 			unsub()
