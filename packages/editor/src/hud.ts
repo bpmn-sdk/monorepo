@@ -270,7 +270,6 @@ export function initEditorHud(
 
 	// Tool selector — bottom center
 	const btnSelect = hudBtn("btn-select", "Select (V)")
-	btnSelect.classList.add("active")
 	const btnPan = hudBtn("btn-pan", "Hand (H)")
 	const btnSpace = hudBtn("btn-space", "Space tool")
 
@@ -741,12 +740,17 @@ export function initEditorHud(
 		}
 	}
 
+	let _currentTool: Tool = "default"
+	editor.on("editor:tool", (tool: Tool) => {
+		_currentTool = tool
+	})
+
 	btnSelect.addEventListener("click", () => {
-		editor.setTool("select")
+		editor.setTool(_currentTool === "select" ? "default" : "select")
 		collapseOnMobile(hudBottomCenter)
 	})
 	btnPan.addEventListener("click", () => {
-		editor.setTool("pan")
+		editor.setTool(_currentTool === "pan" ? "default" : "pan")
 		collapseOnMobile(hudBottomCenter)
 	})
 	btnSpace.addEventListener("click", () => {

@@ -10,7 +10,6 @@ import { createMainMenuPlugin } from "@bpmnkit/plugins/main-menu"
 import { createOptimizePlugin } from "@bpmnkit/plugins/optimize"
 import { InMemoryFileResolver, createStorageTabsBridge } from "@bpmnkit/plugins/storage-tabs-bridge"
 import { createWatermarkPlugin } from "@bpmnkit/plugins/watermark"
-import { createZoomControlsPlugin } from "@bpmnkit/plugins/zoom-controls"
 import { makeExamples } from "./examples.js"
 
 const LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
@@ -104,6 +103,9 @@ const mainMenuPlugin = createMainMenuPlugin({
 
 // ── Plugins ───────────────────────────────────────────────────────────────────
 
+// Forward ref — aiBridgePlugin is created below but onAskAI fires only at runtime
+let _aiPlugin: { ask(q: string): void } | null = null
+
 const palette = createCommandPalettePlugin({
 	onZenModeChange(active) {
 		for (const el of document.querySelectorAll<HTMLElement>(".hud")) {
@@ -111,6 +113,7 @@ const palette = createCommandPalettePlugin({
 		}
 		editorRef?.setReadOnly(active)
 	},
+	onAskAI: (query) => _aiPlugin?.ask(query),
 })
 
 const paletteEditor = createCommandPaletteEditorPlugin(palette, () => editorRef)
@@ -188,6 +191,7 @@ const aiBridgePlugin = createAiBridgePlugin({
 		dock.switchTab("ai")
 	},
 })
+_aiPlugin = aiBridgePlugin
 
 palette.addCommands([
 	{
@@ -207,7 +211,6 @@ const editor = new BpmnEditor({
 	fit: "center",
 	plugins: [
 		mainMenuPlugin,
-		createZoomControlsPlugin(),
 		createWatermarkPlugin({
 			links: [{ label: "Github", url: "https://github.com/bpmnkit/monorepo" }],
 			logo: LOGO_SVG,

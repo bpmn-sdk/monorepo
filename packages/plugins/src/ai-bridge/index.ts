@@ -79,6 +79,8 @@ export function createAiBridgePlugin(options: AiBridgePluginOptions): {
 	openPanel(): void
 	/** Set the node context shown as a badge above the chat input. Pass null to clear. */
 	setContext(node: NodeContext | null): void
+	/** Open the AI panel, pre-fill `prompt`, and submit it immediately. */
+	ask(prompt: string): void
 } {
 	const serverUrl = options.serverUrl ?? DEFAULT_SERVER
 
@@ -167,11 +169,17 @@ export function createAiBridgePlugin(options: AiBridgePluginOptions): {
 		})
 	}
 
+	function ask(prompt: string): void {
+		openPanel()
+		getOrCreatePanel().submit(prompt)
+	}
+
 	return {
 		name: "ai-bridge",
 		install,
 		button,
 		openPanel,
 		setContext,
+		ask,
 	}
 }

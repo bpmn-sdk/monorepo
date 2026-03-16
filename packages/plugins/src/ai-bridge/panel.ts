@@ -230,6 +230,7 @@ export function createAiPanel(options: PanelOptions): {
 	open(): void
 	close(): void
 	setContext(node: NodeContext | null): void
+	submit(prompt: string): void
 } {
 	injectAiBridgeStyles()
 
@@ -859,7 +860,15 @@ export function createAiPanel(options: PanelOptions): {
 		panel.classList.remove("ai-panel-open")
 	}
 
-	return { panel, open, close, setContext }
+	/** Open the panel, pre-fill the given prompt, and submit it immediately. */
+	function submit(prompt: string): void {
+		open()
+		textarea.value = prompt
+		autoGrow()
+		void send()
+	}
+
+	return { panel, open, close, setContext, submit }
 }
 
 export { DEFAULT_SERVER }

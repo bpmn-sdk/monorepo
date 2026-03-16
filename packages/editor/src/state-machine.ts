@@ -65,6 +65,7 @@ type SpaceSub =
 	| { name: "dragging"; origin: DiagPoint; last: DiagPoint; axis: "h" | "v" | null }
 
 export type EditorMode =
+	| { mode: "default"; sub: SelectSub }
 	| { mode: "select"; sub: SelectSub }
 	| { mode: "create"; elementType: CreateShapeType }
 	| { mode: "pan" }
@@ -131,9 +132,22 @@ function screenDist(ax: number, ay: number, bx: number, by: number): number {
  * via injected `Callbacks`.
  */
 export class EditorStateMachine {
-	private _mode: EditorMode = { mode: "select", sub: { name: "idle", hoveredId: null } }
+	private _mode: EditorMode = { mode: "default", sub: { name: "idle", hoveredId: null } }
 
 	constructor(private readonly _cb: Callbacks) {}
+
+	/** Creates an idle state preserving the current base mode ("default" or "select"). */
+	private _idle(): EditorMode {
+		return this._withSub({ name: "idle", hoveredId: null })
+	}
+
+	/**
+	 * Wraps a sub-state with the current base mode so that "default" and "select"
+	 * mode operations return to the same mode when they complete.
+	 */
+	private _withSub(sub: SelectSub): EditorMode {
+		return this._mode.mode === "default" ? { mode: "default", sub } : { mode: "select", sub }
+	}
 
 	get mode(): EditorMode {
 		return this._mode
@@ -148,11 +162,11 @@ export class EditorStateMachine {
 	onPointerDown(e: PointerEvent, diag: DiagPoint, hit: HitResult): void {
 		const mode = this._mode
 
-		// Create mode: place shape and revert to select
+		// Create mode: place shape and revert to default
 		if (mode.mode === "create") {
 			this._cb.commitCreate(mode.elementType, diag)
-			this._mode = { mode: "select", sub: { name: "idle", hoveredId: null } }
-			this._cb.setTool("select")
+			this._mode = { mode: "default", sub: { name: "idle", hoveredId: null } }
+			this._cb.setTool("default")
 			return
 		}
 
@@ -169,6 +183,18 @@ export class EditorStateMachine {
 		// Pan mode: viewport handles this
 		if (mode.mode === "pan") return
 
+		// Default mode: canvas click without Shift → track for selection clear on pointer-up, but don't lock
+		// viewport so panning still works naturally. Shift falls through to rubber-band.
+		if (mode.mode === "default" && hit.type === "canvas" && !e.shiftKey) {
+			this._mode = this._withSub({
+				name: "pointing-canvas",
+				origin: diag,
+				screenX: e.clientX,
+				screenY: e.clientY,
+			})
+			return
+		}
+
 		// If already in connecting mode (entered from contextual toolbar), a click commits or cancels
 		if (mode.sub.name === "connecting") {
 			this._cb.lockViewport(false)
@@ -177,7 +203,7 @@ export class EditorStateMachine {
 			} else {
 				this._cb.cancelConnect()
 			}
-			this._mode = { mode: "select", sub: { name: "idle", hoveredId: null } }
+			this._mode = this._idle()
 			return
 		}
 
@@ -191,33 +217,27 @@ export class EditorStateMachine {
 				const shape = shapes.find((s) => s.id === hit.shapeId)
 				if (!shape) return
 				this._cb.lockViewport(true)
-				this._mode = {
-					mode: "select",
-					sub: {
-						name: "pointing-handle",
-						origin: diag,
-						id: hit.shapeId,
-						handle: hit.handle,
-						screenX: e.clientX,
-						screenY: e.clientY,
-					},
-				}
+				this._mode = this._withSub({
+					name: "pointing-handle",
+					origin: diag,
+					id: hit.shapeId,
+					handle: hit.handle,
+					screenX: e.clientX,
+					screenY: e.clientY,
+				})
 				break
 			}
 
 			case "port": {
 				this._cb.lockViewport(true)
-				this._mode = {
-					mode: "select",
-					sub: {
-						name: "pointing-port",
-						origin: diag,
-						sourceId: hit.shapeId,
-						port: hit.port,
-						screenX: e.clientX,
-						screenY: e.clientY,
-					},
-				}
+				this._mode = this._withSub({
+					name: "pointing-port",
+					origin: diag,
+					sourceId: hit.shapeId,
+					port: hit.port,
+					screenX: e.clientX,
+					screenY: e.clientY,
+				})
 				break
 			}
 
@@ -228,98 +248,81 @@ export class EditorStateMachine {
 						? selectedIds.filter((id) => id !== hit.id)
 						: [...selectedIds, hit.id]
 					this._cb.setSelection(newIds)
-					this._mode = { mode: "select", sub: { name: "idle", hoveredId: hit.id } }
+					this._mode = this._withSub({ name: "idle", hoveredId: hit.id })
 				} else {
 					if (!selectedIds.includes(hit.id)) {
 						this._cb.setSelection([hit.id])
 					}
-					this._mode = {
-						mode: "select",
-						sub: {
-							name: "pointing-shape",
-							origin: diag,
-							id: hit.id,
-							screenX: e.clientX,
-							screenY: e.clientY,
-						},
-					}
+					this._mode = this._withSub({
+						name: "pointing-shape",
+						origin: diag,
+						id: hit.id,
+						screenX: e.clientX,
+						screenY: e.clientY,
+					})
 				}
 				break
 			}
 
 			case "edge": {
 				this._cb.setEdgeSelected(hit.id)
-				this._mode = { mode: "select", sub: { name: "idle", hoveredId: null } }
+				this._mode = this._idle()
 				break
 			}
 
 			case "edge-segment": {
 				this._cb.lockViewport(true)
-				this._mode = {
-					mode: "select",
-					sub: {
-						name: "pointing-edge-segment",
-						edgeId: hit.id,
-						segIdx: hit.segIdx,
-						isHoriz: hit.isHoriz,
-						projPt: hit.projPt,
-						origin: diag,
-						screenX: e.clientX,
-						screenY: e.clientY,
-					},
-				}
+				this._mode = this._withSub({
+					name: "pointing-edge-segment",
+					edgeId: hit.id,
+					segIdx: hit.segIdx,
+					isHoriz: hit.isHoriz,
+					projPt: hit.projPt,
+					origin: diag,
+					screenX: e.clientX,
+					screenY: e.clientY,
+				})
 				break
 			}
 
 			case "edge-waypoint": {
 				this._cb.lockViewport(true)
-				this._mode = {
-					mode: "select",
-					sub: {
-						name: "pointing-edge-waypoint",
-						edgeId: hit.id,
-						wpIdx: hit.wpIdx,
-						pt: hit.pt,
-						screenX: e.clientX,
-						screenY: e.clientY,
-					},
-				}
+				this._mode = this._withSub({
+					name: "pointing-edge-waypoint",
+					edgeId: hit.id,
+					wpIdx: hit.wpIdx,
+					pt: hit.pt,
+					screenX: e.clientX,
+					screenY: e.clientY,
+				})
 				break
 			}
 
 			case "edge-endpoint": {
 				this._cb.lockViewport(true)
-				this._mode = {
-					mode: "select",
-					sub: {
-						name: "pointing-edge-endpoint",
-						edgeId: hit.edgeId,
-						isStart: hit.isStart,
-						origin: diag,
-						screenX: e.clientX,
-						screenY: e.clientY,
-					},
-				}
+				this._mode = this._withSub({
+					name: "pointing-edge-endpoint",
+					edgeId: hit.edgeId,
+					isStart: hit.isStart,
+					origin: diag,
+					screenX: e.clientX,
+					screenY: e.clientY,
+				})
 				break
 			}
 
 			case "canvas": {
 				if (e.shiftKey) {
 					this._cb.lockViewport(true)
-					this._mode = {
-						mode: "select",
-						sub: { name: "rubber-band", origin: diag, current: diag },
-					}
+					this._mode = this._withSub({ name: "rubber-band", origin: diag, current: diag })
 				} else {
-					this._mode = {
-						mode: "select",
-						sub: {
-							name: "pointing-canvas",
-							origin: diag,
-							screenX: e.clientX,
-							screenY: e.clientY,
-						},
-					}
+					// Only reachable in explicit "select" mode (default mode canvas+no-shift returned early)
+					this._mode = this._withSub({
+						name: "pointing-canvas",
+						origin: diag,
+						screenX: e.clientX,
+						screenY: e.clientY,
+					})
 				}
 				break
 			}
@@ -345,7 +348,7 @@ export class EditorStateMachine {
 			return
 		}
 
-		if (mode.mode !== "select") {
+		if (mode.mode !== "select" && mode.mode !== "default") {
 			if (mode.mode === "create") {
 				// Ghost create: update overlay (editor reads state.mode to update ghost)
 			}
@@ -359,7 +362,7 @@ export class EditorStateMachine {
 				const hoveredId = hit.type === "shape" ? hit.id : null
 				if (hoveredId !== sub.hoveredId) {
 					this._cb.setHovered(hoveredId)
-					this._mode = { mode: "select", sub: { name: "idle", hoveredId } }
+					this._mode = this._withSub({ name: "idle", hoveredId })
 				}
 				if (hit.type === "edge-segment") {
 					this._cb.showEdgeHoverDot(hit.projPt)
@@ -378,10 +381,7 @@ export class EditorStateMachine {
 				const dist = screenDist(e.clientX, e.clientY, sub.screenX, sub.screenY)
 				if (dist > DRAG_THRESHOLD) {
 					this._cb.lockViewport(true)
-					this._mode = {
-						mode: "select",
-						sub: { name: "translating", origin: sub.origin, last: diag },
-					}
+					this._mode = this._withSub({ name: "translating", origin: sub.origin, last: diag })
 					const dx = diag.x - sub.origin.x
 					const dy = diag.y - sub.origin.y
 					this._cb.previewTranslate(dx, dy)
@@ -392,7 +392,7 @@ export class EditorStateMachine {
 			case "translating": {
 				const dx = diag.x - sub.origin.x
 				const dy = diag.y - sub.origin.y
-				this._mode = { mode: "select", sub: { ...sub, last: diag } }
+				this._mode = this._withSub({ ...sub, last: diag })
 				this._cb.previewTranslate(dx, dy)
 				break
 			}
@@ -404,16 +404,13 @@ export class EditorStateMachine {
 					const shape = shapes.find((s) => s.id === sub.id)
 					if (!shape) break
 					const newBounds = applyResize(shape.shape.bounds, sub.handle, diag.x, diag.y)
-					this._mode = {
-						mode: "select",
-						sub: {
-							name: "resizing",
-							id: sub.id,
-							handle: sub.handle,
-							original: shape.shape.bounds,
-							current: diag,
-						},
-					}
+					this._mode = this._withSub({
+						name: "resizing",
+						id: sub.id,
+						handle: sub.handle,
+						original: shape.shape.bounds,
+						current: diag,
+					})
 					this._cb.previewResize(newBounds)
 				}
 				break
@@ -421,7 +418,7 @@ export class EditorStateMachine {
 
 			case "resizing": {
 				const newBounds = applyResize(sub.original, sub.handle, diag.x, diag.y)
-				this._mode = { mode: "select", sub: { ...sub, current: diag } }
+				this._mode = this._withSub({ ...sub, current: diag })
 				this._cb.previewResize(newBounds)
 				break
 			}
@@ -429,17 +426,18 @@ export class EditorStateMachine {
 			case "pointing-port": {
 				const dist = screenDist(e.clientX, e.clientY, sub.screenX, sub.screenY)
 				if (dist > DRAG_THRESHOLD) {
-					this._mode = {
-						mode: "select",
-						sub: { name: "connecting", sourceId: sub.sourceId, ghostEnd: diag },
-					}
+					this._mode = this._withSub({
+						name: "connecting",
+						sourceId: sub.sourceId,
+						ghostEnd: diag,
+					})
 					this._cb.previewConnect(diag)
 				}
 				break
 			}
 
 			case "connecting": {
-				this._mode = { mode: "select", sub: { ...sub, ghostEnd: diag } }
+				this._mode = this._withSub({ ...sub, ghostEnd: diag })
 				this._cb.previewConnect(diag)
 				break
 			}
@@ -447,15 +445,12 @@ export class EditorStateMachine {
 			case "pointing-edge-endpoint": {
 				const dist = screenDist(e.clientX, e.clientY, sub.screenX, sub.screenY)
 				if (dist > DRAG_THRESHOLD) {
-					this._mode = {
-						mode: "select",
-						sub: {
-							name: "dragging-edge-endpoint",
-							edgeId: sub.edgeId,
-							isStart: sub.isStart,
-							origin: sub.origin,
-						},
-					}
+					this._mode = this._withSub({
+						name: "dragging-edge-endpoint",
+						edgeId: sub.edgeId,
+						isStart: sub.isStart,
+						origin: sub.origin,
+					})
 					this._cb.previewEndpointMove(sub.edgeId, sub.isStart, diag)
 				}
 				break
@@ -469,15 +464,12 @@ export class EditorStateMachine {
 			case "pointing-edge-segment": {
 				const dist = screenDist(e.clientX, e.clientY, sub.screenX, sub.screenY)
 				if (dist > DRAG_THRESHOLD) {
-					this._mode = {
-						mode: "select",
-						sub: {
-							name: "dragging-edge-waypoint-new",
-							edgeId: sub.edgeId,
-							segIdx: sub.segIdx,
-							origin: sub.origin,
-						},
-					}
+					this._mode = this._withSub({
+						name: "dragging-edge-waypoint-new",
+						edgeId: sub.edgeId,
+						segIdx: sub.segIdx,
+						origin: sub.origin,
+					})
 					this._cb.previewWaypointInsert(sub.edgeId, sub.segIdx, diag)
 				}
 				break
@@ -491,15 +483,12 @@ export class EditorStateMachine {
 			case "pointing-edge-waypoint": {
 				const dist = screenDist(e.clientX, e.clientY, sub.screenX, sub.screenY)
 				if (dist > DRAG_THRESHOLD) {
-					this._mode = {
-						mode: "select",
-						sub: {
-							name: "dragging-edge-waypoint",
-							edgeId: sub.edgeId,
-							wpIdx: sub.wpIdx,
-							origin: sub.pt,
-						},
-					}
+					this._mode = this._withSub({
+						name: "dragging-edge-waypoint",
+						edgeId: sub.edgeId,
+						wpIdx: sub.wpIdx,
+						origin: sub.pt,
+					})
 					this._cb.previewWaypointMove(sub.edgeId, sub.wpIdx, diag)
 				}
 				break
@@ -511,21 +500,23 @@ export class EditorStateMachine {
 			}
 
 			case "rubber-band": {
-				this._mode = { mode: "select", sub: { ...sub, current: diag } }
+				this._mode = this._withSub({ ...sub, current: diag })
 				this._cb.previewRubberBand(sub.origin, diag)
 				break
 			}
 
 			case "pointing-canvas": {
-				// Transition to rubber-band when drag threshold exceeded (no Shift required)
 				const dist = screenDist(e.clientX, e.clientY, sub.screenX, sub.screenY)
 				if (dist > DRAG_THRESHOLD) {
-					this._cb.lockViewport(true)
-					this._mode = {
-						mode: "select",
-						sub: { name: "rubber-band", origin: sub.origin, current: diag },
+					if (this._mode.mode === "default") {
+						// Default mode canvas drag → pan. Return to idle so pointer-up doesn't clear selection.
+						this._mode = this._idle()
+					} else {
+						// Select mode canvas drag → rubber-band
+						this._cb.lockViewport(true)
+						this._mode = this._withSub({ name: "rubber-band", origin: sub.origin, current: diag })
+						this._cb.previewRubberBand(sub.origin, diag)
 					}
-					this._cb.previewRubberBand(sub.origin, diag)
 				}
 				break
 			}
@@ -550,14 +541,23 @@ export class EditorStateMachine {
 			return
 		}
 
-		if (mode.mode !== "select") return
+		// Pan mode: deselect tool on short click (no actual pan)
+		if (mode.mode === "pan") {
+			if (!this._cb.viewportDidPan()) {
+				this._mode = { mode: "default", sub: { name: "idle", hoveredId: null } }
+				this._cb.setTool("default")
+			}
+			return
+		}
+
+		if (mode.mode !== "select" && mode.mode !== "default") return
 
 		const sub = mode.sub
 
 		switch (sub.name) {
 			case "pointing-shape": {
 				this._cb.setSelection([sub.id])
-				this._mode = { mode: "select", sub: { name: "idle", hoveredId: sub.id } }
+				this._mode = this._withSub({ name: "idle", hoveredId: sub.id })
 				break
 			}
 
@@ -566,13 +566,13 @@ export class EditorStateMachine {
 				const dy = diag.y - sub.origin.y
 				this._cb.lockViewport(false)
 				this._cb.commitTranslate(dx, dy)
-				this._mode = { mode: "select", sub: { name: "idle", hoveredId: null } }
+				this._mode = this._idle()
 				break
 			}
 
 			case "pointing-handle": {
 				this._cb.lockViewport(false)
-				this._mode = { mode: "select", sub: { name: "idle", hoveredId: null } }
+				this._mode = this._idle()
 				break
 			}
 
@@ -580,13 +580,13 @@ export class EditorStateMachine {
 				const newBounds = applyResize(sub.original, sub.handle, diag.x, diag.y)
 				this._cb.lockViewport(false)
 				this._cb.commitResize(sub.id, newBounds)
-				this._mode = { mode: "select", sub: { name: "idle", hoveredId: null } }
+				this._mode = this._idle()
 				break
 			}
 
 			case "pointing-port": {
 				this._cb.lockViewport(false)
-				this._mode = { mode: "select", sub: { name: "idle", hoveredId: null } }
+				this._mode = this._idle()
 				break
 			}
 
@@ -597,7 +597,7 @@ export class EditorStateMachine {
 				} else {
 					this._cb.cancelConnect()
 				}
-				this._mode = { mode: "select", sub: { name: "idle", hoveredId: null } }
+				this._mode = this._idle()
 				break
 			}
 
@@ -616,20 +616,20 @@ export class EditorStateMachine {
 					})
 					.map((s) => s.id)
 				this._cb.setSelection(ids)
-				this._mode = { mode: "select", sub: { name: "idle", hoveredId: null } }
+				this._mode = this._idle()
 				break
 			}
 
 			case "pointing-edge-endpoint": {
 				this._cb.lockViewport(false)
-				this._mode = { mode: "select", sub: { name: "idle", hoveredId: null } }
+				this._mode = this._idle()
 				break
 			}
 
 			case "dragging-edge-endpoint": {
 				this._cb.lockViewport(false)
 				this._cb.commitEndpointMove(sub.edgeId, sub.isStart, diag)
-				this._mode = { mode: "select", sub: { name: "idle", hoveredId: null } }
+				this._mode = this._idle()
 				break
 			}
 
@@ -637,28 +637,28 @@ export class EditorStateMachine {
 				this._cb.lockViewport(false)
 				// Tap without drag: select the edge
 				this._cb.setEdgeSelected(sub.edgeId)
-				this._mode = { mode: "select", sub: { name: "idle", hoveredId: null } }
+				this._mode = this._idle()
 				break
 			}
 
 			case "dragging-edge-waypoint-new": {
 				this._cb.lockViewport(false)
 				this._cb.commitWaypointInsert(sub.edgeId, sub.segIdx, diag)
-				this._mode = { mode: "select", sub: { name: "idle", hoveredId: null } }
+				this._mode = this._idle()
 				break
 			}
 
 			case "pointing-edge-waypoint": {
 				this._cb.lockViewport(false)
 				this._cb.setEdgeSelected(sub.edgeId)
-				this._mode = { mode: "select", sub: { name: "idle", hoveredId: null } }
+				this._mode = this._idle()
 				break
 			}
 
 			case "dragging-edge-waypoint": {
 				this._cb.lockViewport(false)
 				this._cb.commitWaypointMove(sub.edgeId, sub.wpIdx, diag)
-				this._mode = { mode: "select", sub: { name: "idle", hoveredId: null } }
+				this._mode = this._idle()
 				break
 			}
 
@@ -666,7 +666,9 @@ export class EditorStateMachine {
 				if (!this._cb.viewportDidPan()) {
 					this._cb.setSelection([])
 				}
-				this._mode = { mode: "select", sub: { name: "idle", hoveredId: null } }
+				// Return to default mode after canvas click
+				this._mode = { mode: "default", sub: { name: "idle", hoveredId: null } }
+				this._cb.setTool("default")
 				break
 			}
 
@@ -691,8 +693,8 @@ export class EditorStateMachine {
 
 		if (mode.mode === "create" && e.key === "Escape") {
 			e.preventDefault()
-			this._mode = { mode: "select", sub: { name: "idle", hoveredId: null } }
-			this._cb.setTool("select")
+			this._mode = { mode: "default", sub: { name: "idle", hoveredId: null } }
+			this._cb.setTool("default")
 			return
 		}
 
@@ -706,7 +708,7 @@ export class EditorStateMachine {
 			return
 		}
 
-		if (mode.mode !== "select") return
+		if (mode.mode !== "select" && mode.mode !== "default") return
 
 		const sub = mode.sub
 
@@ -737,7 +739,7 @@ export class EditorStateMachine {
 				this._cb.cancelWaypointMove()
 			}
 			this._cb.setSelection([])
-			this._mode = { mode: "select", sub: { name: "idle", hoveredId: null } }
+			this._mode = this._idle()
 			return
 		}
 

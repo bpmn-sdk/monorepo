@@ -614,7 +614,7 @@ export class BpmnEditor {
 			this._ghostSnapCenter = null
 			this._stateMachine.setMode({ mode: "pan" })
 		} else {
-			this.setTool("select")
+			this.setTool("default")
 		}
 	}
 
@@ -626,7 +626,9 @@ export class BpmnEditor {
 		this._overlay.setAlignmentGuides([])
 		this._setCreateEdgeDropHighlight(null)
 		this._ghostSnapCenter = null
-		if (tool === "select") {
+		if (tool === "default") {
+			this._stateMachine.setMode({ mode: "default", sub: { name: "idle", hoveredId: null } })
+		} else if (tool === "select") {
 			this._stateMachine.setMode({ mode: "select", sub: { name: "idle", hoveredId: null } })
 		} else if (tool === "pan") {
 			this._stateMachine.setMode({ mode: "pan" })
