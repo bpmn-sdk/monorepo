@@ -763,6 +763,16 @@ const server = http.createServer(async (req, res) => {
 		}
 
 		// Step 3: Execute search against Camunda
+		// Coerce variables filter.value to JSON-serialized string form.
+		// The Camunda API stores variable values as JSON strings (e.g. "3355" for the number 3355).
+		// If the AI emits a number or boolean, stringify it to match the stored representation.
+		if (
+			spec.endpoint === "variables" &&
+			spec.filter.value !== undefined &&
+			typeof spec.filter.value !== "string"
+		) {
+			spec.filter.value = JSON.stringify(spec.filter.value)
+		}
 		const finalSpec = spec
 		let items: unknown[] = []
 		let total = 0
