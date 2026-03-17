@@ -790,6 +790,58 @@ const server = http.createServer(async (req, res) => {
 					}
 					items = result.items ?? []
 					total = result.page?.totalItems ?? items.length
+
+					// Enrich variable results with instance startDate (best-effort, single batch request)
+					const keys = [
+						...new Set(
+							(items as Array<{ processInstanceKey?: string }>)
+								.map((v) => v.processInstanceKey)
+								.filter((k): k is string => typeof k === "string"),
+						),
+					]
+					if (keys.length > 0) {
+						try {
+							const ir = await fetch(`${baseUrl}/process-instances/search`, {
+								method: "POST",
+								headers: apiHeaders,
+								body: JSON.stringify({
+									filter: { processInstanceKey: { $in: keys } },
+									page: { limit: keys.length },
+								}),
+							})
+							if (ir.ok) {
+								const instResult = (await ir.json()) as {
+									items?: Array<{
+										processInstanceKey: string
+										startDate: string
+										processDefinitionName: string | null
+										processDefinitionId: string
+										state: string
+										parentProcessInstanceKey: string | null
+									}>
+								}
+								const instMap = new Map(
+									(instResult.items ?? []).map((inst) => [inst.processInstanceKey, inst]),
+								)
+								items = (items as Array<Record<string, unknown>>).map((v) => {
+									const inst = instMap.get(v.processInstanceKey as string)
+									return {
+										...v,
+										instanceStartDate: inst?.startDate ?? null,
+										instanceProcessName: inst?.processDefinitionName ?? null,
+										instanceProcessId: inst?.processDefinitionId ?? null,
+										instanceState: inst?.state ?? null,
+										instanceIsSubprocess:
+											inst != null &&
+											inst.parentProcessInstanceKey != null &&
+											inst.parentProcessInstanceKey !== "",
+									}
+								})
+							}
+						} catch {
+							// Enrichment is best-effort; variable results are still returned
+						}
+					}
 				}
 			} else {
 				const r = await fetch(`${baseUrl}/process-instances/search`, {
