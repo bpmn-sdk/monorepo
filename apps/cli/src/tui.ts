@@ -526,8 +526,6 @@ function renderMain(state: TuiState, screen: Extract<Screen, { kind: "main" }>):
 	}
 
 	const visible = groups.slice(screen.scroll, screen.scroll + viewH)
-	// Find the index of the ask group in the full (unfiltered) groups list for separator placement
-	const askGlobalIdx = state.groups.findIndex((g) => g.name === "ask")
 	for (let vi = 0; vi < visible.length; vi++) {
 		const g = visible[vi]
 		if (!g) continue
@@ -537,8 +535,8 @@ function renderMain(state: TuiState, screen: Extract<Screen, { kind: "main" }>):
 		const desc = dim(fit(g.description, cols - nameW - 8))
 		const line = `  ${name}  ${desc}`
 		lines.push(isCursor ? inv(line.padEnd(cols - 1)) : line)
-		// Add separator after ask group (only when not searching and there's more content after it)
-		if (!searching && g.name === "ask" && askGlobalIdx >= 0 && i < groups.length - 1) {
+		// Add separator after the pinned top section (ask, settings, profile)
+		if (!searching && g.name === "profile" && i < groups.length - 1) {
 			lines.push(`  ${dim("─".repeat(cols - 4))}`)
 		}
 	}

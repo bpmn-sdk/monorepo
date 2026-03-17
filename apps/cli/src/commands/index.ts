@@ -51,15 +51,18 @@ const customisedGroups: CommandGroup[] = generatedCommandGroups.map((g) => {
 })
 
 const sortedOtherGroups = [
-	profileGroup,
-	settingsGroup,
 	connectorGroup,
 	...customisedGroups,
 	...adminCommandGroups,
 	completionGroup,
 ].sort((a, b) => a.name.localeCompare(b.name))
 
-export const commandGroups: CommandGroup[] = [askGroup, ...sortedOtherGroups]
+export const commandGroups: CommandGroup[] = [
+	askGroup,
+	settingsGroup,
+	profileGroup,
+	...sortedOtherGroups,
+]
 
 // Compute follow-up relations between commands based on shared field/arg names
 computeRelations(commandGroups)
