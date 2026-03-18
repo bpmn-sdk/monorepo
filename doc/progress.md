@@ -1,5 +1,27 @@
 # Progress
 
+## 2026-03-18 — Connector selector: searchable dropdown, dark theme fix, import prefix
+
+- **`packages/plugins/src/config-panel/types.ts`**: Added `searchable?: boolean` to `FieldSchema` for `select` fields.
+- **`packages/plugins/src/config-panel/css.ts`**: Added `.bpmnkit-cfg-ss-*` styles for the custom searchable dropdown (trigger button, floating panel, search input, option list, empty state). Full dark/light theme support via `data-theme="light"` on the panel element.
+- **`packages/plugins/src/config-panel/renderer.ts`**: Added `_renderSearchableSelect()` — a custom dropdown that replaces the native `<select>` when `field.searchable === true`. Features: search input with live filtering, keyboard navigation (ArrowUp/Down, Enter, Escape), smart flip-up positioning, and singleton tracking so only one dropdown is open at a time. The dropdown closes when the panel hides via `_activeDropdownClose` in `_hidePanel()`.
+- **`packages/plugins/src/config-panel-bpmn/index.ts`**: Added `searchable: true` to the service-task Connector field.
+- **`packages/plugins/src/connector-catalog/index.ts`**: Added `derivePrefix()` (strips "REST API", "Web API" etc. suffixes) and `withPrefix()` (maps templates to `"Prefix: name"`). Catalog imports now show as e.g. `"GitHub: List repositories"`; URL imports use the hostname last-segment capitalized as prefix.
+
+## 2026-03-18 — Fix `verify` build failure: `connector-gen` Node.js imports in browser bundle
+
+- **`packages/connector-gen/src/browser.ts`**: New browser-safe entry point — exports everything from the main entry except `writeTemplates` (which imports `node:fs/promises` and `node:path`). `generateFromUrl` and `generateFromCatalog` drop the `outputDir` option since disk I/O is not available in browser environments.
+- **`packages/connector-gen/package.json`**: Added `"./browser"` export pointing to `dist/browser.js`.
+- **`packages/plugins/src/connector-catalog/index.ts`**: Updated import to `@bpmnkit/connector-gen/browser` so Vite no longer attempts to bundle the Node-only `write-templates.js`.
+
+## 2026-03-18 — `connector-catalog` plugin: import OpenAPI connectors from the editor
+
+- **`packages/plugins/src/connector-catalog/index.ts`**: New `createConnectorCatalogPlugin(registrar, palette)` plugin. Registers one command per built-in catalog entry (30+ APIs) plus an "Import from OpenAPI URL…" command in the command palette. Selecting a catalog entry calls `generateFromCatalog()`, then registers all generated templates via `configPanelBpmn.registerTemplate()`. The URL command uses `palette.pushView()` to prompt for a URL, then calls `generateFromUrl()`. A toast notification shows loading/success/error state.
+- **`packages/plugins/src/connector-catalog/css.ts`**: Toast notification styles (`bpmnkit-cc-toast`) with `loading`, `success`, and `error` variants. Respects `data-bpmnkit-hud-theme="light"`.
+- **`packages/plugins/package.json`**: Added `@bpmnkit/connector-gen` as a runtime dependency. Added `./connector-catalog` export.
+- **`apps/desktop/src/editor.ts`**: Instantiated `createConnectorCatalogPlugin(configPanelBpmn, palette)` and added it to the editor plugins list.
+- **`apps/landing/src/scripts/editor.ts`**: Same wiring — this is the actual editor app the user interacts with on bpmnkit.com. Both editor apps now have the plugin.
+
 ## 2026-03-17 — Mobile editor follow-up fixes
 
 - **`apps/desktop/src/editor.ts`**: `onPanelShow` in the config panel now only calls `dock.expand()` when `window.innerWidth > 600`. On mobile the sidebar stays collapsed when an element is selected — the user must open it actively.
