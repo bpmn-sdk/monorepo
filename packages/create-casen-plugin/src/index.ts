@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 /**
- * create-casen-plugin — Scaffold a new casen CLI plugin.
+ * @bpmnkit/create-casen-plugin — Scaffold a new casen CLI plugin.
  *
  * Usage:
- *   pnpm create casen-plugin
- *   npx create-casen-plugin
- *   bunx create-casen-plugin
+ *   pnpm create @bpmnkit/casen-plugin
+ *   npx @bpmnkit/create-casen-plugin
+ *   bunx @bpmnkit/create-casen-plugin
  *
  * Non-interactive:
- *   pnpm create casen-plugin --name casen-deploy --description "Git-tag-aware deploys"
+ *   pnpm create @bpmnkit/casen-plugin --name casen-deploy --description "Git-tag-aware deploys"
  */
 
 import { execFile } from "node:child_process"
@@ -202,7 +202,7 @@ async function main(): Promise<void> {
 
 	const isInteractive = !opts.name || !opts.description
 
-	process.stdout.write("\n  create-casen-plugin — casen plugin scaffolding\n\n")
+	process.stdout.write("\n  @bpmnkit/create-casen-plugin — casen plugin scaffolding\n\n")
 
 	let name: string
 	let displayName: string

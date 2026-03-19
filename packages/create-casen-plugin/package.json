@@ -1,5 +1,5 @@
 {
-	"name": "create-casen-plugin",
+	"name": "@bpmnkit/create-casen-plugin",
 	"version": "0.0.1",
 	"private": false,
 	"type": "module",

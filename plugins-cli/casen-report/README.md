@@ -1,56 +1,83 @@
 <div align="center">
   <a href="https://bpmnkit.com"><img src="https://bpmnkit.com/favicon.svg" width="72" height="72" alt="BPMN Kit logo"></a>
-  <h1>@bpmnkit/astro-shared</h1>
-  <p>Shared CSS design tokens, aurora background, and site metadata for BPMN Kit Astro apps</p>
+  <h1>@bpmnkit/casen-report</h1>
+  <p>Render HTML reports from Camunda 8 incident and SLA data</p>
 
-  [![npm](https://img.shields.io/npm/v/@bpmnkit/astro-shared?style=flat-square&color=6244d7)](https://www.npmjs.com/package/@bpmnkit/astro-shared)
-  [![license](https://img.shields.io/npm/l/@bpmnkit/astro-shared?style=flat-square)](https://github.com/bpmnkit/monorepo/blob/main/LICENSE)
+  [![npm](https://img.shields.io/npm/v/@bpmnkit/casen-report?style=flat-square&color=6244d7)](https://www.npmjs.com/package/@bpmnkit/casen-report)
+  [![license](https://img.shields.io/npm/l/@bpmnkit/casen-report?style=flat-square)](https://github.com/bpmnkit/monorepo/blob/main/LICENSE)
   [![typescript](https://img.shields.io/badge/TypeScript-strict-6244d7?style=flat-square&logo=typescript&logoColor=white)](https://github.com/bpmnkit/monorepo)
 
-  [Website](https://bpmnkit.com) · [Documentation](https://docs.bpmnkit.com) · [GitHub](https://github.com/bpmnkit/monorepo) · [Changelog](https://github.com/bpmnkit/monorepo/blob/main/packages/astro-shared/CHANGELOG.md)
+  [Website](https://bpmnkit.com) · [Documentation](https://docs.bpmnkit.com) · [GitHub](https://github.com/bpmnkit/monorepo) · [Changelog](https://github.com/bpmnkit/monorepo/blob/main/plugins-cli/casen-report/CHANGELOG.md)
 </div>
 
 ---
 
 ## Overview
 
-`@bpmnkit/astro-shared` provides shared CSS imports and site metadata used across BPMN Kit's Astro-based apps (landing page, docs, learn). It re-exports the design tokens from `@bpmnkit/ui` and adds a global aurora background animation.
-
-This package is primarily intended for internal use by BPMN Kit's own Astro applications.
+`casen-report` is an official `casen` CLI plugin that generates HTML reports from live Camunda 8 data. Install it once and run `casen report incidents` or `casen report sla` from any terminal.
 
 ## Installation
 
 ```sh
-npm install @bpmnkit/astro-shared
+casen plugin install casen-report
 ```
 
-## Usage
+## Commands
 
-### Import design tokens in Astro layouts
+### `casen report incidents`
 
-```astro
----
-import "@bpmnkit/astro-shared/tokens.css"
-import "@bpmnkit/astro-shared/background.css"
----
+Fetch active incidents and render an HTML report grouped by process.
+
+```sh
+# Print table to stdout
+casen report incidents
+
+# Filter by process definition ID
+casen report incidents --process-id order-process
+
+# Write self-contained HTML file
+casen report incidents --out incidents.html
+
+# Limit fetch size
+casen report incidents --limit 500 --out incidents.html
 ```
 
-### Access site metadata
+**Flags**
 
-```typescript
-import { SITE } from "@bpmnkit/astro-shared"
+| Flag | Short | Description | Default |
+|------|-------|-------------|---------|
+| `--process-id` | `-p` | Filter by process definition ID | — |
+| `--limit` | `-l` | Max incidents to fetch | 200 |
+| `--out` | `-o` | Write HTML to this file path | — |
 
-console.log(SITE.name)    // "BPMN Kit"
-console.log(SITE.docsUrl) // "https://docs.bpmnkit.com"
+### `casen report sla`
+
+Fetch process instances and generate an SLA compliance report. Instances whose duration exceeds the threshold are marked as **BREACHED**.
+
+```sh
+# Print table (30-minute SLA threshold)
+casen report sla --threshold 30
+
+# SLA report for a specific process, save to file
+casen report sla --threshold 60 --process-id order-process --out sla.html
 ```
 
-## Exports
+**Flags**
 
-| Export | Description |
-|--------|-------------|
-| `/tokens.css` | All `--bpmnkit-*` CSS custom properties (re-exports `@bpmnkit/ui/tokens.css`) |
-| `/background.css` | Global aurora background animation styles |
-| `.` | `SITE` metadata object (name, url, github, docsUrl, learnUrl, npm) |
+| Flag | Short | Description | Default |
+|------|-------|-------------|---------|
+| `--threshold` | `-t` | SLA threshold in minutes (required) | — |
+| `--process-id` | `-p` | Filter by process definition ID | — |
+| `--limit` | `-l` | Max instances to fetch | 200 |
+| `--out` | `-o` | Write HTML to this file path | — |
+
+## Report Format
+
+HTML reports are self-contained single-file documents — no external CSS, no fonts to load. They use the BPMN Kit dark theme and include:
+
+- **Summary stat cards** — totals, breach counts, compliance rate
+- **Sortable data table** — all fetched rows with status badges
+- **Generated timestamp** — so reports can be archived
 
 ---
 
@@ -74,7 +101,6 @@ console.log(SITE.docsUrl) // "https://docs.bpmnkit.com"
 | [`@bpmnkit/proxy`](https://www.npmjs.com/package/@bpmnkit/proxy) | Local AI bridge and Camunda API proxy server |
 | [`@bpmnkit/cli-sdk`](https://www.npmjs.com/package/@bpmnkit/cli-sdk) | Plugin authoring SDK for the casen CLI |
 | [`@bpmnkit/create-casen-plugin`](https://www.npmjs.com/package/@bpmnkit/create-casen-plugin) | Scaffold a new casen CLI plugin in seconds |
-| [`@bpmnkit/casen-report`](https://www.npmjs.com/package/@bpmnkit/casen-report) | HTML reports from Camunda 8 incident and SLA data |
 
 ## License
 

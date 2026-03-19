@@ -11,15 +11,15 @@ commands appear in the main TUI and in shell tab-completion alongside the built-
 The fastest way to start is with the official scaffolding tool:
 
 ```sh
-pnpm create casen-plugin
-# or: npx create-casen-plugin
-# or: bunx create-casen-plugin
+pnpm create @bpmnkit/casen-plugin
+# or: npx @bpmnkit/create-casen-plugin
+# or: bunx @bpmnkit/create-casen-plugin
 ```
 
 The tool runs interactively:
 
 ```
-  create-casen-plugin — casen plugin scaffolding
+  @bpmnkit/create-casen-plugin — casen plugin scaffolding
 
   Plugin name (npm package name): casen-deploy
   Display name             (Deploy):
@@ -42,7 +42,7 @@ The tool runs interactively:
 Pass flags to skip all prompts — useful in CI or cookiecutter scripts:
 
 ```sh
-pnpm create casen-plugin \
+pnpm create @bpmnkit/casen-plugin \
   --name casen-deploy \
   --description "Git-tag-aware deploys for casen" \
   --author acme \
