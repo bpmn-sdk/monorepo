@@ -1,0 +1,35 @@
+{
+	"name": "@bpmnkit/cli-sdk",
+	"version": "0.0.1",
+	"private": false,
+	"type": "module",
+	"exports": {
+		".": {
+			"import": "./dist/index.js",
+			"types": "./dist/index.d.ts"
+		}
+	},
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"files": ["LICENSE", "README.md", "dist/**/*.js", "dist/**/*.d.ts"],
+	"scripts": {
+		"build": "tsc",
+		"typecheck": "tsc --noEmit",
+		"check": "biome check .",
+		"test": "echo \"no tests\""
+	},
+	"description": "Plugin authoring SDK for the casen CLI",
+	"keywords": ["camunda", "casen", "cli", "plugin", "sdk", "bpmnkit"],
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/bpmnkit/monorepo"
+	},
+	"homepage": "https://bpmnkit.com",
+	"bugs": {
+		"url": "https://github.com/bpmnkit/monorepo/issues"
+	},
+	"publishConfig": {
+		"access": "public"
+	}
+}

@@ -50,6 +50,9 @@ function footer(currentPkg) {
 		{ name: "@bpmnkit/connector-gen", desc: "Generate connector templates from OpenAPI specs" },
 		{ name: "@bpmnkit/cli", desc: "Camunda 8 command-line interface (casen)" },
 		{ name: "@bpmnkit/proxy", desc: "Local AI bridge and Camunda API proxy server" },
+		{ name: "@bpmnkit/cli-sdk", desc: "Plugin authoring SDK for the casen CLI" },
+		{ name: "@bpmnkit/create-casen-plugin", desc: "Scaffold a new casen CLI plugin in seconds" },
+		{ name: "@bpmnkit/casen-report", desc: "HTML reports from Camunda 8 incident and SLA data" },
 	].filter((p) => p.name !== currentPkg)
 
 	const rows = packages
@@ -1412,6 +1415,232 @@ casen instances list --state active
 `,
 	},
 
+	// ── cli-sdk ───────────────────────────────────────────────────────────────
+	"packages/cli-sdk": {
+		name: "@bpmnkit/cli-sdk",
+		description: "Plugin authoring SDK for the casen CLI — types, contracts, and helpers",
+		content: `## Overview
+
+\`@bpmnkit/cli-sdk\` is the official SDK for building \`casen\` CLI plugins. It exports the \`CasenPlugin\` contract and all supporting types (\`CommandGroup\`, \`Command\`, \`RunContext\`, \`OutputWriter\`) so you can build typed, TUI-integrated plugins without depending on casen internals.
+
+## Installation
+
+Install as a \`devDependency\` in your plugin package:
+
+\`\`\`sh
+pnpm add -D @bpmnkit/cli-sdk
+npm install --save-dev @bpmnkit/cli-sdk
+\`\`\`
+
+## Quick Start
+
+\`\`\`typescript
+import type { CasenPlugin } from "@bpmnkit/cli-sdk"
+
+const plugin: CasenPlugin = {
+  id: "com.example.casen-hello",
+  name: "Hello",
+  version: "0.1.0",
+  groups: [
+    {
+      name: "hello",
+      description: "Say hello",
+      commands: [
+        {
+          name: "world",
+          description: "Print a greeting",
+          async run(ctx) {
+            ctx.output.ok("Hello, world!")
+          },
+        },
+      ],
+    },
+  ],
+}
+
+export default plugin
+\`\`\`
+
+## API Reference
+
+### \`CasenPlugin\`
+
+The top-level contract every plugin must export as its default export.
+
+\`\`\`typescript
+interface CasenPlugin {
+  /** Unique reverse-domain identifier, e.g. "com.acme.casen-deploy" */
+  id: string
+  /** Human-readable name shown in \`casen plugin list\` */
+  name: string
+  version: string
+  /** Command groups this plugin contributes to the CLI */
+  groups: CommandGroup[]
+}
+\`\`\`
+
+### \`CommandGroup\`
+
+Maps to a single top-level token: \`casen <group>\`.
+
+\`\`\`typescript
+interface CommandGroup {
+  name: string          // kebab-case, e.g. "my-integration"
+  aliases?: string[]
+  description: string
+  commands: Command[]
+}
+\`\`\`
+
+### \`Command\`
+
+\`\`\`typescript
+interface Command {
+  name: string
+  aliases?: string[]
+  description: string
+  args?: ArgSpec[]
+  flags?: FlagSpec[]
+  examples?: Example[]
+  run(ctx: RunContext): Promise<void>
+}
+\`\`\`
+
+### \`RunContext\`
+
+Passed to every \`run()\` function.
+
+\`\`\`typescript
+interface RunContext {
+  positional: string[]
+  flags: ParsedFlags
+  output: OutputWriter
+  /** Returns a Camunda C8 REST client. Cast to \`CamundaClient\` from \`@bpmnkit/api\`. */
+  getClient(): Promise<unknown>
+  getAdminClient(): Promise<unknown>
+}
+\`\`\`
+
+### \`OutputWriter\`
+
+\`\`\`typescript
+interface OutputWriter {
+  readonly format: "table" | "json" | "yaml"
+  readonly isInteractive: boolean
+  printList(data: unknown, columns: ColumnDef[]): void
+  printItem(data: unknown): void
+  print(data: unknown): void
+  ok(msg: string): void    // ✓ message
+  info(msg: string): void  // → message
+}
+\`\`\`
+`,
+	},
+
+	// ── create-casen-plugin ───────────────────────────────────────────────────
+	"packages/create-casen-plugin": {
+		name: "@bpmnkit/create-casen-plugin",
+		description: "Scaffold a new casen CLI plugin in seconds",
+		content: `## Overview
+
+\`create-casen-plugin\` is the official scaffolding tool for \`casen\` CLI plugins. Run it with any package manager's \`create\` shorthand — no prior install required.
+
+\`\`\`sh
+pnpm create @bpmnkit/casen-plugin
+# or: npx @bpmnkit/create-casen-plugin
+# or: bunx @bpmnkit/create-casen-plugin
+\`\`\`
+
+## Interactive Flow
+
+\`\`\`
+  create-casen-plugin — casen plugin scaffolding
+
+  Plugin name (npm package name): casen-deploy
+  Display name             (Deploy):
+  Description              (): Git-tag-aware deploys for casen
+  Author                   (): acme
+
+  Initialize git repo? (Y/n): Y
+
+  ✔ Created casen-deploy/
+  ✔ package.json
+  ✔ tsconfig.json
+  ✔ src/index.ts
+  ✔ git init
+
+  Next steps:
+    cd casen-deploy
+    pnpm install
+    pnpm build
+    casen plugin install ./casen-deploy
+\`\`\`
+
+## Non-Interactive Mode
+
+\`\`\`sh
+pnpm create @bpmnkit/casen-plugin \\
+  --name casen-deploy \\
+  --display-name Deploy \\
+  --description "Git-tag-aware deploys for casen" \\
+  --author acme \\
+  --no-git
+\`\`\`
+
+## Generated Files
+
+### \`package.json\`
+
+\`\`\`json
+{
+  "name": "casen-deploy",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "keywords": ["casen-plugin"],
+  "scripts": { "build": "tsc" },
+  "devDependencies": {
+    "@bpmnkit/cli-sdk": "latest",
+    "typescript": "latest"
+  }
+}
+\`\`\`
+
+### \`src/index.ts\`
+
+\`\`\`typescript
+import type { CasenPlugin } from "@bpmnkit/cli-sdk"
+
+const plugin: CasenPlugin = {
+  id: "com.example.casen-deploy",
+  name: "Deploy",
+  version: "0.1.0",
+  groups: [
+    {
+      name: "deploy",
+      description: "Git-tag-aware deploys",
+      commands: [
+        {
+          name: "release",
+          description: "Tag and deploy the current process version",
+          async run(ctx) {
+            ctx.output.ok("TODO: implement release")
+          },
+        },
+      ],
+    },
+  ],
+}
+
+export default plugin
+\`\`\`
+
+## Plugin Discovery
+
+All plugins with \`"casen-plugin"\` in their \`keywords\` appear in \`casen plugin search\`. The scaffold injects this keyword automatically.
+`,
+	},
+
 	// ── proxy ─────────────────────────────────────────────────────────────────
 	"apps/proxy": {
 		name: "@bpmnkit/proxy",
@@ -1469,6 +1698,80 @@ Or use the \`X-Profile\` request header to target a specific profile on the \`/a
 \`\`\`sh
 curl -H "X-Profile: production" http://localhost:3033/api/v2/process-definitions
 \`\`\`
+`,
+	},
+
+	// ── casen-report ──────────────────────────────────────────────────────────
+	"plugins-cli/casen-report": {
+		name: "@bpmnkit/casen-report",
+		dir: "plugins-cli",
+		description: "Render HTML reports from Camunda 8 incident and SLA data",
+		content: `## Overview
+
+\`casen-report\` is an official \`casen\` CLI plugin that generates HTML reports from live Camunda 8 data. Install it once and run \`casen report incidents\` or \`casen report sla\` from any terminal.
+
+## Installation
+
+\`\`\`sh
+casen plugin install casen-report
+\`\`\`
+
+## Commands
+
+### \`casen report incidents\`
+
+Fetch active incidents and render an HTML report grouped by process.
+
+\`\`\`sh
+# Print table to stdout
+casen report incidents
+
+# Filter by process definition ID
+casen report incidents --process-id order-process
+
+# Write self-contained HTML file
+casen report incidents --out incidents.html
+
+# Limit fetch size
+casen report incidents --limit 500 --out incidents.html
+\`\`\`
+
+**Flags**
+
+| Flag | Short | Description | Default |
+|------|-------|-------------|---------|
+| \`--process-id\` | \`-p\` | Filter by process definition ID | — |
+| \`--limit\` | \`-l\` | Max incidents to fetch | 200 |
+| \`--out\` | \`-o\` | Write HTML to this file path | — |
+
+### \`casen report sla\`
+
+Fetch process instances and generate an SLA compliance report. Instances whose duration exceeds the threshold are marked as **BREACHED**.
+
+\`\`\`sh
+# Print table (30-minute SLA threshold)
+casen report sla --threshold 30
+
+# SLA report for a specific process, save to file
+casen report sla --threshold 60 --process-id order-process --out sla.html
+\`\`\`
+
+**Flags**
+
+| Flag | Short | Description | Default |
+|------|-------|-------------|---------|
+| \`--threshold\` | \`-t\` | SLA threshold in minutes (required) | — |
+| \`--process-id\` | \`-p\` | Filter by process definition ID | — |
+| \`--limit\` | \`-l\` | Max instances to fetch | 200 |
+| \`--out\` | \`-o\` | Write HTML to this file path | — |
+
+## Report Format
+
+HTML reports are self-contained single-file documents — no external CSS, no fonts to load. They use the BPMN Kit dark theme and include:
+
+- **Summary stat cards** — totals, breach counts, compliance rate
+- **Sortable data table** — all fetched rows with status badges
+- **Generated timestamp** — so reports can be archived
 `,
 	},
 }

@@ -237,12 +237,200 @@ Plugin authors install the SDK as a `devDependency`:
 
 ---
 
-## 7. Implementation Order
+## 7. Plugin Discovery (`casen plugin search`)
+
+### npm Registry API
+
+The npm registry exposes a public search endpoint that supports a `keywords:` qualifier matching against the `keywords` array in `package.json`:
+
+```
+GET https://registry.npmjs.org/-/v1/search?text=keywords:casen-plugin&size=50
+```
+
+No authentication, no new dependency — just `fetch`, which Node.js provides natively. Response includes name, version, description, publish date, publisher, repository link, and a composite quality/popularity/maintenance score.
+
+### Convention
+
+All casen plugins — first-party and community — must include `"casen-plugin"` in their `package.json` `keywords` array. This is the sole discovery mechanism. The scaffolding tool (§8) adds it automatically, so authors don't have to remember.
+
+### New command
+
+```
+casen plugin search [query]     # search npm for casen-plugin packages
+```
+
+Implementation:
+
+```typescript
+const q = `keywords:casen-plugin${query ? ` ${query}` : ""}`
+const res = await fetch(
+  `https://registry.npmjs.org/-/v1/search?text=${encodeURIComponent(q)}&size=50`
+)
+const { objects } = await res.json()
+// render as table: name | version | description | score
+```
+
+Output (plain mode):
+
+```
+NAME              VERSION  DESCRIPTION                          SCORE
+casen-deploy      1.2.0    Git-tag-aware deploys for casen      0.85
+casen-ci          0.9.1    CI-mode output (JUnit, SARIF)        0.78
+casen-slack       0.3.0    Slack notifications from incidents   0.61
+```
+
+**TUI stretch goal**: make `casen plugin search` interactive — a live-filtered list where selecting a package immediately runs `casen plugin install <name>`. Fits naturally into the existing TUI pattern.
+
+### Rate limits
+
+npm does not publish hard per-client limits; casual CLI usage will never approach them. No caching or throttling needed on our side.
+
+---
+
+## 8. Plugin Scaffolding (`create-casen-plugin`)
+
+### Motivation
+
+The plugin contract is simple (`CasenPlugin` + `CommandGroup[]`), but bootstrapping a publishable npm package still involves boilerplate: `package.json`, TypeScript config, build script, entry point, the right keyword, and a working example command. Without a scaffold, authors start from scratch or copy-paste from a reference plugin — both invite mistakes.
+
+A `create-casen-plugin` package lets an author go from zero to a working, publishable plugin in under a minute:
+
+```
+pnpm create casen-plugin
+# or: npx create-casen-plugin
+# or: bunx create-casen-plugin
+```
+
+All major package managers support the `create <name>` shorthand: they resolve `create-<name>` from the registry and run its `bin` entry without installing it globally.
+
+### Package location
+
+```
+packages/create-casen-plugin/
+  package.json        # name: "create-casen-plugin", bin: { "create-casen-plugin": "./index.js" }
+  index.js            # ESM, executable (#!/usr/bin/env node)
+  templates/
+    base/
+      package.json.tpl
+      tsconfig.json
+      src/
+        index.ts.tpl
+```
+
+Lives in the monorepo alongside `@bpmnkit/cli-sdk`. No runtime dependencies beyond Node.js built-ins; the interactive prompts use `node:readline` directly (no `inquirer` or `prompts` — a handful of questions doesn't justify a dependency).
+
+### Interactive flow
+
+```
+$ pnpm create casen-plugin
+
+  create-casen-plugin — casen plugin scaffolding
+
+  Plugin name (npm package name): casen-deploy
+  Display name:                   Deploy
+  Description:                    Git-tag-aware deploys for casen
+  Author:                         acme
+  Initialize git repo? (Y/n):     Y
+
+  ✔ Created casen-deploy/
+  ✔ package.json
+  ✔ tsconfig.json
+  ✔ src/index.ts
+  ✔ git init
+
+  Next steps:
+    cd casen-deploy
+    pnpm install
+    pnpm build
+    casen plugin install ./casen-deploy
+```
+
+All prompts have sensible defaults so pressing Enter through them produces a valid package.
+
+### Generated `package.json`
+
+```json
+{
+  "name": "casen-deploy",
+  "version": "0.1.0",
+  "description": "Git-tag-aware deploys for casen",
+  "type": "module",
+  "main": "dist/index.js",
+  "keywords": ["casen-plugin"],
+  "scripts": {
+    "build": "tsc"
+  },
+  "devDependencies": {
+    "@bpmnkit/cli-sdk": "latest",
+    "typescript": "latest"
+  }
+}
+```
+
+`"casen-plugin"` is always injected into `keywords` — the author cannot forget it. Once published, the package appears in `casen plugin search` automatically.
+
+### Generated `src/index.ts`
+
+```typescript
+import type { CasenPlugin } from "@bpmnkit/cli-sdk"
+
+const plugin: CasenPlugin = {
+  id: "com.example.casen-deploy",
+  name: "Deploy",
+  version: "0.1.0",
+  groups: [
+    {
+      name: "deploy",
+      description: "Git-tag-aware deploys",
+      commands: [
+        {
+          name: "release",
+          description: "Tag and deploy the current process version",
+          async run(ctx) {
+            ctx.output.success("TODO: implement release")
+          },
+        },
+      ],
+    },
+  ],
+}
+
+export default plugin
+```
+
+Everything a plugin author touches is in `src/index.ts`. The build, publish, and install pipeline is handled by the scaffold.
+
+### Non-interactive mode (CI / scripting)
+
+All prompts accept flags for scripted use:
+
+```
+pnpm create casen-plugin \
+  --name casen-deploy \
+  --display-name Deploy \
+  --description "Git-tag-aware deploys for casen" \
+  --author acme \
+  --no-git
+```
+
+### Why not a separate CLI command (`casen plugin new`)?
+
+`casen plugin new` could work, but `create-casen-plugin` is better for two reasons:
+
+1. **No prior install required.** `pnpm create casen-plugin` always fetches the latest scaffold. A new author doesn't need casen installed first.
+2. **Convention.** The `create-*` pattern is immediately familiar to anyone who has used `create-react-app`, `create-next-app`, `create-vite`, etc. Authors know what to expect.
+
+Both could coexist (`casen plugin new` as a thin alias that execs `pnpm create casen-plugin`), but that's a cosmetic addition, not a requirement.
+
+---
+
+## 9. Implementation Order
 
 1. **`packages/cli-sdk`** — define `CasenPlugin` interface; re-export shared types. No runtime code yet.
 2. **`apps/cli/src/plugin-loader.ts`** — loader with error isolation per plugin.
 3. **Wire into `run.ts`** — `await loadPlugins()` before group assembly.
-4. **`casen plugin` command group** — `list`, `install`, `remove`, `update`, `info`.
-5. **Reference plugin `casen-deploy`** — validates the contract end-to-end; used in integration tests.
-6. **Shell completion update** — ensure completions include dynamically loaded groups.
-7. **Documentation** — `casen plugin --help`, README plugin authoring guide.
+4. **`casen plugin` command group** — `list`, `install`, `remove`, `update`, `info`, `search`.
+5. **`packages/create-casen-plugin`** — scaffolding tool; validates the authoring story end-to-end.
+6. **Reference plugin `casen-deploy`** — built with the scaffold; validates the contract; used in integration tests.
+7. **Shell completion update** — ensure completions include dynamically loaded groups.
+8. **Documentation** — `casen plugin --help`, README plugin authoring guide, link to `create-casen-plugin`.

@@ -19,6 +19,7 @@ import {
 } from "./bpmn.js"
 import { completionGroup } from "./completion.js"
 import { connectorGroup } from "./connector.js"
+import { pluginGroup } from "./plugin.js"
 import { profileGroup } from "./profile.js"
 import { computeRelations } from "./relations.js"
 import { settingsGroup } from "./settings.js"
@@ -52,6 +53,7 @@ const customisedGroups: CommandGroup[] = generatedCommandGroups.map((g) => {
 
 const sortedOtherGroups = [
 	connectorGroup,
+	pluginGroup,
 	...customisedGroups,
 	...adminCommandGroups,
 	completionGroup,

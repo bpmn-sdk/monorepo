@@ -1,6 +1,7 @@
 export { buildTemplate, buildTemplates } from "./build-template.js"
 export { CATALOG, getCatalogEntry } from "./catalog.js"
 export type { CatalogEntry } from "./catalog.js"
+export { CONNECTOR_STATS } from "./stats.js"
 export {
 	detectDefaultAuth,
 	getBaseUrl,

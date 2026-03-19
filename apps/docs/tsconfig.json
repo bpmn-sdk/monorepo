@@ -8,6 +8,7 @@
 		"lib": ["ES2022", "DOM"],
 		"types": ["astro/client"],
 		"baseUrl": ".",
+		"rootDir": ".",
 		"declaration": false,
 		"declarationMap": false
 	}

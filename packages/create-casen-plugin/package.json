@@ -1,0 +1,33 @@
+{
+	"name": "@bpmnkit/create-casen-plugin",
+	"version": "0.0.1",
+	"private": false,
+	"type": "module",
+	"bin": {
+		"create-casen-plugin": "./dist/index.js"
+	},
+	"files": ["LICENSE", "README.md", "dist/**/*.js"],
+	"scripts": {
+		"build": "tsc",
+		"typecheck": "tsc --noEmit",
+		"check": "biome check .",
+		"test": "echo \"no tests\""
+	},
+	"description": "Scaffold a new casen CLI plugin in seconds",
+	"keywords": ["camunda", "casen", "cli", "plugin", "scaffold", "create", "bpmnkit"],
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/bpmnkit/monorepo"
+	},
+	"homepage": "https://bpmnkit.com",
+	"bugs": {
+		"url": "https://github.com/bpmnkit/monorepo/issues"
+	},
+	"publishConfig": {
+		"access": "public"
+	},
+	"engines": {
+		"node": ">=20"
+	}
+}

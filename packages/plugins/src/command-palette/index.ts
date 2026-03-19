@@ -288,8 +288,8 @@ const AI_ICON =
 // ── Theme helper ──────────────────────────────────────────────────────────────
 
 function resolveTheme(theme: Theme): "dark" | "light" {
-	if (theme === "dark") return "dark"
 	if (theme === "light") return "light"
+	if (theme === "dark" || theme === "neon") return "dark"
 	return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"
 }
 

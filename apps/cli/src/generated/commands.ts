@@ -417,20 +417,6 @@ export const decisionInstanceGroup: CommandGroup = {
       argName: "decisionEvaluationInstanceKey",
       get: (client, key) => client.decisionInstance.getDecisionInstance(key),
     }),
-    {
-      name: "delete",
-      description: "Delete decision instance",
-      args: [{ name: "decisionInstanceKey", description: "decisionInstanceKey", required: true }],
-      flags: [DATA_OPT_FLAG],
-      async run(ctx) {
-        const decisionInstanceKey = ctx.positional[0];
-        if (!decisionInstanceKey) throw new Error("Missing required argument: <decisionInstanceKey>");
-        const body = parseJson(ctx.flags.data as string | undefined, "data");
-        const client = await ctx.getClient();
-        await client.decisionInstance.deleteDecisionInstance(decisionInstanceKey, body as never);
-        ctx.output.ok("delete completed.");
-      },
-    },
     makeCreateCmd({
       name: "delete-batch-operation",
       description: "Delete decision instances (batch)",

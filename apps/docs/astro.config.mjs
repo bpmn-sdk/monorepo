@@ -68,6 +68,24 @@ export default defineConfig({
 						type: "image/svg+xml",
 					},
 				},
+				{
+					tag: "meta",
+					attrs: {
+						property: "og:image",
+						content: "https://bpmn-sdk-docs.pages.dev/og.png",
+					},
+				},
+				{
+					tag: "meta",
+					attrs: { name: "twitter:card", content: "summary_large_image" },
+				},
+				{
+					tag: "meta",
+					attrs: {
+						name: "twitter:image",
+						content: "https://bpmn-sdk-docs.pages.dev/og.png",
+					},
+				},
 			],
 		}),
 	],
