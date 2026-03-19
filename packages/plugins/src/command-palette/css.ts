@@ -208,6 +208,44 @@ export const COMMAND_PALETTE_CSS = `
   background: rgba(0, 0, 0, 0.03);
 }
 
+/* ── Neon theme overrides ─────────────────────────────────────────────────── */
+[data-bpmnkit-hud-theme="neon"] .bpmnkit-palette-panel {
+  background: oklch(8% 0.03 270 / 0.96);
+  border-color: oklch(65% 0.28 280 / 0.2);
+  box-shadow: 0 20px 60px oklch(0% 0 0 / 0.7), 0 0 0 1px oklch(65% 0.28 280 / 0.15);
+}
+[data-bpmnkit-hud-theme="neon"] .bpmnkit-palette-search {
+  border-bottom-color: oklch(65% 0.28 280 / 0.15);
+}
+[data-bpmnkit-hud-theme="neon"] .bpmnkit-palette-search-icon { color: oklch(50% 0.06 280); }
+[data-bpmnkit-hud-theme="neon"] .bpmnkit-palette-input { color: oklch(73% 0.16 280); caret-color: oklch(72% 0.18 185); }
+[data-bpmnkit-hud-theme="neon"] .bpmnkit-palette-input::placeholder { color: oklch(40% 0.06 280); }
+[data-bpmnkit-hud-theme="neon"] .bpmnkit-palette-kbd kbd {
+  background: oklch(65% 0.28 280 / 0.08);
+  border-color: oklch(65% 0.28 280 / 0.2);
+  color: oklch(50% 0.06 280);
+}
+[data-bpmnkit-hud-theme="neon"] .bpmnkit-palette-empty { color: oklch(40% 0.06 280); }
+[data-bpmnkit-hud-theme="neon"] .bpmnkit-palette-section { color: oklch(45% 0.08 280); }
+[data-bpmnkit-hud-theme="neon"] .bpmnkit-palette-item { color: oklch(73% 0.16 280); }
+[data-bpmnkit-hud-theme="neon"] .bpmnkit-palette-item:hover,
+[data-bpmnkit-hud-theme="neon"] .bpmnkit-palette-item.bpmnkit-palette-focused {
+  background: oklch(65% 0.28 280 / 0.1);
+  color: oklch(85% 0.12 280);
+}
+[data-bpmnkit-hud-theme="neon"] .bpmnkit-palette-item-desc { color: oklch(45% 0.08 280); }
+[data-bpmnkit-hud-theme="neon"] .bpmnkit-palette-item--doc .bpmnkit-palette-item-title {
+  color: oklch(72% 0.18 185);
+}
+[data-bpmnkit-hud-theme="neon"] .bpmnkit-palette-item--ai .bpmnkit-palette-item-icon,
+[data-bpmnkit-hud-theme="neon"] .bpmnkit-palette-item--ai .bpmnkit-palette-item-title {
+  color: oklch(72% 0.18 185);
+}
+[data-bpmnkit-hud-theme="neon"] .bpmnkit-palette-item--disabled:hover,
+[data-bpmnkit-hud-theme="neon"] .bpmnkit-palette-item--disabled.bpmnkit-palette-focused {
+  background: oklch(65% 0.28 280 / 0.04);
+}
+
 /* ── Zen mode: hide internal canvas controls ──────────────────────────────── */
 .bpmnkit-zen-mode .bpmnkit-zoom-controls,
 .bpmnkit-zen-mode .bpmnkit-main-menu-panel {
