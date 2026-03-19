@@ -582,6 +582,177 @@ export const CATALOG: CatalogEntry[] = [
 		idPrefix: "com.amplitude",
 		defaultAuth: "basic",
 	},
+	{
+		id: "mollie",
+		name: "Mollie Payments API",
+		description:
+			"European payment gateway for accepting online payments via cards, iDEAL, SEPA, and other methods",
+		url: "https://raw.githubusercontent.com/mollie/openapi/main/specs.yaml",
+		idPrefix: "com.mollie",
+		defaultAuth: "apiKey",
+	},
+	{
+		id: "quickbooks-online",
+		name: "QuickBooks Online API",
+		description: "Manage invoices, payments, expenses, and financial data in QuickBooks Online",
+		url: "https://raw.githubusercontent.com/ballerina-platform/openapi-connectors/main/openapi/quickbooks.online/openapi.yaml",
+		idPrefix: "com.intuit.quickbooks",
+		defaultAuth: "oauth-client-credentials-flow",
+	},
+	{
+		id: "servicenow",
+		name: "ServiceNow API",
+		description: "IT service management for incidents, changes, requests, and CMDB operations",
+		url: "https://raw.githubusercontent.com/ballerina-platform/openapi-connectors/main/openapi/servicenow/openapi.yaml",
+		idPrefix: "com.servicenow",
+		defaultAuth: "basic",
+	},
+	{
+		id: "telegram-bot",
+		name: "Telegram Bot API",
+		description:
+			"Build Telegram bots — send messages, manage chats, handle updates and inline queries",
+		url: "https://raw.githubusercontent.com/APIs-guru/openapi-directory/main/APIs/telegram.org/5.0.0/openapi.yaml",
+		idPrefix: "org.telegram",
+		defaultAuth: "apiKey",
+	},
+	{
+		id: "clickup",
+		name: "ClickUp API",
+		description:
+			"Project management platform for tasks, spaces, lists, docs, goals, and time tracking",
+		url: "https://raw.githubusercontent.com/APIs-guru/openapi-directory/main/APIs/clickup.com/1.0.0/openapi.yaml",
+		idPrefix: "com.clickup",
+		defaultAuth: "apiKey",
+	},
+	{
+		id: "webflow",
+		name: "Webflow API",
+		description: "Manage Webflow sites, CMS collections, pages, forms, and ecommerce orders",
+		url: "https://raw.githubusercontent.com/webflow/openapi-spec/main/openapi/v2.yml",
+		idPrefix: "com.webflow",
+		defaultAuth: "oauth-client-credentials-flow",
+	},
+	{
+		id: "activecampaign",
+		name: "ActiveCampaign API",
+		description:
+			"Email marketing and CRM automation for contacts, campaigns, automations, and deals",
+		url: "https://raw.githubusercontent.com/ballerina-platform/openapi-connectors/main/openapi/activecampaign/openapi.yaml",
+		idPrefix: "com.activecampaign",
+		defaultAuth: "apiKey",
+	},
+	{
+		id: "zoho-crm",
+		name: "Zoho CRM API",
+		description: "Manage leads, contacts, accounts, deals, and sales pipelines in Zoho CRM",
+		url: "https://raw.githubusercontent.com/ballerina-platform/openapi-connectors/main/openapi/zoho.crm.rest/openapi.yaml",
+		idPrefix: "com.zoho.crm",
+		defaultAuth: "oauth-client-credentials-flow",
+	},
+	{
+		id: "influxdb",
+		name: "InfluxDB API",
+		description: "Write, query, and manage time-series metrics and monitoring data in InfluxDB",
+		url: "https://raw.githubusercontent.com/APIs-guru/openapi-directory/main/APIs/influxdata.com/2.0.0/openapi.yaml",
+		idPrefix: "com.influxdata",
+		defaultAuth: "apiKey",
+	},
+	{
+		id: "telnyx",
+		name: "Telnyx API",
+		description:
+			"Cloud communications platform for programmable voice, SMS, fax, and number management",
+		url: "https://raw.githubusercontent.com/APIs-guru/openapi-directory/main/APIs/telnyx.com/2.0.0/openapi.yaml",
+		idPrefix: "com.telnyx",
+		defaultAuth: "bearer",
+	},
+	{
+		id: "bamboohr",
+		name: "BambooHR API",
+		description:
+			"HR software for employee records, time-off requests, onboarding, and performance management",
+		url: "https://raw.githubusercontent.com/konfig-sdks/openapi-examples/main/bamboohr/openapi.yaml",
+		idPrefix: "com.bamboohr",
+		defaultAuth: "apiKey",
+	},
+	{
+		id: "gusto",
+		name: "Gusto Payroll API",
+		description:
+			"Payroll and HR platform for managing employees, payroll runs, benefits, and tax filings",
+		url: "https://raw.githubusercontent.com/konfig-sdks/openapi-examples/main/gusto/embedded-payroll/openapi.yaml",
+		idPrefix: "com.gusto",
+		defaultAuth: "oauth-client-credentials-flow",
+	},
+	{
+		id: "copper-crm",
+		name: "Copper CRM API",
+		description:
+			"Google Workspace-native CRM for managing leads, people, companies, and opportunities",
+		url: "https://raw.githubusercontent.com/konfig-sdks/openapi-examples/main/copper/openapi.yaml",
+		idPrefix: "com.copper",
+		defaultAuth: "apiKey",
+	},
+	{
+		id: "vonage-sms",
+		name: "Vonage SMS API",
+		description: "Send and receive SMS messages globally via the Vonage (Nexmo) messaging platform",
+		url: "https://raw.githubusercontent.com/APIs-guru/openapi-directory/main/APIs/nexmo.com/sms/1.2.0/openapi.yaml",
+		idPrefix: "com.vonage",
+		defaultAuth: "apiKey",
+	},
+	{
+		id: "personio",
+		name: "Personio HR API",
+		description: "European HR platform for employee data, attendance, absences, and recruiting",
+		url: "https://raw.githubusercontent.com/APIs-guru/openapi-directory/main/APIs/personio.de/personnel/1.0/openapi.yaml",
+		idPrefix: "de.personio",
+		defaultAuth: "bearer",
+	},
+	{
+		id: "weatherbit",
+		name: "Weatherbit API",
+		description: "Current weather, forecasts, historical data, and severe weather alerts worldwide",
+		url: "https://raw.githubusercontent.com/APIs-guru/openapi-directory/main/APIs/weatherbit.io/2.0.0/swagger.yaml",
+		idPrefix: "io.weatherbit",
+		defaultAuth: "apiKey",
+	},
+	{
+		id: "magento",
+		name: "Adobe Commerce (Magento) API",
+		description: "E-commerce platform for products, orders, customers, inventory, and checkout",
+		url: "https://raw.githubusercontent.com/APIs-guru/openapi-directory/main/APIs/magento.com/2.2.10/openapi.yaml",
+		idPrefix: "com.magento",
+		defaultAuth: "bearer",
+	},
+	{
+		id: "zoho-books",
+		name: "Zoho Books API",
+		description:
+			"Online accounting for invoices, expenses, bank reconciliation, and financial reports",
+		url: "https://raw.githubusercontent.com/ballerina-platform/openapi-connectors/main/openapi/zoho.books/openapi.yaml",
+		idPrefix: "com.zoho.books",
+		defaultAuth: "oauth-client-credentials-flow",
+	},
+	{
+		id: "appwrite",
+		name: "Appwrite API",
+		description:
+			"Open-source BaaS for authentication, databases, file storage, and cloud functions",
+		url: "https://raw.githubusercontent.com/APIs-guru/openapi-directory/main/APIs/appwrite.io/server/0.9.3/openapi.yaml",
+		idPrefix: "io.appwrite",
+		defaultAuth: "apiKey",
+	},
+	{
+		id: "nasa",
+		name: "NASA APOD API",
+		description:
+			"NASA Astronomy Picture of the Day — daily space imagery with metadata and explanations",
+		url: "https://raw.githubusercontent.com/APIs-guru/openapi-directory/main/APIs/nasa.gov/apod/1.0.0/openapi.yaml",
+		idPrefix: "gov.nasa",
+		defaultAuth: "apiKey",
+	},
 ]
 
 export function getCatalogEntry(id: string): CatalogEntry | undefined {
