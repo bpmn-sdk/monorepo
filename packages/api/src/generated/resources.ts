@@ -535,20 +535,6 @@ export class DecisionInstanceResource extends ResourceBase {
   }
 
   /**
-   * Delete decision instance
-   *
-   * Delete all associated decision evaluations based on provided key.
-   * @see POST /decision-instances/{decisionInstanceKey}/deletion
-   */
-  async deleteDecisionInstance(decisionInstanceKey: string, body?: Types.DeleteDecisionInstanceRequest): Promise<void> {
-    return this._http.request({
-      method: "POST",
-      path: `/decision-instances/${decisionInstanceKey}/deletion`,
-      body,
-    });
-  }
-
-  /**
    * Delete decision instances (batch)
    *
    *  Delete multiple decision instances. This will delete the historic data from secondary storage.

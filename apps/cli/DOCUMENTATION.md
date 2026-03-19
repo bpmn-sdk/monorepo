@@ -175,7 +175,6 @@ Decision instance
 |---------|------|-------|-------------|
 | `list` |  | `--filter` `--limit` `--sort-by` `--data` | Search decision instances |
 | `get` | `<decisionEvaluationInstanceKey>` |  | Get decision instance |
-| `delete` | `<decisionInstanceKey>` | `--data` | Delete decision instance |
 | `delete-batch-operation` |  | `--data` \* | Delete decision instances (batch) |
 
 > `casen decision-instance <command> --help` for full flag details.
@@ -566,4 +565,4 @@ Generate shell completion scripts.
 
 ---
 
-_Generated from 180 operations across 34 API tags._
+_Generated from 179 operations across 34 API tags._
