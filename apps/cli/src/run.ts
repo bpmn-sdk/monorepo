@@ -11,6 +11,7 @@ import { commandGroups } from "./commands/index.js"
 import { getRuntimeCompletions } from "./completion.js"
 import { printCommandHelp, printGlobalHelp, printGroupHelp, printVersion } from "./help.js"
 import { createNullWriter, createOutputWriter, printRawResponse } from "./output.js"
+import { loadPlugins } from "./plugin-loader.js"
 import { runProfileManager } from "./profile-tui.js"
 import { runSettingsManager } from "./settings-tui.js"
 import { runAskTui, runGroupTui, runMainTui } from "./tui.js"
@@ -60,6 +61,11 @@ function printError(msg: string, colors: boolean): void {
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 export async function run(argv: string[]): Promise<void> {
+	// Load plugin-contributed groups and merge with built-in groups.
+	// Failures are isolated inside loadPlugins — a broken plugin cannot crash the CLI.
+	const pluginGroups = await loadPlugins()
+	const allGroups = [...commandGroups, ...pluginGroups]
+
 	// ── Completion protocol ───────────────────────────────────────────────────
 	// casen --complete <cursorWordIndex> -- <words...>
 	const completeIdx = argv.indexOf("--complete")
@@ -67,7 +73,7 @@ export async function run(argv: string[]): Promise<void> {
 		const cursorIdx = Number(argv[completeIdx + 1] ?? "0")
 		const dashDash = argv.indexOf("--", completeIdx + 2)
 		const words = dashDash >= 0 ? argv.slice(dashDash + 1) : []
-		const suggestions = getRuntimeCompletions(commandGroups, cursorIdx, words)
+		const suggestions = getRuntimeCompletions(allGroups, cursorIdx, words)
 		process.stdout.write(`${suggestions.join("\n")}\n`)
 		return
 	}
@@ -91,11 +97,11 @@ export async function run(argv: string[]): Promise<void> {
 	// ── Top-level: main menu TUI or help ─────────────────────────────────────
 	if (positional.length === 0) {
 		if (wantHelp) {
-			printGlobalHelp(commandGroups, colors)
+			printGlobalHelp(allGroups, colors)
 		} else {
 			const { name: pName, info: pInfo } = buildProfileInfo(profileName)
 			await runMainTui(
-				commandGroups,
+				allGroups,
 				() => Promise.resolve(createClientFromProfile(profileName)),
 				() => Promise.resolve(createAdminClientFromProfile(profileName)),
 				{ profile: pName, profileInfo: pInfo },
@@ -109,7 +115,7 @@ export async function run(argv: string[]): Promise<void> {
 
 	// ── Find group ────────────────────────────────────────────────────────────
 	const groupToken = positional[0] ?? ""
-	const group = commandGroups.find((g) => g.name === groupToken || g.aliases?.includes(groupToken))
+	const group = allGroups.find((g) => g.name === groupToken || g.aliases?.includes(groupToken))
 
 	if (!group) {
 		printError(
@@ -143,7 +149,7 @@ export async function run(argv: string[]): Promise<void> {
 	if (positional.length === 1 && !wantHelp) {
 		if (group.name === "ask") {
 			const { name: pName, info: pInfo } = buildProfileInfo(profileName)
-			await runAskTui(commandGroups, getClient, getAdminClient, {
+			await runAskTui(allGroups, getClient, getAdminClient, {
 				profile: pName,
 				profileInfo: pInfo,
 			})
@@ -153,7 +159,7 @@ export async function run(argv: string[]): Promise<void> {
 			await runSettingsManager()
 		} else if (group.name !== "completion") {
 			const { name: pName, info: pInfo } = buildProfileInfo(profileName)
-			await runGroupTui(group, commandGroups, getClient, getAdminClient, {
+			await runGroupTui(group, allGroups, getClient, getAdminClient, {
 				profile: pName,
 				profileInfo: pInfo,
 			})
