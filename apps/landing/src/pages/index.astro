@@ -1,5 +1,6 @@
 ---
 import "../styles/global.css"
+import { CONNECTOR_STATS } from "@bpmnkit/connector-gen"
 import { CODE_HTML } from "../data/content"
 
 const withSdkCode = CODE_HTML.withSdk
@@ -229,6 +230,21 @@ const typeGuardsCode = CODE_HTML.typeGuards
           <div>
             <h3>Camunda&nbsp;8 Ready</h3>
             <p>Native Zeebe task definitions, IO mappings, connectors, forms, and modeler templates. Deploy directly to Camunda Cloud.</p>
+          </div>
+        </div>
+
+        <!-- Wide: Connector Catalog -->
+        <div class="bcard bcard-wide">
+          <div class="bcard-icon bcard-icon--teal">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+          </div>
+          <div>
+            <h3>{CONNECTOR_STATS.services} API Connectors, Out&nbsp;of&nbsp;the&nbsp;Box</h3>
+            <p>Generate typed Zeebe connector templates from {CONNECTOR_STATS.services} built-in OpenAPI specs — GitHub, Stripe, Slack, DigitalOcean, Kubernetes, and more. Over {(CONNECTOR_STATS.endpoints).toLocaleString("en")} API endpoints covered with zero boilerplate.</p>
+          </div>
+          <div class="bcard-chips">
+            <span class="dmn-chip">{CONNECTOR_STATS.services} services</span>
+            <span class="dmn-chip">{CONNECTOR_STATS.endpoints.toLocaleString("en")}+ endpoints</span>
           </div>
         </div>
       </div>
