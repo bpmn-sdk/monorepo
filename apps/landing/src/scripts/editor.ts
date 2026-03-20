@@ -551,3 +551,20 @@ hudRef = initEditorHud(editor, {
 		else dock.collapse()
 	},
 })
+
+// ── Open diagram forwarded from Operate ───────────────────────────────────────
+// Deferred via rAF so it runs AFTER the welcome-screen's own rAF callback
+// (which hides the HUD/dock). Both rAFs queue in the same frame; ours fires
+// second (registration order), ensuring the tab open wins.
+requestAnimationFrame(() => {
+	try {
+		const raw = sessionStorage.getItem("bpmnkit-from-operate")
+		if (raw) {
+			sessionStorage.removeItem("bpmnkit-from-operate")
+			const { xml, name } = JSON.parse(raw) as { xml: string; name: string }
+			bridge.tabsPlugin.api.openTab({ type: "bpmn", xml, name })
+		}
+	} catch {
+		// sessionStorage unavailable or malformed JSON — ignore
+	}
+})
