@@ -564,8 +564,12 @@ function renderMain(state: TuiState, screen: Extract<Screen, { kind: "main" }>):
 		const desc = dim(fit(g.description, cols - nameW - 8))
 		const line = `  ${name}  ${desc}`
 		lines.push(isCursor ? inv(line.padEnd(cols - 1)) : line)
-		// Add separator after the pinned top section (ask, settings, worker)
+		// Separator after pinned section (after "worker", before plugins or api groups)
 		if (!searching && g.name === "worker" && i < groups.length - 1) {
+			lines.push(`  ${dim("─".repeat(cols - 4))}`)
+		}
+		// Separator after the last plugin group (before api groups), only when plugins exist
+		if (!searching && g._plugin && !groups[i + 1]?._plugin && i < groups.length - 1) {
 			lines.push(`  ${dim("─".repeat(cols - 4))}`)
 		}
 	}
@@ -1482,8 +1486,21 @@ async function runWorkerLoop(
 				"info",
 				`Activated ${job.jobKey}  process=${job.processDefinitionId}  element=${job.elementId}`,
 			)
+			let completionVars = variables
+			const processJob = ws.cmd._worker?.processJob
+			if (processJob) {
+				try {
+					completionVars = await processJob(job)
+				} catch (err) {
+					addWorkerLog(
+						ws,
+						"err",
+						`Handler error: ${err instanceof Error ? err.message : String(err)} — using defaults`,
+					)
+				}
+			}
 			try {
-				await client.job.completeJob(job.jobKey, { variables })
+				await client.job.completeJob(job.jobKey, { variables: completionVars })
 				ws.stats.completed++
 				addWorkerLog(ws, "ok", `Completed ${job.jobKey}`)
 			} catch (err) {
@@ -1871,21 +1888,25 @@ function handleMainKey(
 					error: "",
 					_timer: null,
 				})
-			} else if (group?.name === "worker") {
+			} else if (
+				group &&
+				group.commands.length === 1 &&
+				group.commands[0] &&
+				"_worker" in group.commands[0]
+			) {
+				// Single-command worker group: skip commands list, go straight to input
 				const cmd = group.commands[0]
-				if (cmd) {
-					state.stack.push({
-						kind: "input",
-						group,
-						cmd,
-						fields: buildFields(cmd),
-						cursor: 0,
-						scroll: 0,
-						editing: false,
-						error: "",
-						running: false,
-					})
-				}
+				state.stack.push({
+					kind: "input",
+					group,
+					cmd,
+					fields: buildFields(cmd),
+					cursor: 0,
+					scroll: 0,
+					editing: false,
+					error: "",
+					running: false,
+				})
 			} else if (group) {
 				state.stack.push({ kind: "commands", group, cursor: 0, search: "" })
 			}
@@ -2208,7 +2229,7 @@ async function handleInputKey(
 		case "\n":
 			if (!field) break
 			if (field.kind === "run") {
-				if (screen.cmd.name === "worker") {
+				if ("_worker" in screen.cmd) {
 					launchWorkerView(screen, state)
 				} else {
 					await executeCommand(screen, state)
@@ -3228,18 +3249,23 @@ function renderPlugins(state: TuiState, screen: Extract<Screen, { kind: "plugins
 					32,
 					screen.results.reduce((m, r) => Math.max(m, r.name.length), 0),
 				) + 2
+			// Official badge shown for @bpmnkit/* packages (2 visible chars: "◆ ")
+			const BADGE = `${cyan("◆")} `
+			const BADGE_W = 2
 			const visible = screen.results.slice(screen.resultScroll, screen.resultScroll + viewH)
 			for (let vi = 0; vi < visible.length; vi++) {
 				const r = visible[vi]
 				if (!r) continue
 				const ri = screen.resultScroll + vi
 				const isCursor = ri === screen.resultCursor
+				const isOfficial = r.name.startsWith("@bpmnkit/")
+				const badge = isOfficial ? BADGE : " ".repeat(BADGE_W)
 				const name = padEnd(isCursor ? cyan(r.name) : r.name, nameW)
 				const verStr = r.version.padEnd(10)
 				const extra = isSearch
-					? dim(fit(r.description, cols - nameW - 14))
+					? dim(fit(r.description, cols - nameW - BADGE_W - 14))
 					: dim(r.installedAt.slice(0, 10))
-				const line = `  ${name}  ${verStr}  ${extra}`
+				const line = `  ${badge}${name}  ${verStr}  ${extra}`
 				lines.push(isCursor ? inv(line.padEnd(cols - 1)) : line)
 			}
 		}
@@ -3252,6 +3278,7 @@ function renderPlugins(state: TuiState, screen: Extract<Screen, { kind: "plugins
 			? `${cyan("enter/i")} install  ${cyan("esc")} back  ${cyan("q")} quit`
 			: `${cyan("enter/r")} remove  ${cyan("esc")} back  ${cyan("q")} quit`
 		lines.push(`  ${dim("↑↓")} navigate  ${actions}`)
+		lines.push(`  ${cyan("◆")} ${dim("= official @bpmnkit plugin")}`)
 		return lines
 	}
 

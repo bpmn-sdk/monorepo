@@ -274,6 +274,12 @@ importers:
         specifier: workspace:*
         version: link:../../packages/cli-sdk
 
+  plugins-cli/casen-worker-http:
+    devDependencies:
+      '@bpmnkit/cli-sdk':
+        specifier: workspace:*
+        version: link:../../packages/cli-sdk
+
 packages:
 
   '@astrojs/check@0.9.6':

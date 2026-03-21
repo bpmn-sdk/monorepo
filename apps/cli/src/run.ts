@@ -7,7 +7,13 @@ import {
 	getProfile,
 } from "@bpmnkit/profiles"
 import { parseArgs } from "./args.js"
-import { commandGroups, pluginGroup, profileGroup } from "./commands/index.js"
+import {
+	apiGroups,
+	commandGroups,
+	pinnedGroups,
+	pluginGroup,
+	profileGroup,
+} from "./commands/index.js"
 import { getRuntimeCompletions } from "./completion.js"
 import { printCommandHelp, printGlobalHelp, printGroupHelp, printVersion } from "./help.js"
 import { createNullWriter, createOutputWriter, printRawResponse } from "./output.js"
@@ -101,8 +107,12 @@ export async function run(argv: string[]): Promise<void> {
 		} else {
 			const { name: pName, info: pInfo } = buildProfileInfo(profileName)
 			await runMainTui(
-				// commandGroups only — profile and plugin are accessed via the settings menu
-				[...commandGroups, ...pluginGroups],
+				// Order: pinned → plugins (tagged) → api groups
+				[
+					...pinnedGroups,
+					...pluginGroups.map((g) => ({ ...g, _plugin: true as const })),
+					...apiGroups,
+				],
 				() => Promise.resolve(createClientFromProfile(profileName)),
 				() => Promise.resolve(createAdminClientFromProfile(profileName)),
 				{ profile: pName, profileInfo: pInfo },

@@ -13,6 +13,7 @@ import type { Command } from "../types.js"
 export const workerCmd: Command = {
 	name: "worker",
 	description: "Run a simple job worker that auto-completes jobs of a given type",
+	_worker: { jobType: "io.camunda.connector.HttpJson:1" },
 	args: [
 		{
 			name: "type",

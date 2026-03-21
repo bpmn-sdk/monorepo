@@ -99,6 +99,23 @@ export interface RunContext {
 
 export type ParsedFlags = Record<string, string | boolean | number>
 
+/** Minimal shape of an activated job — full type is in @bpmnkit/api. */
+export interface WorkerJob {
+	jobKey: string
+	processDefinitionId: string
+	elementId: string
+	processInstanceKey: string
+	variables: Record<string, unknown>
+}
+
+/** Worker configuration attached to commands created via createWorkerCommand. */
+export interface WorkerConfig {
+	jobType: string
+	description?: string
+	defaultVariables?: Record<string, unknown>
+	processJob?: (job: WorkerJob) => Promise<Record<string, unknown>>
+}
+
 /** A single executable command. */
 export interface Command {
 	name: string
@@ -111,6 +128,8 @@ export interface Command {
 	columns?: ColumnDef[]
 	/** Follow-up commands whose args can be pre-filled from this command's result fields. */
 	relations?: Relation[]
+	/** If set, the TUI routes this command through the live worker view. */
+	_worker?: WorkerConfig
 	run(ctx: RunContext): Promise<void>
 }
 
@@ -121,4 +140,6 @@ export interface CommandGroup {
 	aliases?: string[]
 	description: string
 	commands: Command[]
+	/** Tagged true by the plugin loader — drives the plugin section separators in the TUI. */
+	_plugin?: true
 }

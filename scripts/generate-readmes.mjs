@@ -53,6 +53,10 @@ function footer(currentPkg) {
 		{ name: "@bpmnkit/cli-sdk", desc: "Plugin authoring SDK for the casen CLI" },
 		{ name: "@bpmnkit/create-casen-plugin", desc: "Scaffold a new casen CLI plugin in seconds" },
 		{ name: "@bpmnkit/casen-report", desc: "HTML reports from Camunda 8 incident and SLA data" },
+		{
+			name: "@bpmnkit/casen-worker-http",
+			desc: "Example HTTP worker plugin — completes jobs with live JSONPlaceholder API data",
+		},
 	].filter((p) => p.name !== currentPkg)
 
 	const rows = packages
@@ -1701,6 +1705,78 @@ curl -H "X-Profile: production" http://localhost:3033/api/v2/process-definitions
 `,
 	},
 
+	// ── casen-worker-http ─────────────────────────────────────────────────────
+	"plugins-cli/casen-worker-http": {
+		name: "@bpmnkit/casen-worker-http",
+		dir: "plugins-cli",
+		description:
+			"Example casen worker plugin — processes HTTP connector jobs using the JSONPlaceholder API",
+		content: `## Overview
+
+\`casen-worker-http\` is an official \`casen\` CLI plugin that demonstrates the worker plugin pattern. It subscribes to \`io.camunda.connector.HttpJson:1\` jobs and completes each one with live data fetched from the [JSONPlaceholder](https://jsonplaceholder.typicode.com/) API — useful for quickly testing a Camunda worker setup without writing any integration code.
+
+## Installation
+
+\`\`\`sh
+casen plugin install casen-worker-http
+\`\`\`
+
+## Usage
+
+Start the worker from the TUI or directly from the command line:
+
+\`\`\`sh
+# Interactive TUI
+casen http-worker
+
+# CLI foreground mode (Ctrl+C to stop)
+casen http-worker start
+\`\`\`
+
+## What it does
+
+For every activated job the worker:
+
+1. Picks a random user ID (1–10) and fetches \`https://jsonplaceholder.typicode.com/users/{id}\`
+2. Completes the job with the following variables:
+
+| Variable | Source |
+|---|---|
+| \`userId\` | \`user.id\` |
+| \`name\` | \`user.name\` |
+| \`email\` | \`user.email\` |
+| \`city\` | \`user.address.city\` |
+| \`company\` | \`user.company.name\` |
+| \`inputVariables\` | Original job variables |
+| \`processedAt\` | ISO 8601 timestamp |
+
+## Building your own worker plugin
+
+Use this package as a starting point. The key API is \`createWorkerCommand\` from \`@bpmnkit/cli-sdk\`:
+
+\`\`\`typescript
+import { createWorkerCommand, type CasenPlugin } from "@bpmnkit/cli-sdk"
+
+const plugin: CasenPlugin = {
+  id: "com.example.my-worker",
+  name: "My Worker",
+  version: "1.0.0",
+  groups: [{
+    name: "my-worker",
+    description: "Process my-job jobs",
+    commands: [createWorkerCommand({
+      jobType: "my-job",
+      async processJob(job) {
+        return { result: "processed", input: job.variables }
+      },
+    })],
+  }],
+}
+export default plugin
+\`\`\`
+`,
+	},
+
 	// ── casen-report ──────────────────────────────────────────────────────────
 	"plugins-cli/casen-report": {
 		name: "@bpmnkit/casen-report",
@@ -1845,6 +1921,7 @@ BPMN Kit is an open-source TypeScript monorepo covering the full lifecycle of Ca
 | Package | Version | Description |
 |---------|---------|-------------|
 | [\`@bpmnkit/casen-report\`](plugins-cli/casen-report) | [![npm](https://img.shields.io/npm/v/@bpmnkit/casen-report?style=flat-square&color=6244d7)](https://www.npmjs.com/package/@bpmnkit/casen-report) | HTML reports from Camunda incident and SLA data |
+| [\`@bpmnkit/casen-worker-http\`](plugins-cli/casen-worker-http) | [![npm](https://img.shields.io/npm/v/@bpmnkit/casen-worker-http?style=flat-square&color=6244d7)](https://www.npmjs.com/package/@bpmnkit/casen-worker-http) | Example HTTP worker — complete jobs with live API data |
 
 ### Design System & Shared
 
@@ -1979,7 +2056,8 @@ bpmnkit/monorepo
 │   ├── learn/          # Interactive learning center (Astro)
 │   └── examples/       # Runnable BPMN workflow examples
 ├── plugins-cli/        # Official casen CLI plugins
-│   └── casen-report/   # HTML incident & SLA reports
+│   ├── casen-report/        # HTML incident & SLA reports
+│   └── casen-worker-http/   # Example HTTP worker plugin
 ├── scripts/            # Build utilities (readme gen, stats, etc.)
 ├── turbo.json          # Turborepo pipeline
 └── pnpm-workspace.yaml # pnpm workspace config

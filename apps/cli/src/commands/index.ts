@@ -64,12 +64,14 @@ const workerGroup: CommandGroup = {
 	commands: [workerCmd],
 }
 
-export const commandGroups: CommandGroup[] = [
-	askGroup,
-	settingsGroup,
-	workerGroup,
-	...sortedOtherGroups,
-]
+/** Pinned groups shown above the separator in the main TUI menu. */
+export const pinnedGroups: CommandGroup[] = [askGroup, settingsGroup, workerGroup]
+
+/** API command groups — shown below the plugin section in the main TUI menu. */
+export const apiGroups: CommandGroup[] = sortedOtherGroups
+
+/** All built-in groups — used for CLI routing. */
+export const commandGroups: CommandGroup[] = [...pinnedGroups, ...apiGroups]
 
 // Exported for CLI routing in run.ts (not shown in main TUI menu)
 export { pluginGroup, profileGroup }
