@@ -108,12 +108,23 @@ export interface WorkerJob {
 	variables: Record<string, unknown>
 }
 
+/** Result returned by WorkerConfig.processJob — mirrors WorkerJobResult in cli-sdk. */
+export type WorkerJobResult =
+	| { outcome: "complete"; variables: Record<string, unknown> }
+	| { outcome: "fail"; errorMessage: string; retries?: number; retryBackOff?: number }
+	| {
+			outcome: "error"
+			errorCode: string
+			errorMessage?: string
+			variables?: Record<string, unknown>
+	  }
+
 /** Worker configuration attached to commands created via createWorkerCommand. */
 export interface WorkerConfig {
 	jobType: string
 	description?: string
 	defaultVariables?: Record<string, unknown>
-	processJob?: (job: WorkerJob) => Promise<Record<string, unknown>>
+	processJob?: (job: WorkerJob) => Promise<WorkerJobResult>
 }
 
 /** A single executable command. */

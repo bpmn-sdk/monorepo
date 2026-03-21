@@ -29,6 +29,7 @@ const PUBLISHED = [
 	"apps/proxy",
 	"plugins-cli/casen-report",
 	"plugins-cli/casen-worker-http",
+	"plugins-cli/casen-worker-ai",
 ]
 
 const src = resolve(ROOT, "LICENSE")

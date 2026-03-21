@@ -1,4 +1,9 @@
-import { type CasenPlugin, type WorkerJob, createWorkerCommand } from "@bpmnkit/cli-sdk"
+import {
+	type CasenPlugin,
+	type WorkerJob,
+	type WorkerJobResult,
+	createWorkerCommand,
+} from "@bpmnkit/cli-sdk"
 
 interface JsonPlaceholderUser {
 	id: number
@@ -19,16 +24,19 @@ const httpWorkerCommand = createWorkerCommand({
 	jobType: "io.camunda.connector.HttpJson:1",
 	description: "Subscribe to HTTP connector jobs and complete them with live API data",
 	defaultVariables: { result: "sample-value" },
-	async processJob(job: WorkerJob) {
+	async processJob(job: WorkerJob): Promise<WorkerJobResult> {
 		const user = await fetchRandomUser()
 		return {
-			userId: user.id,
-			name: user.name,
-			email: user.email,
-			city: user.address.city,
-			company: user.company.name,
-			inputVariables: job.variables,
-			processedAt: new Date().toISOString(),
+			outcome: "complete",
+			variables: {
+				userId: user.id,
+				name: user.name,
+				email: user.email,
+				city: user.address.city,
+				company: user.company.name,
+				inputVariables: job.variables,
+				processedAt: new Date().toISOString(),
+			},
 		}
 	},
 })

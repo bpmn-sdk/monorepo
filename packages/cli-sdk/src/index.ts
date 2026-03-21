@@ -128,6 +128,25 @@ export interface WorkerJob {
 }
 
 /**
+ * The result returned by {@link WorkerConfig.processJob}.
+ *
+ * - `complete` — complete the job with the given variables (default path)
+ * - `fail` — fail the job so Camunda retries it after `retryBackOff` ms;
+ *   use for transient errors (rate limits, network timeouts)
+ * - `error` — throw a BPMN error so an error boundary event can catch it;
+ *   use for business-logic failures (invalid input, unrecoverable state)
+ */
+export type WorkerJobResult =
+	| { outcome: "complete"; variables: Record<string, unknown> }
+	| { outcome: "fail"; errorMessage: string; retries?: number; retryBackOff?: number }
+	| {
+			outcome: "error"
+			errorCode: string
+			errorMessage?: string
+			variables?: Record<string, unknown>
+	  }
+
+/**
  * Configuration for a worker command created with {@link createWorkerCommand}.
  */
 export interface WorkerConfig {
@@ -138,11 +157,12 @@ export interface WorkerConfig {
 	/** Variables used to complete each job when no {@link processJob} is provided. */
 	defaultVariables?: Record<string, unknown>
 	/**
-	 * Called for each activated job. Return the variables to complete the job with.
+	 * Called for each activated job. Return a {@link WorkerJobResult} describing
+	 * how to complete, fail, or error the job.
 	 * When omitted, jobs are completed with {@link defaultVariables}.
 	 * Called in both TUI live-worker mode and CLI foreground mode.
 	 */
-	processJob?: (job: WorkerJob) => Promise<Record<string, unknown>>
+	processJob?: (job: WorkerJob) => Promise<WorkerJobResult>
 }
 
 /** A single executable command within a group. */
@@ -315,6 +335,18 @@ export function createWorkerCommand(config: WorkerConfig): Command {
 						requestTimeout: number
 					}): Promise<{ jobs: WorkerJob[] }>
 					completeJob(key: string, p: { variables: Record<string, unknown> }): Promise<void>
+					failJob(
+						key: string,
+						p: { retries?: number; retryBackOff?: number; errorMessage?: string },
+					): Promise<void>
+					throwJobError(
+						key: string,
+						p: {
+							errorCode: string
+							errorMessage?: string
+							variables?: Record<string, unknown>
+						},
+					): Promise<void>
 				}
 			}
 			const client = (await ctx.getClient()) as JobClient
@@ -354,10 +386,10 @@ export function createWorkerCommand(config: WorkerConfig): Command {
 					ctx.output.info(
 						`Activated ${job.jobKey}  process=${job.processDefinitionId}  element=${job.elementId}`,
 					)
-					let vars = completionVars
+					let result: WorkerJobResult = { outcome: "complete", variables: completionVars }
 					if (config.processJob) {
 						try {
-							vars = await config.processJob(job)
+							result = await config.processJob(job)
 						} catch (err) {
 							ctx.output.info(
 								`Handler error: ${err instanceof Error ? err.message : String(err)} — completing with defaults`,
@@ -365,12 +397,30 @@ export function createWorkerCommand(config: WorkerConfig): Command {
 						}
 					}
 					try {
-						await client.job.completeJob(job.jobKey, { variables: vars })
-						completed++
-						ctx.output.ok(`Completed ${job.jobKey} (total: ${completed})`)
+						if (result.outcome === "complete") {
+							await client.job.completeJob(job.jobKey, { variables: result.variables })
+							completed++
+							ctx.output.ok(`Completed ${job.jobKey} (total: ${completed})`)
+						} else if (result.outcome === "fail") {
+							await client.job.failJob(job.jobKey, {
+								errorMessage: result.errorMessage,
+								retries: result.retries,
+								retryBackOff: result.retryBackOff,
+							})
+							ctx.output.info(`Failed ${job.jobKey}: ${result.errorMessage}`)
+						} else {
+							await client.job.throwJobError(job.jobKey, {
+								errorCode: result.errorCode,
+								errorMessage: result.errorMessage,
+								variables: result.variables,
+							})
+							ctx.output.info(
+								`Error ${job.jobKey} [${result.errorCode}]: ${result.errorMessage ?? ""}`,
+							)
+						}
 					} catch (err) {
 						ctx.output.info(
-							`Failed to complete ${job.jobKey}: ${err instanceof Error ? err.message : String(err)}`,
+							`Failed to settle ${job.jobKey}: ${err instanceof Error ? err.message : String(err)}`,
 						)
 					}
 				}

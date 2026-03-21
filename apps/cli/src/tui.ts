@@ -16,6 +16,7 @@ import type {
 	OutputWriter,
 	Relation,
 	RunContext,
+	WorkerJobResult,
 } from "./types.js"
 
 // ─── ANSI helpers ─────────────────────────────────────────────────────────────
@@ -1486,11 +1487,11 @@ async function runWorkerLoop(
 				"info",
 				`Activated ${job.jobKey}  process=${job.processDefinitionId}  element=${job.elementId}`,
 			)
-			let completionVars = variables
+			let jobResult: WorkerJobResult = { outcome: "complete", variables }
 			const processJob = ws.cmd._worker?.processJob
 			if (processJob) {
 				try {
-					completionVars = await processJob(job)
+					jobResult = await processJob(job)
 				} catch (err) {
 					addWorkerLog(
 						ws,
@@ -1500,15 +1501,37 @@ async function runWorkerLoop(
 				}
 			}
 			try {
-				await client.job.completeJob(job.jobKey, { variables: completionVars })
-				ws.stats.completed++
-				addWorkerLog(ws, "ok", `Completed ${job.jobKey}`)
+				if (jobResult.outcome === "complete") {
+					await client.job.completeJob(job.jobKey, { variables: jobResult.variables })
+					ws.stats.completed++
+					addWorkerLog(ws, "ok", `Completed ${job.jobKey}`)
+				} else if (jobResult.outcome === "fail") {
+					await client.job.failJob(job.jobKey, {
+						errorMessage: jobResult.errorMessage,
+						retries: jobResult.retries,
+						retryBackOff: jobResult.retryBackOff,
+					})
+					ws.stats.failed++
+					addWorkerLog(ws, "err", `Failed ${job.jobKey}: ${jobResult.errorMessage}`)
+				} else {
+					await client.job.throwJobError(job.jobKey, {
+						errorCode: jobResult.errorCode,
+						errorMessage: jobResult.errorMessage,
+						variables: jobResult.variables,
+					})
+					ws.stats.failed++
+					addWorkerLog(
+						ws,
+						"err",
+						`Error ${job.jobKey} [${jobResult.errorCode}]: ${jobResult.errorMessage ?? ""}`,
+					)
+				}
 			} catch (err) {
 				ws.stats.failed++
 				addWorkerLog(
 					ws,
 					"err",
-					`Failed to complete ${job.jobKey}: ${err instanceof Error ? err.message : String(err)}`,
+					`Failed to settle ${job.jobKey}: ${err instanceof Error ? err.message : String(err)}`,
 				)
 			}
 		}
