@@ -1,7 +1,14 @@
 import type { BpmnDefinitions } from "../bpmn-model.js"
 
 export type OptimizationSeverity = "info" | "warning" | "error"
-export type OptimizationCategory = "feel" | "flow" | "naming" | "task-reuse" | "extract"
+export type OptimizationCategory =
+	| "feel"
+	| "flow"
+	| "naming"
+	| "task-reuse"
+	| "extract"
+	| "pattern"
+	| "data-flow"
 
 export interface ApplyFixResult {
 	description: string
@@ -19,6 +26,10 @@ export interface OptimizationFinding {
 	elementIds: string[]
 	/** Mutates `defs` in-place. Returns what changed + any generated file. */
 	applyFix?: (defs: BpmnDefinitions) => ApplyFixResult
+	/** Data-flow: variable names produced (written) by the associated element. */
+	produces?: string[]
+	/** Data-flow: variable names consumed (read) by the associated element. */
+	consumes?: string[]
 }
 
 export interface OptimizationReport {
