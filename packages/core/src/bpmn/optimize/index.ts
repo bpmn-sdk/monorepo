@@ -2,6 +2,7 @@ import type { BpmnDefinitions } from "../bpmn-model.js"
 import { analyzeFeel } from "./feel.js"
 import { analyzeFlow } from "./flow.js"
 import { analyzeNaming } from "./naming.js"
+import { analyzePatterns } from "./patterns.js"
 import { analyzeTasks } from "./tasks.js"
 import type {
 	OptimizationCategory,
@@ -11,8 +12,17 @@ import type {
 	OptimizeOptions,
 	ResolvedOptions,
 } from "./types.js"
+import { analyzeVariableFlow } from "./variable-flow.js"
 
-const ALL_CATEGORIES: OptimizationCategory[] = ["feel", "flow", "naming", "task-reuse", "extract"]
+const ALL_CATEGORIES: OptimizationCategory[] = [
+	"feel",
+	"flow",
+	"naming",
+	"task-reuse",
+	"extract",
+	"pattern",
+	"data-flow",
+]
 
 function resolveOptions(opts?: OptimizeOptions): ResolvedOptions {
 	return {
@@ -43,13 +53,26 @@ export function optimize(defs: BpmnDefinitions, options?: OptimizeOptions): Opti
 		if (resolved.categories.includes("task-reuse")) {
 			findings.push(...analyzeTasks(process, resolved))
 		}
+		if (resolved.categories.includes("pattern")) {
+			findings.push(...analyzePatterns(process))
+		}
+		if (resolved.categories.includes("data-flow")) {
+			findings.push(...analyzeVariableFlow(process))
+		}
 	}
 
 	const byCategory = Object.fromEntries(
-		(["feel", "flow", "naming", "task-reuse", "extract"] as OptimizationCategory[]).map((c) => [
-			c,
-			findings.filter((f) => f.category === c).length,
-		]),
+		(
+			[
+				"feel",
+				"flow",
+				"naming",
+				"task-reuse",
+				"extract",
+				"pattern",
+				"data-flow",
+			] as OptimizationCategory[]
+		).map((c) => [c, findings.filter((f) => f.category === c).length]),
 	) as Record<OptimizationCategory, number>
 
 	const bySeverity = Object.fromEntries(

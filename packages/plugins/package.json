@@ -76,6 +76,10 @@
 			"import": "./dist/optimize/index.js",
 			"types": "./dist/optimize/index.d.ts"
 		},
+		"./pattern-advisor": {
+			"import": "./dist/pattern-advisor/index.js",
+			"types": "./dist/pattern-advisor/index.d.ts"
+		},
 		"./process-runner": {
 			"import": "./dist/process-runner/index.js",
 			"types": "./dist/process-runner/index.d.ts"
@@ -95,6 +99,18 @@
 		"./token-highlight": {
 			"import": "./dist/token-highlight/index.js",
 			"types": "./dist/token-highlight/index.d.ts"
+		},
+		"./variable-flow": {
+			"import": "./dist/variable-flow/index.js",
+			"types": "./dist/variable-flow/index.d.ts"
+		},
+		"./live-mode": {
+			"import": "./dist/live-mode/index.js",
+			"types": "./dist/live-mode/index.d.ts"
+		},
+		"./story-view": {
+			"import": "./dist/story-view/index.js",
+			"types": "./dist/story-view/index.d.ts"
 		},
 		"./watermark": {
 			"import": "./dist/watermark/index.js",

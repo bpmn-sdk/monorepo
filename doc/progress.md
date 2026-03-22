@@ -1,5 +1,178 @@
 # Progress
 
+## 2026-03-22 — Roadmap completion: all remaining items implemented
+
+### Chaos Simulation Mode — post-run summary + scenario export (`process-runner`)
+
+- **Post-run summary**: After every chaos run (whether the process completes or fails), a `bpmnkit-runner-chaos-summary` banner appears at the top of the Errors tab showing "Chaos run: completed / 1 stuck instance, N unhandled errors found". Implemented via `lastChaosRunCompleted: boolean | null` and `lastChaosInjections: ChaosInjection[]` tracked per-run.
+- **Export chaos as test scenarios**: When `getJobType` is provided and a chaos run has been recorded, a "↓ Chaos (N)" button appears in the Tests tab header. Clicking it creates a `ScenarioLike` for each triggered injection — setting the matching job type's mock to `{ error: "[Chaos] ..." }` — and adds them to the scenarios list.
+- **New options on `ProcessRunnerOptions`**: `getJobType`, `loadSidecarScenarios`, `generateScenarios`.
+
+### Scenario-Based Testing — storage sidecar + AI generate (`process-runner`, `storage`)
+
+- **Storage sidecar auto-discovery** (`storage/storage-api.ts`): Added `onSidecarFile?` to `StorageApiOptions`. When `openFile` is called for a `.bpmn` file, it queries the project for a companion file named `${fileName}.tests.json`. If found, `onSidecarFile(bpmnFileName, content)` is called.
+- **Sidecar loading in process-runner**: On both initial install and `diagram:load`, calls `loadSidecarScenarios?.()`. If it returns scenarios they replace the current list (also persisted back to IndexedDB).
+- **AI "Generate" button**: When `generateScenarios` is provided, a "✨ Generate" button appears in the Tests tab header. Clicking it calls the async generator, appends returned scenarios to the list, and persists them.
+
+### Story Mode — shareable link + resolve/unresolve + author name (`story-view`)
+
+- **Download button** (`story-view/index.ts`): A "⬇ Download" button in the story header calls `renderStoryHtml(defs, { standalone: true, theme })`, creates a Blob, and triggers a browser download of `{processName}-story.html`.
+- **Resolve/unresolve comments**: Each comment now has a "Resolve" / "Unresolve" button. Resolved comments are rendered with `--resolved` modifier class (strikethrough text, muted meta). State is persisted to IndexedDB.
+- **Author name**: `StoryViewOptions.getAuthorName?: () => string` option. Used when creating comments (defaults to `"You"`).
+- **New CSS** (`story-view/css.ts`): Added `.bpmnkit-sv-share`, `.bpmnkit-sv-comment-resolve`, and `.bpmnkit-sv-comment-item--resolved` rules.
+- **New CSS** (`process-runner/css.ts`): Added `.bpmnkit-runner-chaos-summary`, `.bpmnkit-runner-tests-gen`, and `.bpmnkit-runner-tests-chaos-import` rules.
+
+## 2026-03-22 — Phase 2 completion: sequence flow scope + AI bridge variable flow context
+
+### Variable flow: hover sequence flow → variables in scope
+
+- **`packages/core/src/bpmn/optimize/variable-flow.ts`**: Added per-edge scope computation. For each sequence flow, performs a backward BFS from the source element to collect all transitive predecessors, then unions their produced variables into an "in-scope" set. Emits `data-flow/edge-scope:${flowId}` findings (uses `produces` field for the scope variable list).
+- **`packages/plugins/src/variable-flow/index.ts`**: Plugin now parses `data-flow/edge-scope:*` findings into an `edgeScope` map. `showTooltip` distinguishes between flow elements (shows "Variables in scope" list) and regular elements (shows existing writes/reads table). `clearAnalysis` now also clears `edgeScope`.
+
+### AI bridge: variable flow context in compact format
+
+- **`packages/plugins/src/ai-bridge/panel.ts`**: Added `buildVariableFlowContext(defs)` — runs `optimize(defs, { categories: ["data-flow"] })` and extracts per-element producer/consumer roles, undefined variable names, and dead output names. Added `buildContext(defs)` which merges `compactify(defs)` with `{ variableFlow: ... }`. Both `send()` and `sendAction()` now use `buildContext` so the AI receives variable flow analysis alongside the diagram structure.
+
+## 2026-03-22 — Phase 4 & 5: Hot Reload Live Mode + Story Mode + CLI lint/story commands
+
+### Story renderer (pure HTML, no DOM)
+
+- **`packages/core/src/bpmn/story.ts`**: New `renderStoryHtml(defs, options?)` — pure string HTML renderer with no DOM dependencies.
+  - Topological sort via Kahn's algorithm (handles cycles gracefully).
+  - Maps elements to lanes via `process.laneSet`; falls back to a single default lane.
+  - Generates typed cards per element role (start, end, service, user, gateway, parallel, subprocess, event, task).
+  - Gateway cards show outgoing sequence flow conditions inline.
+  - `standalone: true` wraps output in a complete HTML document with embedded CSS using brand tokens.
+  - Light/dark theme support via embedded CSS variable blocks.
+- **`packages/core/src/index.ts`**: Exported `renderStoryHtml` and `StoryRenderOptions`.
+
+### Live Mode plugin
+
+- **`packages/plugins/src/live-mode/css.ts`**: CSS module for live mode UI — toggle button, status pill, conflict banner, variable inspector tooltip. Full light/dark support via `[data-bpmnkit-hud-theme="light"]`.
+- **`packages/plugins/src/live-mode/index.ts`**: `createLiveModePlugin(options)` canvas plugin:
+  - Toggle button and status pill DOM elements exposed for embedding in toolbar.
+  - Auto-deploy on `diagram:change` with 500ms debounce.
+  - IndexedDB (`bpmnkit-live-mode-v1`) persists `processDefinitionKey + instanceKey` per `${profileName}:${bpmnProcessId}`.
+  - Auto-migration via `POST /api/v2/process-instances/{key}/migration` with auto-mapped element IDs.
+  - Migration conflict banner with "Start fresh" button when migration fails.
+  - Active element polling via `POST /api/v2/element-instances/search` (default 3s interval).
+  - Variable inspector tooltip on hover over active elements — debounced 300ms, cached per element.
+  - Sandbox guard: blocks if `getProfile().isProduction === true`.
+  - Optional test-green gate: calls `runTests()` before each deploy.
+  - Full install/uninstall lifecycle; clears timers, event listeners, tooltip.
+
+### Story View plugin
+
+- **`packages/plugins/src/story-view/css.ts`**: CSS for story view browser plugin — container, header, lane, card variants, comment panel. Light theme via `[data-bpmnkit-theme="light"]`.
+- **`packages/plugins/src/story-view/index.ts`**: `createStoryViewPlugin(options?)` canvas plugin:
+  - Toggle button (`📖 Story`) switches between story and edit mode.
+  - Renders HTML via `renderStoryHtml` from `@bpmnkit/core` and mounts into container.
+  - `enterStoryMode()` / `exitStoryMode()` for programmatic control.
+  - Comment threads per card: IndexedDB (`bpmnkit-story-view-v1`) keyed by `${fileKey}:${elementId}`; badge shows count.
+  - AI condition summarizer: async, in-memory cache per condition string.
+  - Subscribes to `diagram:load` and `diagram:change` to keep `currentDefs` updated.
+
+### CLI commands
+
+- **`apps/cli/src/commands/lint.ts`**: `casen lint <file>` — reads BPMN, runs `optimize()`, prints findings with severity symbol + category + element IDs + message; exits 1 on any error-severity finding. `--categories` filter, `--format json` output.
+- **`apps/cli/src/commands/story.ts`**: `casen story <file>` — reads BPMN, calls `renderStoryHtml` with `standalone: true`, writes to `<file>.story.html` (or `--output` path). `--theme dark|light`.
+- **`apps/cli/src/commands/index.ts`**: Added `lintGroup` and `storyGroup` to `pinnedGroups`.
+
+### Plugin package exports
+
+- **`packages/plugins/package.json`**: Added `"./live-mode"` and `"./story-view"` exports.
+
+## 2026-03-22 — Phase 2 & 3: Variable Flow Analysis + Time-Travel Debugger + Scenario Testing
+
+### Variable Flow Analysis
+
+- **`packages/core/src/bpmn/optimize/types.ts`**: Added `"data-flow"` to `OptimizationCategory`, `produces?: string[]` and `consumes?: string[]` to `OptimizationFinding`.
+- **`packages/core/src/bpmn/optimize/variable-flow.ts`**: New module:
+  - `extractFeelIdentifiers(expr)` — parses FEEL via `@bpmnkit/feel`, walks AST, returns variable name references (excluding ~95 built-in names).
+  - `analyzeVariableFlow(p)` — scans IO mapping inputs/outputs and sequence flow conditions; emits three finding types:
+    - `data-flow/undefined-variable:<name>` (warning) — consumed but never produced; typo suggestion via Levenshtein ≤ 2
+    - `data-flow/dead-output:<name>` (info) — produced but never consumed
+    - `data-flow/role:<elementId>` (info) — per-element produces/consumes metadata for canvas overlay
+- **`packages/core/src/bpmn/optimize/index.ts`**: Integrated `analyzeVariableFlow` into `optimize()` as `"data-flow"` category (included by default).
+- **`packages/core/src/index.ts`**: Exported `analyzeVariableFlow` and `extractFeelIdentifiers`.
+- **`packages/core/tests/variable-flow.test.ts`**: 14 tests covering all finding types.
+- **`packages/plugins/src/variable-flow/index.ts`**: New `createVariableFlowPlugin` canvas plugin: colors elements green (writes), blue (reads), teal (both); hover tooltip shows variable read/write table.
+- **`packages/plugins/src/variable-flow/css.ts`**: CSS for overlay rings, hover tooltip, legend.
+- **`packages/plugins/package.json`**: Added `"./variable-flow"` export.
+
+### Time-Travel Simulation Debugger
+
+- **`packages/plugins/src/process-runner/index.ts`**:
+  - Records engine event log (capped at 10,000) during each simulation run.
+  - Timeline scrubber (range input) above the tab bar — dragging backward enters time-travel mode.
+  - `computeStateAt(idx)` replays events 0..idx to project variables, FEEL evals, errors at that point.
+  - Variables/FEEL/Errors tabs update to the projected state when scrubbing.
+  - "Live" button jumps back to real-time; "Replay from here" re-runs from the snapshot at the scrub point.
+- **`packages/plugins/src/process-runner/css.ts`**: Added scrubber row CSS (range input, live/replay buttons, event counter label).
+
+### Scenario-Based Testing (Phase 3)
+
+- **`packages/engine/src/scenario.ts`**: New `runScenario(engine, defs, scenario, timeoutMs?)` function:
+  - `ProcessScenario` type: `id`, `name`, `processId?`, `inputs?`, `mocks?` (worker outputs/errors keyed by task type), `expect.path?`, `expect.variables?`
+  - `ScenarioResult` type: `passed`, `visitedElements`, `finalVariables`, `errors`, `failures` (field/expected/actual), `durationMs`
+  - Registers mock workers, collects events, checks path order and variable assertions.
+- **`packages/engine/src/index.ts`**: Exported `runScenario`, `ProcessScenario`, `ScenarioMock`, `ScenarioExpect`, `ScenarioResult`.
+- **`packages/engine/tests/scenario.test.ts`**: 5 tests.
+- **`packages/plugins/src/process-runner/index.ts`**: Added "Tests" tab (5th tab):
+  - Scenario CRUD stored in IndexedDB (DB bumped to version 2, new `"scenarios"` store).
+  - Run all / run one buttons; pass/fail badge per scenario.
+  - Expandable diff row on failure showing assertion failures and errors.
+  - `runScenario?` callback option in `ProcessRunnerOptions` (avoids hard engine dep in plugin).
+  - `ScenarioLike` / `ScenarioResultLike` minimal interfaces exported.
+- **`packages/plugins/src/process-runner/css.ts`**: Added Tests tab CSS.
+- **`apps/cli/src/commands/test.ts`**: New `casen test <file.bpmn> [--scenarios <file>]` command — reads BPMN + `.bpmn.tests.json` sidecar, runs all scenarios, reports pass/fail with diffs, exits 1 on any failure.
+- **`apps/cli/src/commands/index.ts`**: Added `testGroup` to `pinnedGroups`.
+- **`apps/cli/package.json`**: Added `@bpmnkit/core` and `@bpmnkit/engine` as runtime deps.
+
+---
+
+## 2026-03-22 — Phase 1: Pattern Advisor + Chaos Simulation Mode
+
+### Pattern Advisor
+
+- **`packages/core/src/bpmn/optimize/types.ts`**: Added `"pattern"` to `OptimizationCategory` union.
+- **`packages/core/src/bpmn/optimize/patterns.ts`**: New module implementing 15 pattern rules:
+  1. `pattern/http-no-error-boundary` — HTTP service task without error boundary (error)
+  2. `pattern/gateway-no-default-flow` — Exclusive gateway with multiple outgoing but no default flow (error)
+  3. `pattern/subprocess-no-error-boundary` — Sub-process without error boundary (error)
+  4. `pattern/call-activity-no-error-boundary` — Call activity with no error boundary (error)
+  5. `pattern/parallel-variable-conflict` — Parallel branches writing same variable (error)
+  6. `pattern/user-task-no-timer` — User task without timer boundary (warning)
+  7. `pattern/service-task-no-output` — Service task with job type but no output mapping (warning)
+  8. `pattern/catch-and-swallow` — Error boundary leading directly to end event (warning)
+  9. `pattern/gateway-single-outgoing` — Exclusive gateway with only one outgoing flow (warning)
+  10. `pattern/start-no-documentation` — Process start event with no documentation (warning)
+  11. `pattern/timer-duration-zero` — Timer boundary with zero duration (error)
+  12. `pattern/boundary-no-outgoing` — Boundary event with no outgoing flow (error)
+  13. `pattern/empty-annotation` — Empty text annotation (info)
+  14. `pattern/duplicate-job-type` — Duplicate job type across service tasks (info)
+  15. `pattern/literal-condition` — FEEL condition using only literal values (info)
+- **`packages/core/src/bpmn/optimize/index.ts`**: Integrated `analyzePatterns` into `optimize()` — runs when category `"pattern"` is included (default). Error-severity pattern findings automatically block the deploy plugin's optimizer guard.
+- **`packages/core/tests/patterns.test.ts`**: 20 tests covering all implemented pattern rules.
+- **`packages/plugins/src/pattern-advisor/index.ts`**: New `createPatternAdvisorPlugin` canvas plugin:
+  - Persistent side panel showing findings grouped by element, sorted by severity
+  - Summary badge counts (errors/warnings/info) in the panel header
+  - [Apply Fix] button for fixable findings; [Dismiss] to suppress per-finding
+  - Canvas element rings: error (red), warning (amber), info (blue) on affected elements
+  - Reactive: re-analyzes on `diagram:load` and `diagram:change`
+- **`packages/plugins/src/pattern-advisor/css.ts`**: Panel and canvas badge styles using brand tokens.
+- **`packages/plugins/package.json`**: Added `"./pattern-advisor"` subpath export.
+
+### Chaos Simulation Mode
+
+- **`packages/plugins/src/process-runner/index.ts`**:
+  - Added `chaosEnabled` state and `chaosSchedule` map
+  - Added `buildChaosSchedule()` — randomly selects service/send/business-rule/script tasks at 20% probability per element
+  - Added `applyChaosThenResolve()` — applies the injection type: `service-failure` (rejects), `null-response` (resolves immediately, discarding results), `random-delay` (500–2500ms random delay)
+  - Added **Chaos** checkbox to the play toolbar (visible when idle); shows amber color when enabled
+  - The chaos schedule is built at run start from the deployed process's flow elements; injected tasks are reported in the Errors tab before the run
+- **`packages/plugins/src/process-runner/css.ts`**: Added `.bpmnkit-runner-chaos-label` and `.bpmnkit-runner-chaos-checkbox` styles.
+
 ## 2026-03-21 — `apps/cli`: restructure settings/profiles/plugins menus
 
 - **`apps/cli/src/commands/index.ts`**: Removed `profileGroup` and `pluginGroup` from the exported `commandGroups` (TUI main menu); they are now re-exported for use by `run.ts` so CLI subcommand routing still works.

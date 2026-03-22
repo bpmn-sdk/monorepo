@@ -1,5 +1,5 @@
 import { BpmnCanvas } from "@bpmnkit/canvas"
-import { Bpmn, Dmn, Form, compactify } from "@bpmnkit/core"
+import { Bpmn, Dmn, Form, compactify, optimize } from "@bpmnkit/core"
 import type { BpmnDefinitions } from "@bpmnkit/core"
 import { saveCheckpoint } from "../history/index.js"
 import { injectAiBridgeStyles } from "./css.js"
@@ -224,6 +224,35 @@ const EXAMPLE_PROMPTS = [
 	"Explain what this process does in plain language",
 	"Optimize and simplify this diagram — remove redundant elements",
 ]
+
+// ── Variable flow context builder ─────────────────────────────────────────────
+
+function buildVariableFlowContext(defs: BpmnDefinitions): Record<string, unknown> {
+	const report = optimize(defs, { categories: ["data-flow"] })
+	const byElement: Record<string, { produces?: string[]; consumes?: string[] }> = {}
+	const undefinedVars: string[] = []
+	const deadOutputs: string[] = []
+
+	for (const f of report.findings) {
+		const elId = f.elementIds[0]
+		if (f.id.startsWith("data-flow/role:") && elId !== undefined) {
+			byElement[elId] = {
+				...(f.produces?.length ? { produces: f.produces } : {}),
+				...(f.consumes?.length ? { consumes: f.consumes } : {}),
+			}
+		} else if (f.id.startsWith("data-flow/undefined-variable:") && f.consumes?.[0] !== undefined) {
+			undefinedVars.push(f.consumes[0])
+		} else if (f.id.startsWith("data-flow/dead-output:") && f.produces?.[0] !== undefined) {
+			deadOutputs.push(f.produces[0])
+		}
+	}
+
+	return { byElement, undefinedVars, deadOutputs }
+}
+
+function buildContext(defs: BpmnDefinitions): Record<string, unknown> {
+	return { ...compactify(defs), variableFlow: buildVariableFlowContext(defs) }
+}
 
 export function createAiPanel(options: PanelOptions): {
 	panel: HTMLElement
@@ -782,7 +811,7 @@ export function createAiPanel(options: PanelOptions): {
 		aiMsgEl.classList.add("ai-msg-cursor")
 
 		const defs = options.getDefinitions()
-		const diagramContext = defs ? compactify(defs) : null
+		const diagramContext = defs ? buildContext(defs) : null
 		const { fullText, resultXml } = await runStream(
 			history,
 			diagramContext,
@@ -822,7 +851,7 @@ export function createAiPanel(options: PanelOptions): {
 		const aiMsgEl = addMessage("ai", "")
 		aiMsgEl.classList.add("ai-msg-cursor")
 
-		const context = compactify(defs)
+		const context = buildContext(defs)
 		const { fullText, resultXml } = await runStream(history, context, action, signal, aiMsgEl)
 
 		finalizeAiMessage(aiMsgEl, fullText, resultXml)

@@ -1,5 +1,66 @@
 # Features
 
+## Hot Reload Live Mode (2026-03-22) — `packages/plugins/live-mode`
+
+- **`createLiveModePlugin(options)`**: Canvas plugin that keeps a running Zeebe process instance in sync with the diagram as you edit.
+  - Toolbar toggle button and status pill (OFF / CONNECTING / LIVE / ERROR / BLOCKED / TESTS FAIL).
+  - Auto-deploys via the proxy on every diagram change (debounced 500ms).
+  - Maintains dev instance across reloads via IndexedDB persistence.
+  - Auto-migrates the running instance to each new version; shows conflict banner with "Start fresh" on migration failure.
+  - Polls active element instances and drives token-highlight canvas overlay.
+  - Variable inspector: hover an active element → tooltip showing live variable values.
+  - Sandbox guard: blocked when the active profile is tagged as production.
+  - Optional test-green gate: require `runTests()` to pass before each deploy.
+
+## Story Mode (2026-03-22) — `packages/core/bpmn/story.ts`, `packages/plugins/story-view`
+
+- **`renderStoryHtml(defs, options?)`** (`@bpmnkit/core`): Pure HTML string renderer (no DOM). Topologically sorts flow elements (Kahn's algorithm, cycle-safe), groups by swim lane, renders typed cards with role-colored left borders. Gateway cards show outgoing conditions. `standalone: true` produces a complete self-contained HTML document.
+- **`createStoryViewPlugin(options?)`**: Canvas plugin with `📖 Story` toggle. Renders story HTML from current definitions and mounts it in the editor container. Comment threads per element stored in IndexedDB. AI condition summarizer hook for plain-English FEEL translations.
+
+## CLI lint & story commands (2026-03-22) — `apps/cli`
+
+- **`casen lint <file.bpmn>`**: Runs all static analysis (`optimize()`) on a BPMN file, prints findings with symbols, exits 1 on errors. Supports `--categories` filter and `--format json`.
+- **`casen story <file.bpmn>`**: Renders a BPMN process as a standalone story-mode HTML file. Supports `--output` and `--theme dark|light`.
+
+## Variable Flow Analysis (2026-03-22) — `packages/core/optimize`, `packages/plugins/variable-flow`
+
+- **`analyzeVariableFlow(process)`**: Static analysis engine that scans IO mapping inputs/outputs and sequence flow FEEL conditions to build a producer/consumer graph, then emits:
+  - `data-flow/undefined-variable` (warning) — variable consumed but never produced anywhere in the process; includes Levenshtein ≤ 2 typo suggestions.
+  - `data-flow/dead-output` (info) — variable produced but never consumed downstream.
+  - `data-flow/role` (info) — per-element metadata listing which variables it reads and writes (used by the canvas overlay).
+- **`extractFeelIdentifiers(expr)`**: Parses a FEEL expression string, walks the AST, and returns all variable name references (excluding ~95 built-in function names).
+- **`createVariableFlowPlugin()`**: Canvas overlay plugin — colors elements green (writes), blue (reads), teal (reads & writes). Hovering any colored element shows a tooltip table listing each variable and whether it's read or written. Includes a legend.
+
+## Time-Travel Simulation Debugger (2026-03-22) — `packages/plugins/process-runner`
+
+- **Event log recording**: Every engine event is pushed to an in-memory log (capped at 10,000) during simulation runs.
+- **Timeline scrubber**: Range input above the tab bar. Dragging left enters time-travel mode; the Variables/FEEL/Errors tabs instantly update to show state at the selected event index.
+- **State projection**: `computeStateAt(idx)` replays the event log up to index idx and returns projected variable state, FEEL evals, and errors — O(n) pass, no re-execution.
+- **Live / Replay**: "Live" button returns to the tail of the log. "Replay from here" snapshots variable state at the scrub point and starts a fresh engine run with those variables as inputs.
+
+## Scenario-Based Testing (2026-03-22) — `packages/engine`, `packages/plugins/process-runner`, `apps/cli`
+
+- **`runScenario(engine, defs, scenario)`** (`@bpmnkit/engine`): Runs a single test scenario against a BPMN definition with mock job workers. Supports path assertions (expected element visit order) and variable assertions (expected final state). Returns a typed `ScenarioResult` with `passed`, `failures`, `visitedElements`, `finalVariables`, `errors`, `durationMs`.
+- **`.bpmn.tests.json` sidecar format**: Scenarios as a JSON array of `ProcessScenario` objects — each has `id`, `name`, `inputs`, `mocks` (keyed by task type), and `expect.path`/`expect.variables`.
+- **Tests tab** in process runner panel: Create/delete scenarios, run all or individually, see pass/fail per scenario, and expand failure diffs showing field/expected/actual.
+- **`casen test <file.bpmn>`**: CLI command that reads a BPMN file and its `.bpmn.tests.json` sidecar, runs all scenarios, prints PASS/FAIL with diffs, and exits 1 if any scenario fails.
+
+## Pattern Advisor Plugin (2026-03-22) — `packages/plugins/pattern-advisor`
+
+- **`createPatternAdvisorPlugin`**: Canvas plugin that continuously analyzes the loaded process against 15 production-failure patterns and surfaces findings in a persistent side panel.
+- **15 pattern rules** across two new severity levels: error (blocks deploy), warning (advisory), info (hygiene). Rules cover missing error boundaries on HTTP tasks, sub-processes, call activities; exclusive gateway without default flow; parallel variable conflicts; user tasks without SLA timers; catch-and-swallow error handlers; literal-only FEEL conditions; duplicate job types; empty annotations; and more.
+- **Reactive analysis**: Re-runs on every diagram change — no manual trigger needed.
+- **Canvas badges**: Affected elements get a colored ring (red/amber/blue) indicating the worst finding severity.
+- **Per-finding actions**: [Apply Fix] for auto-fixable patterns; [Dismiss] to suppress a finding without fixing it.
+- **Deploy guard integration**: Error-severity pattern findings (e.g. HTTP task without error boundary) automatically block the deploy plugin — same as the existing optimizer guard.
+
+## Chaos Simulation Mode (2026-03-22) — `packages/plugins/process-runner`
+
+- **Chaos toggle** in the process runner toolbar (visible when idle): enables random failure injection for the next simulation run.
+- **20% default probability**: Each eligible task (service, send, business-rule, script) is independently rolled at 20% chance of receiving an injection.
+- **Three injection types**: `service-failure` (task throws an error — reveals missing error boundaries), `null-response` (task completes but returns nothing — reveals missing null guards downstream), `random-delay` (500–2500ms artificial delay — reveals timer boundary gaps).
+- **Errors tab summary**: The chaos schedule is printed to the Errors tab before execution begins, showing which elements were targeted and with which injection type.
+
 ## Deploy Plugin (2026-03-20) — `packages/plugins/deploy`
 
 - **`createDeployPlugin`**: Editor sidebar plugin (new "Deploy" tab in SideDock) for deploying processes and starting instances without leaving the editor.

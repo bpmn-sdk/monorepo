@@ -226,6 +226,9 @@ export { parseXml, serializeXml } from "./xml/index.js"
 export { readDiColor, writeDiColor, BIOC_NS, COLOR_NS } from "./bpmn/di-color.js"
 export type { DiColor } from "./bpmn/di-color.js"
 export { optimize } from "./bpmn/optimize/index.js"
+export { renderStoryHtml } from "./bpmn/story.js"
+export type { StoryRenderOptions } from "./bpmn/story.js"
+export { analyzeVariableFlow, extractFeelIdentifiers } from "./bpmn/optimize/variable-flow.js"
 export type {
 	OptimizationReport,
 	OptimizationFinding,

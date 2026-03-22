@@ -35,6 +35,30 @@ interface TokenHighlightLike {
 
 // ── Public API ──────────────────────────────────────────────────────────────
 
+/** Minimal scenario interface — avoids hard dep on @bpmnkit/engine. */
+export interface ScenarioLike {
+	id: string
+	name: string
+	processId?: string
+	inputs?: Record<string, unknown>
+	mocks?: Record<string, { outputs?: Record<string, unknown>; error?: string }>
+	expect?: {
+		path?: string[]
+		variables?: Record<string, unknown>
+	}
+}
+
+export interface ScenarioResultLike {
+	scenarioId: string
+	scenarioName: string
+	passed: boolean
+	visitedElements: string[]
+	finalVariables: Record<string, unknown>
+	errors: Array<{ elementId?: string; message: string }>
+	failures: Array<{ field: string; expected: unknown; actual: unknown }>
+	durationMs: number
+}
+
 export interface ProcessRunnerOptions {
 	/** The engine instance used to deploy and execute processes. */
 	engine: EngineLike
@@ -55,15 +79,42 @@ export interface ProcessRunnerOptions {
 	onExitPlayMode?: () => void
 	/** Returns the current project ID, used to scope input variable persistence. */
 	getProjectId?: () => string | null
+	/**
+	 * Optional scenario runner callback. When provided, the Tests tab is active.
+	 * Inject `runScenario` from `@bpmnkit/engine` here to avoid a hard dep.
+	 */
+	runScenario?: (scenario: ScenarioLike) => Promise<ScenarioResultLike>
+	/**
+	 * Called on diagram load to check for a companion .bpmn.tests.json sidecar.
+	 * Return parsed scenarios, or null if no sidecar exists.
+	 */
+	loadSidecarScenarios?: () => Promise<ScenarioLike[] | null>
+	/**
+	 * Optional AI scenario generator. When provided, a "Generate" button appears
+	 * in the Tests tab. Should return draft scenarios to add to the list.
+	 */
+	generateScenarios?: () => Promise<ScenarioLike[]>
+	/**
+	 * Returns the Zeebe job type string for a given element ID.
+	 * Used to map chaos injections to scenario mocks for export.
+	 */
+	getJobType?: (elementId: string) => string | null
 }
 
 // ── IndexedDB persistence for input variables ───────────────────────────────
 
 function openRunnerDb(): Promise<IDBDatabase> {
 	return new Promise((resolve, reject) => {
-		const req = indexedDB.open("bpmnkit-process-runner-v1", 1)
-		req.onupgradeneeded = () => {
-			req.result.createObjectStore("data")
+		const req = indexedDB.open("bpmnkit-process-runner-v1", 2)
+		req.onupgradeneeded = (e) => {
+			const db = req.result
+			if (!db.objectStoreNames.contains("data")) {
+				db.createObjectStore("data")
+			}
+			// Version 2: add scenarios store keyed by projectId
+			if (e.oldVersion < 2 && !db.objectStoreNames.contains("scenarios")) {
+				db.createObjectStore("scenarios")
+			}
 		}
 		req.onsuccess = () => resolve(req.result)
 		req.onerror = () => reject(req.error)
@@ -112,11 +163,77 @@ async function saveInputVars(
 	}
 }
 
+function scenariosKey(projectId: string | null): string {
+	return projectId !== null ? `scenarios:${projectId}` : "scenarios"
+}
+
+async function loadScenarios(projectId: string | null): Promise<ScenarioLike[]> {
+	try {
+		const db = await openRunnerDb()
+		return new Promise((resolve) => {
+			const req = db
+				.transaction("scenarios", "readonly")
+				.objectStore("scenarios")
+				.get(scenariosKey(projectId))
+			req.onsuccess = () => {
+				const raw = req.result
+				resolve(Array.isArray(raw) ? (raw as ScenarioLike[]) : [])
+			}
+			req.onerror = () => resolve([])
+		})
+	} catch {
+		return []
+	}
+}
+
+async function saveScenarios(projectId: string | null, scenarios: ScenarioLike[]): Promise<void> {
+	try {
+		const db = await openRunnerDb()
+		await new Promise<void>((resolve) => {
+			const tx = db.transaction("scenarios", "readwrite")
+			tx.objectStore("scenarios").put(scenarios, scenariosKey(projectId))
+			tx.oncomplete = () => resolve()
+			tx.onerror = () => resolve()
+		})
+	} catch {
+		// ignore
+	}
+}
+
 // ── Internal state ──────────────────────────────────────────────────────────
 
 const AUTO_PLAY_DELAY_MS = 600
+/** Default probability (0–1) that a service task is chaos-injected. */
+const CHAOS_FAILURE_PROBABILITY = 0.2
 
 type RunMode = "idle" | "running-auto" | "running-step"
+
+// ── Chaos helpers ───────────────────────────────────────────────────────────
+
+/** Element types that are eligible for chaos injection (worker tasks). */
+const CHAOS_ELIGIBLE_TYPES = new Set(["serviceTask", "sendTask", "businessRuleTask", "scriptTask"])
+
+interface ChaosInjection {
+	elementId: string
+	type: "service-failure" | "null-response" | "random-delay"
+}
+
+function buildChaosSchedule(
+	elementIds: string[],
+	probability: number,
+): Map<string, ChaosInjection> {
+	const schedule = new Map<string, ChaosInjection>()
+	const types: Array<ChaosInjection["type"]> = ["service-failure", "null-response", "random-delay"]
+	for (const id of elementIds) {
+		if (Math.random() < probability) {
+			const injType = types[Math.floor(Math.random() * types.length)]
+			if (injType !== undefined) {
+				schedule.set(id, { elementId: id, type: injType })
+			}
+		}
+	}
+	return schedule
+}
 
 // ── Plugin factory ──────────────────────────────────────────────────────────
 
@@ -155,6 +272,24 @@ export function createProcessRunnerPlugin(
 	/** Errors emitted during the current run. */
 	const errors: Array<{ elementId?: string; message: string }> = []
 
+	// ── Time-travel debugger state ──────────────────────────────────────────
+
+	const MAX_EVENT_LOG = 10_000
+	/** Full ordered event log for the current run. */
+	const eventLog: Array<Record<string, unknown>> = []
+	/** null = live (tail of log); number = scrubbed to that index. */
+	let scrubIndex: number | null = null
+
+	/** Whether chaos mode is enabled. */
+	let chaosEnabled = false
+
+	/** Active chaos schedule for the current run. */
+	let chaosSchedule = new Map<string, ChaosInjection>()
+	/** Injections that triggered during the last chaos run (cleared on new run). */
+	const lastChaosInjections: ChaosInjection[] = []
+	/** True = last chaos run completed; false = failed/stuck; null = no chaos run yet. */
+	let lastChaosRunCompleted: boolean | null = null
+
 	/** Input variables configured by the user (persisted in IndexedDB). */
 	const inputVars: Array<{ name: string; value: string }> = []
 
@@ -189,11 +324,13 @@ export function createProcessRunnerPlugin(
 	const feelTabBtn = makeTabBtn("FEEL", false)
 	const errorsTabBtn = makeTabBtn("Errors", false)
 	const inputTabBtn = makeTabBtn("Input", false)
+	const testsTabBtn = makeTabBtn("Tests", false)
 
 	playTabBarEl.appendChild(varTabBtn)
 	playTabBarEl.appendChild(feelTabBtn)
 	playTabBarEl.appendChild(errorsTabBtn)
 	playTabBarEl.appendChild(inputTabBtn)
+	playTabBarEl.appendChild(testsTabBtn)
 
 	function makePaneEl(hidden: boolean): HTMLDivElement {
 		const d = document.createElement("div")
@@ -207,28 +344,158 @@ export function createProcessRunnerPlugin(
 	const feelPaneEl = makePaneEl(true)
 	const errorsPaneEl = makePaneEl(true)
 	const ivarsPaneEl = makePaneEl(true)
+	const testsPaneEl = makePaneEl(true)
 
+	// ── Timeline scrubber ───────────────────────────────────────────────────
+
+	const scrubberRowEl = document.createElement("div")
+	scrubberRowEl.className = "bpmnkit-runner-scrubber-row"
+	scrubberRowEl.style.display = "none"
+
+	const scrubberEl = document.createElement("input")
+	scrubberEl.type = "range"
+	scrubberEl.className = "bpmnkit-runner-scrubber"
+	scrubberEl.min = "0"
+	scrubberEl.max = "0"
+	scrubberEl.value = "0"
+
+	const scrubberLiveBtn = document.createElement("button")
+	scrubberLiveBtn.className = "bpmnkit-runner-scrubber-live"
+	scrubberLiveBtn.textContent = "Live"
+
+	const scrubberReplayBtn = document.createElement("button")
+	scrubberReplayBtn.className = "bpmnkit-runner-scrubber-replay"
+	scrubberReplayBtn.textContent = "Replay from here"
+	scrubberReplayBtn.style.display = "none"
+
+	const scrubberIndexEl = document.createElement("span")
+	scrubberIndexEl.className = "bpmnkit-runner-scrubber-index"
+
+	scrubberRowEl.appendChild(scrubberEl)
+	scrubberRowEl.appendChild(scrubberIndexEl)
+	scrubberRowEl.appendChild(scrubberLiveBtn)
+	scrubberRowEl.appendChild(scrubberReplayBtn)
+
+	playPanelEl.appendChild(scrubberRowEl)
 	playPanelEl.appendChild(playTabBarEl)
 	playPanelEl.appendChild(varsPaneEl)
 	playPanelEl.appendChild(feelPaneEl)
 	playPanelEl.appendChild(errorsPaneEl)
 	playPanelEl.appendChild(ivarsPaneEl)
+	playPanelEl.appendChild(testsPaneEl)
 
-	function switchPlayTab(tab: "variables" | "feel" | "errors" | "input"): void {
+	function switchPlayTab(tab: "variables" | "feel" | "errors" | "input" | "tests"): void {
 		varTabBtn.classList.toggle("bpmnkit-runner-play-tab--active", tab === "variables")
 		feelTabBtn.classList.toggle("bpmnkit-runner-play-tab--active", tab === "feel")
 		errorsTabBtn.classList.toggle("bpmnkit-runner-play-tab--active", tab === "errors")
 		inputTabBtn.classList.toggle("bpmnkit-runner-play-tab--active", tab === "input")
+		testsTabBtn.classList.toggle("bpmnkit-runner-play-tab--active", tab === "tests")
 		varsPaneEl.classList.toggle("bpmnkit-runner-play-pane--hidden", tab !== "variables")
 		feelPaneEl.classList.toggle("bpmnkit-runner-play-pane--hidden", tab !== "feel")
 		errorsPaneEl.classList.toggle("bpmnkit-runner-play-pane--hidden", tab !== "errors")
 		ivarsPaneEl.classList.toggle("bpmnkit-runner-play-pane--hidden", tab !== "input")
+		testsPaneEl.classList.toggle("bpmnkit-runner-play-pane--hidden", tab !== "tests")
 	}
 
 	varTabBtn.addEventListener("click", () => switchPlayTab("variables"))
 	feelTabBtn.addEventListener("click", () => switchPlayTab("feel"))
 	errorsTabBtn.addEventListener("click", () => switchPlayTab("errors"))
 	inputTabBtn.addEventListener("click", () => switchPlayTab("input"))
+	testsTabBtn.addEventListener("click", () => switchPlayTab("tests"))
+
+	// ── Time-travel helpers ─────────────────────────────────────────────────
+
+	interface ProjectedState {
+		variables: Map<string, unknown>
+		feelEvals: Array<{ elementId: string; property: string; expression: string; result: unknown }>
+		errors: Array<{ elementId?: string; message: string }>
+	}
+
+	function computeStateAt(idx: number): ProjectedState {
+		const vars = new Map<string, unknown>()
+		const feels: ProjectedState["feelEvals"] = []
+		const errs: ProjectedState["errors"] = []
+		const capped = Math.min(idx, eventLog.length - 1)
+		for (let i = 0; i <= capped; i++) {
+			const evt = eventLog[i]
+			if (evt === undefined) continue
+			if (evt.type === "variable:set" && typeof evt.name === "string") {
+				vars.set(evt.name, evt.value)
+			} else if (
+				evt.type === "feel:evaluated" &&
+				typeof evt.elementId === "string" &&
+				typeof evt.property === "string" &&
+				typeof evt.expression === "string"
+			) {
+				feels.push({
+					elementId: evt.elementId,
+					property: evt.property,
+					expression: evt.expression,
+					result: evt.result,
+				})
+			} else if (evt.type === "element:failed") {
+				if (typeof evt.elementId === "string" && typeof evt.error === "string") {
+					errs.push({ elementId: evt.elementId, message: evt.error })
+				}
+			} else if (evt.type === "process:failed" && typeof evt.error === "string") {
+				errs.push({ message: evt.error })
+			}
+		}
+		return { variables: vars, feelEvals: feels, errors: errs }
+	}
+
+	function updateScrubber(): void {
+		const len = eventLog.length
+		if (len === 0) {
+			scrubberRowEl.style.display = "none"
+			return
+		}
+		scrubberRowEl.style.display = ""
+		scrubberEl.max = String(len - 1)
+
+		const isLive = scrubIndex === null
+		scrubberEl.value = isLive ? String(len - 1) : String(scrubIndex)
+		scrubberIndexEl.textContent = isLive
+			? `${len} events (live)`
+			: `Event ${(scrubIndex ?? 0) + 1} / ${len}`
+		scrubberLiveBtn.style.display = isLive ? "none" : ""
+		scrubberReplayBtn.style.display = isLive ? "none" : ""
+	}
+
+	function renderAtCurrentScrub(): void {
+		if (scrubIndex === null) {
+			renderVariables()
+			renderFeelEvals()
+			renderErrors()
+		} else {
+			const state = computeStateAt(scrubIndex)
+			renderVariables(state.variables)
+			renderFeelEvals(state.feelEvals)
+			renderErrors(state.errors)
+		}
+		updateScrubber()
+	}
+
+	scrubberEl.addEventListener("input", () => {
+		const idx = Number(scrubberEl.value)
+		scrubIndex = idx >= eventLog.length - 1 ? null : idx
+		renderAtCurrentScrub()
+	})
+
+	scrubberLiveBtn.addEventListener("click", () => {
+		scrubIndex = null
+		renderAtCurrentScrub()
+	})
+
+	scrubberReplayBtn.addEventListener("click", () => {
+		if (scrubIndex === null) return
+		// Snapshot variables at the scrub point and re-run
+		const state = computeStateAt(scrubIndex)
+		const initVars: Record<string, unknown> = {}
+		for (const [k, v] of state.variables) initVars[k] = v
+		scrubIndex = null
+		startInstance(initVars)
+	})
 
 	// ── Render functions ────────────────────────────────────────────────────
 
@@ -243,13 +510,14 @@ export function createProcessRunnerPlugin(
 		while (el.firstChild !== null) el.removeChild(el.firstChild)
 	}
 
-	function renderVariables(): void {
+	function renderVariables(snapshot?: Map<string, unknown>): void {
 		clearEl(varsPaneEl)
-		if (variables.size === 0) {
+		const src = snapshot ?? variables
+		if (src.size === 0) {
 			varsPaneEl.appendChild(emptyEl("No variables yet."))
 			return
 		}
-		for (const [name, value] of variables) {
+		for (const [name, value] of src) {
 			const row = document.createElement("div")
 			row.className = "bpmnkit-runner-play-var-row"
 			const nameEl = document.createElement("span")
@@ -264,9 +532,12 @@ export function createProcessRunnerPlugin(
 		}
 	}
 
-	function renderFeelEvals(): void {
+	function renderFeelEvals(
+		snapshot?: Array<{ elementId: string; property: string; expression: string; result: unknown }>,
+	): void {
 		clearEl(feelPaneEl)
-		if (feelEvals.length === 0) {
+		const src = snapshot ?? feelEvals
+		if (src.length === 0) {
 			feelPaneEl.appendChild(emptyEl("No FEEL expressions evaluated yet."))
 			return
 		}
@@ -274,7 +545,7 @@ export function createProcessRunnerPlugin(
 			string,
 			Array<{ property: string; expression: string; result: unknown }>
 		>()
-		for (const ev of feelEvals) {
+		for (const ev of src) {
 			let arr = groups.get(ev.elementId)
 			if (arr === undefined) {
 				arr = []
@@ -325,13 +596,23 @@ export function createProcessRunnerPlugin(
 		}
 	}
 
-	function renderErrors(): void {
+	function renderErrors(snapshot?: Array<{ elementId?: string; message: string }>): void {
 		clearEl(errorsPaneEl)
-		if (errors.length === 0) {
+		// Chaos summary banner — only in live (non-scrubbed) mode after a chaos run
+		if (snapshot === undefined && chaosEnabled && lastChaosRunCompleted !== null) {
+			const banner = document.createElement("div")
+			banner.className = "bpmnkit-runner-chaos-summary"
+			const stuck = lastChaosRunCompleted ? 0 : 1
+			const errCount = errors.filter((e) => e.elementId !== undefined).length
+			banner.textContent = `Chaos run: ${stuck > 0 ? "1 stuck instance" : "completed"}, ${errCount} unhandled error${errCount !== 1 ? "s" : ""} found`
+			errorsPaneEl.appendChild(banner)
+		}
+		const src = snapshot ?? errors
+		if (src.length === 0) {
 			errorsPaneEl.appendChild(emptyEl("No errors."))
 			return
 		}
-		for (const err of errors) {
+		for (const err of src) {
 			const rowEl = document.createElement("div")
 			rowEl.className = "bpmnkit-runner-play-error-row"
 			if (err.elementId !== undefined) {
@@ -429,6 +710,190 @@ export function createProcessRunnerPlugin(
 		ivarsPaneEl.appendChild(addBtn)
 	}
 
+	// ── Tests tab ────────────────────────────────────────────────────────────
+
+	const scenarios: ScenarioLike[] = []
+	const scenarioResults = new Map<string, ScenarioResultLike>()
+
+	function renderTests(): void {
+		clearEl(testsPaneEl)
+
+		if (options.runScenario === undefined) {
+			testsPaneEl.appendChild(emptyEl("Pass runScenario in options to enable the Tests tab."))
+			return
+		}
+
+		// Run all button
+		const headerEl = document.createElement("div")
+		headerEl.className = "bpmnkit-runner-tests-header"
+
+		const runAllBtn = document.createElement("button")
+		runAllBtn.className = "bpmnkit-runner-btn bpmnkit-runner-tests-run-all"
+		runAllBtn.textContent = `\u25B6 Run all (${scenarios.length})`
+		runAllBtn.disabled = scenarios.length === 0
+		runAllBtn.addEventListener("click", () => {
+			runAllBtn.disabled = true
+			const runs = scenarios.map((s) =>
+				(options.runScenario as NonNullable<typeof options.runScenario>)(s).then((r) => {
+					scenarioResults.set(s.id, r)
+					renderTests()
+				}),
+			)
+			void Promise.all(runs).then(() => renderTests())
+		})
+		headerEl.appendChild(runAllBtn)
+
+		const addBtn = document.createElement("button")
+		addBtn.className = "bpmnkit-runner-btn bpmnkit-runner-tests-add"
+		addBtn.textContent = "+ New scenario"
+		addBtn.addEventListener("click", () => {
+			const id = `scenario-${Date.now()}`
+			scenarios.push({
+				id,
+				name: `Scenario ${scenarios.length + 1}`,
+				inputs: {},
+				mocks: {},
+				expect: {},
+			})
+			void saveScenarios(currentProjectId, scenarios)
+			renderTests()
+		})
+		headerEl.appendChild(addBtn)
+
+		// AI generate scenarios button
+		if (options.generateScenarios !== undefined) {
+			const genBtn = document.createElement("button")
+			genBtn.className = "bpmnkit-runner-btn bpmnkit-runner-tests-gen"
+			genBtn.textContent = "\u2728 Generate"
+			genBtn.title = "Generate test scenarios with AI"
+			genBtn.addEventListener("click", () => {
+				genBtn.disabled = true
+				genBtn.textContent = "Generating\u2026"
+				void (options.generateScenarios as NonNullable<typeof options.generateScenarios>)()
+					.then((newScenarios) => {
+						scenarios.push(...newScenarios)
+						void saveScenarios(currentProjectId, scenarios)
+					})
+					.catch(() => undefined)
+					.finally(() => renderTests())
+			})
+			headerEl.appendChild(genBtn)
+		}
+
+		// Import chaos findings as draft scenarios
+		if (lastChaosInjections.length > 0 && options.getJobType !== undefined) {
+			const importChaosBtn = document.createElement("button")
+			importChaosBtn.className = "bpmnkit-runner-btn bpmnkit-runner-tests-chaos-import"
+			importChaosBtn.textContent = `\u2193 Chaos (${lastChaosInjections.length})`
+			importChaosBtn.title = "Import chaos findings as draft test scenarios"
+			importChaosBtn.addEventListener("click", () => {
+				const newScenarios: ScenarioLike[] = []
+				for (let idx = 0; idx < lastChaosInjections.length; idx++) {
+					const inj = lastChaosInjections[idx]
+					if (inj === undefined) continue
+					const jobType = options.getJobType?.(inj.elementId) ?? null
+					if (jobType === null) continue
+					newScenarios.push({
+						id: `chaos-${Date.now()}-${idx}`,
+						name: `Chaos: ${inj.elementId} (${inj.type})`,
+						mocks: { [jobType]: { error: `[Chaos] ${inj.type}` } },
+						expect: {},
+					})
+				}
+				if (newScenarios.length > 0) {
+					scenarios.push(...newScenarios)
+					void saveScenarios(currentProjectId, scenarios)
+					renderTests()
+				}
+			})
+			headerEl.appendChild(importChaosBtn)
+		}
+
+		testsPaneEl.appendChild(headerEl)
+
+		if (scenarios.length === 0) {
+			testsPaneEl.appendChild(emptyEl("No test scenarios yet. Click + New scenario."))
+			return
+		}
+
+		for (let i = 0; i < scenarios.length; i++) {
+			const scenario = scenarios[i]
+			if (scenario === undefined) continue
+			const result = scenarioResults.get(scenario.id)
+
+			const rowEl = document.createElement("div")
+			rowEl.className = "bpmnkit-runner-tests-row"
+			if (result !== undefined) {
+				rowEl.classList.add(
+					result.passed ? "bpmnkit-runner-tests-pass" : "bpmnkit-runner-tests-fail",
+				)
+			}
+
+			const statusEl = document.createElement("span")
+			statusEl.className = "bpmnkit-runner-tests-status"
+			statusEl.textContent = result === undefined ? "\u25CB" : result.passed ? "\u2713" : "\u2717"
+
+			const nameInput = document.createElement("input")
+			nameInput.className = "bpmnkit-runner-tests-name"
+			nameInput.value = scenario.name
+			nameInput.addEventListener("input", () => {
+				if (scenarios[i] !== undefined) {
+					;(scenarios[i] as ScenarioLike).name = nameInput.value
+					void saveScenarios(currentProjectId, scenarios)
+				}
+			})
+
+			const runOneBtn = document.createElement("button")
+			runOneBtn.className = "bpmnkit-runner-btn bpmnkit-runner-tests-run-one"
+			runOneBtn.textContent = "\u25B6"
+			runOneBtn.title = "Run this scenario"
+			runOneBtn.addEventListener("click", () => {
+				void (options.runScenario as NonNullable<typeof options.runScenario>)(scenario).then(
+					(r) => {
+						scenarioResults.set(scenario.id, r)
+						renderTests()
+					},
+				)
+			})
+
+			const delBtn = document.createElement("button")
+			delBtn.className = "bpmnkit-runner-btn bpmnkit-runner-tests-del"
+			delBtn.textContent = "\u00D7"
+			delBtn.title = "Delete"
+			delBtn.addEventListener("click", () => {
+				scenarios.splice(i, 1)
+				scenarioResults.delete(scenario.id)
+				void saveScenarios(currentProjectId, scenarios)
+				renderTests()
+			})
+
+			rowEl.appendChild(statusEl)
+			rowEl.appendChild(nameInput)
+			rowEl.appendChild(runOneBtn)
+			rowEl.appendChild(delBtn)
+			testsPaneEl.appendChild(rowEl)
+
+			// Expandable diff on failure
+			if (result !== undefined && !result.passed) {
+				const diffEl = document.createElement("div")
+				diffEl.className = "bpmnkit-runner-tests-diff"
+				for (const f of result.failures) {
+					const failRow = document.createElement("div")
+					failRow.className = "bpmnkit-runner-tests-diff-row"
+					failRow.textContent = `${f.field}: expected ${JSON.stringify(f.expected)}, got ${JSON.stringify(f.actual)}`
+					diffEl.appendChild(failRow)
+				}
+				for (const e of result.errors) {
+					const errRow = document.createElement("div")
+					errRow.className = "bpmnkit-runner-tests-diff-row bpmnkit-runner-tests-diff-error"
+					errRow.textContent = `Error${e.elementId !== undefined ? ` (${e.elementId})` : ""}: ${e.message}`
+					diffEl.appendChild(errRow)
+				}
+				testsPaneEl.appendChild(diffEl)
+			}
+		}
+	}
+
 	// ── Helpers ────────────────────────────────────────────────────────────
 
 	function getPrimaryProcessId(): string | undefined {
@@ -439,9 +904,14 @@ export function createProcessRunnerPlugin(
 		feelEvals.length = 0
 		variables.clear()
 		errors.length = 0
+		eventLog.length = 0
+		scrubIndex = null
+		lastChaosInjections.length = 0
+		lastChaosRunCompleted = null
 		renderVariables()
 		renderFeelEvals()
 		renderErrors()
+		updateScrubber()
 	}
 
 	/** Cancel running instance and reset run state. Stays in play mode. */
@@ -473,6 +943,27 @@ export function createProcessRunnerPlugin(
 		options.onHidePlayTab?.()
 	}
 
+	function applyChaosThenResolve(
+		chaos: ChaosInjection,
+		resolve: () => void,
+		reject: (err: Error) => void,
+	): void {
+		switch (chaos.type) {
+			case "service-failure":
+				reject(new Error(`[Chaos] Simulated service failure at "${chaos.elementId}"`))
+				break
+			case "null-response":
+				// Completes with empty variables — downstream FEEL will get nulls
+				resolve()
+				break
+			case "random-delay": {
+				const delay = 500 + Math.random() * 2000
+				setTimeout(resolve, delay)
+				break
+			}
+		}
+	}
+
 	function startInstance(vars?: Record<string, unknown>, stepMode = false): void {
 		if (currentInstance !== null) cleanup()
 
@@ -480,18 +971,64 @@ export function createProcessRunnerPlugin(
 		if (processId === undefined) return
 
 		mode = stepMode ? "running-step" : "running-auto"
+
+		// Build chaos schedule from flow elements of current process
+		if (chaosEnabled) {
+			// Gather element IDs from the current definitions
+			const defs = (
+				engine as unknown as {
+					_defs?: {
+						processes?: Array<{ id: string; flowElements?: Array<{ id: string; type: string }> }>
+					}
+				}
+			)._defs
+			const proc = defs?.processes?.find((p) => p.id === processId)
+			const eligibleIds =
+				proc?.flowElements?.filter((e) => CHAOS_ELIGIBLE_TYPES.has(e.type)).map((e) => e.id) ?? []
+			chaosSchedule = buildChaosSchedule(eligibleIds, CHAOS_FAILURE_PROBABILITY)
+			if (chaosSchedule.size > 0) {
+				errors.push({
+					message: `[Chaos] Scheduled injections for ${chaosSchedule.size} element(s): ${[...chaosSchedule.values()].map((i) => `${i.elementId}(${i.type})`).join(", ")}`,
+				})
+				renderErrors()
+			}
+		} else {
+			chaosSchedule = new Map()
+		}
+
 		updateToolbar()
 
 		const beforeComplete = stepMode
-			? (_elementId: string): Promise<void> =>
-					new Promise<void>((resolve) => {
-						stepQueue.push(resolve)
-						updateToolbar()
+			? (elementId: string): Promise<void> =>
+					new Promise<void>((resolve, reject) => {
+						const chaos = chaosEnabled ? chaosSchedule.get(elementId) : undefined
+						if (chaos !== undefined) {
+							lastChaosInjections.push(chaos)
+							applyChaosThenResolve(chaos, resolve, reject)
+						} else {
+							stepQueue.push(resolve)
+							updateToolbar()
+						}
 					})
-			: (_elementId: string): Promise<void> =>
-					new Promise<void>((resolve) => {
-						setTimeout(resolve, AUTO_PLAY_DELAY_MS)
+			: (elementId: string): Promise<void> =>
+					new Promise<void>((resolve, reject) => {
+						const chaos = chaosEnabled ? chaosSchedule.get(elementId) : undefined
+						if (chaos !== undefined) {
+							lastChaosInjections.push(chaos)
+							applyChaosThenResolve(chaos, resolve, reject)
+						} else {
+							setTimeout(resolve, AUTO_PLAY_DELAY_MS)
+						}
 					})
+
+		// Reset chaos tracking for new run
+		lastChaosInjections.length = 0
+		lastChaosRunCompleted = null
+
+		// Reset event log for new run
+		eventLog.length = 0
+		scrubIndex = null
+		updateScrubber()
 
 		const instance = engine.start(processId, vars, { beforeComplete })
 		currentInstance = instance
@@ -501,8 +1038,19 @@ export function createProcessRunnerPlugin(
 		}
 
 		instance.onChange((evt) => {
+			// Record every event (capped at MAX_EVENT_LOG)
+			if (eventLog.length < MAX_EVENT_LOG) {
+				eventLog.push(evt)
+			}
+			// Update scrubber max — only if in live mode
+			if (scrubIndex === null) updateScrubber()
+
 			const type = evt.type
 			if (type === "process:completed" || type === "process:failed") {
+				if (chaosEnabled) {
+					lastChaosRunCompleted = type === "process:completed"
+					renderErrors()
+				}
 				if (type === "process:failed") {
 					const error = evt.error
 					if (typeof error === "string") {
@@ -580,6 +1128,22 @@ export function createProcessRunnerPlugin(
 		const isRunning = mode !== "idle"
 		const hasPendingStep = mode === "running-step" && stepQueue.length > 0
 
+		// Chaos toggle (only show when idle)
+		if (!isRunning) {
+			const chaosLabel = document.createElement("label")
+			chaosLabel.className = "bpmnkit-runner-chaos-label"
+			const chaosCheckbox = document.createElement("input")
+			chaosCheckbox.type = "checkbox"
+			chaosCheckbox.className = "bpmnkit-runner-chaos-checkbox"
+			chaosCheckbox.checked = chaosEnabled
+			chaosCheckbox.addEventListener("change", () => {
+				chaosEnabled = chaosCheckbox.checked
+			})
+			chaosLabel.appendChild(chaosCheckbox)
+			chaosLabel.appendChild(document.createTextNode(" Chaos"))
+			toolbarEl.appendChild(chaosLabel)
+		}
+
 		// Run button
 		const runBtn = btn("\u25B6 Run")
 		runBtn.disabled = isRunning
@@ -640,18 +1204,35 @@ export function createProcessRunnerPlugin(
 			renderFeelEvals()
 			renderErrors()
 			renderInputVars()
+			renderTests()
 
 			if (options.playContainer !== undefined) {
 				options.playContainer.appendChild(playPanelEl)
 			}
 
-			// Load persisted input variables for the initial project
+			// Load persisted input variables and scenarios for the initial project
 			currentProjectId = options.getProjectId?.() ?? null
 			void loadInputVars(currentProjectId).then((loaded) => {
 				inputVars.length = 0
 				for (const v of loaded) inputVars.push(v)
 				renderInputVars()
 			})
+			void loadScenarios(currentProjectId).then((loaded) => {
+				scenarios.length = 0
+				for (const s of loaded) scenarios.push(s)
+				renderTests()
+			})
+			// Auto-load sidecar on initial mount
+			if (options.loadSidecarScenarios !== undefined) {
+				void options.loadSidecarScenarios().then((sidecar) => {
+					if (sidecar !== null && sidecar.length > 0) {
+						scenarios.length = 0
+						for (const s of sidecar) scenarios.push(s)
+						void saveScenarios(currentProjectId, scenarios)
+						renderTests()
+					}
+				})
+			}
 
 			type AnyOn = (event: string, handler: (arg: unknown) => void) => () => void
 			const onAny = api.on as unknown as AnyOn
@@ -661,7 +1242,7 @@ export function createProcessRunnerPlugin(
 					currentProcessId = defs.processes[0]?.id
 					engine.deploy({ bpmn: defs })
 					if (currentInstance !== null) cleanup()
-					// Reload input vars if the project changed
+					// Reload input vars and scenarios if the project changed
 					const pid = options.getProjectId?.() ?? null
 					if (pid !== currentProjectId) {
 						currentProjectId = pid
@@ -670,6 +1251,24 @@ export function createProcessRunnerPlugin(
 							for (const v of loaded) inputVars.push(v)
 							renderInputVars()
 						})
+						void loadScenarios(pid).then((loaded) => {
+							scenarios.length = 0
+							for (const s of loaded) scenarios.push(s)
+							scenarioResults.clear()
+							renderTests()
+						})
+						// Auto-load sidecar test file alongside BPMN
+						if (options.loadSidecarScenarios !== undefined) {
+							void options.loadSidecarScenarios().then((sidecar) => {
+								if (sidecar !== null && sidecar.length > 0) {
+									scenarios.length = 0
+									for (const s of sidecar) scenarios.push(s)
+									scenarioResults.clear()
+									void saveScenarios(currentProjectId, scenarios)
+									renderTests()
+								}
+							})
+						}
 					}
 					updateToolbar()
 				}),

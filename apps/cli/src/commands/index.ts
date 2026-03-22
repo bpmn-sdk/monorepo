@@ -19,10 +19,13 @@ import {
 } from "./bpmn.js"
 import { completionGroup } from "./completion.js"
 import { connectorGroup } from "./connector.js"
+import { lintGroup } from "./lint.js"
 import { pluginGroup } from "./plugin.js"
 import { profileGroup } from "./profile.js"
 import { computeRelations } from "./relations.js"
 import { settingsGroup } from "./settings.js"
+import { storyGroup } from "./story.js"
+import { testGroup } from "./test.js"
 import { workerCmd } from "./worker.js"
 
 // Inject custom commands into generated groups without modifying generated files.
@@ -65,7 +68,14 @@ const workerGroup: CommandGroup = {
 }
 
 /** Pinned groups shown above the separator in the main TUI menu. */
-export const pinnedGroups: CommandGroup[] = [askGroup, settingsGroup, workerGroup]
+export const pinnedGroups: CommandGroup[] = [
+	askGroup,
+	lintGroup,
+	storyGroup,
+	settingsGroup,
+	testGroup,
+	workerGroup,
+]
 
 /** API command groups — shown below the plugin section in the main TUI menu. */
 export const apiGroups: CommandGroup[] = sortedOtherGroups

@@ -11,6 +11,12 @@ import type {
 export interface StorageApiOptions {
 	/** Called when the user opens a file from the menu. */
 	onOpenFile(file: FileRecord, content: string): void
+	/**
+	 * Called when a `.bpmn.tests.json` sidecar is found alongside an opened BPMN file.
+	 * The `bpmnFileName` is the name of the BPMN file (e.g. `"my-process.bpmn"`).
+	 * The `content` is the raw JSON string of the sidecar.
+	 */
+	onSidecarFile?: (bpmnFileName: string, content: string) => void
 }
 
 const CURRENT_PROJECT_KEY = "bpmn-sdk-current-project"
@@ -296,6 +302,18 @@ export class StorageApi {
 		if (content === null) return
 		this._currentFileId = fileId
 		this._options.onOpenFile(file, content)
+		// Auto-discover sidecar .tests.json alongside BPMN files
+		if (file.type === "bpmn" && this._options.onSidecarFile !== undefined) {
+			const sidecarName = `${file.name}.tests.json`
+			const projectFiles = await db.files.where("projectId").equals(file.projectId).toArray()
+			const sidecarFile = projectFiles.find((f) => f.name === sidecarName)
+			if (sidecarFile !== undefined) {
+				const sidecarContent = await this.getFileContent(sidecarFile.id)
+				if (sidecarContent !== null) {
+					this._options.onSidecarFile(file.name, sidecarContent)
+				}
+			}
+		}
 		this._notify()
 	}
 
