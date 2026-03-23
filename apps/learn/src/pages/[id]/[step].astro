@@ -44,11 +44,15 @@ const isCli = step.mode === "cli"
 // Escape characters that would be mangled by HTML parsing when the JSON is
 // embedded in a <script> tag. \u003c / \u003e / \u0026 are valid JSON
 // Unicode escapes that JSON.parse decodes back to < > & correctly.
+// First step with XML in this tutorial — used as fallback for steps without initialXml
+const rootXml = tutorial.steps.find((s) => s.initialXml)?.initialXml ?? ""
+
 const stepConfigJson = JSON.stringify({
 	tutorialId: tutorial.id,
 	stepIndex,
 	totalSteps,
 	step,
+	rootXml,
 })
 	.replace(/&/g, "\\u0026")
 	.replace(/</g, "\\u003c")
@@ -145,6 +149,7 @@ const contentHtml = renderMarkdown(step.content)
           <div class="canvas-pane">
             <div class="canvas-pane-label">Interactive BPMN Editor</div>
             <div id="learn-canvas"></div>
+            <div id="learn-play-panel" class="learn-play-panel"></div>
           </div>
         )}
 
@@ -219,31 +224,48 @@ const contentHtml = renderMarkdown(step.content)
     stepIndex: number
     totalSteps: number
     step: TutorialStep
+    rootXml: string
   }
 
   // Parse config
   const configEl = document.getElementById("step-config")
   if (!configEl) throw new Error("Missing step config")
   const config = JSON.parse(configEl.textContent ?? "{}") as StepConfig
-  const { tutorialId, stepIndex, totalSteps, step } = config
+  const { tutorialId, stepIndex, totalSteps, step, rootXml } = config
 
-  // Restore saved XML or use initialXml
+  // Restore saved XML, fall back to step's initialXml, then to the tutorial's root XML
   const savedProgress = loadProgress(tutorialId)
-  const xml = savedProgress?.savedXml ?? step.initialXml ?? ""
+  const xml = savedProgress?.savedXml ?? step.initialXml ?? rootXml
 
   // Initialize interactive pane
   const canvasContainer = document.getElementById("learn-canvas")
 
   let editor: BpmnEditor | null = null
 
-  if (step.mode === "web-editor" && canvasContainer && xml) {
+  if (step.mode === "web-editor" && canvasContainer) {
     const engine = new Engine()
     const tokenHighlight = createTokenHighlightPlugin()
-    const processRunner = createProcessRunnerPlugin({ engine, tokenHighlight })
+    const playPanelContainer = document.getElementById("learn-play-panel") as HTMLElement | null
+
+    const processRunner = createProcessRunnerPlugin({
+      engine,
+      tokenHighlight,
+      playContainer: playPanelContainer ?? undefined,
+      onEnterPlayMode() {
+        processRunner.toolbar.style.display = ""
+      },
+      onExitPlayMode() {
+        processRunner.toolbar.style.display = "none"
+      },
+    })
+
+    processRunner.toolbar.classList.add("bpmnkit-runner-toolbar--hud-bottom")
+    processRunner.toolbar.style.display = "none"
+    document.body.appendChild(processRunner.toolbar)
 
     editor = new BpmnEditor({
       container: canvasContainer,
-      xml,
+      xml: xml || undefined,
       theme: "neon",
       fit: "center",
       plugins: [tokenHighlight, processRunner],
@@ -298,7 +320,7 @@ const contentHtml = renderMarkdown(step.content)
 
   if (checkBtn) {
     checkBtn.addEventListener("click", () => {
-      const result = validateStep(step.validation, canvasContainer)
+      const result = validateStep(step.validation, canvasContainer, editor)
       showValidationResult(result.passed, result.message)
       if (result.passed) {
         markStepComplete(tutorialId, stepIndex, totalSteps)
