@@ -1013,6 +1013,13 @@ button {
 	width: 100%;
 }
 
+.learn-play-panel {
+	flex-shrink: 0;
+	max-height: 40%;
+	overflow-y: auto;
+	border-top: 1px solid var(--border);
+}
+
 /* CLI pane */
 .cli-pane {
 	flex: 1;

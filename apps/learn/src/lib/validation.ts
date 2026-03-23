@@ -1,3 +1,4 @@
+import type { BpmnEditor } from "@bpmnkit/editor"
 import type { ValidationConfig } from "./types.js"
 
 export interface ValidationResult {
@@ -5,10 +6,11 @@ export interface ValidationResult {
 	message: string
 }
 
-/** Validate a canvas step. canvasContainer is the container element with the BpmnCanvas. */
+/** Validate a canvas step. canvasContainer is the rendered SVG container; editor gives model access. */
 export function validateStep(
 	config: ValidationConfig,
 	canvasContainer: HTMLElement | null,
+	editor?: BpmnEditor | null,
 ): ValidationResult {
 	if (config.type === "manual") {
 		return { passed: true, message: config.successMessage }
@@ -19,8 +21,15 @@ export function validateStep(
 	}
 
 	if (config.type === "bpmnkit-element-count") {
-		const elements = canvasContainer.querySelectorAll(`[data-bpmnkit-type="${config.elementType}"]`)
-		if (elements.length >= config.min) {
+		const defs = editor?.getDefinitions()
+		if (!defs) return { passed: false, message: "Canvas not ready" }
+		let count = 0
+		for (const process of defs.processes) {
+			for (const el of process.flowElements) {
+				if (el.type === config.elementType) count++
+			}
+		}
+		if (count >= config.min) {
 			return { passed: true, message: config.successMessage }
 		}
 		return { passed: false, message: config.errorMessage }
