@@ -1,5 +1,16 @@
 # Progress
 
+## 2026-03-24 — Studio: architecture plan and implementation roadmap
+
+- Designed BPMNkit Studio — a unified app replacing fragmented Camunda tooling (Modeler, Operate, Tasklist).
+- Architecture: Preact + preact/compat + Zustand + TanStack Query + wouter + shadcn/ui + Tailwind v4.
+- Connection model: always via proxy (localhost:3033), consistent with existing operate package.
+- Storage abstraction: `StorageAdapter` interface with `IndexedDbAdapter` (web) and `TauriAdapter` (desktop).
+- Smart caching: deployed process definition XML cached with `staleTime: Infinity` (immutable once deployed).
+- New package planned: `packages/user-tasks` — vanilla TS widget for rendering and completing Camunda user tasks.
+- 9-phase implementation plan written to `doc/studio-plan.md`.
+- Detailed action-item roadmap written to `doc/studio-roadmap.md`.
+
 ## 2026-03-24 — CLI: fix worker jobKey undefined when activating jobs
 
 - Zeebe-compatible engines (e.g. reebe) return `key` in the activation response rather than `jobKey` as the Camunda 8 REST spec defines.
