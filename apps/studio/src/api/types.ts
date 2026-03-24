@@ -1,5 +1,5 @@
 export interface ProcessDefinition {
-	key: string
+	processDefinitionKey: string
 	name: string
 	processDefinitionId: string
 	bpmnProcessId?: string
@@ -9,7 +9,7 @@ export interface ProcessDefinition {
 }
 
 export interface ProcessInstance {
-	key: string
+	processInstanceKey: string
 	processDefinitionId: string
 	processDefinitionKey?: string
 	state: "ACTIVE" | "COMPLETED" | "CANCELED" | "TERMINATED"
@@ -20,6 +20,7 @@ export interface ProcessInstance {
 export interface Incident {
 	incidentKey: string
 	processDefinitionId: string
+	processDefinitionKey?: string
 	processInstanceKey: string
 	elementId: string
 	errorType: string
@@ -40,7 +41,7 @@ export interface UserTask {
 }
 
 export interface DecisionDefinition {
-	key: string
+	decisionDefinitionKey: string
 	name: string
 	decisionDefinitionId: string
 	version: number
@@ -48,7 +49,7 @@ export interface DecisionDefinition {
 }
 
 export interface Job {
-	key: string
+	jobKey: string
 	type: string
 	state: string
 	processInstanceKey?: string
@@ -70,7 +71,7 @@ export interface Variable {
 
 export interface PageResponse<T> {
 	items: T[]
-	total?: number
+	page?: { totalItems: number }
 }
 
 export interface Profile {

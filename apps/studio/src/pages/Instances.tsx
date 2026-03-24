@@ -22,7 +22,7 @@ export function Instances() {
 		(i) =>
 			!search ||
 			i.processDefinitionId?.toLowerCase().includes(search.toLowerCase()) ||
-			i.key.includes(search),
+			i.processInstanceKey.includes(search),
 	)
 
 	function toggleSelect(key: string) {
@@ -119,32 +119,35 @@ export function Instances() {
 							))}
 						{filtered?.map((inst) => (
 							<tr
-								key={inst.key}
+								key={inst.processInstanceKey}
 								className="border-b border-border/50 hover:bg-surface-2 cursor-pointer"
 							>
 								<td className="px-4 py-3">
 									<input
 										type="checkbox"
-										checked={selected.has(inst.key)}
+										checked={selected.has(inst.processInstanceKey)}
 										onClick={(e) => e.stopPropagation()}
-										onChange={() => toggleSelect(inst.key)}
-										aria-label={`Select instance ${inst.key}`}
+										onChange={() => toggleSelect(inst.processInstanceKey)}
+										aria-label={`Select instance ${inst.processInstanceKey}`}
 										className="cursor-pointer"
 									/>
 								</td>
 								<td className="px-4 py-3">
-									<Link href={`/instances/${inst.key}`}>
+									<Link href={`/instances/${inst.processInstanceKey}`}>
 										<StatusPill state={inst.state} />
 									</Link>
 								</td>
 								<td className="px-4 py-3 font-mono text-xs text-muted">
-									<Link href={`/instances/${inst.key}`} className="hover:text-fg">
+									<Link href={`/instances/${inst.processInstanceKey}`} className="hover:text-fg">
 										{inst.processDefinitionId}
 									</Link>
 								</td>
 								<td className="px-4 py-3 font-mono text-xs text-muted">
-									<Link href={`/instances/${inst.key}`} className="hover:text-accent">
-										{inst.key}
+									<Link
+										href={`/instances/${inst.processInstanceKey}`}
+										className="hover:text-accent"
+									>
+										{inst.processInstanceKey}
 									</Link>
 								</td>
 								<td className="px-4 py-3 text-muted text-xs">

@@ -57,7 +57,9 @@ export function DecisionDetail() {
 							)}
 							<div className="flex gap-4">
 								<span className="text-muted w-32">Key</span>
-								<span className="font-mono text-muted text-xs">{decision.key}</span>
+								<span className="font-mono text-muted text-xs">
+									{decision.decisionDefinitionKey}
+								</span>
 							</div>
 						</div>
 					</div>

@@ -61,3 +61,14 @@ export async function proxyPostMultipart<T = unknown>(path: string, form: FormDa
 export async function proxyDelete<T = unknown>(path: string): Promise<T> {
 	return proxyFetch<T>(path, { method: "DELETE" })
 }
+
+export async function proxyFetchText(path: string): Promise<string> {
+	const url = `${getProxyUrl()}${path}`
+	const headers = buildHeaders({ accept: "*/*" })
+	const res = await fetch(url, { headers })
+	if (!res.ok) {
+		const text = await res.text().catch(() => "")
+		throw new Error(`HTTP ${res.status}${text ? `: ${text}` : ""}`)
+	}
+	return res.text()
+}

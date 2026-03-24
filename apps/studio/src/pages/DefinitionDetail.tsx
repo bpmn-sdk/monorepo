@@ -110,7 +110,7 @@ export function DefinitionDetail() {
 								Instances
 								{instances && (
 									<span className="ml-1 text-muted">
-										({instances.total ?? instances.items.length})
+										({instances.page?.totalItems ?? instances.items.length})
 									</span>
 								)}
 							</TabsTrigger>
@@ -128,10 +128,12 @@ export function DefinitionDetail() {
 							) : (
 								<ul className="divide-y divide-border">
 									{instances?.items.slice(0, 10).map((inst) => (
-										<li key={inst.key} className="p-3 hover:bg-surface-2">
-											<Link href={`/instances/${inst.key}`} className="block">
+										<li key={inst.processInstanceKey} className="p-3 hover:bg-surface-2">
+											<Link href={`/instances/${inst.processInstanceKey}`} className="block">
 												<div className="flex items-center justify-between">
-													<span className="text-xs font-mono text-muted truncate">{inst.key}</span>
+													<span className="text-xs font-mono text-muted truncate">
+														{inst.processInstanceKey}
+													</span>
 													<StatusPill state={inst.state} />
 												</div>
 											</Link>

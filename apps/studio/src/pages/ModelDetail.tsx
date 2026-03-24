@@ -1,4 +1,4 @@
-import { BpmnEditor } from "@bpmnkit/editor"
+import { BpmnEditor, initEditorHud } from "@bpmnkit/editor"
 import { ChevronLeft, Link2, Save } from "lucide-react"
 import { useEffect, useRef, useState } from "preact/hooks"
 import { Link, useParams } from "wouter"
@@ -32,9 +32,9 @@ function DeployedVersionsPanel({ processDefinitionId }: { processDefinitionId?: 
 	return (
 		<ul className="divide-y divide-border">
 			{data.items.map((def) => (
-				<li key={def.key} className="p-3 hover:bg-surface-2">
+				<li key={def.processDefinitionKey} className="p-3 hover:bg-surface-2">
 					<Link
-						href={`/definitions/${def.key}`}
+						href={`/definitions/${def.processDefinitionKey}`}
 						className="flex items-center justify-between text-sm hover:text-accent"
 					>
 						<span className="text-fg">v{def.version}</span>
@@ -65,6 +65,7 @@ export function ModelDetail() {
 		if (!container || !model) return
 
 		const editor = new BpmnEditor({ container, theme: "dark" })
+		initEditorHud(editor)
 		editorRef.current = editor
 
 		if (model.content) {
@@ -166,7 +167,7 @@ export function ModelDetail() {
 			{/* Main area */}
 			<div className="flex flex-1 overflow-hidden">
 				{/* Editor */}
-				<div ref={editorContainerRef} className="flex-1 overflow-hidden" />
+				<div ref={editorContainerRef} className="flex-1 overflow-hidden relative" />
 
 				{/* Right panel */}
 				<div className="w-60 shrink-0 border-l border-border bg-surface overflow-y-auto">

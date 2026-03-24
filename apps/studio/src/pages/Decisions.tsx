@@ -62,10 +62,13 @@ export function Decisions() {
 								</tr>
 							))}
 						{filtered?.map((dec) => (
-							<tr key={dec.key} className="border-b border-border/50 hover:bg-surface-2">
+							<tr
+								key={dec.decisionDefinitionKey}
+								className="border-b border-border/50 hover:bg-surface-2"
+							>
 								<td className="px-4 py-3">
 									<Link
-										href={`/decisions/${dec.key}`}
+										href={`/decisions/${dec.decisionDefinitionKey}`}
 										className="font-medium text-fg hover:text-accent"
 									>
 										{dec.name || dec.decisionDefinitionId}

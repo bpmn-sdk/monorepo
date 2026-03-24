@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { proxyDelete, proxyFetch, proxyPost, proxyPostMultipart } from "./client.js"
+import { proxyDelete, proxyFetch, proxyFetchText, proxyPost, proxyPostMultipart } from "./client.js"
 import { keys } from "./keys.js"
 import type {
 	DashboardStats,
@@ -23,7 +23,7 @@ export function useDefinitions(filter?: object) {
 			proxyPost<PageResponse<ProcessDefinition>>("/api/process-definitions/search", {
 				filter: filter ?? {},
 				page: { from: 0, limit: 50 },
-				sort: [{ field: "version", order: "desc" }],
+				sort: [{ field: "version", order: "DESC" }],
 			}),
 		staleTime: 30_000,
 	})
@@ -41,8 +41,7 @@ export function useDefinition(key: string) {
 export function useDefinitionXml(key: string) {
 	return useQuery({
 		queryKey: keys.definitionXml(key),
-		queryFn: () =>
-			proxyFetch<{ bpmnXml: string }>(`/api/process-definitions/${key}/xml`).then((r) => r.bpmnXml),
+		queryFn: () => proxyFetchText(`/api/process-definitions/${key}/xml`),
 		enabled: !!key,
 		staleTime: Number.POSITIVE_INFINITY,
 		gcTime: 30 * 60_000,
@@ -58,7 +57,7 @@ export function useInstances(filter?: object) {
 			proxyPost<PageResponse<ProcessInstance>>("/api/process-instances/search", {
 				filter: filter ?? {},
 				page: { from: 0, limit: 50 },
-				sort: [{ field: "startDate", order: "desc" }],
+				sort: [{ field: "startDate", order: "DESC" }],
 			}),
 		staleTime: 10_000,
 		refetchInterval: 15_000,
@@ -95,7 +94,7 @@ export function useIncidents(filter?: object) {
 			proxyPost<PageResponse<Incident>>("/api/incidents/search", {
 				filter: filter ?? {},
 				page: { from: 0, limit: 50 },
-				sort: [{ field: "creationTime", order: "desc" }],
+				sort: [{ field: "creationTime", order: "DESC" }],
 			}),
 		staleTime: 10_000,
 		refetchInterval: 15_000,
@@ -177,34 +176,35 @@ export function useDashboardStats() {
 	return useQuery({
 		queryKey: keys.dashboard(),
 		queryFn: async (): Promise<DashboardStats> => {
+			const empty: PageResponse<never> = { items: [] }
 			const [instances, incidents, tasks, definitions, jobs] = await Promise.all([
 				proxyPost<PageResponse<ProcessInstance>>("/api/process-instances/search", {
 					filter: { state: "ACTIVE" },
 					page: { from: 0, limit: 1 },
-				}).catch(() => ({ items: [], total: 0 })),
+				}).catch(() => empty),
 				proxyPost<PageResponse<Incident>>("/api/incidents/search", {
 					filter: { state: "ACTIVE" },
 					page: { from: 0, limit: 1 },
-				}).catch(() => ({ items: [], total: 0 })),
+				}).catch(() => empty),
 				proxyPost<PageResponse<UserTask>>("/api/user-tasks/search", {
 					filter: {},
 					page: { from: 0, limit: 1 },
-				}).catch(() => ({ items: [], total: 0 })),
+				}).catch(() => empty),
 				proxyPost<PageResponse<ProcessDefinition>>("/api/process-definitions/search", {
 					filter: {},
 					page: { from: 0, limit: 1 },
-				}).catch(() => ({ items: [], total: 0 })),
+				}).catch(() => empty),
 				proxyPost<PageResponse<Job>>("/api/jobs/search", {
 					filter: { state: "ACTIVATABLE" },
 					page: { from: 0, limit: 1 },
-				}).catch(() => ({ items: [], total: 0 })),
+				}).catch(() => empty),
 			])
 			return {
-				runningInstances: instances.total ?? instances.items.length,
-				activeIncidents: incidents.total ?? incidents.items.length,
-				pendingTasks: tasks.total ?? tasks.items.length,
-				deployedDefinitions: definitions.total ?? definitions.items.length,
-				activeJobs: jobs.total ?? jobs.items.length,
+				runningInstances: instances.page?.totalItems ?? instances.items.length,
+				activeIncidents: incidents.page?.totalItems ?? incidents.items.length,
+				pendingTasks: tasks.page?.totalItems ?? tasks.items.length,
+				deployedDefinitions: definitions.page?.totalItems ?? definitions.items.length,
+				activeJobs: jobs.page?.totalItems ?? jobs.items.length,
 			}
 		},
 		staleTime: 15_000,

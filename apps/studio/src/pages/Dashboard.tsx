@@ -177,9 +177,9 @@ export function Dashboard() {
 					) : (
 						<ul className="space-y-2">
 							{recentDefs?.items.slice(0, 5).map((def) => (
-								<li key={def.key}>
+								<li key={def.processDefinitionKey}>
 									<Link
-										href={`/definitions/${def.key}`}
+										href={`/definitions/${def.processDefinitionKey}`}
 										className="flex items-center justify-between hover:text-accent text-sm"
 									>
 										<span className="truncate text-fg">{def.name || def.processDefinitionId}</span>
@@ -227,9 +227,9 @@ export function Dashboard() {
 					) : (
 						<ul className="space-y-2">
 							{recentInstances?.items.slice(0, 5).map((inst) => (
-								<li key={inst.key}>
+								<li key={inst.processInstanceKey}>
 									<Link
-										href={`/instances/${inst.key}`}
+										href={`/instances/${inst.processInstanceKey}`}
 										className="flex items-center justify-between hover:text-accent"
 									>
 										<span className="text-xs text-muted truncate mr-2">

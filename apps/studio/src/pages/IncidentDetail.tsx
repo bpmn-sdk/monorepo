@@ -10,7 +10,7 @@ import { toast } from "../stores/toast.js"
 export function IncidentDetail() {
 	const { key } = useParams<{ key: string }>()
 	const { data: incident, isLoading, isError } = useIncident(key)
-	const { data: xml } = useDefinitionXml(incident?.processDefinitionId ?? "")
+	const { data: xml } = useDefinitionXml(incident?.processDefinitionKey ?? "")
 	const retryMutation = useRetryIncident()
 	const canvasContainerRef = useRef<HTMLDivElement>(null)
 	const canvasRef = useRef<BpmnCanvas | null>(null)

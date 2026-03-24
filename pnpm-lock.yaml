@@ -204,6 +204,9 @@ importers:
       '@bpmnkit/ui':
         specifier: workspace:*
         version: link:../../packages/ui
+      '@bpmnkit/user-tasks':
+        specifier: workspace:*
+        version: link:../../packages/user-tasks
       '@radix-ui/react-dialog':
         specifier: ^1.1.4
         version: 1.1.15(react-dom@19.2.4(react@19.2.4))(react@19.2.4)

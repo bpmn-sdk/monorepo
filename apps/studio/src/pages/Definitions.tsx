@@ -72,10 +72,13 @@ export function Definitions() {
 						{filtered?.map((def) => {
 							const localModel = findLocalModel(def.processDefinitionId)
 							return (
-								<tr key={def.key} className="border-b border-border/50 hover:bg-surface-2">
+								<tr
+									key={def.processDefinitionKey}
+									className="border-b border-border/50 hover:bg-surface-2"
+								>
 									<td className="px-4 py-3">
 										<Link
-											href={`/definitions/${def.key}`}
+											href={`/definitions/${def.processDefinitionKey}`}
 											className="font-medium text-fg hover:text-accent"
 										>
 											{def.name || def.processDefinitionId}
