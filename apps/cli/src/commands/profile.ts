@@ -19,6 +19,7 @@ const API_TYPE_FLAG: FlagSpec = {
 	type: "string",
 	default: "c8",
 	placeholder: "TYPE",
+	enum: ["c8", "admin"],
 }
 
 const AUTH_FLAGS: FlagSpec[] = [
@@ -35,6 +36,7 @@ const AUTH_FLAGS: FlagSpec[] = [
 		type: "string",
 		required: true,
 		placeholder: "TYPE",
+		enum: ["bearer", "oauth2", "basic", "none"],
 	},
 	{
 		name: "token",

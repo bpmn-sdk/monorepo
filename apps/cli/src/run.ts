@@ -16,7 +16,12 @@ import {
 } from "./commands/index.js"
 import { getRuntimeCompletions } from "./completion.js"
 import { printCommandHelp, printGlobalHelp, printGroupHelp, printVersion } from "./help.js"
-import { createNullWriter, createOutputWriter, printRawResponse } from "./output.js"
+import {
+	createNullWriter,
+	createOutputWriter,
+	printHttpErrorDetails,
+	printRawResponse,
+} from "./output.js"
 import { loadPlugins } from "./plugin-loader.js"
 import { runProfileManager } from "./profile-tui.js"
 import { runSettingsManager } from "./settings-tui.js"
@@ -284,6 +289,8 @@ export async function run(argv: string[]): Promise<void> {
 		const capture = rawCaptureRef[0]
 		if (isRaw && capture) {
 			printRawResponse(capture, noColor)
+		} else if (capture) {
+			printHttpErrorDetails(capture, noColor)
 		}
 		const msg = err instanceof Error ? err.message : String(err)
 		appendAuditEntry(effectiveProfile, {

@@ -1525,6 +1525,20 @@ function extractJsonFieldSpecs(schema, schemas) {
 	}
 	if (!resolved || typeof resolved !== "object") return null
 
+	// Handle oneOf: merge all variant fields so the user sees the full union
+	if (Array.isArray(resolved.oneOf)) {
+		const mergedMap = new Map()
+		for (const sub of resolved.oneOf) {
+			const subSpecs = extractJsonFieldSpecs(sub, schemas)
+			if (subSpecs) {
+				for (const spec of subSpecs) {
+					if (!mergedMap.has(spec.name)) mergedMap.set(spec.name, spec)
+				}
+			}
+		}
+		return mergedMap.size > 0 ? [...mergedMap.values()] : null
+	}
+
 	// Flatten allOf/anyOf composition
 	const flat = flattenSchema(resolved)
 	if (!flat) return null

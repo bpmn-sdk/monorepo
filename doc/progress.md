@@ -1,5 +1,52 @@
 # Progress
 
+## 2026-03-24 — CLI: fix worker jobKey undefined when activating jobs
+
+- Zeebe-compatible engines (e.g. reebe) return `key` in the activation response rather than `jobKey` as the Camunda 8 REST spec defines.
+- With `job.jobKey` being `undefined`, completion requests were sent to `/v2/jobs/undefined/completion`, causing 400 errors.
+- Fixed both `apps/cli/src/tui.ts` (`runWorkerLoop`) and `apps/cli/src/commands/worker.ts` to resolve the key via `job.jobKey ?? job.key`. If neither is present the job is skipped with an error log instead of sending a broken request.
+
+## 2026-03-24 — CLI: fix profile delete feedback + JSON body field specs for oneOf schemas
+
+### Profile list delete feedback
+- `d` on the profile list now shows a confirmation message: `✓ Deleted profile "X"`.
+- If the profile is a read-only Camunda Modeler profile, an explanatory message is shown instead of silently failing.
+- `u` (use) also shows `✓ Active profile: X` feedback on success.
+- Messages clear automatically on the next keypress.
+- Added `message: string` field to the `results` screen type for transient status lines.
+
+### JSON body field specs for `oneOf` schemas
+- The CLI code generator (`packages/api/scripts/generate.mjs`) did not handle `oneOf` schemas when extracting `bodyFields`. Commands using a `oneOf` request body (like "create process instance") had no field guidance in the JSON editor.
+- Fixed `extractJsonFieldSpecs` to recurse into each `oneOf` variant and merge all fields. `$ref` resolution per variant is handled by the recursive call.
+- Regenerated `apps/cli/src/generated/commands.ts` — "create process instance" now has full `bodyFields`: `processDefinitionKey`, `processDefinitionId`, `variables`, `tenantId`, `awaitCompletion`, `startInstructions`, and more.
+
+## 2026-03-24 — CLI: profile/settings UX improvements + JSON editor field picker
+
+### Profile `create` command — enum pickers for flag values
+- `--api-type` now has `enum: ["c8", "admin"]` — TUI shows a cycling picker (↑↓) instead of free text.
+- `--auth-type` now has `enum: ["bearer", "oauth2", "basic", "none"]` — same cycling picker.
+
+### Profile list — inline use / show / delete shortcuts
+- Pressing `u` on a profile in the list immediately activates it (calls `useProfile`) and updates the TUI header (profile name and info) in-place. No need to re-enter the name.
+- Pressing `s` opens a detail view for the selected profile.
+- Pressing `d` deletes the selected profile and refreshes the list in-place. Cursor is adjusted if the deleted item was the last row.
+- The `u`/`U` curl-toggle shortcut is preserved for all other result screens; only the profile list intercepts it.
+- Footer hints updated to show `u use  s show  d delete` when on the profile list.
+
+### JSON editor — guided field selection + type hints
+- **Key cycling**: When fieldSpecs are provided, pressing ↑↓ while editing the key column cycles through available (non-duplicate) field names instead of inserting arrow characters.
+- **Pre-seeded keys**: Pressing `enter` on the add-row or pressing `a`/`A` pre-fills the new entry's key with the first available spec name, reducing manual typing.
+- **Value type hints**: When a field spec exists but no value has been entered, the value column shows `<string>`, `<number>`, `<boolean>`, etc. as a dim placeholder.
+- **Edit hint line** updated: shows `↑↓ pick field` guidance when on the key column with specs available.
+- Duplicate field prevention: cycling and pre-seeding exclude keys already used by other entries.
+
+## 2026-03-24 — CLI: verbose HTTP error details on failure
+
+- On any HTTP error (e.g. 404), the CLI now prints the full request and response to stderr: method, URL, request headers, response status, response headers, and response body (JSON pretty-printed where possible).
+- Previously only the extracted message (e.g. "HTTP 404") was shown.
+- Added `printHttpErrorDetails()` in `apps/cli/src/output.ts`, called from the catch block in `apps/cli/src/run.ts` whenever a raw response was captured and `--raw` mode is not active.
+- Fixed the same gap in the TUI: the `input` screen now carries `errorRaw: RawResponseEvent | null`; on error the raw capture is stored and `renderInput` displays method, URL, HTTP status, and pretty-printed response body inline below the error message.
+
 ## 2026-03-22 — Roadmap completion: all remaining items implemented
 
 ### Chaos Simulation Mode — post-run summary + scenario export (`process-runner`)

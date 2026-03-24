@@ -273,3 +273,28 @@ export function printRawResponse(raw: RawResponseEvent, noColor: boolean): void 
 		process.stdout.write(`${raw.body}\n`)
 	}
 }
+
+/** Print HTTP error details (request + response) to stderr. */
+export function printHttpErrorDetails(raw: RawResponseEvent, noColor: boolean): void {
+	const colors = shouldUseColor(noColor)
+	process.stderr.write(`\n${dim("→", colors)} ${bold(`${raw.method} ${raw.url}`, colors)}\n`)
+	for (const [k, v] of Object.entries(raw.requestHeaders)) {
+		process.stderr.write(`  ${dim(k, colors)}: ${v}\n`)
+	}
+	if (raw.requestBody) {
+		process.stderr.write(`\n${dim(raw.requestBody, colors)}\n`)
+	}
+	process.stderr.write(`\n${red(`HTTP ${raw.status}`, colors)}\n`)
+	for (const [k, v] of Object.entries(raw.headers)) {
+		process.stderr.write(`  ${dim(k, colors)}: ${v}\n`)
+	}
+	if (raw.body) {
+		process.stderr.write("\n")
+		try {
+			const parsed = JSON.parse(raw.body)
+			process.stderr.write(`${JSON.stringify(parsed, null, 2)}\n`)
+		} catch {
+			process.stderr.write(`${raw.body}\n`)
+		}
+	}
+}
