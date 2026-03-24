@@ -83,22 +83,22 @@ export function Sidebar() {
 							onClick={() => navigate(item.path)}
 							aria-label={item.label}
 							aria-current={active ? "page" : undefined}
-							className={`relative flex h-10 w-10 items-center justify-center rounded transition-colors ${
+							className={`relative flex h-10 w-10 items-center justify-center rounded transition-all duration-150 ${
 								active
-									? "text-nav-fg-active"
-									: "text-nav-fg hover:text-nav-fg-active hover:bg-white/5"
+									? "text-nav-fg-active scale-110"
+									: "text-nav-fg hover:text-nav-fg-active hover:bg-white/5 hover:scale-105"
 							}`}
 						>
 							{active && (
 								<span
-									className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-r bg-accent"
+									className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-r bg-accent animate-in fade-in slide-in-from-left-1 duration-200"
 									aria-hidden="true"
 								/>
 							)}
 							<Icon size={20} />
 						</button>
 						<div
-							className="pointer-events-none absolute left-full top-1/2 z-50 ml-2 -translate-y-1/2 whitespace-nowrap rounded bg-surface-2 px-2 py-1 text-xs text-fg opacity-0 shadow-md transition-opacity group-hover:opacity-100"
+							className="pointer-events-none absolute left-full top-1/2 z-50 ml-2 -translate-y-1/2 whitespace-nowrap rounded bg-surface-2 px-2 py-1 text-xs text-fg opacity-0 shadow-md transition-opacity duration-150 delay-300 group-hover:opacity-100"
 							role="tooltip"
 						>
 							{item.label}
@@ -111,7 +111,13 @@ export function Sidebar() {
 			{/* Cluster status indicator at bottom */}
 			<div className="group relative mt-auto pb-2">
 				<div
-					className={`h-2.5 w-2.5 rounded-full ${status === "connected" ? "bg-success" : status === "loading" ? "bg-warn" : "bg-danger"}`}
+					className={`h-2.5 w-2.5 rounded-full ${
+						status === "connected"
+							? "bg-success"
+							: status === "loading"
+								? "bg-warn animate-pulse"
+								: "bg-danger"
+					}`}
 					aria-label={`Cluster ${status}`}
 				/>
 				<div

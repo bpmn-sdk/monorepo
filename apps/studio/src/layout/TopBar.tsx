@@ -24,7 +24,7 @@ export function TopBar() {
 			<button
 				type="button"
 				onClick={openCommandPalette}
-				className="flex flex-1 items-center gap-2 rounded border border-border bg-surface-2 px-3 py-1 text-sm text-muted hover:text-fg max-w-sm"
+				className="flex flex-1 items-center gap-2 rounded border border-border bg-surface-2 px-3 py-1 text-sm text-muted hover:text-fg hover:border-border/80 transition-all duration-150 max-w-sm"
 				aria-label="Open command palette"
 			>
 				<span className="flex-1 text-left">Search...</span>

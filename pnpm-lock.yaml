@@ -195,6 +195,9 @@ importers:
       '@bpmnkit/editor':
         specifier: workspace:*
         version: link:../../packages/editor
+      '@bpmnkit/operate':
+        specifier: workspace:*
+        version: link:../../packages/operate
       '@bpmnkit/plugins':
         specifier: workspace:*
         version: link:../../packages/plugins

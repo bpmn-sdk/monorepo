@@ -1,5 +1,52 @@
 # Progress
 
+## 2026-03-24 — Studio: decisions rendered via operate DMN editor
+
+- Exported `createDecisionDetailView` and `DecisionsStore` from `packages/operate/src/index.ts`.
+- Replaced `apps/studio/src/pages/DecisionDetail.tsx` with the same operate-view pattern as `DefinitionDetail` and `InstanceDetail`: mounts `createDecisionDetailView`, connects `DecisionsStore` via SSE, syncs theme, navigates with wouter.
+- Decision detail now renders the full DMN decision table (via `DmnEditor` from `@bpmnkit/plugins/dmn-editor`) with breadcrumb, version selector, and DRG metadata.
+- Added page entry animation and count subtitle to `Decisions.tsx`.
+
+## 2026-03-24 — Studio: UI polish — animations, hover effects, visual refinements
+
+- Page entry animations: all list pages (Definitions, Instances, Incidents, Tasks, Models, Dashboard) now fade + slide in from bottom on mount using `animate-in fade-in slide-in-from-bottom-2 duration-300`.
+- Dashboard stat cards: added `hover:-translate-y-0.5 hover:shadow-lg transition-all` lift effect on hover.
+- Models grid cards: added hover lift + shadow + fade-in overlay animation for the action buttons.
+- Sidebar: nav buttons now scale slightly on hover (`hover:scale-105`) and active button is `scale-110`; active indicator animates in with `animate-in fade-in slide-in-from-left-1`; tooltip shows with a 300ms delay; cluster status dot pulses with `animate-pulse` when loading.
+- TopBar search trigger: added `transition-all duration-150` for border and text transitions.
+- Incidents/Tasks table rows: added `transition-colors duration-100` for smooth hover.
+- `Input` component: added `transition-colors duration-150` and `focus-visible:border-accent` for a cleaner focus state.
+- List pages (Instances, Incidents, Tasks): added count subtitle below page title (e.g., "12 instances").
+
+## 2026-03-24 — Studio: bug fixes round 2 + operate integration improvements
+
+- Editor zoom 100%: fixed by listening to `editor.on("diagram:load")` event instead of calling `setZoom` immediately after `load()`.
+- Editor sidebar: removed `createSideDock()` (fixed position — wrong for constrained layout); embedded config panel directly in the right panel via `propertiesPaneRef` with a "Click an element to edit" placeholder.
+- Editor top-right menu: removed `createMainMenuPlugin`.
+- Definitions page: fully rewritten — groups all definitions by `processDefinitionId`, shows version count badge, clicking the process name opens latest version, clicking the version count shows all versions in an expandable sub-table with `animate-in` entry.
+- Incidents "View definition" 400: fixed by using `incident.processDefinitionKey` (numeric) instead of `incident.processDefinitionId` (string) in the definition link.
+- User task form: fixed `packages/user-tasks/src/widget.ts` — Camunda v2 returns `FormResult.schema` as a parsed object (`Record<string,unknown>`), not a JSON string; widget now checks `typeof raw === "object"` first and passes it directly to `FormViewer`.
+- BPMN canvas theme: all canvas instances now use `useThemeStore` instead of hardcoded `"dark"`.
+
+## 2026-03-24 — Studio: API fixes + operate integration + editor improvements
+
+- Fixed jobs 400 error: dashboard stats job filter changed from `"ACTIVATABLE"` → `"CREATED"` (matching proxy's operate/stream handler).
+- Fixed task form "No form associated": `packages/user-tasks` widget now parses Camunda v2's `{ schema: "json string" }` envelope before checking for `components`.
+- Integrated `packages/operate` views into Studio:
+  - Exported `createDefinitionDetailView`, `createInstanceDetailView`, `DefinitionsStore`, `InstancesStore` from operate package.
+  - Added `injectOperateStyles()` calls inside `createDefinitionDetailView` and `createInstanceDetailView` so consumers don't need to call it separately.
+  - Replaced `DefinitionDetail.tsx` with operate view: subprocess hierarchy, node click → properties panel, version selector, start instance button, open-in-editor button.
+  - Replaced `InstanceDetail.tsx` with operate view: process chain (subprocess navigation), variables panel, incidents panel, properties panel, token highlight.
+- Editor improvements in `ModelDetail.tsx`:
+  - Added `createSideDock()` for the collapsible properties panel (appended to body, removed on unmount).
+  - Added config panel plugin (`createConfigPanelPlugin` + `createConfigPanelBpmnPlugin`) wired to dock's properties pane.
+  - Added bridge plugin connecting `element:click` → `editor:select` for the config panel to activate.
+  - Added `createMainMenuPlugin` for the top-right menu.
+  - Editor now opens at 100% zoom (`editor.setZoom(1)` after load).
+  - Editor theme now reads from `useThemeStore` instead of hardcoded `"dark"`.
+- Fixed BPMN canvas theme in `IncidentDetail.tsx` (was hardcoded `"dark"`, now reads from theme store).
+- Added `@bpmnkit/operate` to `apps/studio/package.json` dependencies.
+
 ## 2026-03-24 — Studio: full implementation (phases 1–8) + user-tasks package
 
 - Implemented all 9 phases of the studio roadmap (phases 1–8 fully functional; phase 9 / desktop scaffold deferred).

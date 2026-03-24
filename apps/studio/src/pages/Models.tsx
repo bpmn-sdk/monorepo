@@ -33,7 +33,7 @@ function ProcessCard({ model, onDelete }: { model: ModelFile; onDelete: () => vo
 
 	return (
 		<article
-			className="relative rounded-lg border border-border bg-surface overflow-hidden hover:border-accent transition-colors"
+			className="relative rounded-lg border border-border bg-surface overflow-hidden hover:border-accent hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200"
 			onMouseEnter={() => setHovered(true)}
 			onMouseLeave={() => setHovered(false)}
 			aria-label={`Model: ${model.name}`}
@@ -51,7 +51,7 @@ function ProcessCard({ model, onDelete }: { model: ModelFile; onDelete: () => vo
 				<p className="text-xs text-muted mt-1">{new Date(model.updatedAt).toLocaleDateString()}</p>
 			</div>
 			{hovered && (
-				<div className="absolute inset-0 flex items-center justify-center gap-2 bg-bg/60">
+				<div className="absolute inset-0 flex items-center justify-center gap-2 bg-bg/70 animate-in fade-in duration-150">
 					<Button
 						size="sm"
 						onClick={(e) => {
@@ -143,7 +143,7 @@ export function Models() {
 
 	return (
 		<div
-			className="p-6 max-w-6xl mx-auto"
+			className="p-6 max-w-6xl mx-auto animate-in fade-in slide-in-from-bottom-2 duration-300"
 			onDragOver={(e) => e.preventDefault()}
 			onDrop={handleDrop}
 		>

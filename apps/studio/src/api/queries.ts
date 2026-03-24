@@ -195,7 +195,7 @@ export function useDashboardStats() {
 					page: { from: 0, limit: 1 },
 				}).catch(() => empty),
 				proxyPost<PageResponse<Job>>("/api/jobs/search", {
-					filter: { state: "ACTIVATABLE" },
+					filter: { state: "CREATED" },
 					page: { from: 0, limit: 1 },
 				}).catch(() => empty),
 			])

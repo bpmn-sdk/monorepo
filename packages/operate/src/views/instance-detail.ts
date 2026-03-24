@@ -5,6 +5,7 @@ import { createConfigPanelPlugin } from "@bpmnkit/plugins/config-panel"
 import { createConfigPanelBpmnPlugin } from "@bpmnkit/plugins/config-panel-bpmn"
 import { createTokenHighlightPlugin } from "@bpmnkit/plugins/token-highlight"
 import { badge } from "../components/badge.js"
+import { injectOperateStyles } from "../css.js"
 import {
 	MOCK_ACTIVE_ELEMENTS,
 	MOCK_BPMN_XML,
@@ -148,6 +149,8 @@ export function createInstanceDetailView(
 	setTheme(t: "light" | "dark" | "neon"): void
 	destroy(): void
 } {
+	injectOperateStyles()
+
 	const el = document.createElement("div")
 	el.className = "op-view op-instance-detail"
 

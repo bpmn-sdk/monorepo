@@ -161,9 +161,25 @@ export function createUserTaskWidget(options: UserTaskWidgetOptions): UserTaskWi
 
 		try {
 			const formData = await fetchTaskForm(proxyUrl, profile, task.userTaskKey)
-			if (formData && typeof formData === "object" && "components" in formData) {
-				formViewer = new FormViewer({ container: formContainer, theme: "dark" })
-				formViewer.load(formData as FormDefinition)
+			// Camunda v2 returns { schema: Record<string,unknown>, ... }
+			// Some versions send schema as a JSON string instead of an object
+			let formDef: unknown = formData
+			if (formData && typeof formData === "object" && "schema" in formData) {
+				const raw = (formData as Record<string, unknown>).schema
+				if (raw && typeof raw === "object") {
+					formDef = raw
+				} else if (typeof raw === "string") {
+					try {
+						formDef = JSON.parse(raw)
+					} catch {
+						formDef = null
+					}
+				}
+			}
+			if (formDef && typeof formDef === "object" && "components" in formDef) {
+				const fvTheme: "light" | "dark" = theme === "light" ? "light" : "dark"
+				formViewer = new FormViewer({ container: formContainer, theme: fvTheme })
+				formViewer.load(formDef as FormDefinition)
 			} else {
 				const placeholder = el("div", "ut-form-placeholder", "No form associated with this task.")
 				formContainer.appendChild(placeholder)

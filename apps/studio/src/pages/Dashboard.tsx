@@ -22,7 +22,7 @@ function StatCard({
 	return (
 		<Link
 			href={href}
-			className={`flex items-center gap-4 rounded-lg border p-4 transition-colors hover:bg-surface-2 ${
+			className={`flex items-center gap-4 rounded-lg border p-4 transition-all duration-200 hover:bg-surface-2 hover:-translate-y-0.5 hover:shadow-lg ${
 				danger && (value ?? 0) > 0 ? "border-danger/50" : "border-border"
 			} bg-surface`}
 		>
@@ -103,7 +103,7 @@ export function Dashboard() {
 		: null
 
 	return (
-		<div className="p-6 max-w-6xl mx-auto">
+		<div className="p-6 max-w-6xl mx-auto animate-in fade-in slide-in-from-bottom-2 duration-300">
 			<div className="flex items-center justify-between mb-6">
 				<div>
 					<h1 className="text-xl font-semibold text-fg">Dashboard</h1>

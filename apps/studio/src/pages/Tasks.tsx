@@ -39,9 +39,16 @@ export function Tasks() {
 	}
 
 	return (
-		<div className="p-6 max-w-6xl mx-auto">
+		<div className="p-6 max-w-6xl mx-auto animate-in fade-in slide-in-from-bottom-2 duration-300">
 			<div className="flex items-center justify-between mb-6">
-				<h1 className="text-xl font-semibold text-fg">Tasks</h1>
+				<div>
+					<h1 className="text-xl font-semibold text-fg">Tasks</h1>
+					{!isLoading && (
+						<p className="text-xs text-muted mt-0.5">
+							{filtered?.length ?? 0} task{(filtered?.length ?? 0) !== 1 ? "s" : ""}
+						</p>
+					)}
+				</div>
 			</div>
 
 			<div className="mb-4">
@@ -79,7 +86,10 @@ export function Tasks() {
 						{filtered?.map((task) => {
 							const overdue = isOverdue(task.dueDate)
 							return (
-								<tr key={task.userTaskKey} className="border-b border-border/50 hover:bg-surface-2">
+								<tr
+									key={task.userTaskKey}
+									className="border-b border-border/50 hover:bg-surface-2 transition-colors duration-100"
+								>
 									<td className="px-4 py-3">
 										<Link
 											href={`/tasks/${task.userTaskKey}`}

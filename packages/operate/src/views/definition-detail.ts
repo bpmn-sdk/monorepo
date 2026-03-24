@@ -3,6 +3,7 @@ import { BpmnCanvas } from "@bpmnkit/canvas"
 import type { BpmnDefinitions } from "@bpmnkit/core"
 import { createConfigPanelPlugin } from "@bpmnkit/plugins/config-panel"
 import { createConfigPanelBpmnPlugin } from "@bpmnkit/plugins/config-panel-bpmn"
+import { injectOperateStyles } from "../css.js"
 import { MOCK_BPMN_XML } from "../mock-data.js"
 import type { DefinitionsStore } from "../stores/definitions.js"
 import type { ProcessDefinitionResult } from "../types.js"
@@ -40,6 +41,8 @@ export function createDefinitionDetailView(
 	setTheme(t: "light" | "dark" | "neon"): void
 	destroy(): void
 } {
+	injectOperateStyles()
+
 	const el = document.createElement("div")
 	el.className = "op-view op-def-detail"
 

@@ -5,6 +5,7 @@ import { useEffect, useRef } from "preact/hooks"
 import { Link, useParams } from "wouter"
 import { useDefinitionXml, useIncident, useRetryIncident } from "../api/queries.js"
 import { Button } from "../components/ui/button.js"
+import { useThemeStore } from "../stores/theme.js"
 import { toast } from "../stores/toast.js"
 
 export function IncidentDetail() {
@@ -15,6 +16,7 @@ export function IncidentDetail() {
 	const canvasContainerRef = useRef<HTMLDivElement>(null)
 	const canvasRef = useRef<BpmnCanvas | null>(null)
 	const tokenPluginRef = useRef<ReturnType<typeof createTokenHighlightPlugin> | null>(null)
+	const { theme } = useThemeStore()
 
 	useEffect(() => {
 		const container = canvasContainerRef.current
@@ -23,7 +25,7 @@ export function IncidentDetail() {
 		tokenPluginRef.current = tokenPlugin
 		const canvas = new BpmnCanvas({
 			container,
-			theme: "dark",
+			theme: useThemeStore.getState().theme,
 			grid: false,
 			fit: "contain",
 			plugins: [tokenPlugin],
@@ -35,6 +37,10 @@ export function IncidentDetail() {
 			tokenPluginRef.current = null
 		}
 	}, [])
+
+	useEffect(() => {
+		canvasRef.current?.setTheme(theme)
+	}, [theme])
 
 	useEffect(() => {
 		if (xml && canvasRef.current) {
@@ -121,12 +127,14 @@ export function IncidentDetail() {
 									>
 										View instance →
 									</Link>
-									<Link
-										href={`/definitions/${incident.processDefinitionId}`}
-										className="block text-sm text-accent hover:underline"
-									>
-										View definition →
-									</Link>
+									{incident.processDefinitionKey && (
+										<Link
+											href={`/definitions/${incident.processDefinitionKey}`}
+											className="block text-sm text-accent hover:underline"
+										>
+											View definition →
+										</Link>
+									)}
 								</div>
 							</div>
 							{incident.creationTime && (
