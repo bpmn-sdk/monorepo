@@ -1,0 +1,180 @@
+import { AlertTriangle } from "lucide-react"
+import { useState } from "preact/hooks"
+import { Link } from "wouter"
+import { useCancelInstance, useInstances } from "../api/queries.js"
+import { StatusPill } from "../components/StatusPill.js"
+import { Button } from "../components/ui/button.js"
+import { Input } from "../components/ui/input.js"
+import { toast } from "../stores/toast.js"
+
+type StateFilter = "all" | "ACTIVE" | "COMPLETED" | "CANCELED" | "TERMINATED"
+
+export function Instances() {
+	const [search, setSearch] = useState("")
+	const [stateFilter, setStateFilter] = useState<StateFilter>("all")
+	const [selected, setSelected] = useState<Set<string>>(new Set())
+	const cancelMutation = useCancelInstance()
+
+	const filter = stateFilter !== "all" ? { state: stateFilter } : undefined
+	const { data, isLoading, isError } = useInstances(filter)
+
+	const filtered = data?.items.filter(
+		(i) =>
+			!search ||
+			i.processDefinitionId?.toLowerCase().includes(search.toLowerCase()) ||
+			i.processInstanceKey.includes(search),
+	)
+
+	function toggleSelect(key: string) {
+		setSelected((prev) => {
+			const next = new Set(prev)
+			if (next.has(key)) next.delete(key)
+			else next.add(key)
+			return next
+		})
+	}
+
+	async function handleBulkCancel() {
+		for (const key of selected) {
+			try {
+				await cancelMutation.mutateAsync(key)
+			} catch {
+				toast.error(`Failed to cancel instance ${key}`)
+			}
+		}
+		setSelected(new Set())
+		toast.success(`Cancelled ${selected.size} instance(s)`)
+	}
+
+	if (isError) {
+		return (
+			<div className="flex flex-col items-center justify-center h-full gap-4 p-8 text-center">
+				<AlertTriangle size={32} className="text-danger" />
+				<p className="text-sm text-muted">Could not load instances.</p>
+			</div>
+		)
+	}
+
+	return (
+		<div className="p-6 max-w-6xl mx-auto animate-in fade-in slide-in-from-bottom-2 duration-300">
+			<div className="flex items-center justify-between mb-6">
+				<div>
+					<h1 className="text-xl font-semibold text-fg">Instances</h1>
+					{!isLoading && (
+						<p className="text-xs text-muted mt-0.5">
+							{filtered?.length ?? 0} instance{(filtered?.length ?? 0) !== 1 ? "s" : ""}
+						</p>
+					)}
+				</div>
+				{selected.size > 0 && (
+					<Button variant="danger" size="sm" onClick={() => void handleBulkCancel()}>
+						Cancel selected ({selected.size})
+					</Button>
+				)}
+			</div>
+
+			{/* Filters */}
+			<div className="flex items-center gap-3 mb-4">
+				<Input
+					placeholder="Search by process ID or key..."
+					value={search}
+					onInput={(e) => setSearch((e.target as HTMLInputElement).value)}
+					className="max-w-80"
+					aria-label="Search instances"
+				/>
+				<div className="flex rounded border border-border bg-surface-2 text-xs overflow-hidden">
+					{(["all", "ACTIVE", "COMPLETED", "CANCELED", "TERMINATED"] as StateFilter[]).map((s) => (
+						<button
+							key={s}
+							type="button"
+							onClick={() => setStateFilter(s)}
+							className={`px-3 py-1.5 capitalize transition-colors ${
+								stateFilter === s ? "bg-surface text-fg" : "text-muted hover:text-fg"
+							}`}
+							aria-pressed={stateFilter === s}
+						>
+							{s === "all" ? "All" : s}
+						</button>
+					))}
+				</div>
+			</div>
+
+			<div className="rounded-lg border border-border bg-surface overflow-hidden">
+				<table className="w-full text-sm">
+					<thead>
+						<tr className="border-b border-border bg-surface-2 text-left text-xs text-muted">
+							<th className="px-4 py-3 w-8">
+								<span className="sr-only">Select</span>
+							</th>
+							<th className="px-4 py-3 font-medium">State</th>
+							<th className="px-4 py-3 font-medium">Process ID</th>
+							<th className="px-4 py-3 font-medium">Key</th>
+							<th className="px-4 py-3 font-medium">Started</th>
+							<th className="px-4 py-3 font-medium">Ended</th>
+						</tr>
+					</thead>
+					<tbody>
+						{isLoading &&
+							(["s0", "s1", "s2", "s3", "s4"] as const).map((sk) => (
+								<tr key={sk} className="border-b border-border/50">
+									{(["a", "b", "c", "d", "e", "f"] as const).map((col) => (
+										<td key={col} className="px-4 py-3">
+											<div className="h-4 animate-pulse rounded bg-surface-2" />
+										</td>
+									))}
+								</tr>
+							))}
+						{filtered?.map((inst) => (
+							<tr
+								key={inst.processInstanceKey}
+								className="border-b border-border/50 hover:bg-surface-2 cursor-pointer"
+							>
+								<td className="px-4 py-3">
+									<input
+										type="checkbox"
+										checked={selected.has(inst.processInstanceKey)}
+										onClick={(e) => e.stopPropagation()}
+										onChange={() => toggleSelect(inst.processInstanceKey)}
+										aria-label={`Select instance ${inst.processInstanceKey}`}
+										className="cursor-pointer"
+									/>
+								</td>
+								<td className="px-4 py-3">
+									<Link href={`/instances/${inst.processInstanceKey}`}>
+										<StatusPill state={inst.state} />
+									</Link>
+								</td>
+								<td className="px-4 py-3 font-mono text-xs text-muted">
+									<Link href={`/instances/${inst.processInstanceKey}`} className="hover:text-fg">
+										{inst.processDefinitionId}
+									</Link>
+								</td>
+								<td className="px-4 py-3 font-mono text-xs text-muted">
+									<Link
+										href={`/instances/${inst.processInstanceKey}`}
+										className="hover:text-accent"
+									>
+										{inst.processInstanceKey}
+									</Link>
+								</td>
+								<td className="px-4 py-3 text-muted text-xs">
+									{inst.startDate ? new Date(inst.startDate).toLocaleString() : "—"}
+								</td>
+								<td className="px-4 py-3 text-muted text-xs">
+									{inst.endDate ? new Date(inst.endDate).toLocaleString() : "—"}
+								</td>
+							</tr>
+						))}
+						{!isLoading && filtered?.length === 0 && (
+							<tr>
+								<td colSpan={6} className="px-4 py-8 text-center text-sm text-muted">
+									No instances found.
+								</td>
+							</tr>
+						)}
+					</tbody>
+				</table>
+			</div>
+		</div>
+	)
+}

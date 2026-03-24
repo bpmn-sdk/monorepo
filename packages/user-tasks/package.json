@@ -1,0 +1,24 @@
+{
+	"name": "@bpmnkit/user-tasks",
+	"version": "0.0.1",
+	"type": "module",
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"import": "./dist/index.js",
+			"types": "./dist/index.d.ts"
+		}
+	},
+	"scripts": {
+		"build": "tsc",
+		"typecheck": "tsc --noEmit",
+		"check": "biome check ."
+	},
+	"dependencies": {
+		"@bpmnkit/api": "workspace:*",
+		"@bpmnkit/core": "workspace:*",
+		"@bpmnkit/plugins": "workspace:*",
+		"@bpmnkit/ui": "workspace:*"
+	}
+}

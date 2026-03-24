@@ -1,5 +1,127 @@
 # Progress
 
+## 2026-03-24 — Studio: decisions rendered via operate DMN editor
+
+- Exported `createDecisionDetailView` and `DecisionsStore` from `packages/operate/src/index.ts`.
+- Replaced `apps/studio/src/pages/DecisionDetail.tsx` with the same operate-view pattern as `DefinitionDetail` and `InstanceDetail`: mounts `createDecisionDetailView`, connects `DecisionsStore` via SSE, syncs theme, navigates with wouter.
+- Decision detail now renders the full DMN decision table (via `DmnEditor` from `@bpmnkit/plugins/dmn-editor`) with breadcrumb, version selector, and DRG metadata.
+- Added page entry animation and count subtitle to `Decisions.tsx`.
+
+## 2026-03-24 — Studio: UI polish — animations, hover effects, visual refinements
+
+- Page entry animations: all list pages (Definitions, Instances, Incidents, Tasks, Models, Dashboard) now fade + slide in from bottom on mount using `animate-in fade-in slide-in-from-bottom-2 duration-300`.
+- Dashboard stat cards: added `hover:-translate-y-0.5 hover:shadow-lg transition-all` lift effect on hover.
+- Models grid cards: added hover lift + shadow + fade-in overlay animation for the action buttons.
+- Sidebar: nav buttons now scale slightly on hover (`hover:scale-105`) and active button is `scale-110`; active indicator animates in with `animate-in fade-in slide-in-from-left-1`; tooltip shows with a 300ms delay; cluster status dot pulses with `animate-pulse` when loading.
+- TopBar search trigger: added `transition-all duration-150` for border and text transitions.
+- Incidents/Tasks table rows: added `transition-colors duration-100` for smooth hover.
+- `Input` component: added `transition-colors duration-150` and `focus-visible:border-accent` for a cleaner focus state.
+- List pages (Instances, Incidents, Tasks): added count subtitle below page title (e.g., "12 instances").
+
+## 2026-03-24 — Studio: bug fixes round 2 + operate integration improvements
+
+- Editor zoom 100%: fixed by listening to `editor.on("diagram:load")` event instead of calling `setZoom` immediately after `load()`.
+- Editor sidebar: removed `createSideDock()` (fixed position — wrong for constrained layout); embedded config panel directly in the right panel via `propertiesPaneRef` with a "Click an element to edit" placeholder.
+- Editor top-right menu: removed `createMainMenuPlugin`.
+- Definitions page: fully rewritten — groups all definitions by `processDefinitionId`, shows version count badge, clicking the process name opens latest version, clicking the version count shows all versions in an expandable sub-table with `animate-in` entry.
+- Incidents "View definition" 400: fixed by using `incident.processDefinitionKey` (numeric) instead of `incident.processDefinitionId` (string) in the definition link.
+- User task form: fixed `packages/user-tasks/src/widget.ts` — Camunda v2 returns `FormResult.schema` as a parsed object (`Record<string,unknown>`), not a JSON string; widget now checks `typeof raw === "object"` first and passes it directly to `FormViewer`.
+- BPMN canvas theme: all canvas instances now use `useThemeStore` instead of hardcoded `"dark"`.
+
+## 2026-03-24 — Studio: API fixes + operate integration + editor improvements
+
+- Fixed jobs 400 error: dashboard stats job filter changed from `"ACTIVATABLE"` → `"CREATED"` (matching proxy's operate/stream handler).
+- Fixed task form "No form associated": `packages/user-tasks` widget now parses Camunda v2's `{ schema: "json string" }` envelope before checking for `components`.
+- Integrated `packages/operate` views into Studio:
+  - Exported `createDefinitionDetailView`, `createInstanceDetailView`, `DefinitionsStore`, `InstancesStore` from operate package.
+  - Added `injectOperateStyles()` calls inside `createDefinitionDetailView` and `createInstanceDetailView` so consumers don't need to call it separately.
+  - Replaced `DefinitionDetail.tsx` with operate view: subprocess hierarchy, node click → properties panel, version selector, start instance button, open-in-editor button.
+  - Replaced `InstanceDetail.tsx` with operate view: process chain (subprocess navigation), variables panel, incidents panel, properties panel, token highlight.
+- Editor improvements in `ModelDetail.tsx`:
+  - Added `createSideDock()` for the collapsible properties panel (appended to body, removed on unmount).
+  - Added config panel plugin (`createConfigPanelPlugin` + `createConfigPanelBpmnPlugin`) wired to dock's properties pane.
+  - Added bridge plugin connecting `element:click` → `editor:select` for the config panel to activate.
+  - Added `createMainMenuPlugin` for the top-right menu.
+  - Editor now opens at 100% zoom (`editor.setZoom(1)` after load).
+  - Editor theme now reads from `useThemeStore` instead of hardcoded `"dark"`.
+- Fixed BPMN canvas theme in `IncidentDetail.tsx` (was hardcoded `"dark"`, now reads from theme store).
+- Added `@bpmnkit/operate` to `apps/studio/package.json` dependencies.
+
+## 2026-03-24 — Studio: full implementation (phases 1–8) + user-tasks package
+
+- Implemented all 9 phases of the studio roadmap (phases 1–8 fully functional; phase 9 / desktop scaffold deferred).
+- Created `apps/studio` — Preact + Zustand v5 + TanStack Query v5 + wouter v3 + Tailwind v4 app.
+- Pages: Dashboard, Models, ModelDetail, Definitions, DefinitionDetail, Instances, InstanceDetail, Incidents, IncidentDetail, Tasks, TaskDetail, Decisions, DecisionDetail, Settings.
+- Layout: Shell (3-column), Sidebar (mode-ordered navigation), TopBar, AIDrawer (streaming SSE chat).
+- Stores: theme, cluster (proxy profile selection), models (IndexedDB CRUD), ui (command palette / AI drawer), mode (developer/operator), toast.
+- API layer: typed query key factory, `proxyFetch`/`proxyPost`/`proxyDelete` helpers with `x-profile` header, all TanStack Query hooks + mutations.
+- Storage: `StorageAdapter` interface + `IndexedDbAdapter` (native IndexedDB API).
+- UI components: Button (cva+Slot), Input, Badge, Dialog, DropdownMenu, Popover, Tabs, Tooltip, all wrapping Radix UI primitives with Preact compat ref casts.
+- Editor integration: `BpmnEditor` (sync `load()` / `exportXml()`), 2s debounced auto-save, ⌘S immediate save, deployed-versions panel.
+- Canvas overlays: `createTokenHighlightPlugin` used in DefinitionDetail, InstanceDetail, IncidentDetail; access via `.api.setError()`.
+- Command palette: ⌘K dialog with keyboard navigation (arrow keys + Enter).
+- Created `packages/user-tasks` — vanilla TS widget (`createUserTaskWidget`) for rendering and completing Camunda user tasks with form-viewer integration.
+- Fixed all TypeScript errors (zero errors across both packages).
+- Fixed all Biome lint/format issues (zero warnings/errors).
+
+## 2026-03-24 — Studio: architecture plan and implementation roadmap
+
+- Designed BPMNkit Studio — a unified app replacing fragmented Camunda tooling (Modeler, Operate, Tasklist).
+- Architecture: Preact + preact/compat + Zustand + TanStack Query + wouter + shadcn/ui + Tailwind v4.
+- Connection model: always via proxy (localhost:3033), consistent with existing operate package.
+- Storage abstraction: `StorageAdapter` interface with `IndexedDbAdapter` (web) and `TauriAdapter` (desktop).
+- Smart caching: deployed process definition XML cached with `staleTime: Infinity` (immutable once deployed).
+- New package planned: `packages/user-tasks` — vanilla TS widget for rendering and completing Camunda user tasks.
+- 9-phase implementation plan written to `doc/studio-plan.md`.
+- Detailed action-item roadmap written to `doc/studio-roadmap.md`.
+
+## 2026-03-24 — CLI: fix worker jobKey undefined when activating jobs
+
+- Zeebe-compatible engines (e.g. reebe) return `key` in the activation response rather than `jobKey` as the Camunda 8 REST spec defines.
+- With `job.jobKey` being `undefined`, completion requests were sent to `/v2/jobs/undefined/completion`, causing 400 errors.
+- Fixed both `apps/cli/src/tui.ts` (`runWorkerLoop`) and `apps/cli/src/commands/worker.ts` to resolve the key via `job.jobKey ?? job.key`. If neither is present the job is skipped with an error log instead of sending a broken request.
+
+## 2026-03-24 — CLI: fix profile delete feedback + JSON body field specs for oneOf schemas
+
+### Profile list delete feedback
+- `d` on the profile list now shows a confirmation message: `✓ Deleted profile "X"`.
+- If the profile is a read-only Camunda Modeler profile, an explanatory message is shown instead of silently failing.
+- `u` (use) also shows `✓ Active profile: X` feedback on success.
+- Messages clear automatically on the next keypress.
+- Added `message: string` field to the `results` screen type for transient status lines.
+
+### JSON body field specs for `oneOf` schemas
+- The CLI code generator (`packages/api/scripts/generate.mjs`) did not handle `oneOf` schemas when extracting `bodyFields`. Commands using a `oneOf` request body (like "create process instance") had no field guidance in the JSON editor.
+- Fixed `extractJsonFieldSpecs` to recurse into each `oneOf` variant and merge all fields. `$ref` resolution per variant is handled by the recursive call.
+- Regenerated `apps/cli/src/generated/commands.ts` — "create process instance" now has full `bodyFields`: `processDefinitionKey`, `processDefinitionId`, `variables`, `tenantId`, `awaitCompletion`, `startInstructions`, and more.
+
+## 2026-03-24 — CLI: profile/settings UX improvements + JSON editor field picker
+
+### Profile `create` command — enum pickers for flag values
+- `--api-type` now has `enum: ["c8", "admin"]` — TUI shows a cycling picker (↑↓) instead of free text.
+- `--auth-type` now has `enum: ["bearer", "oauth2", "basic", "none"]` — same cycling picker.
+
+### Profile list — inline use / show / delete shortcuts
+- Pressing `u` on a profile in the list immediately activates it (calls `useProfile`) and updates the TUI header (profile name and info) in-place. No need to re-enter the name.
+- Pressing `s` opens a detail view for the selected profile.
+- Pressing `d` deletes the selected profile and refreshes the list in-place. Cursor is adjusted if the deleted item was the last row.
+- The `u`/`U` curl-toggle shortcut is preserved for all other result screens; only the profile list intercepts it.
+- Footer hints updated to show `u use  s show  d delete` when on the profile list.
+
+### JSON editor — guided field selection + type hints
+- **Key cycling**: When fieldSpecs are provided, pressing ↑↓ while editing the key column cycles through available (non-duplicate) field names instead of inserting arrow characters.
+- **Pre-seeded keys**: Pressing `enter` on the add-row or pressing `a`/`A` pre-fills the new entry's key with the first available spec name, reducing manual typing.
+- **Value type hints**: When a field spec exists but no value has been entered, the value column shows `<string>`, `<number>`, `<boolean>`, etc. as a dim placeholder.
+- **Edit hint line** updated: shows `↑↓ pick field` guidance when on the key column with specs available.
+- Duplicate field prevention: cycling and pre-seeding exclude keys already used by other entries.
+
+## 2026-03-24 — CLI: verbose HTTP error details on failure
+
+- On any HTTP error (e.g. 404), the CLI now prints the full request and response to stderr: method, URL, request headers, response status, response headers, and response body (JSON pretty-printed where possible).
+- Previously only the extracted message (e.g. "HTTP 404") was shown.
+- Added `printHttpErrorDetails()` in `apps/cli/src/output.ts`, called from the catch block in `apps/cli/src/run.ts` whenever a raw response was captured and `--raw` mode is not active.
+- Fixed the same gap in the TUI: the `input` screen now carries `errorRaw: RawResponseEvent | null`; on error the raw capture is stored and `renderInput` displays method, URL, HTTP status, and pretty-printed response body inline below the error message.
+
 ## 2026-03-22 — Roadmap completion: all remaining items implemented
 
 ### Chaos Simulation Mode — post-run summary + scenario export (`process-runner`)

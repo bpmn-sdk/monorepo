@@ -1,0 +1,70 @@
+@import "tailwindcss";
+@import "@bpmnkit/ui/tokens.css";
+
+@theme inline {
+	--color-bg: var(--bpmnkit-bg);
+	--color-surface: var(--bpmnkit-surface);
+	--color-surface-2: var(--bpmnkit-surface-2);
+	--color-border: var(--bpmnkit-border);
+	--color-fg: var(--bpmnkit-fg);
+	--color-muted: var(--bpmnkit-fg-muted);
+	--color-accent: var(--bpmnkit-accent);
+	--color-accent-bright: var(--bpmnkit-accent-bright);
+	--color-accent-subtle: var(--bpmnkit-accent-subtle);
+	--color-accent-fg: var(--bpmnkit-accent-fg);
+	--color-teal: var(--bpmnkit-teal);
+	--color-success: var(--bpmnkit-success);
+	--color-warn: var(--bpmnkit-warn);
+	--color-danger: var(--bpmnkit-danger);
+	--color-panel: var(--bpmnkit-panel-bg);
+	--color-nav: var(--bpmnkit-nav-bg);
+	--color-nav-fg: var(--bpmnkit-nav-fg);
+	--color-nav-fg-active: var(--bpmnkit-nav-fg-active);
+	--font-sans: var(--bpmnkit-font);
+	--font-mono: var(--bpmnkit-font-mono);
+	--radius: var(--bpmnkit-radius);
+}
+
+* {
+	box-sizing: border-box;
+}
+
+html,
+body {
+	height: 100%;
+	margin: 0;
+	font-family: var(--bpmnkit-font);
+	background: var(--bpmnkit-bg);
+	color: var(--bpmnkit-fg);
+}
+
+#root {
+	height: 100%;
+	display: flex;
+	flex-direction: column;
+}
+
+:focus-visible {
+	outline: 2px solid var(--bpmnkit-accent);
+	outline-offset: 2px;
+}
+
+::-webkit-scrollbar {
+	width: 6px;
+	height: 6px;
+}
+
+::-webkit-scrollbar-track {
+	background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+	background: var(--bpmnkit-border);
+	border-radius: 3px;
+}
+
+button,
+a,
+[role="button"] {
+	cursor: pointer;
+}

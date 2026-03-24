@@ -98,7 +98,8 @@ export const workerCmd: Command = {
 		while (running) {
 			let result: {
 				jobs: Array<{
-					jobKey: string
+					jobKey?: string
+					key?: string
 					processDefinitionId: string
 					elementId: string
 					processInstanceKey: string
@@ -111,7 +112,6 @@ export const workerCmd: Command = {
 					worker: "casen-worker",
 					timeout,
 					maxJobsToActivate: maxJobs,
-					requestTimeout: 20000, // 20 s long poll
 				})) as typeof result
 			} catch (err) {
 				if (!running) break
@@ -127,9 +127,15 @@ export const workerCmd: Command = {
 
 			for (const job of jobs) {
 				if (!running) break
+				// Some Zeebe-compatible engines return `key` instead of `jobKey`
+				const jobKey = job.jobKey ?? job.key
+				if (!jobKey) {
+					ctx.output.info("Activated job has no key — skipping")
+					continue
+				}
 
 				ctx.output.info(
-					`Activated job ${job.jobKey}  process=${job.processDefinitionId}  element=${job.elementId}  instance=${job.processInstanceKey}`,
+					`Activated job ${jobKey}  process=${job.processDefinitionId}  element=${job.elementId}  instance=${job.processInstanceKey}`,
 				)
 
 				if (Object.keys(job.variables ?? {}).length > 0) {
@@ -137,21 +143,18 @@ export const workerCmd: Command = {
 				}
 
 				try {
-					await client.job.completeJob(job.jobKey, { variables })
+					await client.job.completeJob(jobKey, { variables })
 					completed++
-					ctx.output.ok(`Completed job ${job.jobKey} (total: ${completed})`)
+					ctx.output.ok(`Completed job ${jobKey} (total: ${completed})`)
 				} catch (err) {
 					ctx.output.info(
-						`Failed to complete job ${job.jobKey}: ${err instanceof Error ? err.message : String(err)}`,
+						`Failed to complete job ${jobKey}: ${err instanceof Error ? err.message : String(err)}`,
 					)
 				}
 			}
 
-			// When no jobs were returned, the long-poll already waited; loop immediately.
-			// When jobs were found, yield the event loop briefly before the next poll.
-			if (jobs.length > 0) {
-				await delay(100)
-			}
+			// Sleep between polls: brief yield after processing jobs, longer pause when idle
+			await delay(jobs.length > 0 ? 100 : 2000)
 		}
 
 		ctx.output.info(`\nWorker stopped. Completed ${completed} job(s).`)

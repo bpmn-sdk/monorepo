@@ -1,0 +1,17 @@
+export const keys = {
+	definitions: (filter?: object) => ["definitions", filter] as const,
+	definition: (key: string) => ["definitions", key] as const,
+	definitionXml: (key: string) => ["definitions", key, "xml"] as const,
+	instances: (filter?: object) => ["instances", filter] as const,
+	instance: (key: string) => ["instances", key] as const,
+	instanceVariables: (key: string) => ["instances", key, "variables"] as const,
+	incidents: (filter?: object) => ["incidents", filter] as const,
+	incident: (key: string) => ["incidents", key] as const,
+	tasks: (filter?: object) => ["tasks", filter] as const,
+	task: (key: string) => ["tasks", key] as const,
+	decisions: (filter?: object) => ["decisions", filter] as const,
+	decision: (key: string) => ["decisions", key] as const,
+	jobs: (filter?: object) => ["jobs", filter] as const,
+	dashboard: () => ["dashboard"] as const,
+	profiles: () => ["profiles"] as const,
+} as const

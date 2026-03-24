@@ -1,7 +1,17 @@
 import { spawn } from "node:child_process"
 import type { AdminApiClient, CamundaClient, RawResponseEvent } from "@bpmnkit/api"
 import { renderBpmnAscii } from "@bpmnkit/ascii"
-import { appendAuditEntry, getAuditLog, getSettings, saveSettings } from "@bpmnkit/profiles"
+import {
+	appendAuditEntry,
+	deleteProfile,
+	getActiveName,
+	getAuditLog,
+	getProfile,
+	getSettings,
+	listProfiles,
+	saveSettings,
+	useProfile,
+} from "@bpmnkit/profiles"
 import { type AskResult, runAskQuery } from "./commands/ask.js"
 import { type NpmSearchObject, pluginGroup, searchNpmRegistry } from "./commands/plugin.js"
 import { profileGroup } from "./commands/profile.js"
@@ -80,6 +90,7 @@ type Screen =
 			scroll: number
 			editing: boolean
 			error: string
+			errorRaw: RawResponseEvent | null
 			running: boolean
 	  }
 	| {
@@ -93,6 +104,8 @@ type Screen =
 			altView: boolean
 			cursor: number
 			scroll: number
+			/** Transient status message shown in the footer after inline actions. */
+			message: string
 	  }
 	| {
 			kind: "detail"
@@ -368,8 +381,9 @@ function entriesToJson(entries: JsonEntry[]): string {
 
 /**
  * Build initial entries for the JSON editor.
- * If fieldSpecs are provided, pre-populate with all known fields (in spec order),
- * merging in any existing values. Extra keys from existing JSON are appended at the end.
+ * If fieldSpecs are provided, pre-populate only required fields (in spec order),
+ * merging in any existing values. Optional fields are available via the add-row picker.
+ * Extra keys from existing JSON that are not in the spec are appended at the end.
  */
 function buildInitialEntries(existingJson: string, fieldSpecs?: JsonFieldSpec[]): JsonEntry[] {
 	const existing: Record<string, string> = {}
@@ -389,7 +403,9 @@ function buildInitialEntries(existingJson: string, fieldSpecs?: JsonFieldSpec[])
 	const seenKeys = new Set<string>()
 	const entries: JsonEntry[] = []
 
+	// Only pre-populate required fields; optional ones are added on demand
 	for (const spec of fieldSpecs) {
+		if (!spec.required && !(spec.name in existing)) continue
 		seenKeys.add(spec.name)
 		const val = existing[spec.name] ?? ""
 		entries.push({ key: spec.name, keyCursor: spec.name.length, val, valCursor: val.length })
@@ -407,6 +423,63 @@ function buildInitialEntries(existingJson: string, fieldSpecs?: JsonFieldSpec[])
 /** Look up a JsonFieldSpec by key name. */
 function getFieldSpec(key: string, fieldSpecs?: JsonFieldSpec[]): JsonFieldSpec | undefined {
 	return fieldSpecs?.find((s) => s.name === key)
+}
+
+/**
+ * Return specs not already used as keys by OTHER entries (not the one at currentIndex).
+ * Pass null for currentIndex when adding a brand-new entry.
+ */
+function getAvailableFieldSpecs(
+	currentIndex: number | null,
+	entries: Array<{ key: string }>,
+	fieldSpecs: JsonFieldSpec[],
+): JsonFieldSpec[] {
+	const usedKeys = new Set(
+		entries
+			.filter((_, i) => i !== currentIndex)
+			.map((e) => e.key)
+			.filter(Boolean),
+	)
+	return fieldSpecs.filter((s) => !usedKeys.has(s.name))
+}
+
+/** Build profile info entries (key/value pairs with secrets redacted). */
+function buildProfileInfoEntries(profileName: string): Array<{ key: string; value: string }> {
+	const p = getProfile(profileName)
+	if (!p) return [{ key: "status", value: "profile not found" }]
+	const info: Array<{ key: string; value: string }> = [
+		{ key: "name", value: p.name },
+		{ key: "apiType", value: p.apiType },
+		{ key: "baseUrl", value: p.config.baseUrl ?? "(default)" },
+	]
+	const auth = p.config.auth
+	if (auth) {
+		info.push({ key: "auth.type", value: auth.type })
+		if (auth.type === "bearer") {
+			info.push({ key: "auth.token", value: "***" })
+		} else if (auth.type === "oauth2") {
+			info.push({ key: "auth.clientId", value: auth.clientId })
+			info.push({ key: "auth.clientSecret", value: "***" })
+			info.push({ key: "auth.tokenUrl", value: auth.tokenUrl })
+		} else if (auth.type === "basic") {
+			info.push({ key: "auth.username", value: auth.username })
+			info.push({ key: "auth.password", value: "***" })
+		}
+	}
+	return info
+}
+
+/** Rebuild profile list items after use/delete. */
+function rebuildProfileListItems(): Record<string, unknown>[] {
+	const profiles = listProfiles()
+	const active = getActiveName()
+	return profiles.map((p) => ({
+		active: p.name === active ? "●" : " ",
+		name: p.name,
+		apiType: p.apiType,
+		baseUrl: p.config.baseUrl ?? "(from env/file)",
+		authType: p.config.auth?.type ?? "—",
+	}))
 }
 
 // ─── Table helpers ────────────────────────────────────────────────────────────
@@ -721,6 +794,21 @@ function renderInput(state: TuiState, screen: Extract<Screen, { kind: "input" }>
 	lines.push("")
 	if (screen.error) {
 		lines.push(`  ${red("error:")} ${screen.error}`)
+		if (screen.errorRaw) {
+			const raw = screen.errorRaw
+			lines.push(`  ${dim(`${raw.method} ${raw.url}`)}`)
+			lines.push(`  ${red(`HTTP ${raw.status}`)}`)
+			if (raw.body) {
+				try {
+					const parsed = JSON.parse(raw.body)
+					for (const l of JSON.stringify(parsed, null, 2).split("\n")) {
+						lines.push(`  ${dim(l)}`)
+					}
+				} catch {
+					lines.push(`  ${dim(raw.body)}`)
+				}
+			}
+		}
 	} else if (screen.running) {
 		lines.push(`  ${dim("running…")}`)
 	} else if (screen.editing) {
@@ -929,8 +1017,13 @@ function renderResults(state: TuiState, screen: Extract<Screen, { kind: "results
 			lines.push(`  ${dim(`${screen.scroll + 1}–${hi} of ${out.total}`)}`)
 		}
 		const followupHint = screen.cmd.relations ? `  ${cyan("f")} follow-up` : ""
+		const profileListHints =
+			screen.group.name === "profile" && screen.cmd.name === "list"
+				? `  ${cyan("u")} use  ${cyan("s")} show  ${cyan("d")} delete`
+				: ""
+		if (screen.message) lines.push(`  ${green(screen.message)}`)
 		lines.push(
-			`  ${dim("↑↓")} navigate  ${cyan("enter")} detail${followupHint}  ${dim("pgup/pgdn")} page${rawToggle}${curlToggle}  ${cyan("m")} main menu  ${cyan("esc")} back  ${cyan("q")} quit`,
+			`  ${dim("↑↓")} navigate  ${cyan("enter")} detail${followupHint}${profileListHints}  ${dim("pgup/pgdn")} page${rawToggle}${curlToggle}  ${cyan("m")} main menu  ${cyan("esc")} back  ${cyan("q")} quit`,
 		)
 	} else if (out.type === "item") {
 		lines.push(renderHeader([screen.group.name, screen.cmd.name], cols, state.profile))
@@ -1327,13 +1420,16 @@ function renderJsonEditor(
 		const editVal = isCursor && screen.col === "val" && screen.editing
 		const keyStr = renderText(entry.key, entry.keyCursor, keyW - (isKnown ? 0 : 0), editKey)
 
-		// For known enum fields in nav mode, show cycling hint instead of raw value
+		// For known enum fields in nav mode, show cycling hint instead of raw value.
+		// For non-enum known fields, show a type placeholder when value is empty.
 		const valDisplay =
 			!editVal && hasEnum && entry.val
 				? `${entry.val} ${dim("↑↓")}`
 				: !editVal && hasEnum && !entry.val
 					? dim("<pick ↑↓>")
-					: renderText(entry.val, entry.valCursor, valW - 4, editVal)
+					: !editVal && !hasEnum && spec && !entry.val
+						? dim(`<${spec.type}>`)
+						: renderText(entry.val, entry.valCursor, valW - 4, editVal)
 		const valStr = valDisplay
 
 		const keyPart =
@@ -1381,7 +1477,9 @@ function renderJsonEditor(
 				: undefined
 		const editHint = editSpec?.enum
 			? `${dim("↑↓")} pick value  ${cyan("enter")} confirm  ${cyan("esc")} cancel`
-			: `${dim("←→")} cursor  ${cyan("tab")} switch col  ${cyan("enter")} confirm  ${cyan("esc")} cancel`
+			: screen.col === "key" && screen.fieldSpecs && screen.fieldSpecs.length > 0
+				? `${dim("↑↓")} pick field  ${dim("←→")} cursor  ${cyan("tab")} switch col  ${cyan("enter")} confirm  ${cyan("esc")} cancel`
+				: `${dim("←→")} cursor  ${cyan("tab")} switch col  ${cyan("enter")} confirm  ${cyan("esc")} cancel`
 		lines.push(`  ${editHint}`)
 	} else {
 		lines.push(
@@ -1452,7 +1550,8 @@ async function runWorkerLoop(
 	while (running) {
 		let result: {
 			jobs: Array<{
-				jobKey: string
+				jobKey?: string
+				key?: string
 				processDefinitionId: string
 				elementId: string
 				processInstanceKey: string
@@ -1465,7 +1564,6 @@ async function runWorkerLoop(
 				worker: "casen-worker",
 				timeout: jobTimeout,
 				maxJobsToActivate: maxJobs,
-				requestTimeout: 20000,
 			})) as typeof result
 		} catch (err) {
 			if (!running) break
@@ -1481,17 +1579,23 @@ async function runWorkerLoop(
 		const jobs = result?.jobs ?? []
 		for (const job of jobs) {
 			if (!running) break
+			// Some Zeebe-compatible engines return `key` instead of `jobKey`
+			const jobKey = job.jobKey ?? job.key
+			if (!jobKey) {
+				addWorkerLog(ws, "err", "Activated job has no key — skipping")
+				continue
+			}
 			ws.stats.activated++
 			addWorkerLog(
 				ws,
 				"info",
-				`Activated ${job.jobKey}  process=${job.processDefinitionId}  element=${job.elementId}`,
+				`Activated ${jobKey}  process=${job.processDefinitionId}  element=${job.elementId}`,
 			)
 			let jobResult: WorkerJobResult = { outcome: "complete", variables }
 			const processJob = ws.cmd._worker?.processJob
 			if (processJob) {
 				try {
-					jobResult = await processJob(job)
+					jobResult = await processJob({ ...job, jobKey })
 				} catch (err) {
 					addWorkerLog(
 						ws,
@@ -1502,19 +1606,19 @@ async function runWorkerLoop(
 			}
 			try {
 				if (jobResult.outcome === "complete") {
-					await client.job.completeJob(job.jobKey, { variables: jobResult.variables })
+					await client.job.completeJob(jobKey, { variables: jobResult.variables })
 					ws.stats.completed++
-					addWorkerLog(ws, "ok", `Completed ${job.jobKey}`)
+					addWorkerLog(ws, "ok", `Completed ${jobKey}`)
 				} else if (jobResult.outcome === "fail") {
-					await client.job.failJob(job.jobKey, {
+					await client.job.failJob(jobKey, {
 						errorMessage: jobResult.errorMessage,
 						retries: jobResult.retries,
 						retryBackOff: jobResult.retryBackOff,
 					})
 					ws.stats.failed++
-					addWorkerLog(ws, "err", `Failed ${job.jobKey}: ${jobResult.errorMessage}`)
+					addWorkerLog(ws, "err", `Failed ${jobKey}: ${jobResult.errorMessage}`)
 				} else {
-					await client.job.throwJobError(job.jobKey, {
+					await client.job.throwJobError(jobKey, {
 						errorCode: jobResult.errorCode,
 						errorMessage: jobResult.errorMessage,
 						variables: jobResult.variables,
@@ -1523,7 +1627,7 @@ async function runWorkerLoop(
 					addWorkerLog(
 						ws,
 						"err",
-						`Error ${job.jobKey} [${jobResult.errorCode}]: ${jobResult.errorMessage ?? ""}`,
+						`Error ${jobKey} [${jobResult.errorCode}]: ${jobResult.errorMessage ?? ""}`,
 					)
 				}
 			} catch (err) {
@@ -1531,11 +1635,12 @@ async function runWorkerLoop(
 				addWorkerLog(
 					ws,
 					"err",
-					`Failed to settle ${job.jobKey}: ${err instanceof Error ? err.message : String(err)}`,
+					`Failed to settle ${jobKey}: ${err instanceof Error ? err.message : String(err)}`,
 				)
 			}
 		}
-		if (jobs.length > 0) await new Promise((r) => setTimeout(r, 100))
+		// Sleep between polls: brief yield after processing jobs, longer pause when idle
+		await new Promise((r) => setTimeout(r, jobs.length > 0 ? 100 : 2000))
 	}
 
 	ws.status = "stopped"
@@ -1675,6 +1780,7 @@ async function runAskInTui(
 		},
 		raw: null,
 		rawView: false,
+		message: "",
 		curlView: false,
 		altView: false,
 		cursor: 0,
@@ -1928,6 +2034,7 @@ function handleMainKey(
 					scroll: 0,
 					editing: false,
 					error: "",
+					errorRaw: null,
 					running: false,
 				})
 			} else if (group) {
@@ -2001,6 +2108,7 @@ function handleCommandsKey(
 					scroll: 0,
 					editing: false,
 					error: "",
+					errorRaw: null,
 					running: false,
 				})
 			}
@@ -2034,6 +2142,7 @@ async function executeCommand(
 	}
 	screen.running = true
 	screen.error = ""
+	screen.errorRaw = null
 	render(state)
 
 	const { writer, get } = makeCapturingWriter()
@@ -2092,6 +2201,7 @@ async function executeCommand(
 			altView: false,
 			cursor: 0,
 			scroll: 0,
+			message: "",
 		})
 	} catch (err) {
 		const msg = err instanceof Error ? err.message : String(err)
@@ -2104,6 +2214,7 @@ async function executeCommand(
 			error: msg,
 		})
 		screen.error = msg
+		screen.errorRaw = rawCapture
 	} finally {
 		screen.running = false
 	}
@@ -2324,6 +2435,61 @@ function handleResultsKey(
 ): void {
 	const { rows } = termSize()
 	const viewH = Math.max(3, rows - 10)
+
+	// Profile list inline shortcuts: u=use, s=show, d=delete
+	if (
+		screen.group.name === "profile" &&
+		screen.cmd.name === "list" &&
+		screen.output.type === "list"
+	) {
+		// Clear stale message on any key in this context
+		screen.message = ""
+		if (key === "u" || key === "U") {
+			const item = screen.output.items[screen.cursor]
+			const name = item?.name as string | undefined
+			if (name && useProfile(name)) {
+				state.profile = name
+				state.profileInfo = buildProfileInfoEntries(name)
+				const items = rebuildProfileListItems()
+				screen.output = { type: "list", items, columns: screen.output.columns, total: items.length }
+				screen.message = `✓ Active profile: ${name}`
+			} else if (name) {
+				screen.message = `Profile "${name}" not found`
+			}
+			render(state)
+			return
+		}
+		if (key === "s" || key === "S") {
+			const item = screen.output.items[screen.cursor]
+			if (item) {
+				state.stack.push({
+					kind: "detail",
+					group: screen.group,
+					cmd: screen.cmd,
+					item,
+					label: String(item.name ?? "profile"),
+					cursor: 0,
+					scroll: 0,
+				})
+			}
+			render(state)
+			return
+		}
+		if (key === "d" || key === "D") {
+			const item = screen.output.items[screen.cursor]
+			const name = item?.name as string | undefined
+			if (name && deleteProfile(name)) {
+				const items = rebuildProfileListItems()
+				screen.output = { type: "list", items, columns: screen.output.columns, total: items.length }
+				screen.cursor = Math.min(screen.cursor, Math.max(0, items.length - 1))
+				screen.message = `✓ Deleted profile "${name}"`
+			} else if (name) {
+				screen.message = `Cannot delete "${name}" (modeler profiles are read-only)`
+			}
+			render(state)
+			return
+		}
+	}
 
 	// r/R toggles raw view; u/U toggles curl view — mutually exclusive
 	if (key === "r" || key === "R") {
@@ -2765,6 +2931,7 @@ function handleFollowupKey(
 					scroll: 0,
 					editing: false,
 					error: "",
+					errorRaw: null,
 					running: false,
 				})
 			}
@@ -2823,6 +2990,29 @@ function handleJsonEditorKey(
 			} else {
 				entry.val = text
 				entry.valCursor = cur
+			}
+		}
+
+		// Key cycling for key column when fieldSpecs are available
+		if (activeIsKey && screen.fieldSpecs && screen.fieldSpecs.length > 0) {
+			const available = getAvailableFieldSpecs(screen.cursor, screen.entries, screen.fieldSpecs)
+			if (available.length > 0) {
+				if (key === "\x1b[A" || key === "\x1b[B") {
+					const curIdx = available.findIndex((s) => s.name === entry.key)
+					let nextIdx: number
+					if (key === "\x1b[A") {
+						nextIdx = curIdx <= 0 ? available.length - 1 : curIdx - 1
+					} else {
+						nextIdx = curIdx < 0 || curIdx >= available.length - 1 ? 0 : curIdx + 1
+					}
+					const newSpec = available[nextIdx]
+					if (newSpec) {
+						entry.key = newSpec.name
+						entry.keyCursor = entry.key.length
+					}
+					render(state)
+					return
+				}
 			}
 		}
 
@@ -2948,8 +3138,17 @@ function handleJsonEditorKey(
 		case "\r":
 		case "\n":
 			if (isAddRow) {
-				// Add a new entry and start editing its key
-				screen.entries.push({ key: "", keyCursor: 0, val: "", valCursor: 0 })
+				// Add a new entry; pre-seed key from first available field spec if available
+				const newEntry = { key: "", keyCursor: 0, val: "", valCursor: 0 }
+				if (screen.fieldSpecs && screen.fieldSpecs.length > 0) {
+					const available = getAvailableFieldSpecs(null, screen.entries, screen.fieldSpecs)
+					const firstSpec = available[0]
+					if (firstSpec) {
+						newEntry.key = firstSpec.name
+						newEntry.keyCursor = firstSpec.name.length
+					}
+				}
+				screen.entries.push(newEntry)
 				screen.cursor = screen.entries.length - 1
 				screen.col = "key"
 				screen.editing = true
@@ -2966,18 +3165,23 @@ function handleJsonEditorKey(
 			}
 			break
 		case "a":
-		case "A":
-			// Insert new entry after cursor and start editing
-			screen.entries.splice(screen.cursor + 1, 0, {
-				key: "",
-				keyCursor: 0,
-				val: "",
-				valCursor: 0,
-			})
+		case "A": {
+			// Insert new entry after cursor; pre-seed key from first available field spec
+			const addEntry = { key: "", keyCursor: 0, val: "", valCursor: 0 }
+			if (screen.fieldSpecs && screen.fieldSpecs.length > 0) {
+				const available = getAvailableFieldSpecs(null, screen.entries, screen.fieldSpecs)
+				const firstSpec = available[0]
+				if (firstSpec) {
+					addEntry.key = firstSpec.name
+					addEntry.keyCursor = firstSpec.name.length
+				}
+			}
+			screen.entries.splice(screen.cursor + 1, 0, addEntry)
 			screen.cursor = Math.min(screen.cursor + 1, screen.entries.length - 1)
 			screen.col = "key"
 			screen.editing = true
 			break
+		}
 		case "d":
 		case "D":
 			if (!isAddRow && screen.entries.length > 0) {
