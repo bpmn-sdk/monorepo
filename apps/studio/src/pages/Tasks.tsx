@@ -1,0 +1,135 @@
+import { AlertTriangle } from "lucide-react"
+import { useState } from "preact/hooks"
+import { Link } from "wouter"
+import { useUserTasks } from "../api/queries.js"
+import { Badge } from "../components/ui/badge.js"
+import { Input } from "../components/ui/input.js"
+
+function isOverdue(dueDate?: string): boolean {
+	if (!dueDate) return false
+	return new Date(dueDate) < new Date()
+}
+
+function priorityLabel(priority?: number): string {
+	if (!priority) return "Normal"
+	if (priority >= 80) return "Critical"
+	if (priority >= 60) return "High"
+	if (priority >= 40) return "Medium"
+	return "Low"
+}
+
+export function Tasks() {
+	const [search, setSearch] = useState("")
+	const { data, isLoading, isError } = useUserTasks()
+
+	const filtered = data?.items.filter(
+		(t) =>
+			!search ||
+			t.name?.toLowerCase().includes(search.toLowerCase()) ||
+			t.assignee?.toLowerCase().includes(search.toLowerCase()),
+	)
+
+	if (isError) {
+		return (
+			<div className="flex flex-col items-center justify-center h-full gap-4 p-8 text-center">
+				<AlertTriangle size={32} className="text-danger" />
+				<p className="text-sm text-muted">Could not load tasks.</p>
+			</div>
+		)
+	}
+
+	return (
+		<div className="p-6 max-w-6xl mx-auto">
+			<div className="flex items-center justify-between mb-6">
+				<h1 className="text-xl font-semibold text-fg">Tasks</h1>
+			</div>
+
+			<div className="mb-4">
+				<Input
+					placeholder="Search by name or assignee..."
+					value={search}
+					onInput={(e) => setSearch((e.target as HTMLInputElement).value)}
+					className="max-w-80"
+					aria-label="Search tasks"
+				/>
+			</div>
+
+			<div className="rounded-lg border border-border bg-surface overflow-hidden">
+				<table className="w-full text-sm">
+					<thead>
+						<tr className="border-b border-border bg-surface-2 text-left text-xs text-muted">
+							<th className="px-4 py-3 font-medium">Name</th>
+							<th className="px-4 py-3 font-medium">Assignee</th>
+							<th className="px-4 py-3 font-medium">Candidate Groups</th>
+							<th className="px-4 py-3 font-medium">Due Date</th>
+							<th className="px-4 py-3 font-medium">Priority</th>
+						</tr>
+					</thead>
+					<tbody>
+						{isLoading &&
+							(["s0", "s1", "s2", "s3", "s4"] as const).map((sk) => (
+								<tr key={sk} className="border-b border-border/50">
+									{(["a", "b", "c", "d", "e"] as const).map((col) => (
+										<td key={col} className="px-4 py-3">
+											<div className="h-4 animate-pulse rounded bg-surface-2" />
+										</td>
+									))}
+								</tr>
+							))}
+						{filtered?.map((task) => {
+							const overdue = isOverdue(task.dueDate)
+							return (
+								<tr key={task.userTaskKey} className="border-b border-border/50 hover:bg-surface-2">
+									<td className="px-4 py-3">
+										<Link
+											href={`/tasks/${task.userTaskKey}`}
+											className="font-medium text-fg hover:text-accent"
+										>
+											{task.name || `Task ${task.userTaskKey}`}
+										</Link>
+									</td>
+									<td className="px-4 py-3 text-muted text-sm">
+										{task.assignee ?? <span className="text-xs italic">Unassigned</span>}
+									</td>
+									<td className="px-4 py-3">
+										<div className="flex flex-wrap gap-1">
+											{task.candidateGroups?.map((g) => (
+												<Badge key={g} variant="default" className="text-xs">
+													{g}
+												</Badge>
+											))}
+										</div>
+									</td>
+									<td className={`px-4 py-3 text-xs ${overdue ? "text-danger" : "text-muted"}`}>
+										{task.dueDate ? new Date(task.dueDate).toLocaleDateString() : "—"}
+										{overdue && <span className="ml-1">(overdue)</span>}
+									</td>
+									<td className="px-4 py-3">
+										<Badge
+											variant={
+												(task.priority ?? 0) >= 60
+													? "danger"
+													: (task.priority ?? 0) >= 40
+														? "warn"
+														: "muted"
+											}
+										>
+											{priorityLabel(task.priority)}
+										</Badge>
+									</td>
+								</tr>
+							)
+						})}
+						{!isLoading && filtered?.length === 0 && (
+							<tr>
+								<td colSpan={5} className="px-4 py-8 text-center text-sm text-muted">
+									No tasks found.
+								</td>
+							</tr>
+						)}
+					</tbody>
+				</table>
+			</div>
+		</div>
+	)
+}

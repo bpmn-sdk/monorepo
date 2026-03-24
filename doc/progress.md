@@ -1,5 +1,22 @@
 # Progress
 
+## 2026-03-24 — Studio: full implementation (phases 1–8) + user-tasks package
+
+- Implemented all 9 phases of the studio roadmap (phases 1–8 fully functional; phase 9 / desktop scaffold deferred).
+- Created `apps/studio` — Preact + Zustand v5 + TanStack Query v5 + wouter v3 + Tailwind v4 app.
+- Pages: Dashboard, Models, ModelDetail, Definitions, DefinitionDetail, Instances, InstanceDetail, Incidents, IncidentDetail, Tasks, TaskDetail, Decisions, DecisionDetail, Settings.
+- Layout: Shell (3-column), Sidebar (mode-ordered navigation), TopBar, AIDrawer (streaming SSE chat).
+- Stores: theme, cluster (proxy profile selection), models (IndexedDB CRUD), ui (command palette / AI drawer), mode (developer/operator), toast.
+- API layer: typed query key factory, `proxyFetch`/`proxyPost`/`proxyDelete` helpers with `x-profile` header, all TanStack Query hooks + mutations.
+- Storage: `StorageAdapter` interface + `IndexedDbAdapter` (native IndexedDB API).
+- UI components: Button (cva+Slot), Input, Badge, Dialog, DropdownMenu, Popover, Tabs, Tooltip, all wrapping Radix UI primitives with Preact compat ref casts.
+- Editor integration: `BpmnEditor` (sync `load()` / `exportXml()`), 2s debounced auto-save, ⌘S immediate save, deployed-versions panel.
+- Canvas overlays: `createTokenHighlightPlugin` used in DefinitionDetail, InstanceDetail, IncidentDetail; access via `.api.setError()`.
+- Command palette: ⌘K dialog with keyboard navigation (arrow keys + Enter).
+- Created `packages/user-tasks` — vanilla TS widget (`createUserTaskWidget`) for rendering and completing Camunda user tasks with form-viewer integration.
+- Fixed all TypeScript errors (zero errors across both packages).
+- Fixed all Biome lint/format issues (zero warnings/errors).
+
 ## 2026-03-24 — Studio: architecture plan and implementation roadmap
 
 - Designed BPMNkit Studio — a unified app replacing fragmented Camunda tooling (Modeler, Operate, Tasklist).

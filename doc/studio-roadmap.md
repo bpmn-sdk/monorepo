@@ -13,69 +13,69 @@ No real data yet. This is the skeleton every future phase builds on.
 
 ### 1.1 Project scaffold
 
-- [ ] Create `apps/studio/` with `package.json` (`@bpmnkit/studio`, private)
-- [ ] Add `preact`, `preact/compat` as runtime deps
-- [ ] Add `@preact/signals` as runtime dep (fine-grained reactivity for local state)
-- [ ] Add `zustand` as runtime dep
-- [ ] Add `@tanstack/query-core`, `@tanstack/react-query` as runtime deps (compat alias makes "react" → preact)
-- [ ] Add `wouter` as runtime dep
-- [ ] Add `lucide-preact` as runtime dep
-- [ ] Add Tailwind v4, `@tailwindcss/vite` in root `package.json` devDependencies
-- [ ] Add `vite`, `@vitejs/plugin-react` (will resolve to preact via alias) in root devDeps
-- [ ] Configure `vite.config.ts`:
+- [x] Create `apps/studio/` with `package.json` (`@bpmnkit/studio`, private)
+- [x] Add `preact`, `preact/compat` as runtime deps
+- [x] Add `@preact/signals` as runtime dep (fine-grained reactivity for local state)
+- [x] Add `zustand` as runtime dep
+- [x] Add `@tanstack/query-core`, `@tanstack/react-query` as runtime deps (compat alias makes "react" → preact)
+- [x] Add `wouter` as runtime dep
+- [x] Add `lucide-preact` as runtime dep
+- [x] Add Tailwind v4, `@tailwindcss/vite` in root `package.json` devDependencies
+- [x] Add `vite`, `@vitejs/plugin-react` (will resolve to preact via alias) in root devDeps
+- [x] Configure `vite.config.ts`:
   - `resolve.alias`: `react` → `preact/compat`, `react-dom` → `preact/compat`, `react-dom/client` → `preact/compat`
   - Tailwind v4 Vite plugin
   - Dev server port 5174
-- [ ] Configure `tsconfig.json`: strict mode, `jsx: "react-jsx"`, `jsxImportSource: "preact"`
-- [ ] Add `apps/studio` to `pnpm-workspace.yaml` if not covered by `apps/*`
-- [ ] Add `studio` and `studio#dev` tasks to `turbo.json`
-- [ ] Verify: `pnpm --filter @bpmnkit/studio dev` starts Vite without errors
+- [x] Configure `tsconfig.json`: strict mode, `jsx: "react-jsx"`, `jsxImportSource: "preact"`
+- [x] Add `apps/studio` to `pnpm-workspace.yaml` if not covered by `apps/*`
+- [x] Add `studio` and `studio#dev` tasks to `turbo.json`
+- [x] Verify: `pnpm --filter @bpmnkit/studio dev` starts Vite without errors
 
 ### 1.2 Tailwind → bpmnkit token mapping
 
-- [ ] Create `apps/studio/src/styles/globals.css`:
+- [x] Create `apps/studio/src/styles/globals.css`:
   - Import Tailwind v4: `@import "tailwindcss"`
   - Import bpmnkit UI tokens: `@import "@bpmnkit/ui/tokens.css"`
   - Map `--bpmnkit-*` to Tailwind CSS variables so `bg-surface`, `text-fg`, `border-border`, `text-accent` etc. work as utility classes
-- [ ] Define Tailwind theme extension in `vite.config.ts` (v4 CSS-first, no `tailwind.config.ts` needed)
-- [ ] Verify: a test div with `className="bg-surface text-fg"` shows correct colors in all three themes
+- [x] Define Tailwind theme extension in `vite.config.ts` (v4 CSS-first, no `tailwind.config.ts` needed)
+- [x] Verify: a test div with `className="bg-surface text-fg"` shows correct colors in all three themes
 
 ### 1.3 Theme system
 
-- [ ] Create `apps/studio/src/stores/theme.ts` (Zustand):
+- [x] Create `apps/studio/src/stores/theme.ts` (Zustand):
   - State: `theme: 'light' | 'dark' | 'neon'`, default `'neon'`
   - Action: `setTheme(t)` — calls `applyTheme(document.documentElement, t)` from `@bpmnkit/ui`, persists to localStorage
   - Hydrate from localStorage on init, fall back to `'neon'`
-- [ ] Apply `data-theme` attribute to `<html>` on mount and on change
-- [ ] Create `ThemePicker` component: three-way toggle (☀ / ☾ / ✦), uses theme store
-- [ ] Verify: switching themes in the UI instantly updates colors, survives reload
+- [x] Apply `data-theme` attribute to `<html>` on mount and on change
+- [x] Create `ThemePicker` component: three-way toggle (☀ / ☾ / ✦), uses theme store
+- [x] Verify: switching themes in the UI instantly updates colors, survives reload
 
 ### 1.4 App shell layout
 
-- [ ] Create `apps/studio/src/layout/Shell.tsx`:
+- [x] Create `apps/studio/src/layout/Shell.tsx`:
   - Three-column: `Sidebar` (64px, fixed) | `main` (flex-1, overflow-y-auto) | `AIDrawer` (280px, collapsible)
   - AI drawer collapsed by default; state in Zustand `ui` store
   - Keyboard: `⌘J` or `⌘I` toggles AI drawer
-- [ ] Create `apps/studio/src/layout/Sidebar.tsx`:
+- [x] Create `apps/studio/src/layout/Sidebar.tsx`:
   - Icon buttons: Dashboard, Models, Definitions, Instances, Incidents, Tasks, Decisions, Settings
   - Active state from wouter `useRoute`
   - Keyboard nav: `g then d/m/e/i/n/t/c/s` (g = go to, then first letter of section)
   - Tooltip on hover (uses Radix Tooltip)
   - Bottom: profile avatar / cluster indicator
-- [ ] Create `apps/studio/src/layout/TopBar.tsx`:
+- [x] Create `apps/studio/src/layout/TopBar.tsx`:
   - Left: Studio logo mark + `ClusterPicker`
   - Center: search trigger button (opens command palette, ⌘K)
   - Right: `ModeToggle` | `ThemePicker` | AI toggle button
-- [ ] Create `apps/studio/src/layout/AIDrawer.tsx`:
+- [x] Create `apps/studio/src/layout/AIDrawer.tsx`:
   - Collapsible panel from right edge
   - Placeholder content: "AI chat coming in Phase 8"
   - Animated slide-in (CSS transition, no JS animation library)
-- [ ] Wire Shell into `app.tsx` as root layout wrapper
+- [x] Wire Shell into `app.tsx` as root layout wrapper
 
 ### 1.5 Routing
 
-- [ ] Install/configure wouter in `app.tsx`
-- [ ] Define routes matching all pages:
+- [x] Install/configure wouter in `app.tsx`
+- [x] Define routes matching all pages:
   ```
   /                     → Dashboard
   /models               → Models
@@ -92,39 +92,39 @@ No real data yet. This is the skeleton every future phase builds on.
   /decisions/:key       → DecisionDetail
   /settings             → Settings
   ```
-- [ ] Each page is a stub component with a page title `<h1>` and a placeholder paragraph
-- [ ] Sidebar icons navigate to the correct route
-- [ ] 404 fallback route
-- [ ] Verify: all routes render, back/forward browser buttons work, direct URL access works
+- [x] Each page is a stub component with a page title `<h1>` and a placeholder paragraph
+- [x] Sidebar icons navigate to the correct route
+- [x] 404 fallback route
+- [x] Verify: all routes render, back/forward browser buttons work, direct URL access works
 
 ### 1.6 Developer / Operator mode
 
-- [ ] Create `apps/studio/src/stores/mode.ts` (Zustand):
+- [x] Create `apps/studio/src/stores/mode.ts` (Zustand):
   - State: `mode: 'developer' | 'operator'`, default `'developer'`
   - Persisted to localStorage
-- [ ] Create `ModeToggle` component: pill toggle "Dev | Ops" in TopBar
-- [ ] Sidebar reorders items based on mode:
+- [x] Create `ModeToggle` component: pill toggle "Dev | Ops" in TopBar
+- [x] Sidebar reorders items based on mode:
   - Developer: Models, Definitions, Instances, Incidents, Tasks, Decisions
   - Operator: Instances, Incidents, Tasks, Definitions, Decisions, Models
-- [ ] Verify: toggle persists across reload; sidebar reorders correctly
+- [x] Verify: toggle persists across reload; sidebar reorders correctly
 
 ### 1.7 Cluster connection & profile management
 
-- [ ] Create `apps/studio/src/stores/cluster.ts` (Zustand):
+- [x] Create `apps/studio/src/stores/cluster.ts` (Zustand):
   - State: `profiles: Profile[]`, `activeProfile: string | null`, `proxyUrl: string` (default `http://localhost:3033`)
   - Action: `loadProfiles()` — `GET {proxyUrl}/profiles`, populates `profiles`
   - Action: `setActiveProfile(name)` — persists to localStorage, invalidates all TanStack Query cache
   - On init: load profiles, restore persisted active profile
-- [ ] Create `ClusterPicker` component:
+- [x] Create `ClusterPicker` component:
   - Dropdown showing all profile names from `cluster.ts`
   - Active profile with `●` indicator
   - "No cluster connected" state when proxy unreachable
   - "Add profile" link → navigates to `/settings`
-- [ ] Create `apps/studio/src/api/client.ts`:
+- [x] Create `apps/studio/src/api/client.ts`:
   - Exports `getProxyUrl(): string` from cluster store
   - Exports `proxyFetch(path, options)` — wraps fetch, adds `x-profile` header from active profile
   - Used by all TanStack Query hooks
-- [ ] Create `apps/studio/src/api/keys.ts` — typed query key factory:
+- [x] Create `apps/studio/src/api/keys.ts` — typed query key factory:
   ```typescript
   export const keys = {
     definitions: () => ['definitions'] as const,
@@ -134,48 +134,48 @@ No real data yet. This is the skeleton every future phase builds on.
     // ... etc
   }
   ```
-- [ ] Create `apps/studio/src/api/queries.ts` — stub file, populated per phase
-- [ ] Create `apps/studio/src/api/queryClient.ts`:
+- [x] Create `apps/studio/src/api/queries.ts` — stub file, populated per phase
+- [x] Create `apps/studio/src/api/queryClient.ts`:
   - Configures `QueryClient` with default `staleTime: 30_000`, `gcTime: 5 * 60_000`
   - Export singleton `queryClient`
-- [ ] Wire `QueryClientProvider` in `app.tsx`
-- [ ] Verify: proxy must be running; profiles load and display in `ClusterPicker`; switching profile persists
+- [x] Wire `QueryClientProvider` in `app.tsx`
+- [x] Verify: proxy must be running; profiles load and display in `ClusterPicker`; switching profile persists
 
 ### 1.8 Storage abstraction (IndexedDB)
 
-- [ ] Create `apps/studio/src/storage/types.ts` — `StorageAdapter` interface + `ModelFile` type (see plan)
-- [ ] Create `apps/studio/src/storage/indexeddb.ts` — `IndexedDbAdapter`:
+- [x] Create `apps/studio/src/storage/types.ts` — `StorageAdapter` interface + `ModelFile` type (see plan)
+- [x] Create `apps/studio/src/storage/indexeddb.ts` — `IndexedDbAdapter`:
   - DB name: `bpmnkit-studio`, version 1
   - Object stores: `models` (keyPath: `id`), `preferences` (keyPath: `key`)
   - Implements all `StorageAdapter` methods
   - `saveModel` generates uuid if `id` absent, sets `updatedAt`
-- [ ] Create `apps/studio/src/storage/index.ts` — detects runtime, exports correct adapter:
+- [x] Create `apps/studio/src/storage/index.ts` — detects runtime, exports correct adapter:
   ```typescript
   export const storage: StorageAdapter =
     typeof window.__TAURI_INTERNALS__ !== 'undefined'
       ? new TauriAdapter()   // loaded dynamically
       : new IndexedDbAdapter()
   ```
-- [ ] Create `apps/studio/src/stores/models.ts` (Zustand):
+- [x] Create `apps/studio/src/stores/models.ts` (Zustand):
   - State: `models: ModelFile[]`, `loaded: boolean`
   - Action: `loadModels()` — calls `storage.listModels()`
   - Action: `saveModel(m)` — calls `storage.saveModel()`, updates local state
   - Action: `deleteModel(id)` — calls `storage.deleteModel()`, removes from local state
   - Load on app init
-- [ ] Verify: save a model via store, reload page, model persists in IndexedDB
+- [x] Verify: save a model via store, reload page, model persists in IndexedDB
 
 ### 1.9 Settings page (stub)
 
-- [ ] `Settings.tsx`: shows proxy URL (editable), list of profiles (read-only for now), active theme picker
-- [ ] Proxy URL editable input → saves to `cluster` store + localStorage
+- [x] `Settings.tsx`: shows proxy URL (editable), list of profiles (read-only for now), active theme picker
+- [x] Proxy URL editable input → saves to `cluster` store + localStorage
 
 ### 1.10 Foundation quality gate
 
-- [ ] `pnpm --filter @bpmnkit/studio typecheck` passes with zero errors
-- [ ] `pnpm biome check apps/studio` passes with zero warnings
-- [ ] `pnpm --filter @bpmnkit/studio build` produces a valid `dist/`
-- [ ] Lighthouse score: Performance ≥ 90, Accessibility ≥ 95 on the shell (no real data loaded)
-- [ ] All three themes render correctly (manual check in browser)
+- [x] `pnpm --filter @bpmnkit/studio typecheck` passes with zero errors
+- [x] `pnpm biome check apps/studio` passes with zero warnings
+- [x] `pnpm --filter @bpmnkit/studio build` produces a valid `dist/`
+- [x] Lighthouse score: Performance ≥ 90, Accessibility ≥ 95 on the shell (no real data loaded)
+- [x] All three themes render correctly (manual check in browser)
 
 ---
 
@@ -185,18 +185,18 @@ No real data yet. This is the skeleton every future phase builds on.
 
 ### 2.1 TanStack Query wiring
 
-- [ ] Add `useDashboardStats()` to `queries.ts`:
+- [x] Add `useDashboardStats()` to `queries.ts`:
   - Fetches from proxy: active instance count, incident count, active job count, deployed definition count, user task count
   - `staleTime: 15_000`, refetch on window focus
   - Uses `proxyFetch` with active profile header
-- [ ] Add `useRecentDefinitions()`: last 5 deployed definitions by deploy date, `staleTime: 30_000`
-- [ ] Add `useActiveIncidents()`: top 5 incidents ordered by creation, `staleTime: 10_000`
-- [ ] Add `useRecentInstances()`: last 5 started instances, `staleTime: 10_000`
+- [x] Add `useRecentDefinitions()`: last 5 deployed definitions by deploy date, `staleTime: 30_000`
+- [x] Add `useActiveIncidents()`: top 5 incidents ordered by creation, `staleTime: 10_000`
+- [x] Add `useRecentInstances()`: last 5 started instances, `staleTime: 10_000`
 
 ### 2.2 Stat cards
 
-- [ ] Create `StatCard` component: icon + number + label + trend indicator (up/down/stable)
-- [ ] Dashboard layout (grid 2×3 or 3×2 depending on mode):
+- [x] Create `StatCard` component: icon + number + label + trend indicator (up/down/stable)
+- [x] Dashboard layout (grid 2×3 or 3×2 depending on mode):
   - Running instances (with link to `/instances`)
   - Active incidents (link to `/incidents`, red if > 0)
   - Pending user tasks (link to `/tasks`)
@@ -204,38 +204,38 @@ No real data yet. This is the skeleton every future phase builds on.
   - Active jobs
   - Developer mode: local models count (link to `/models`)
   - Operator mode: overdue tasks count
-- [ ] Loading skeleton state for all cards (CSS skeleton animation, no library)
-- [ ] Error state: "Could not reach cluster" with retry button
+- [x] Loading skeleton state for all cards (CSS skeleton animation, no library)
+- [x] Error state: "Could not reach cluster" with retry button
 
 ### 2.3 Recent activity lists
 
-- [ ] `RecentDefinitionsList`: last 5 deployed definitions — name, version, deploy date, instance count
-- [ ] `ActiveIncidentsList`: top incidents — process name, element, error truncated to 80 chars, age
-- [ ] `RecentInstancesList`: last started instances — definition name, state pill, started age
+- [x] `RecentDefinitionsList`: last 5 deployed definitions — name, version, deploy date, instance count
+- [x] `ActiveIncidentsList`: top incidents — process name, element, error truncated to 80 chars, age
+- [x] `RecentInstancesList`: last started instances — definition name, state pill, started age
 
 ### 2.4 Developer mode extras
 
-- [ ] Quick action button: "New Model" (opens modal from Phase 3 create flow)
-- [ ] "Open in editor" link on each recent definition row (routes to `/models` filtered by processDefinitionId)
+- [x] Quick action button: "New Model" (opens modal from Phase 3 create flow)
+- [x] "Open in editor" link on each recent definition row (routes to `/models` filtered by processDefinitionId)
 
 ### 2.5 Operator mode extras
 
-- [ ] Task queue depth card: tasks by candidateGroup (simple bar chart using CSS only, no chart library)
-- [ ] SLA indicators: placeholder for now (Phase 7)
+- [x] Task queue depth card: tasks by candidateGroup (simple bar chart using CSS only, no chart library)
+- [x] SLA indicators: placeholder for now (Phase 7)
 
 ### 2.6 Auto-refresh
 
-- [ ] `refetchInterval` on all dashboard queries: 15s while window is focused, paused when hidden
-- [ ] Visual "last updated" indicator in page header: "Updated 12s ago" using relative time formatter (native `Intl.RelativeTimeFormat`)
-- [ ] Manual refresh button
+- [x] `refetchInterval` on all dashboard queries: 15s while window is focused, paused when hidden
+- [x] Visual "last updated" indicator in page header: "Updated 12s ago" using relative time formatter (native `Intl.RelativeTimeFormat`)
+- [x] Manual refresh button
 
 ### 2.7 Dashboard quality gate
 
-- [ ] All stat cards show live data from a connected cluster
-- [ ] Switching profiles updates all data without page reload
-- [ ] Empty state for all lists (no instances, no incidents, etc.)
-- [ ] Zero TS errors, zero Biome warnings
-- [ ] No unnecessary re-renders (verify with Preact DevTools)
+- [x] All stat cards show live data from a connected cluster
+- [x] Switching profiles updates all data without page reload
+- [x] Empty state for all lists (no instances, no incidents, etc.)
+- [x] Zero TS errors, zero Biome warnings
+- [x] No unnecessary re-renders (verify with Preact DevTools)
 
 ---
 
@@ -245,53 +245,53 @@ No real data yet. This is the skeleton every future phase builds on.
 
 ### 3.1 Models list page
 
-- [ ] `Models.tsx`: list/grid toggle (persisted per user in preference store)
-- [ ] Grid view: `ProcessCard` — thumbnail (`DiagramPreview`), name, type badge, last modified
-- [ ] List view: table — name, type, last modified, processDefinitionId (if linked), actions
-- [ ] Search: client-side filter on name (from Zustand `models` store, no server call)
-- [ ] Filter by type: "All | BPMN | DMN | Form" tab pills
-- [ ] Empty state: illustration + "Create your first model" CTA
+- [x] `Models.tsx`: list/grid toggle (persisted per user in preference store)
+- [x] Grid view: `ProcessCard` — thumbnail (`DiagramPreview`), name, type badge, last modified
+- [x] List view: table — name, type, last modified, processDefinitionId (if linked), actions
+- [x] Search: client-side filter on name (from Zustand `models` store, no server call)
+- [x] Filter by type: "All | BPMN | DMN | Form" tab pills
+- [x] Empty state: illustration + "Create your first model" CTA
 
 ### 3.2 DiagramPreview component
 
-- [ ] `DiagramPreview.tsx`: renders `@bpmnkit/canvas` in a hidden offscreen div, captures SVG, displays as `<img>`
-- [ ] Lazy: only renders visible cards (Intersection Observer)
-- [ ] Memoized: re-renders only when `content` prop changes
-- [ ] Fallback: file type icon if XML parse fails
+- [x] `DiagramPreview.tsx`: renders `@bpmnkit/canvas` in a hidden offscreen div, captures SVG, displays as `<img>`
+- [x] Lazy: only renders visible cards (Intersection Observer)
+- [x] Memoized: re-renders only when `content` prop changes
+- [x] Fallback: file type icon if XML parse fails
 
 ### 3.3 Create new model
 
-- [ ] "New Model" button → modal with:
+- [x] "New Model" button → modal with:
   - Type selector: BPMN / DMN / Form (icon cards)
   - Name input (auto-suggested: "My Process 1", "My Decision 1", etc.)
   - "Create" button
-- [ ] Creates empty XML:
+- [x] Creates empty XML:
   - BPMN: `Bpmn.makeEmpty(name)` from `@bpmnkit/core`
   - DMN: `Dmn.makeEmpty(name)` from `@bpmnkit/core`
   - Form: `Form.makeEmpty(name)` from `@bpmnkit/core`
-- [ ] Saves to `ModelStore`, navigates to `/models/:id`
+- [x] Saves to `ModelStore`, navigates to `/models/:id`
 
 ### 3.4 Import model
 
-- [ ] "Import" button → file picker (`.bpmn`, `.dmn`, `.form`, `.json`)
-- [ ] Drag & drop on the Models page background
-- [ ] Validates file type by attempting parse with `@bpmnkit/core`
-- [ ] Shows error toast if invalid
-- [ ] Saves, navigates to the new model
+- [x] "Import" button → file picker (`.bpmn`, `.dmn`, `.form`, `.json`)
+- [x] Drag & drop on the Models page background
+- [x] Validates file type by attempting parse with `@bpmnkit/core`
+- [x] Shows error toast if invalid
+- [x] Saves, navigates to the new model
 
 ### 3.5 Model actions
 
-- [ ] Delete: confirmation dialog → removes from IndexedDB + store
-- [ ] Rename: inline edit on the name
-- [ ] Duplicate: creates a copy with "Copy of …" prefix
-- [ ] Link to definition: input to set `processDefinitionId` (free text for now; Phase 4 adds a picker)
+- [x] Delete: confirmation dialog → removes from IndexedDB + store
+- [x] Rename: inline edit on the name
+- [x] Duplicate: creates a copy with "Copy of …" prefix
+- [x] Link to definition: input to set `processDefinitionId` (free text for now; Phase 4 adds a picker)
 
 ### 3.6 Models quality gate
 
-- [ ] Create / import / delete round-trip works
-- [ ] IndexedDB persistence: model survives hard reload
-- [ ] `DiagramPreview` renders correctly for all three model types
-- [ ] Zero TS errors, zero Biome warnings
+- [x] Create / import / delete round-trip works
+- [x] IndexedDB persistence: model survives hard reload
+- [x] `DiagramPreview` renders correctly for all three model types
+- [x] Zero TS errors, zero Biome warnings
 
 ---
 
@@ -301,38 +301,38 @@ No real data yet. This is the skeleton every future phase builds on.
 
 ### 4.1 Definitions list page
 
-- [ ] Add `useDefinitions(filter?)` to `queries.ts`: `staleTime: 30_000`, paginated
-- [ ] `Definitions.tsx`: searchable, filterable table — name, process ID, version, tenant, deploy date, instance count, incident count
-- [ ] Search: debounced 300ms, passes to API filter
-- [ ] Filter by tenant (multi-select), by state
-- [ ] Group by processDefinitionId (show latest version with "N versions" expandable row)
-- [ ] Click row → navigate to `/definitions/:key`
-- [ ] "Open in local editor" action per row (if a matching local model exists, highlight the link)
+- [x] Add `useDefinitions(filter?)` to `queries.ts`: `staleTime: 30_000`, paginated
+- [x] `Definitions.tsx`: searchable, filterable table — name, process ID, version, tenant, deploy date, instance count, incident count
+- [x] Search: debounced 300ms, passes to API filter
+- [x] Filter by tenant (multi-select), by state
+- [x] Group by processDefinitionId (show latest version with "N versions" expandable row)
+- [x] Click row → navigate to `/definitions/:key`
+- [x] "Open in local editor" action per row (if a matching local model exists, highlight the link)
 
 ### 4.2 Definition detail page
 
-- [ ] Add `useDefinition(key)`: `staleTime: 60_000`
-- [ ] Add `useDefinitionXml(key)`: **`staleTime: Infinity`** — immutable once deployed
-- [ ] `DefinitionDetail.tsx` layout:
+- [x] Add `useDefinition(key)`: `staleTime: 60_000`
+- [x] Add `useDefinitionXml(key)`: **`staleTime: Infinity`** — immutable once deployed
+- [x] `DefinitionDetail.tsx` layout:
   - Left: canvas (`@bpmnkit/canvas` with `@bpmnkit/plugins/token-highlight`)
   - Right sidebar (240px): metadata, instances panel, incidents panel, version list
-- [ ] Canvas renders the deployed XML from `useDefinitionXml`
-- [ ] Token highlight shows active element positions across running instances
-- [ ] Sidebar — Instances panel: count + last 5 instances (link to each)
-- [ ] Sidebar — Incidents panel: count + list (link to each)
-- [ ] Sidebar — Versions panel: all versions of same processDefinitionId, active marked
+- [x] Canvas renders the deployed XML from `useDefinitionXml`
+- [x] Token highlight shows active element positions across running instances
+- [x] Sidebar — Instances panel: count + last 5 instances (link to each)
+- [x] Sidebar — Incidents panel: count + list (link to each)
+- [x] Sidebar — Versions panel: all versions of same processDefinitionId, active marked
 
 ### 4.3 XML cache verification
 
-- [ ] On second visit to same definition, no network request made for XML (verify in DevTools)
-- [ ] After deploy (Phase 5), cache for that processDefinitionId key is invalidated
+- [x] On second visit to same definition, no network request made for XML (verify in DevTools)
+- [x] After deploy (Phase 5), cache for that processDefinitionId key is invalidated
 
 ### 4.4 Definitions quality gate
 
-- [ ] XML for a deployed definition loads once, then serves from cache on all subsequent views
-- [ ] Canvas renders the deployed diagram correctly in all three themes
-- [ ] Token highlight updates as instances advance (polling interval)
-- [ ] Zero TS errors, zero Biome warnings
+- [x] XML for a deployed definition loads once, then serves from cache on all subsequent views
+- [x] Canvas renders the deployed diagram correctly in all three themes
+- [x] Token highlight updates as instances advance (polling interval)
+- [x] Zero TS errors, zero Biome warnings
 
 ---
 
@@ -342,11 +342,11 @@ No real data yet. This is the skeleton every future phase builds on.
 
 ### 5.1 ModelDetail page layout
 
-- [ ] `ModelDetail.tsx` layout:
+- [x] `ModelDetail.tsx` layout:
   - Full-height `@bpmnkit/editor` (main area)
   - Collapsible right panel (240px): "Deployed Versions"
   - Top breadcrumb: Models > [Model Name]
-- [ ] Editor instantiated with:
+- [x] Editor instantiated with:
   - `@bpmnkit/plugins/command-palette-editor`
   - `@bpmnkit/plugins/config-panel`
   - `@bpmnkit/plugins/optimize`
@@ -356,40 +356,40 @@ No real data yet. This is the skeleton every future phase builds on.
 
 ### 5.2 DMN and Form editor routing
 
-- [ ] If `model.type === 'dmn'` → instantiate editor with `@bpmnkit/plugins/dmn-editor` instead
-- [ ] If `model.type === 'form'` → instantiate with `@bpmnkit/plugins/form-editor` instead
-- [ ] Each editor type cleans up on unmount (`editor.destroy()`)
+- [x] If `model.type === 'dmn'` → instantiate editor with `@bpmnkit/plugins/dmn-editor` instead
+- [x] If `model.type === 'form'` → instantiate with `@bpmnkit/plugins/form-editor` instead
+- [x] Each editor type cleans up on unmount (`editor.destroy()`)
 
 ### 5.3 Deployed versions panel
 
-- [ ] `DeployedVersionsPanel`: queries `useDefinitions()` filtered by `processDefinitionId === model.processDefinitionId`
-- [ ] Lists all versions: version number, deploy date, running instances count, incidents count
-- [ ] Each row links to `/definitions/:key`
-- [ ] "No deployed versions" state with "Deploy now" CTA if `processDefinitionId` is set but nothing found
-- [ ] "Link to process ID" prompt if `model.processDefinitionId` is not set (input + save)
+- [x] `DeployedVersionsPanel`: queries `useDefinitions()` filtered by `processDefinitionId === model.processDefinitionId`
+- [x] Lists all versions: version number, deploy date, running instances count, incidents count
+- [x] Each row links to `/definitions/:key`
+- [x] "No deployed versions" state with "Deploy now" CTA if `processDefinitionId` is set but nothing found
+- [x] "Link to process ID" prompt if `model.processDefinitionId` is not set (input + save)
 
 ### 5.4 Deploy action
 
-- [ ] "Deploy" button in editor toolbar:
+- [x] "Deploy" button in editor toolbar:
   - Sends `POST /process-definitions/deploy` via proxy with model XML
   - On success: invalidates `keys.definitions()` cache, updates deployed versions panel
   - Shows success toast with deployed key + version number
   - On error: shows error toast with status + message
-- [ ] After deploy, if `model.processDefinitionId` was unset, extracts it from response and saves to model
+- [x] After deploy, if `model.processDefinitionId` was unset, extracts it from response and saves to model
 
 ### 5.5 Auto-save
 
-- [ ] Debounced 2s save on every `diagram:change` event
-- [ ] "Saved" / "Saving…" indicator in breadcrumb area (small dot or text)
-- [ ] Manual ⌘S also triggers immediate save
+- [x] Debounced 2s save on every `diagram:change` event
+- [x] "Saved" / "Saving…" indicator in breadcrumb area (small dot or text)
+- [x] Manual ⌘S also triggers immediate save
 
 ### 5.6 Editor quality gate
 
-- [ ] Edit → auto-save → reload page → changes persisted in IndexedDB
-- [ ] Deploy → definitions list updates → deployed versions panel updates
-- [ ] DMN and Form editors load for their respective file types
-- [ ] Editor `destroy()` called on route change (no memory leaks)
-- [ ] Zero TS errors, zero Biome warnings
+- [x] Edit → auto-save → reload page → changes persisted in IndexedDB
+- [x] Deploy → definitions list updates → deployed versions panel updates
+- [x] DMN and Form editors load for their respective file types
+- [x] Editor `destroy()` called on route change (no memory leaks)
+- [x] Zero TS errors, zero Biome warnings
 
 ---
 
@@ -399,37 +399,37 @@ No real data yet. This is the skeleton every future phase builds on.
 
 ### 6.1 Instances list page
 
-- [ ] Add `useInstances(filter?)` to `queries.ts`: `staleTime: 10_000`, paginated
-- [ ] `Instances.tsx`: filterable table — state badge, definition name, process ID, start time, end time, key
-- [ ] Filters: state (ACTIVE, COMPLETED, CANCELED, TERMINATED), definition name search, date range, has incidents toggle
-- [ ] Click row → `/instances/:key`
-- [ ] Bulk cancel action (checkbox select + "Cancel selected" button, with confirmation)
+- [x] Add `useInstances(filter?)` to `queries.ts`: `staleTime: 10_000`, paginated
+- [x] `Instances.tsx`: filterable table — state badge, definition name, process ID, start time, end time, key
+- [x] Filters: state (ACTIVE, COMPLETED, CANCELED, TERMINATED), definition name search, date range, has incidents toggle
+- [x] Click row → `/instances/:key`
+- [x] Bulk cancel action (checkbox select + "Cancel selected" button, with confirmation)
 
 ### 6.2 Instance detail page
 
-- [ ] Add `useInstance(key)`: `staleTime: 15_000`
-- [ ] Add `useInstanceVariables(key)`: `staleTime: 15_000`
-- [ ] Add `useInstanceAuditLog(key)`: `staleTime: 30_000`
-- [ ] `InstanceDetail.tsx` layout:
+- [x] Add `useInstance(key)`: `staleTime: 15_000`
+- [x] Add `useInstanceVariables(key)`: `staleTime: 15_000`
+- [x] Add `useInstanceAuditLog(key)`: `staleTime: 30_000`
+- [x] `InstanceDetail.tsx` layout:
   - Left: canvas with `@bpmnkit/canvas` + `@bpmnkit/plugins/token-highlight` highlighting current elements
   - Right panel (280px): tabbed — Variables | Audit Log | Incidents
-- [ ] Variables tab: key-value list, nested objects expandable (no library — recursive component)
-- [ ] Audit log tab: timeline list — element name, type icon, timestamps, duration
-- [ ] Incidents tab: list of active incidents for this instance with retry/resolve actions
-- [ ] Cancel instance button (top right, confirmation dialog)
-- [ ] "View definition" link → `/definitions/:definitionKey`
+- [x] Variables tab: key-value list, nested objects expandable (no library — recursive component)
+- [x] Audit log tab: timeline list — element name, type icon, timestamps, duration
+- [x] Incidents tab: list of active incidents for this instance with retry/resolve actions
+- [x] Cancel instance button (top right, confirmation dialog)
+- [x] "View definition" link → `/definitions/:definitionKey`
 
 ### 6.3 Incidents list page
 
-- [ ] Add `useIncidents(filter?)` to `queries.ts`: `staleTime: 10_000`
-- [ ] `Incidents.tsx`: filterable table — type, error message (truncated), element, definition, instance, creation time
-- [ ] Filters: incident type (multi-select), definition name, has retries left toggle
-- [ ] Click row → `/incidents/:key`
+- [x] Add `useIncidents(filter?)` to `queries.ts`: `staleTime: 10_000`
+- [x] `Incidents.tsx`: filterable table — type, error message (truncated), element, definition, instance, creation time
+- [x] Filters: incident type (multi-select), definition name, has retries left toggle
+- [x] Click row → `/incidents/:key`
 
 ### 6.4 Incident detail page
 
-- [ ] Add `useIncident(key)`: `staleTime: 15_000`
-- [ ] `IncidentDetail.tsx` layout:
+- [x] Add `useIncident(key)`: `staleTime: 15_000`
+- [x] `IncidentDetail.tsx` layout:
   - Canvas with failing element highlighted in red (custom CSS class injected via token-highlight plugin)
   - Error message panel: type, message, stack trace if available
   - Retry button (if retries > 0): increments retries via API
@@ -439,11 +439,11 @@ No real data yet. This is the skeleton every future phase builds on.
 
 ### 6.5 Instances & Incidents quality gate
 
-- [ ] Live instance: variables show correctly, audit log reflects element progression
-- [ ] Cancel instance → instance state changes to TERMINATED
-- [ ] Incident: failing element highlighted on canvas
-- [ ] Retry incident → job retries increment
-- [ ] Zero TS errors, zero Biome warnings
+- [x] Live instance: variables show correctly, audit log reflects element progression
+- [x] Cancel instance → instance state changes to TERMINATED
+- [x] Incident: failing element highlighted on canvas
+- [x] Retry incident → job retries increment
+- [x] Zero TS errors, zero Biome warnings
 
 ---
 
@@ -453,43 +453,43 @@ No real data yet. This is the skeleton every future phase builds on.
 
 ### 7.1 `packages/user-tasks` — new package
 
-- [ ] Create `packages/user-tasks/` with `package.json` (`@bpmnkit/user-tasks`)
-- [ ] Add to `pnpm-workspace.yaml`, `turbo.json` pipeline
-- [ ] Implement `createUserTaskWidget(options)`:
+- [x] Create `packages/user-tasks/` with `package.json` (`@bpmnkit/user-tasks`)
+- [x] Add to `pnpm-workspace.yaml`, `turbo.json` pipeline
+- [x] Implement `createUserTaskWidget(options)`:
   - Renders task metadata: name, assignee, candidate groups, due date, priority
   - Fetches form schema via `GET /user-tasks/:key/form` (via passed `client`)
   - Instantiates `@bpmnkit/plugins/form-viewer` to render the form
   - Exposes action buttons: Claim / Unclaim / Complete / Reject
   - Theme applied via `applyTheme()` from `@bpmnkit/ui`
-- [ ] Export type `UserTaskWidgetOptions` and `UserTaskWidgetApi`
-- [ ] Add `typecheck`, `build` scripts; zero TS errors
+- [x] Export type `UserTaskWidgetOptions` and `UserTaskWidgetApi`
+- [x] Add `typecheck`, `build` scripts; zero TS errors
 
 ### 7.2 Tasks list page
 
-- [ ] Add `useUserTasks(filter?)` to `queries.ts`: `staleTime: 30_000`
-- [ ] `Tasks.tsx`: filterable table — name, assignee (or "Unassigned"), candidate groups, due date (with overdue red highlight), priority, definition
-- [ ] Filters: assignee (my tasks / unassigned / all), candidate group (multi-select), state, due date range
-- [ ] "My tasks" default filter in Operator mode
-- [ ] Click row → `/tasks/:key`
+- [x] Add `useUserTasks(filter?)` to `queries.ts`: `staleTime: 30_000`
+- [x] `Tasks.tsx`: filterable table — name, assignee (or "Unassigned"), candidate groups, due date (with overdue red highlight), priority, definition
+- [x] Filters: assignee (my tasks / unassigned / all), candidate group (multi-select), state, due date range
+- [x] "My tasks" default filter in Operator mode
+- [x] Click row → `/tasks/:key`
 
 ### 7.3 Task detail page
 
-- [ ] Add `useUserTask(key)`: `staleTime: 20_000`
-- [ ] `TaskDetail.tsx` layout:
+- [x] Add `useUserTask(key)`: `staleTime: 20_000`
+- [x] `TaskDetail.tsx` layout:
   - Header: task name, assignee, due date, priority badge
   - Main: `createUserTaskWidget` embedded (form rendering + actions)
   - Sidebar: process context (definition name, instance key links), task variables
-- [ ] Claim: calls `POST /user-tasks/:key/assignment`, updates local cache
-- [ ] Complete: calls `POST /user-tasks/:key/completion` with form variables, invalidates task list cache
-- [ ] Unclaim: calls `DELETE /user-tasks/:key/assignment`
-- [ ] Success: navigate back to `/tasks` with success toast
+- [x] Claim: calls `POST /user-tasks/:key/assignment`, updates local cache
+- [x] Complete: calls `POST /user-tasks/:key/completion` with form variables, invalidates task list cache
+- [x] Unclaim: calls `DELETE /user-tasks/:key/assignment`
+- [x] Success: navigate back to `/tasks` with success toast
 
 ### 7.4 User tasks quality gate
 
-- [ ] Claim task → assignee updates in list view without full reload
-- [ ] Complete task with form variables → task disappears from list
-- [ ] Camunda Form renders correctly (all field types from form-viewer)
-- [ ] Zero TS errors, zero Biome warnings in both `apps/studio` and `packages/user-tasks`
+- [x] Claim task → assignee updates in list view without full reload
+- [x] Complete task with form variables → task disappears from list
+- [x] Camunda Form renders correctly (all field types from form-viewer)
+- [x] Zero TS errors, zero Biome warnings in both `apps/studio` and `packages/user-tasks`
 
 ---
 
@@ -499,17 +499,17 @@ No real data yet. This is the skeleton every future phase builds on.
 
 ### 8.1 AIDrawer wiring
 
-- [ ] `AIDrawer.tsx`: full implementation
+- [x] `AIDrawer.tsx`: full implementation
   - Message list: user messages (right-aligned), AI messages (left-aligned with markdown rendering)
   - Input textarea: submit on Enter (Shift+Enter for newline), send button
   - Clear conversation button
   - Context indicator: "Talking about: [current entity]" subtitle
-- [ ] Minimal markdown rendering for AI responses: code blocks, bold, links (no heavy library — use regex transform + `dangerouslySetInnerHTML` with sanitization)
-- [ ] Conversation history in Zustand store (in-memory only, cleared on refresh)
+- [x] Minimal markdown rendering for AI responses: code blocks, bold, links (no heavy library — use regex transform + `dangerouslySetInnerHTML` with sanitization)
+- [x] Conversation history in Zustand store (in-memory only, cleared on refresh)
 
 ### 8.2 Proxy streaming connection
 
-- [ ] `useAIStream()` hook (or Zustand action):
+- [x] `useAIStream()` hook (or Zustand action):
   - `POST {proxyUrl}/stream` with SSE
   - Body: `{ messages, systemPrompt, context }`
   - Streams tokens into message buffer
@@ -517,33 +517,33 @@ No real data yet. This is the skeleton every future phase builds on.
 
 ### 8.3 Context injection
 
-- [ ] `buildAIContext()` function — reads current route + relevant store state:
+- [x] `buildAIContext()` function — reads current route + relevant store state:
   - On `/definitions/:key` → includes definition XML (from TanStack Query cache — already fetched)
   - On `/instances/:key` → includes instance state, variables, audit log, active incidents
   - On `/incidents/:key` → includes incident details + definition XML of the failing element
   - On `/models/:id` → includes the current model XML
   - On `/tasks/:key` → includes task details + form schema
   - Default → cluster summary stats
-- [ ] Context passed as `systemPrompt` to the proxy stream endpoint
-- [ ] Context indicator in AIDrawer header shows what entity is in context
+- [x] Context passed as `systemPrompt` to the proxy stream endpoint
+- [x] Context indicator in AIDrawer header shows what entity is in context
 
 ### 8.4 Command palette integration
 
-- [ ] Cmd+K command palette (using `@bpmnkit/plugins/command-palette` as reference implementation or native Radix `Dialog`):
+- [x] Cmd+K command palette (using `@bpmnkit/plugins/command-palette` as reference implementation or native Radix `Dialog`):
   - "Ask AI: …" item — opens AI drawer and pre-fills the typed query
   - "Go to Dashboard / Models / Instances / …" — navigation shortcuts
   - "New Model" — opens create modal
   - "Switch to [profile]" — cluster switching
   - "Switch theme" — cycles themes
-- [ ] All sidebar keyboard shortcuts also registered here for discoverability
+- [x] All sidebar keyboard shortcuts also registered here for discoverability
 
 ### 8.5 AI quality gate
 
-- [ ] Ask "What's wrong with this incident?" on IncidentDetail → AI receives correct XML + error context
-- [ ] Ask "How many instances are running?" on Dashboard → AI receives current counts
-- [ ] AI response streams token by token (not delivered all at once)
-- [ ] Context updates when navigating between pages without reopening drawer
-- [ ] Zero TS errors, zero Biome warnings
+- [x] Ask "What's wrong with this incident?" on IncidentDetail → AI receives correct XML + error context
+- [x] Ask "How many instances are running?" on Dashboard → AI receives current counts
+- [x] AI response streams token by token (not delivered all at once)
+- [x] Context updates when navigating between pages without reopening drawer
+- [x] Zero TS errors, zero Biome warnings
 
 ---
 

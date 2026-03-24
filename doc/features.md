@@ -1,5 +1,23 @@
 # Features
 
+## BPMNkit Studio (2026-03-24) — `apps/studio` + `packages/user-tasks`
+
+A unified Preact web application replacing fragmented Camunda tooling (Modeler, Operate, Tasklist).
+
+- **Shell**: 3-column layout (Sidebar / main content / AI Drawer), theme switching (light/dark/neon), developer/operator mode toggle that reorders sidebar navigation.
+- **Cluster connection**: proxy-based (localhost:3033), profile selection via `ClusterPicker` dropdown, `x-profile` header on all requests.
+- **Dashboard**: stat cards (running instances, incidents, tasks, definitions), recent activity lists, auto-refresh every 15s.
+- **Models**: local BPMN/DMN/Form files stored in IndexedDB. Grid and list views, `DiagramPreview` via offscreen BpmnCanvas + IntersectionObserver, create/import/delete with confirmation dialogs.
+- **Model Editor**: full-height `BpmnEditor`, 2-second debounced auto-save, ⌘S immediate save, deployed-versions sidebar panel.
+- **Definitions**: searchable/filterable table of deployed process definitions; detail page with BpmnCanvas + token-highlight + metadata sidebar.
+- **Instances**: filterable table with state pills, bulk cancel, detail page with BpmnCanvas overlay, variable tree (recursive), incidents tab.
+- **Incidents**: filterable table, detail page with BpmnCanvas highlighting the failing element in red via `tokenPlugin.api.setError()`.
+- **User Tasks**: filterable table with overdue highlighting, detail page with form rendering via `@bpmnkit/plugins/form-viewer`, claim/unclaim/complete actions.
+- **Decisions**: browsable DMN decision table list and detail view.
+- **AI Drawer**: context-aware chat via proxy SSE streaming endpoint, persists conversation in-session.
+- **Command Palette**: ⌘K dialog with arrow-key navigation, navigation shortcuts, AI trigger.
+- **`@bpmnkit/user-tasks`**: standalone vanilla TS widget (`createUserTaskWidget`) for embedding task completion forms in any host page.
+
 ## Hot Reload Live Mode (2026-03-22) — `packages/plugins/live-mode`
 
 - **`createLiveModePlugin(options)`**: Canvas plugin that keeps a running Zeebe process instance in sync with the diagram as you edit.
