@@ -1,14 +1,14 @@
-name: Deploy Landing Page
+name: Deploy Studio
 
 on:
   push:
     branches: [main]
     paths:
-      - "apps/landing/**"
+      - "apps/studio/**"
   workflow_dispatch:
 
 concurrency:
-  group: deploy-landing
+  group: deploy-studio
   cancel-in-progress: true
 
 jobs:
@@ -30,12 +30,12 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build landing page
-        run: pnpm turbo build --filter @bpmnkit/landing
+      - name: Build studio
+        run: pnpm turbo build --filter @bpmnkit/studio
 
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy apps/landing/dist --project-name=bpmn-sdk-landing
+          command: pages deploy apps/studio/dist --project-name=bpmnkit-studio
