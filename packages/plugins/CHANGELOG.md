@@ -1,5 +1,12 @@
 # @bpmnkit/plugins
 
+## 0.0.18
+
+### Patch Changes
+
+- Updated dependencies [[`2f2915c`](https://github.com/bpmnkit/monorepo/commit/2f2915c2ef245cfe0096efc5a48c62562c53fe24)]:
+  - @bpmnkit/editor@0.0.18
+
 ## 0.0.17
 
 ### Patch Changes
