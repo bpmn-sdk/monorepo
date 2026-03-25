@@ -1,6 +1,7 @@
 {
 	"name": "@bpmnkit/user-tasks",
 	"version": "0.0.1",
+	"description": "Embeddable user task widget for Camunda 8 — form rendering, claim/complete actions, zero dependencies",
 	"type": "module",
 	"main": "./dist/index.js",
 	"types": "./dist/index.d.ts",
@@ -10,6 +11,7 @@
 			"types": "./dist/index.d.ts"
 		}
 	},
+	"files": ["LICENSE", "README.md", "dist/**/*.js", "dist/**/*.d.ts"],
 	"scripts": {
 		"build": "tsc",
 		"typecheck": "tsc --noEmit",
@@ -20,5 +22,26 @@
 		"@bpmnkit/core": "workspace:*",
 		"@bpmnkit/plugins": "workspace:*",
 		"@bpmnkit/ui": "workspace:*"
+	},
+	"keywords": [
+		"bpmn",
+		"camunda",
+		"user-tasks",
+		"workflow",
+		"form",
+		"task-management",
+		"typescript"
+	],
+	"license": "MIT",
+	"publishConfig": {
+		"access": "public"
+	},
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/bpmnkit/monorepo"
+	},
+	"homepage": "https://bpmnkit.com",
+	"bugs": {
+		"url": "https://github.com/bpmnkit/monorepo/issues"
 	}
 }

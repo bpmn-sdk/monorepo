@@ -54,7 +54,8 @@ export function createDefinitionDetailView(
 	openInEditorBtn.textContent = "Open in Editor ↗"
 	openInEditorBtn.style.display = "none"
 	openInEditorBtn.addEventListener("click", () => {
-		if (_openInEditorXml) cfg.onOpenInEditor?.(_openInEditorXml, _openInEditorName, _openInEditorProcessId)
+		if (_openInEditorXml)
+			cfg.onOpenInEditor?.(_openInEditorXml, _openInEditorName, _openInEditorProcessId)
 	})
 
 	// Metadata row
