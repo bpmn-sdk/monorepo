@@ -670,8 +670,13 @@ const OPERATE_CSS = `
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 14px;
-  flex-wrap: wrap;
+  height: 40px;
+  flex-shrink: 0;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--bpmnkit-border);
+  background: var(--bpmnkit-surface);
+  flex-wrap: nowrap;
+  overflow: hidden;
 }
 .op-def-meta-name {
   font-weight: 600;

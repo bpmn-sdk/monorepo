@@ -1,10 +1,11 @@
 import { AlertTriangle, ChevronDown, ChevronRight, ExternalLink, Layers } from "lucide-react"
-import { useState } from "preact/hooks"
+import { useEffect, useState } from "preact/hooks"
 import { Link } from "wouter"
 import { useDefinitions } from "../api/queries.js"
 import type { ProcessDefinition } from "../api/types.js"
 import { Input } from "../components/ui/input.js"
 import { useModelsStore } from "../stores/models.js"
+import { useUiStore } from "../stores/ui.js"
 
 interface ProcessGroup {
 	processDefinitionId: string
@@ -79,6 +80,11 @@ export function Definitions() {
 	const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
 	const { data, isLoading, isError } = useDefinitions()
 	const { models } = useModelsStore()
+	const { setBreadcrumbs } = useUiStore()
+
+	useEffect(() => {
+		setBreadcrumbs([{ label: "Definitions" }])
+	}, [setBreadcrumbs])
 
 	const groups = data ? groupDefinitions(data.items) : []
 
@@ -113,16 +119,11 @@ export function Definitions() {
 
 	return (
 		<div className="p-6 max-w-6xl mx-auto animate-in fade-in slide-in-from-bottom-2 duration-300">
-			<div className="flex items-center justify-between mb-6">
-				<div>
-					<h1 className="text-xl font-semibold text-fg">Definitions</h1>
-					{!isLoading && (
-						<p className="text-xs text-muted mt-0.5">
-							{filtered.length} process{filtered.length !== 1 ? "es" : ""}
-						</p>
-					)}
-				</div>
-			</div>
+			{!isLoading && (
+				<p className="text-xs text-muted mb-6">
+					{filtered.length} process{filtered.length !== 1 ? "es" : ""}
+				</p>
+			)}
 
 			<div className="mb-4">
 				<Input

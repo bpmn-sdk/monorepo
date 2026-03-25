@@ -24,6 +24,7 @@ import {
 	buildMcpExplainPrompt,
 	buildMcpImprovePrompt,
 	buildMcpSystemPrompt,
+	buildOperateChatSystemPrompt,
 	buildSearchSystemPrompt,
 	buildSystemPrompt,
 } from "./prompt.js"
@@ -872,6 +873,59 @@ const server = http.createServer(async (req, res) => {
 		res.end(
 			JSON.stringify({ endpoint: finalSpec.endpoint, filter: finalSpec.filter, items, total }),
 		)
+		return
+	}
+
+	// ── POST /operate/chat — operations-context AI chat ──────────────────────────
+	if (url.pathname === "/operate/chat" && req.method === "POST") {
+		const body = await readBody(req)
+		let messages: Array<{ role: string; content: string }>
+		let stats: {
+			runningInstances: number
+			activeIncidents: number
+			pendingTasks: number
+			deployedDefinitions: number
+			activeJobs: number
+		} | null
+		try {
+			const parsed = JSON.parse(body) as {
+				messages: typeof messages
+				stats?: typeof stats
+			}
+			messages = parsed.messages
+			stats = parsed.stats ?? null
+		} catch {
+			res.writeHead(400)
+			res.end("Bad Request")
+			return
+		}
+
+		const available = await detectAll()
+		const detected = available[0]
+		if (!detected) {
+			res.writeHead(503)
+			res.end("No AI adapter available. Install claude, copilot, or gemini.")
+			return
+		}
+
+		console.log(`[server] /operate/chat → adapter: ${detected.name}`)
+
+		res.writeHead(200, {
+			"Content-Type": "text/event-stream",
+			"Cache-Control": "no-cache",
+			Connection: "keep-alive",
+		})
+
+		const systemPrompt = buildOperateChatSystemPrompt(stats)
+		try {
+			await detected.adapter.stream(messages, systemPrompt, null, (token) => {
+				res.write(`data: ${JSON.stringify({ type: "token", text: token })}\n\n`)
+			})
+		} catch (err) {
+			res.write(`data: ${JSON.stringify({ type: "error", message: String(err) })}\n\n`)
+		}
+		res.write(`data: ${JSON.stringify({ type: "done" })}\n\n`)
+		res.end()
 		return
 	}
 

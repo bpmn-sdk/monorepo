@@ -1,9 +1,10 @@
-import { AlertTriangle } from "lucide-react"
-import { useState } from "preact/hooks"
+import { useEffect, useState } from "preact/hooks"
 import { Link } from "wouter"
 import { useUserTasks } from "../api/queries.js"
+import { ErrorState } from "../components/ErrorState.js"
 import { Badge } from "../components/ui/badge.js"
 import { Input } from "../components/ui/input.js"
+import { useUiStore } from "../stores/ui.js"
 
 function isOverdue(dueDate?: string): boolean {
 	if (!dueDate) return false
@@ -21,6 +22,11 @@ function priorityLabel(priority?: number): string {
 export function Tasks() {
 	const [search, setSearch] = useState("")
 	const { data, isLoading, isError } = useUserTasks()
+	const { setBreadcrumbs } = useUiStore()
+
+	useEffect(() => {
+		setBreadcrumbs([{ label: "Tasks" }])
+	}, [setBreadcrumbs])
 
 	const filtered = data?.items.filter(
 		(t) =>
@@ -31,10 +37,12 @@ export function Tasks() {
 
 	if (isError) {
 		return (
-			<div className="flex flex-col items-center justify-center h-full gap-4 p-8 text-center">
-				<AlertTriangle size={32} className="text-danger" />
-				<p className="text-sm text-muted">Could not load tasks.</p>
-			</div>
+			<ErrorState
+				title="Could not load tasks"
+				description="Unable to reach the Camunda API. Make sure the proxy is running and your cluster supports the User Tasks API (Camunda 8.5+)."
+				hint="pnpm proxy"
+				settingsHint
+			/>
 		)
 	}
 
@@ -42,9 +50,8 @@ export function Tasks() {
 		<div className="p-6 max-w-6xl mx-auto animate-in fade-in slide-in-from-bottom-2 duration-300">
 			<div className="flex items-center justify-between mb-6">
 				<div>
-					<h1 className="text-xl font-semibold text-fg">Tasks</h1>
 					{!isLoading && (
-						<p className="text-xs text-muted mt-0.5">
+						<p className="text-xs text-muted">
 							{filtered?.length ?? 0} task{(filtered?.length ?? 0) !== 1 ? "s" : ""}
 						</p>
 					)}

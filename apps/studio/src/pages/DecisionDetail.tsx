@@ -3,6 +3,7 @@ import { useEffect, useRef } from "preact/hooks"
 import { useLocation, useParams } from "wouter"
 import { getActiveProfile, getProxyUrl } from "../api/client.js"
 import { useThemeStore } from "../stores/theme.js"
+import { useUiStore } from "../stores/ui.js"
 
 type OperateView = ReturnType<typeof createDecisionDetailView>
 
@@ -13,6 +14,11 @@ export function DecisionDetail() {
 	const storeRef = useRef<DecisionsStore | null>(null)
 	const { theme } = useThemeStore()
 	const [, setLocation] = useLocation()
+	const { setBreadcrumbs } = useUiStore()
+
+	useEffect(() => {
+		setBreadcrumbs([{ label: "Decisions", href: "/decisions" }, { label: key }])
+	}, [key, setBreadcrumbs])
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: view is created once per key; refs are stable
 	useEffect(() => {

@@ -1,4 +1,4 @@
-import { useState } from "preact/hooks"
+import { useEffect, useState } from "preact/hooks"
 import { useProfiles } from "../api/queries.js"
 import { ThemePicker } from "../components/ThemePicker.js"
 import { Button } from "../components/ui/button.js"
@@ -6,11 +6,17 @@ import { Input } from "../components/ui/input.js"
 import { Separator } from "../components/ui/separator.js"
 import { useClusterStore } from "../stores/cluster.js"
 import { toast } from "../stores/toast.js"
+import { useUiStore } from "../stores/ui.js"
 
 export function Settings() {
 	const { proxyUrl, activeProfile, setActiveProfile, setProxyUrl, loadProfiles } = useClusterStore()
 	const [proxyInput, setProxyInput] = useState(proxyUrl)
 	const { data: profiles, refetch } = useProfiles()
+	const { setBreadcrumbs } = useUiStore()
+
+	useEffect(() => {
+		setBreadcrumbs([{ label: "Settings" }])
+	}, [setBreadcrumbs])
 
 	function handleSaveProxy() {
 		setProxyUrl(proxyInput)
@@ -26,8 +32,6 @@ export function Settings() {
 
 	return (
 		<div className="p-6 max-w-2xl mx-auto">
-			<h1 className="text-xl font-semibold text-fg mb-6">Settings</h1>
-
 			{/* Proxy URL */}
 			<section className="mb-6">
 				<h2 className="text-sm font-medium text-fg mb-1">Proxy Server</h2>

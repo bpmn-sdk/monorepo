@@ -251,6 +251,59 @@ export function buildSearchSystemPrompt(): string {
 	].join("\n")
 }
 
+// ── Operate chat prompt ────────────────────────────────────────────────────────
+
+export interface OperateStats {
+	runningInstances: number
+	activeIncidents: number
+	pendingTasks: number
+	deployedDefinitions: number
+	activeJobs: number
+}
+
+export function buildOperateChatSystemPrompt(stats: OperateStats | null): string {
+	const lines = [
+		"You are an operations assistant for Camunda 8 process automation.",
+		"Help operators understand what is running in their cluster and what actions to take.",
+		"Be concise, actionable, and prioritize incidents (they block process execution).",
+		"Use markdown for formatting. Keep responses short unless detail is specifically requested.",
+		"",
+	]
+
+	if (stats) {
+		lines.push(
+			"## Current cluster state",
+			`- Running instances: ${stats.runningInstances}`,
+			`- Active incidents: ${stats.activeIncidents}`,
+			`- Pending user tasks: ${stats.pendingTasks}`,
+			`- Deployed process definitions: ${stats.deployedDefinitions}`,
+			`- Active jobs: ${stats.activeJobs}`,
+			"",
+		)
+		if (stats.activeIncidents > 0) {
+			lines.push(
+				`There are ${stats.activeIncidents} active incident(s) — these are blocking process execution.`,
+				"When asked what to do next, prioritize resolving incidents first.",
+				"",
+			)
+		}
+	}
+
+	lines.push(
+		"## Available actions (user performs these in the UI)",
+		"- View and cancel running instances → Instances page",
+		"- View and retry failed incidents → Incidents page",
+		"- Claim and complete user tasks → Tasks page",
+		"- Start new process instances → Definitions page → Start Instance button",
+		"- Deploy new processes → Models page → Deploy button",
+		"",
+		"When asked to do something, explain which UI page to visit and what to click.",
+		"If asked about a specific instance/incident/task, say you can only see aggregate counts unless you query for details.",
+	)
+
+	return lines.join("\n")
+}
+
 // ── Fallback prompt builders (for non-MCP adapters like Gemini) ───────────────
 
 /** Full system prompt for non-MCP adapters that must return a CompactDiagram JSON block. */

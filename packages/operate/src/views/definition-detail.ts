@@ -14,7 +14,7 @@ interface Config {
 	mock: boolean
 	theme: "light" | "dark" | "neon"
 	navigate?: (path: string) => void
-	onOpenInEditor?: (xml: string, name: string) => void
+	onOpenInEditor?: (xml: string, name: string, processDefinitionId: string | undefined) => void
 }
 
 function parseVariables(raw: string): Record<string, unknown> | null {
@@ -46,28 +46,17 @@ export function createDefinitionDetailView(
 	const el = document.createElement("div")
 	el.className = "op-view op-def-detail"
 
-	// Breadcrumb
-	const breadcrumb = document.createElement("div")
-	breadcrumb.className = "op-breadcrumb"
-	const backBtn = document.createElement("button")
-	backBtn.className = "op-back-btn"
-	backBtn.textContent = "← Processes"
-	backBtn.addEventListener("click", onBack)
-	breadcrumb.appendChild(backBtn)
-
 	let _openInEditorXml: string | null = null
 	let _openInEditorName = ""
+	let _openInEditorProcessId: string | undefined = undefined
 	const openInEditorBtn = document.createElement("button")
 	openInEditorBtn.className = "op-action-btn"
 	openInEditorBtn.textContent = "Open in Editor ↗"
-	openInEditorBtn.style.marginLeft = "auto"
 	openInEditorBtn.style.display = "none"
 	openInEditorBtn.addEventListener("click", () => {
-		if (_openInEditorXml) cfg.onOpenInEditor?.(_openInEditorXml, _openInEditorName)
+		if (_openInEditorXml)
+			cfg.onOpenInEditor?.(_openInEditorXml, _openInEditorName, _openInEditorProcessId)
 	})
-	if (cfg.onOpenInEditor) breadcrumb.appendChild(openInEditorBtn)
-
-	el.appendChild(breadcrumb)
 
 	// Metadata row
 	const meta = document.createElement("div")
@@ -188,10 +177,15 @@ export function createDefinitionDetailView(
 		key.textContent = def.processDefinitionKey ?? ""
 		meta.appendChild(key)
 
+		if (cfg.onOpenInEditor) {
+			openInEditorBtn.style.marginLeft = "auto"
+			meta.appendChild(openInEditorBtn)
+		}
+
 		const startBtn = document.createElement("button")
 		startBtn.className = "op-action-btn op-action-btn--primary"
 		startBtn.textContent = "▶ Start Instance"
-		startBtn.style.marginLeft = "auto"
+		startBtn.style.marginLeft = cfg.onOpenInEditor ? "" : "auto"
 		startBtn.addEventListener("click", () => showStartModal(def))
 		meta.appendChild(startBtn)
 	}
@@ -361,9 +355,10 @@ export function createDefinitionDetailView(
 		setTimeout(() => bizInput.focus(), 0)
 	}
 
-	function loadCanvas(xml: string, name: string): void {
+	function loadCanvas(xml: string, name: string, processDefinitionId: string | undefined): void {
 		_openInEditorXml = xml
 		_openInEditorName = name
+		_openInEditorProcessId = processDefinitionId
 		openInEditorBtn.style.display = ""
 		canvas?.destroy()
 		canvasWrap.innerHTML = ""
@@ -371,6 +366,7 @@ export function createDefinitionDetailView(
 			container: canvasWrap,
 			xml,
 			theme: cfg.theme,
+			fit: "center",
 			plugins: [bridgePlugin, configPanel, configPanelBpmn],
 		})
 	}
@@ -379,11 +375,12 @@ export function createDefinitionDetailView(
 		const def = getDef()
 		renderMeta(def)
 		const mockName = def?.name ?? def?.processDefinitionId ?? "Process"
-		loadCanvas(MOCK_BPMN_XML, mockName)
+		loadCanvas(MOCK_BPMN_XML, mockName, def?.processDefinitionId)
 	} else {
 		const def = getDef()
 		renderMeta(def)
 		const defName = def?.name ?? def?.processDefinitionId ?? "Process"
+		const defProcessId = def?.processDefinitionId
 		fetch(`${cfg.proxyUrl}/api/process-definitions/${definitionKey}/xml`, {
 			headers: {
 				accept: "text/xml",
@@ -391,7 +388,7 @@ export function createDefinitionDetailView(
 			},
 		})
 			.then((r) => r.text())
-			.then((xml) => loadCanvas(xml, defName))
+			.then((xml) => loadCanvas(xml, defName, defProcessId))
 			.catch(() => {
 				canvasWrap.innerHTML = `<div style="padding:24px;color:var(--bpmnkit-fg-muted)">Failed to load diagram</div>`
 			})
@@ -410,6 +407,7 @@ export function createDefinitionDetailView(
 		destroy(): void {
 			canvas?.destroy()
 			defUnsub()
+			el.remove()
 		},
 	}
 }
