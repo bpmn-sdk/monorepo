@@ -1,19 +1,25 @@
-import { AlertTriangle } from "lucide-react"
-import { useState } from "preact/hooks"
+import { useEffect, useState } from "preact/hooks"
 import { Link } from "wouter"
 import { useCancelInstance, useInstances } from "../api/queries.js"
+import { ErrorState } from "../components/ErrorState.js"
 import { StatusPill } from "../components/StatusPill.js"
 import { Button } from "../components/ui/button.js"
 import { Input } from "../components/ui/input.js"
 import { toast } from "../stores/toast.js"
+import { useUiStore } from "../stores/ui.js"
 
-type StateFilter = "all" | "ACTIVE" | "COMPLETED" | "CANCELED" | "TERMINATED"
+type StateFilter = "all" | "ACTIVE" | "COMPLETED" | "TERMINATED"
 
 export function Instances() {
 	const [search, setSearch] = useState("")
 	const [stateFilter, setStateFilter] = useState<StateFilter>("all")
 	const [selected, setSelected] = useState<Set<string>>(new Set())
 	const cancelMutation = useCancelInstance()
+	const { setBreadcrumbs } = useUiStore()
+
+	useEffect(() => {
+		setBreadcrumbs([{ label: "Instances" }])
+	}, [setBreadcrumbs])
 
 	const filter = stateFilter !== "all" ? { state: stateFilter } : undefined
 	const { data, isLoading, isError } = useInstances(filter)
@@ -48,10 +54,12 @@ export function Instances() {
 
 	if (isError) {
 		return (
-			<div className="flex flex-col items-center justify-center h-full gap-4 p-8 text-center">
-				<AlertTriangle size={32} className="text-danger" />
-				<p className="text-sm text-muted">Could not load instances.</p>
-			</div>
+			<ErrorState
+				title="Could not load instances"
+				description="Unable to reach the Camunda API. Make sure the proxy is running and connected to your cluster."
+				hint="pnpm proxy"
+				settingsHint
+			/>
 		)
 	}
 
@@ -59,9 +67,8 @@ export function Instances() {
 		<div className="p-6 max-w-6xl mx-auto animate-in fade-in slide-in-from-bottom-2 duration-300">
 			<div className="flex items-center justify-between mb-6">
 				<div>
-					<h1 className="text-xl font-semibold text-fg">Instances</h1>
 					{!isLoading && (
-						<p className="text-xs text-muted mt-0.5">
+						<p className="text-xs text-muted">
 							{filtered?.length ?? 0} instance{(filtered?.length ?? 0) !== 1 ? "s" : ""}
 						</p>
 					)}
@@ -83,7 +90,7 @@ export function Instances() {
 					aria-label="Search instances"
 				/>
 				<div className="flex rounded border border-border bg-surface-2 text-xs overflow-hidden">
-					{(["all", "ACTIVE", "COMPLETED", "CANCELED", "TERMINATED"] as StateFilter[]).map((s) => (
+					{(["all", "ACTIVE", "COMPLETED", "TERMINATED"] as StateFilter[]).map((s) => (
 						<button
 							key={s}
 							type="button"

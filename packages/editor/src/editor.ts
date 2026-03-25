@@ -552,7 +552,8 @@ export class BpmnEditor {
 		}
 
 		this._ro = new ResizeObserver(() => {
-			if (this._defs) this.fitView()
+			// When fit:"none", the caller manages zoom explicitly — never auto-fit on resize.
+			if (this._defs && this._fit !== "none") this.fitView()
 		})
 		this._ro.observe(this._host)
 

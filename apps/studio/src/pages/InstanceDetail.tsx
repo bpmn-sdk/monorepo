@@ -2,8 +2,10 @@ import { InstancesStore, createInstanceDetailView } from "@bpmnkit/operate"
 import { useEffect, useRef } from "preact/hooks"
 import { useLocation, useParams } from "wouter"
 import { getActiveProfile, getProxyUrl } from "../api/client.js"
+import { useInstance } from "../api/queries.js"
 import { useModelsStore } from "../stores/models.js"
 import { useThemeStore } from "../stores/theme.js"
+import { useUiStore } from "../stores/ui.js"
 
 type OperateView = ReturnType<typeof createInstanceDetailView>
 
@@ -14,6 +16,13 @@ export function InstanceDetail() {
 	const storeRef = useRef<InstancesStore | null>(null)
 	const { theme } = useThemeStore()
 	const [, setLocation] = useLocation()
+	const { setBreadcrumbs } = useUiStore()
+	const { data: instance } = useInstance(key)
+
+	useEffect(() => {
+		const name = instance?.processDefinitionId ?? key
+		setBreadcrumbs([{ label: "Instances", href: "/instances" }, { label: name }])
+	}, [key, instance?.processDefinitionId, setBreadcrumbs])
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: view is created once per key; refs are stable
 	useEffect(() => {

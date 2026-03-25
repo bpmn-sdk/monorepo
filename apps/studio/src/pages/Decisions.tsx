@@ -1,12 +1,18 @@
-import { AlertTriangle } from "lucide-react"
-import { useState } from "preact/hooks"
+import { useEffect, useState } from "preact/hooks"
 import { Link } from "wouter"
 import { useDecisions } from "../api/queries.js"
+import { ErrorState } from "../components/ErrorState.js"
 import { Input } from "../components/ui/input.js"
+import { useUiStore } from "../stores/ui.js"
 
 export function Decisions() {
 	const [search, setSearch] = useState("")
 	const { data, isLoading, isError } = useDecisions()
+	const { setBreadcrumbs } = useUiStore()
+
+	useEffect(() => {
+		setBreadcrumbs([{ label: "Decisions" }])
+	}, [setBreadcrumbs])
 
 	const filtered = data?.items.filter(
 		(d) =>
@@ -17,25 +23,22 @@ export function Decisions() {
 
 	if (isError) {
 		return (
-			<div className="flex flex-col items-center justify-center h-full gap-4 p-8 text-center">
-				<AlertTriangle size={32} className="text-danger" />
-				<p className="text-sm text-muted">Could not load decisions.</p>
-			</div>
+			<ErrorState
+				title="Could not load decisions"
+				description="Unable to reach the Camunda API. Make sure the proxy is running and at least one DMN decision has been deployed to your cluster."
+				hint="pnpm proxy"
+				settingsHint
+			/>
 		)
 	}
 
 	return (
 		<div className="p-6 max-w-6xl mx-auto animate-in fade-in slide-in-from-bottom-2 duration-300">
-			<div className="flex items-center justify-between mb-6">
-				<div>
-					<h1 className="text-xl font-semibold text-fg">Decisions</h1>
-					{!isLoading && (
-						<p className="text-xs text-muted mt-0.5">
-							{filtered?.length ?? 0} decision{(filtered?.length ?? 0) !== 1 ? "s" : ""}
-						</p>
-					)}
-				</div>
-			</div>
+			{!isLoading && (
+				<p className="text-xs text-muted mb-6">
+					{filtered?.length ?? 0} decision{(filtered?.length ?? 0) !== 1 ? "s" : ""}
+				</p>
+			)}
 
 			<div className="mb-4">
 				<Input

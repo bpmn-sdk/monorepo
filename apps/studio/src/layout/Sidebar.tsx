@@ -1,17 +1,29 @@
 import {
 	AlertTriangle,
 	CheckSquare,
-	FileText,
 	FolderOpen,
 	GitBranch,
 	Layers,
 	LayoutDashboard,
+	PanelLeftClose,
+	PanelLeftOpen,
 	Play,
+	Search,
 	Settings,
 } from "lucide-react"
+import { Link } from "wouter"
 import { useLocation } from "wouter"
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuLabel,
+	DropdownMenuSeparator,
+	DropdownMenuTrigger,
+} from "../components/ui/dropdown-menu.js"
 import { useClusterStore } from "../stores/cluster.js"
 import { useModeStore } from "../stores/mode.js"
+import { useUiStore } from "../stores/ui.js"
 
 interface NavItem {
 	icon: typeof LayoutDashboard
@@ -60,7 +72,8 @@ function getOrderedItems(mode: "developer" | "operator"): NavItem[] {
 export function Sidebar() {
 	const [location, navigate] = useLocation()
 	const { mode } = useModeStore()
-	const { status } = useClusterStore()
+	const { profiles, activeProfile, status, setActiveProfile } = useClusterStore()
+	const { sidebarExpanded, toggleSidebar, openCommandPalette } = useUiStore()
 	const items = getOrderedItems(mode)
 
 	function isActive(path: string) {
@@ -68,64 +81,186 @@ export function Sidebar() {
 		return location.startsWith(path)
 	}
 
+	const statusColor =
+		status === "connected" ? "bg-success" : status === "loading" ? "bg-warn" : "bg-danger"
+
 	return (
 		<nav
-			className="flex w-16 shrink-0 flex-col items-center gap-1 bg-nav py-2"
+			className={`flex shrink-0 flex-col bg-nav py-2 transition-[width] duration-200 ease-in-out ${
+				sidebarExpanded ? "w-52 border-r border-border/40" : "w-16"
+			}`}
 			aria-label="Main navigation"
 		>
-			{items.map((item) => {
-				const active = isActive(item.path)
-				const Icon = item.icon
-				return (
-					<div key={item.path} className="group relative">
-						<button
-							type="button"
-							onClick={() => navigate(item.path)}
-							aria-label={item.label}
-							aria-current={active ? "page" : undefined}
-							className={`relative flex h-10 w-10 items-center justify-center rounded transition-all duration-150 ${
-								active
-									? "text-nav-fg-active scale-110"
-									: "text-nav-fg hover:text-nav-fg-active hover:bg-white/5 hover:scale-105"
+			{/* Top: profile picker + search */}
+			<div className="px-2 pb-2 mb-1 border-b border-white/10 flex flex-col gap-0.5">
+				{/* Cluster / profile picker */}
+				<DropdownMenu>
+					<DropdownMenuTrigger
+						className={`flex w-full items-center gap-2.5 rounded-md h-9 px-2.5 text-nav-fg hover:text-nav-fg-active hover:bg-white/5 transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-accent ${
+							sidebarExpanded ? "justify-start" : "justify-center"
+						}`}
+						aria-label="Select cluster profile"
+					>
+						<span
+							className={`h-2 w-2 shrink-0 rounded-full ${statusColor} ${status === "loading" ? "animate-pulse" : ""}`}
+							aria-hidden="true"
+						/>
+						<span
+							className={`text-sm font-medium whitespace-nowrap overflow-hidden transition-[max-width,opacity] duration-150 flex-1 text-left ${
+								sidebarExpanded ? "max-w-xs opacity-100" : "max-w-0 opacity-0"
 							}`}
 						>
-							{active && (
-								<span
-									className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-r bg-accent animate-in fade-in slide-in-from-left-1 duration-200"
-									aria-hidden="true"
-								/>
-							)}
-							<Icon size={20} />
-						</button>
+							{activeProfile ?? (status === "offline" ? "No cluster" : "Select profile")}
+						</span>
+						<span
+							className={`text-muted text-xs transition-[max-width,opacity] duration-150 ${
+								sidebarExpanded ? "max-w-xs opacity-100" : "max-w-0 opacity-0"
+							}`}
+						>
+							▾
+						</span>
+					</DropdownMenuTrigger>
+					<DropdownMenuContent align="start" className="min-w-48">
+						{profiles.length === 0 ? (
+							<>
+								<DropdownMenuLabel>No profiles found</DropdownMenuLabel>
+								<DropdownMenuSeparator />
+							</>
+						) : (
+							<>
+								<DropdownMenuLabel>Profiles</DropdownMenuLabel>
+								{profiles.map((p) => (
+									<DropdownMenuItem
+										key={p.name}
+										onSelect={() => setActiveProfile(p.name)}
+										className="gap-2"
+									>
+										{p.name === activeProfile && (
+											<span className="text-accent" aria-label="Active">
+												●
+											</span>
+										)}
+										<span className={p.name === activeProfile ? "font-medium" : ""}>{p.name}</span>
+									</DropdownMenuItem>
+								))}
+								<DropdownMenuSeparator />
+							</>
+						)}
+						<DropdownMenuItem asChild>
+							<Link href="/settings" className="cursor-pointer text-muted">
+								Add profile →
+							</Link>
+						</DropdownMenuItem>
+					</DropdownMenuContent>
+				</DropdownMenu>
+
+				{/* Search trigger */}
+				<div className="group relative">
+					<button
+						type="button"
+						onClick={openCommandPalette}
+						className={`flex w-full items-center gap-2.5 rounded-md h-9 px-2.5 text-nav-fg hover:text-nav-fg-active hover:bg-white/5 transition-colors duration-150 ${
+							sidebarExpanded ? "justify-start" : "justify-center"
+						}`}
+						aria-label="Open search"
+					>
+						<Search size={18} className="shrink-0" />
+						<span
+							className={`text-sm whitespace-nowrap overflow-hidden transition-[max-width,opacity] duration-150 flex-1 text-left ${
+								sidebarExpanded ? "max-w-xs opacity-100" : "max-w-0 opacity-0"
+							}`}
+						>
+							Search...
+						</span>
+						<kbd
+							className={`text-xs text-muted whitespace-nowrap overflow-hidden transition-[max-width,opacity] duration-150 ${
+								sidebarExpanded ? "max-w-xs opacity-100" : "max-w-0 opacity-0"
+							}`}
+						>
+							⌘K
+						</kbd>
+					</button>
+					{!sidebarExpanded && (
 						<div
 							className="pointer-events-none absolute left-full top-1/2 z-50 ml-2 -translate-y-1/2 whitespace-nowrap rounded bg-surface-2 px-2 py-1 text-xs text-fg opacity-0 shadow-md transition-opacity duration-150 delay-300 group-hover:opacity-100"
 							role="tooltip"
 						>
-							{item.label}
-							<span className="ml-2 text-muted">{item.shortcut}</span>
+							Search <span className="ml-1 text-muted">⌘K</span>
 						</div>
-					</div>
-				)
-			})}
-
-			{/* Cluster status indicator at bottom */}
-			<div className="group relative mt-auto pb-2">
-				<div
-					className={`h-2.5 w-2.5 rounded-full ${
-						status === "connected"
-							? "bg-success"
-							: status === "loading"
-								? "bg-warn animate-pulse"
-								: "bg-danger"
-					}`}
-					aria-label={`Cluster ${status}`}
-				/>
-				<div
-					className="pointer-events-none absolute left-full top-1/2 z-50 ml-2 -translate-y-1/2 whitespace-nowrap rounded bg-surface-2 px-2 py-1 text-xs text-fg opacity-0 shadow-md transition-opacity group-hover:opacity-100"
-					role="tooltip"
-				>
-					Cluster: {status}
+					)}
 				</div>
+			</div>
+
+			{/* Nav items */}
+			<div className="flex flex-col gap-0.5 px-2 flex-1">
+				{items.map((item) => {
+					const active = isActive(item.path)
+					const Icon = item.icon
+					return (
+						<div key={item.path} className="group relative">
+							<button
+								type="button"
+								onClick={() => navigate(item.path)}
+								aria-label={item.label}
+								aria-current={active ? "page" : undefined}
+								className={`relative flex w-full items-center gap-3 rounded-md h-9 px-2.5 transition-all duration-150 ${
+									active
+										? "bg-white/10 text-nav-fg-active"
+										: "text-nav-fg hover:text-nav-fg-active hover:bg-white/5"
+								}`}
+							>
+								{active && (
+									<span
+										className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-r bg-accent animate-in fade-in duration-200"
+										aria-hidden="true"
+									/>
+								)}
+								<Icon size={18} className="shrink-0" />
+								<span
+									className={`text-sm font-medium whitespace-nowrap overflow-hidden transition-[max-width,opacity] duration-150 ${
+										sidebarExpanded ? "max-w-xs opacity-100" : "max-w-0 opacity-0"
+									}`}
+								>
+									{item.label}
+								</span>
+							</button>
+							{/* Tooltip — only when collapsed */}
+							{!sidebarExpanded && (
+								<div
+									className="pointer-events-none absolute left-full top-1/2 z-50 ml-2 -translate-y-1/2 whitespace-nowrap rounded bg-surface-2 px-2 py-1 text-xs text-fg opacity-0 shadow-md transition-opacity duration-150 delay-300 group-hover:opacity-100"
+									role="tooltip"
+								>
+									{item.label}
+									<span className="ml-2 text-muted">{item.shortcut}</span>
+								</div>
+							)}
+						</div>
+					)
+				})}
+			</div>
+
+			{/* Bottom: collapse toggle */}
+			<div className="px-2 pt-2 border-t border-white/10 mt-2">
+				<button
+					type="button"
+					onClick={toggleSidebar}
+					className="flex w-full items-center gap-3 rounded-md h-9 px-2.5 text-nav-fg hover:text-nav-fg-active hover:bg-white/5 transition-colors duration-150"
+					aria-label={sidebarExpanded ? "Collapse sidebar" : "Expand sidebar"}
+					title={sidebarExpanded ? "Collapse sidebar [" : "Expand sidebar ["}
+				>
+					{sidebarExpanded ? (
+						<PanelLeftClose size={18} className="shrink-0" />
+					) : (
+						<PanelLeftOpen size={18} className="shrink-0" />
+					)}
+					<span
+						className={`text-sm whitespace-nowrap overflow-hidden transition-[max-width,opacity] duration-150 ${
+							sidebarExpanded ? "max-w-xs opacity-100" : "max-w-0 opacity-0"
+						}`}
+					>
+						Collapse
+					</span>
+				</button>
 			</div>
 		</nav>
 	)

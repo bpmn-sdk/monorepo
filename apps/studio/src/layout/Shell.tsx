@@ -25,7 +25,7 @@ const ROUTE_MAP: Record<string, string> = {
 
 export function Shell({ children }: ShellProps) {
 	const [, navigate] = useLocation()
-	const { toggleCommandPalette, toggleAI } = useUiStore()
+	const { toggleCommandPalette, toggleAI, toggleSidebar } = useUiStore()
 
 	// Global keyboard shortcuts
 	useEffect(() => {
@@ -53,6 +53,12 @@ export function Shell({ children }: ShellProps) {
 
 			if (isInput) return
 
+			// [ — toggle sidebar
+			if (e.key === "[" && !e.metaKey && !e.ctrlKey) {
+				toggleSidebar()
+				return
+			}
+
 			// g + letter navigation
 			if (e.key === "g" && !e.metaKey && !e.ctrlKey) {
 				gPressed = true
@@ -74,7 +80,7 @@ export function Shell({ children }: ShellProps) {
 
 		window.addEventListener("keydown", handleKeyDown)
 		return () => window.removeEventListener("keydown", handleKeyDown)
-	}, [navigate, toggleCommandPalette, toggleAI])
+	}, [navigate, toggleCommandPalette, toggleAI, toggleSidebar])
 
 	return (
 		<div className="flex h-full flex-col overflow-hidden">

@@ -1,15 +1,17 @@
+import { BpmnCanvas } from "@bpmnkit/canvas"
 import { Bpmn, Dmn, Form } from "@bpmnkit/core"
 import { FileText, Grid, List, Plus, Trash2, Upload } from "lucide-react"
-import { useRef, useState } from "preact/hooks"
+import { useEffect, useRef, useState } from "preact/hooks"
 import { useLocation } from "wouter"
-import { DiagramPreview } from "../components/DiagramPreview.js"
 import { StatusPill } from "../components/StatusPill.js"
 import { Button } from "../components/ui/button.js"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../components/ui/dialog.js"
 import { Input } from "../components/ui/input.js"
 import type { ModelFile } from "../storage/types.js"
 import { useModelsStore } from "../stores/models.js"
+import { useThemeStore } from "../stores/theme.js"
 import { toast } from "../stores/toast.js"
+import { useUiStore } from "../stores/ui.js"
 
 type ModelType = "bpmn" | "dmn" | "form"
 type ViewMode = "grid" | "list"
@@ -27,9 +29,34 @@ function makeEmptyContent(type: ModelType, name: string): string {
 	return Form.export(Form.makeEmpty(id))
 }
 
+function BpmnPreview({ xml, theme }: { xml: string; theme: string }) {
+	const containerRef = useRef<HTMLDivElement>(null)
+	const canvasRef = useRef<BpmnCanvas | null>(null)
+
+	useEffect(() => {
+		const container = containerRef.current
+		if (!container || !xml) return
+		const canvas = new BpmnCanvas({
+			container,
+			theme: theme === "light" ? "light" : "dark",
+			grid: false,
+			fit: "contain",
+		})
+		canvas.load(xml)
+		canvasRef.current = canvas
+		return () => {
+			canvas.destroy()
+			canvasRef.current = null
+		}
+	}, [xml, theme])
+
+	return <div ref={containerRef} className="h-full w-full" style={{ pointerEvents: "none" }} />
+}
+
 function ProcessCard({ model, onDelete }: { model: ModelFile; onDelete: () => void }) {
 	const [, navigate] = useLocation()
 	const [hovered, setHovered] = useState(false)
+	const { theme } = useThemeStore()
 
 	return (
 		<article
@@ -38,8 +65,15 @@ function ProcessCard({ model, onDelete }: { model: ModelFile; onDelete: () => vo
 			onMouseLeave={() => setHovered(false)}
 			aria-label={`Model: ${model.name}`}
 		>
-			<div className="h-36 bg-surface-2">
-				<DiagramPreview xml={model.content} width={220} height={144} />
+			<div className="h-36 bg-surface-2 overflow-hidden">
+				{model.type === "bpmn" ? (
+					<BpmnPreview xml={model.content} theme={theme} />
+				) : (
+					<div className="flex h-full items-center justify-center gap-2 text-muted">
+						<FileText size={22} />
+						<span className="text-xs uppercase tracking-wider">{TYPE_LABELS[model.type]}</span>
+					</div>
+				)}
 			</div>
 			<div className="p-3">
 				<div className="flex items-center justify-between gap-2">
@@ -81,6 +115,7 @@ function ProcessCard({ model, onDelete }: { model: ModelFile; onDelete: () => vo
 export function Models() {
 	const { models, saveModel, deleteModel } = useModelsStore()
 	const [, navigate] = useLocation()
+	const { setBreadcrumbs } = useUiStore()
 	const [search, setSearch] = useState("")
 	const [typeFilter, setTypeFilter] = useState<ModelType | "all">("all")
 	const [viewMode, setViewMode] = useState<ViewMode>("grid")
@@ -89,6 +124,10 @@ export function Models() {
 	const [newType, setNewType] = useState<ModelType>("bpmn")
 	const [confirmDelete, setConfirmDelete] = useState<ModelFile | null>(null)
 	const fileInputRef = useRef<HTMLInputElement>(null)
+
+	useEffect(() => {
+		setBreadcrumbs([{ label: "Models" }])
+	}, [setBreadcrumbs])
 
 	const filtered = models.filter((m) => {
 		if (typeFilter !== "all" && m.type !== typeFilter) return false
@@ -148,8 +187,7 @@ export function Models() {
 			onDrop={handleDrop}
 		>
 			{/* Header */}
-			<div className="flex items-center justify-between mb-6">
-				<h1 className="text-xl font-semibold text-fg">Models</h1>
+			<div className="flex items-center justify-end mb-6">
 				<div className="flex items-center gap-2">
 					<Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
 						<Upload size={14} />

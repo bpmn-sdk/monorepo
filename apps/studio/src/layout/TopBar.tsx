@@ -1,39 +1,61 @@
 import { MessageSquare } from "lucide-react"
-import { ClusterPicker } from "../components/ClusterPicker.js"
+import { Link } from "wouter"
+import { BpmnkitLogo } from "../components/Logo.js"
 import { ModeToggle } from "../components/ModeToggle.js"
-import { ThemePicker } from "../components/ThemePicker.js"
 import { useUiStore } from "../stores/ui.js"
 
 export function TopBar() {
-	const { aiOpen, toggleAI, openCommandPalette } = useUiStore()
+	const { aiOpen, toggleAI, toggleSidebar, breadcrumbs } = useUiStore()
 
 	return (
 		<header className="flex h-12 shrink-0 items-center gap-3 border-b border-border bg-surface px-3">
-			{/* Logo */}
-			<div className="flex items-center gap-1.5 text-sm font-semibold text-fg">
-				<span className="text-accent" aria-hidden="true">
-					◈
-				</span>
-				<span>Studio</span>
-			</div>
-
-			{/* Cluster picker */}
-			<ClusterPicker />
-
-			{/* Search trigger */}
+			{/* Logo — click to toggle sidebar */}
 			<button
 				type="button"
-				onClick={openCommandPalette}
-				className="flex flex-1 items-center gap-2 rounded border border-border bg-surface-2 px-3 py-1 text-sm text-muted hover:text-fg hover:border-border/80 transition-all duration-150 max-w-sm"
-				aria-label="Open command palette"
+				onClick={toggleSidebar}
+				className="flex items-center gap-2 shrink-0 rounded hover:opacity-80 transition-opacity duration-150"
+				aria-label="Toggle sidebar"
+				title="Toggle sidebar ["
 			>
-				<span className="flex-1 text-left">Search...</span>
-				<kbd className="text-xs">⌘K</kbd>
+				<BpmnkitLogo height={30} />
+				<span className="text-sm font-semibold text-fg">Studio</span>
 			</button>
+
+			{/* Breadcrumb */}
+			{breadcrumbs.length > 0 && (
+				<nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-sm min-w-0">
+					<span className="text-border" aria-hidden="true">
+						/
+					</span>
+					{breadcrumbs.map((crumb, i) => {
+						const isLast = i === breadcrumbs.length - 1
+						return (
+							<span key={crumb.label} className="flex items-center gap-1.5 min-w-0">
+								{crumb.href && !isLast ? (
+									<Link
+										href={crumb.href}
+										className="text-muted hover:text-fg transition-colors duration-100 truncate"
+									>
+										{crumb.label}
+									</Link>
+								) : (
+									<span className={`truncate ${isLast ? "text-fg font-medium" : "text-muted"}`}>
+										{crumb.label}
+									</span>
+								)}
+								{!isLast && (
+									<span className="text-border shrink-0" aria-hidden="true">
+										/
+									</span>
+								)}
+							</span>
+						)
+					})}
+				</nav>
+			)}
 
 			<div className="ml-auto flex items-center gap-2">
 				<ModeToggle />
-				<ThemePicker />
 				<button
 					type="button"
 					onClick={toggleAI}

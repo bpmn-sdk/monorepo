@@ -1,5 +1,63 @@
 # Progress
 
+## 2026-03-25 — Studio: breadcrumbs show process name
+
+- **InstanceDetail breadcrumb**: uses `useInstance(key)` to resolve `processDefinitionId`; falls back to numeric key while loading.
+- **DefinitionDetail breadcrumb**: uses `useDefinition(key)` to resolve `name` (then `processDefinitionId`); falls back to numeric key while loading.
+- **IncidentDetail breadcrumb**: uses already-loaded `incident.processDefinitionId`; falls back to numeric key while loading.
+
+## 2026-03-25 — Studio: dashboard charts + AI chat; instances filter fix
+
+- **CANCELED filter removed from Instances page**: Camunda 8 process-instance search only supports `ACTIVE | COMPLETED | TERMINATED`. The `CANCELED` filter button was sending an invalid value that caused a 400 error. Removed from `StateFilter` type and filter button list.
+- **Dashboard time series sparklines**: Each stat poll (`useDashboardStats`, every 15 s) appends a `{ t, running, incidents }` snapshot to `localStorage` (max 24 points). Running Instances and Active Incidents cards show an inline SVG sparkline trend line in the card header.
+- **Dashboard AI chat panel**: New `AiChat` component at the bottom of the dashboard. Sends messages + current dashboard stats as context to the new `/operate/chat` proxy endpoint. Streams SSE tokens and renders the conversation inline. Visible whenever the proxy is reachable.
+- **Proxy `/operate/chat` endpoint**: New SSE endpoint in `apps/proxy/src/index.ts`. Takes `{ messages, stats }`, builds an operations-aware system prompt via `buildOperateChatSystemPrompt` (includes current cluster state, incident priority guidance, and available UI actions), and streams using the first available AI adapter (claude/copilot/gemini).
+
+## 2026-03-25 — Studio: editor dock + permanent zoom fix
+
+- **Zoom on window resize fixed at source**: `packages/editor/src/editor.ts` — the `ResizeObserver` callback now checks `this._fit !== "none"` before calling `fitView()`. With `fit: "none"` (used in Studio), the zoom is never automatically adjusted on resize. This is the definitive fix; the `setTimeout` workaround is removed.
+- **`createSideDock` integrated in ModelDetail**: the editor now uses the same `SideDock` as the landing page — collapsible via the ‹ pill handle, Properties tab wired to `configPanel`/`configPanelBpmn`, Deploy tab renders Studio-specific content (link process ID + deployed versions list).
+- **History tab disabled** (no file-storage context in Studio); **Play tab hidden** (no simulation engine wired).
+- **Deploy pane**: rendered as a Preact subtree inside the dock pane using the exported `queryClient` singleton so `useDefinitions` works without re-mounting providers.
+- **Save bar**: slim `h-10` bar above the editor shows save status + save button. Dock `top` set to `48 + 40 = 88px` so it starts below both the TopBar and save bar.
+- **Custom right panel removed**: editor now takes full width; dock floats over the right edge.
+- **`onToggleSidebar`** wired to `initEditorHud` so the HUD's sidebar toggle button controls the dock.
+
+## 2026-03-25 — Studio: Models page — breadcrumb fix + live BPMN card preview
+
+- **Breadcrumb fix**: `useEffect` for `setBreadcrumbs` was placed between `useState` calls in `Models.tsx`, causing the TopBar to show "Dashboard" instead of "Models". Moved all `useState` declarations before any `useEffect`.
+- **BPMN card preview**: replaced `DiagramPreview` (offscreen SVG export) with a live `BpmnCanvas` mounted directly inside each card (`pointer-events: none`, `fit: "contain"`). Theme-synced to current app theme. DMN and Form cards show a file icon + type label instead.
+- Removed `DiagramPreview` import from `Models.tsx` (no longer used there).
+
+## 2026-03-25 — Studio: sidebar overhaul + TopBar breadcrumbs
+
+- **Sidebar: cluster picker at top** — profile selector (with status dot, profile name, chevron dropdown) moved from TopBar into the top section of the sidebar. Collapsed mode shows just the status dot; expanded mode shows full picker. Uses the same DropdownMenu as before, inlined for sidebar-specific layout.
+- **Sidebar: search trigger** — Search button added below the profile picker. Shows icon + "Search..." + ⌘K hint when expanded; icon only when collapsed with tooltip. Opens the command palette (⌘K still works globally).
+- **Sidebar: visible right border** — When expanded, the sidebar gets `border-r border-border/40` for clear visual separation.
+- **TopBar: ClusterPicker + ThemePicker removed** — TopBar now shows only: logo/sidebar toggle, breadcrumb trail, mode toggle, AI button.
+- **TopBar: breadcrumb system** — Added `breadcrumbs: Breadcrumb[]` + `setBreadcrumbs()` to the `ui` Zustand store. TopBar reads and renders them as a clickable trail (each non-last crumb with `href` is a Link). All pages call `setBreadcrumbs` in a `useEffect` on mount.
+- **Pages: local h1 + breadcrumb bars removed** — List pages (Dashboard, Instances, Incidents, Tasks, Definitions, Decisions, Models, Settings) no longer render `<h1>` — the title appears in the TopBar. Detail pages (ModelDetail, TaskDetail, IncidentDetail) had their embedded breadcrumb bar divs removed; breadcrumbs set via store instead. Operate-managed pages (InstanceDetail, DefinitionDetail, DecisionDetail) now also set breadcrumbs.
+- **ModelDetail: save toolbar** moved from removed breadcrumb bar into the top of the right panel.
+- **IncidentDetail: Retry button** moved from removed breadcrumb bar into the top of the error details panel.
+
+## 2026-03-25 — Studio: real logo, dashboard card integration
+
+- **Logo**: copied `doc/logos/2026.svg` → `apps/studio/public/logo.svg`. `Logo.tsx` now renders `<img src="/logo.svg">` (the actual 2026 BPMNkit brand mark) at 30px height in TopBar.
+- **Dashboard cards redesigned**: the 6 stat cards now include an embedded mini-list below the count. Each card has a clickable header linking to the overview page, and a bordered content area showing 4 recent items with timestamps. The three "Recent lists" bottom section is removed.
+  - Running Instances → active instances (process ID, status badge, relative start time)
+  - Active Incidents → active incidents (error type in monospace, relative creation time)
+  - Pending Tasks → recent tasks (name, assignee)
+  - Deployed Definitions → grouped by processDefinitionId (name, latest version, relative deployment time)
+  - Active Jobs → created jobs (job type in monospace, last 6 chars of instance key)
+  - Local Models / Overdue Tasks → models list with type tag / overdue tasks with due date in danger color
+- Card heights are equalized by CSS grid stretch; all cards show 3-item skeleton loaders.
+
+## 2026-03-25 — Studio: logo, expandable sidebar, better error states
+
+- **BPMNkit logo**: created `src/components/Logo.tsx` — SVG diamond/gateway mark (BPMN parallel gateway) replacing the `◈` unicode character in TopBar.
+- **Sidebar expand/collapse**: transitions between `w-16` (icon-only) and `w-52` (icon + label) with `transition-[width] duration-200`. Labels use `max-w-0/max-w-xs` + opacity for smooth entry/exit. Toggle button at bottom; logo in TopBar also toggles. Keyboard shortcut `[`. State persisted in localStorage.
+- **Error states**: `src/components/ErrorState.tsx` — reusable component with title, description, hint code block, Retry, and optional Settings link. Applied to Dashboard, Instances, Incidents, Tasks, Decisions, IncidentDetail, TaskDetail with context-specific advice.
+
 ## 2026-03-24 — Studio: decisions rendered via operate DMN editor
 
 - Exported `createDecisionDetailView` and `DecisionsStore` from `packages/operate/src/index.ts`.
