@@ -8,9 +8,11 @@ import {
 	PanelLeftClose,
 	PanelLeftOpen,
 	Play,
+	RotateCw,
 	Search,
 	Settings,
 } from "lucide-react"
+import { useState } from "preact/hooks"
 import { Link } from "wouter"
 import { useLocation } from "wouter"
 import {
@@ -31,6 +33,16 @@ interface NavItem {
 	path: string
 	shortcut: string
 }
+
+// Paths that require a running proxy to be useful
+const PROXY_REQUIRED = new Set([
+	"/",
+	"/definitions",
+	"/instances",
+	"/incidents",
+	"/tasks",
+	"/decisions",
+])
 
 const ALL_ITEMS: NavItem[] = [
 	{ icon: LayoutDashboard, label: "Dashboard", path: "/", shortcut: "g d" },
@@ -72,7 +84,14 @@ function getOrderedItems(mode: "developer" | "operator"): NavItem[] {
 export function Sidebar() {
 	const [location, navigate] = useLocation()
 	const { mode } = useModeStore()
-	const { profiles, activeProfile, status, setActiveProfile } = useClusterStore()
+	const { profiles, activeProfile, status, setActiveProfile, loadProfiles } = useClusterStore()
+	const [reconnecting, setReconnecting] = useState(false)
+
+	async function handleReconnect() {
+		setReconnecting(true)
+		await loadProfiles()
+		setReconnecting(false)
+	}
 	const { sidebarExpanded, toggleSidebar, openCommandPalette } = useUiStore()
 	const items = getOrderedItems(mode)
 
@@ -154,6 +173,38 @@ export function Sidebar() {
 					</DropdownMenuContent>
 				</DropdownMenu>
 
+				{/* Reconnect button — visible when proxy is offline */}
+				{status === "offline" && (
+					<div className="group relative">
+						<button
+							type="button"
+							onClick={() => void handleReconnect()}
+							disabled={reconnecting}
+							className={`flex w-full items-center gap-2.5 rounded-md h-9 px-2.5 text-warn hover:text-warn/80 hover:bg-white/5 transition-colors duration-150 disabled:opacity-50 ${
+								sidebarExpanded ? "justify-start" : "justify-center"
+							}`}
+							aria-label="Retry proxy connection"
+						>
+							<RotateCw size={18} className={`shrink-0 ${reconnecting ? "animate-spin" : ""}`} />
+							<span
+								className={`text-sm whitespace-nowrap overflow-hidden transition-[max-width,opacity] duration-150 ${
+									sidebarExpanded ? "max-w-xs opacity-100" : "max-w-0 opacity-0"
+								}`}
+							>
+								{reconnecting ? "Connecting…" : "Retry connection"}
+							</span>
+						</button>
+						{!sidebarExpanded && (
+							<div
+								className="pointer-events-none absolute left-full top-1/2 z-50 ml-2 -translate-y-1/2 whitespace-nowrap rounded bg-surface-2 px-2 py-1 text-xs text-fg opacity-0 shadow-md transition-opacity duration-150 delay-300 group-hover:opacity-100"
+								role="tooltip"
+							>
+								Retry connection
+							</div>
+						)}
+					</div>
+				)}
+
 				{/* Search trigger */}
 				<div className="group relative">
 					<button
@@ -196,8 +247,9 @@ export function Sidebar() {
 				{items.map((item) => {
 					const active = isActive(item.path)
 					const Icon = item.icon
+					const dimmed = status === "offline" && PROXY_REQUIRED.has(item.path)
 					return (
-						<div key={item.path} className="group relative">
+						<div key={item.path} className={`group relative ${dimmed ? "opacity-40" : ""}`}>
 							<button
 								type="button"
 								onClick={() => navigate(item.path)}
