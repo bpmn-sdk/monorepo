@@ -1,5 +1,24 @@
 # Progress
 
+## 2026-03-26 — Studio: connector catalog in command palette
+
+- **`apps/studio/src/pages/ModelDetail.tsx`**: Added `createConnectorCatalogPlugin(configPanelBpmn, bridgePalette)` to the editor plugin list. The catalog plugin registers 40+ "Import API: …" commands (GitHub, Stripe, Slack, OpenAI, etc.) plus "Import from OpenAPI URL…" and "Import from OpenAPI file…" through `bridgePalette`, so they appear in the Studio Ctrl+K palette under the "Editor" group. Removed the placeholder `editor:generate-openapi` stub that routed to the AI drawer instead.
+
+## 2026-03-26 — Studio: context-aware command palette (editor commands in global palette)
+
+- **`apps/studio/src/stores/ui.ts`**: Added `contextCommands`, `paletteViewStack`, `aiInitialPrompt` state. New actions: `addContextCommands()` (returns deregister fn), `clearContextCommands()`, `pushPaletteView()`, `popPaletteView()`, `openAI(prompt?)`.
+- **`apps/studio/src/components/CommandPalette.tsx`**: Rebuilt to support view stack — context commands appear grouped alongside static items; when `paletteViewStack` has entries the top view is shown (list or text-input mode); Escape pops the stack; back chevron button added.
+- **`apps/studio/src/pages/ModelDetail.tsx`**: On editor mount, creates a `bridgePalette` shim (`CommandPalettePlugin`) that routes `addCommands()` → `addContextCommands()` and `pushView()` → `pushPaletteView()`. Passes it to `createCommandPaletteEditorPlugin` so all element-creation commands flow into the global Studio palette when on the editor page. Also registers extra commands: Export BPMN, Auto Layout, Zoom to Fit, and "Generate from OpenAPI spec" (opens AI drawer with pre-filled prompt). All are deregistered on editor destroy.
+- **`apps/studio/src/layout/AIDrawer.tsx`**: Pre-fills input with `aiInitialPrompt` when the drawer opens with an initial prompt.
+
+## 2026-03-26 — reebe-wasm: BPMN canvas in definition and instance detail pages
+
+- **`apps/studio/src/pages/DefinitionDetail.tsx` (`WasmDefinitionDetail`)**: Added `BpmnCanvas` side-by-side layout — diagram fills the left panel, info/start-instance/instances list in a right sidebar. Canvas is created/destroyed in a `useEffect` keyed on `xmlData` and `theme`.
+- **`apps/studio/src/pages/InstanceDetail.tsx` (`WasmInstanceDetail`)**: Added `BpmnCanvas` + `createTokenHighlightPlugin` — diagram shows active elements (blue) and visited elements (grey). Token state comes from `useElementInstances`. Uses the instance's `processDefinitionKey` to fetch XML via `useDefinitionXml`.
+- **`apps/studio/src/api/wasm-adapter.ts`**: Added `WasmElementInstance` snapshot interface and `/api/element-instances/search` route — filters by `processInstanceKey`, maps snake_case Rust fields to `ElementInstance` API shape.
+- **`apps/studio/src/api/types.ts`**: Added `ElementInstance` type.
+- **`apps/studio/src/api/queries.ts`**: Added `useElementInstances(processInstanceKey)` hook.
+
 ## 2026-03-26 — Fix: reebe-wasm create_process_instance wrong value_type
 
 - **`apps/reebe/crates/reebe-wasm/src/lib.rs`**: `create_process_instance()` was submitting with `value_type = "PROCESS_INSTANCE"` but `ProcessInstanceCreationProcessor.accepts()` checks for `"PROCESS_INSTANCE_CREATION"`. The processor never ran, `first_response` stayed `None`, and `submit_and_drain` returned `{}` — making `processInstanceKey` undefined and falling back to `"0"`. Fixed by using the correct value_type `"PROCESS_INSTANCE_CREATION"`.

@@ -8,6 +8,7 @@
 
 import type { WasmEngine } from "@bpmnkit/reebe-wasm"
 import type {
+	ElementInstance,
 	Incident,
 	Job,
 	PageResponse,
@@ -52,8 +53,18 @@ interface WasmIncident {
 	created_at: string
 }
 
+interface WasmElementInstance {
+	key: number
+	process_instance_key: number
+	process_definition_key: number
+	element_id: string
+	element_type: string
+	state: string
+}
+
 interface WasmSnapshot {
 	processInstances: WasmProcessInstance[]
+	elementInstances: WasmElementInstance[]
 	jobs: WasmJob[]
 	variables: WasmVariable[]
 	incidents: WasmIncident[]
@@ -149,6 +160,17 @@ function mapIncident(inc: WasmIncident, instancesById: Map<string, WasmProcessIn
 		errorMessage: inc.error_message ?? "",
 		creationTime: inc.created_at,
 		state: inc.state,
+	}
+}
+
+function mapElementInstance(ei: WasmElementInstance): ElementInstance {
+	return {
+		elementInstanceKey: String(ei.key),
+		processInstanceKey: String(ei.process_instance_key),
+		processDefinitionKey: String(ei.process_definition_key),
+		elementId: ei.element_id,
+		elementType: ei.element_type,
+		state: ei.state,
 	}
 }
 
@@ -318,6 +340,21 @@ export async function wasmRoute(
 		}
 		log(`← ${method} ${path} → ${vars.length} variables`)
 		return pageOf(vars, vars.length)
+	}
+
+	// ── Element instances ─────────────────────────────────────────────────────
+	if (method === "POST" && path === "/api/element-instances/search") {
+		const filter = (body as { filter?: Record<string, unknown> })?.filter ?? {}
+		const piKey = filter.processInstanceKey as string | undefined
+		let items = snap().elementInstances.map(mapElementInstance)
+		if (piKey) {
+			const piKeyNum = Number(piKey)
+			items = snap()
+				.elementInstances.filter((ei) => ei.process_instance_key === piKeyNum)
+				.map(mapElementInstance)
+		}
+		log(`← ${method} ${path} → ${items.length} element instances`)
+		return pageOf(items, items.length)
 	}
 
 	// ── Incidents ─────────────────────────────────────────────────────────────

@@ -1,8 +1,11 @@
 import type { CanvasPlugin } from "@bpmnkit/canvas"
 import { BpmnEditor, createSideDock, initEditorHud } from "@bpmnkit/editor"
 import type { SideDock } from "@bpmnkit/editor"
+import type { CommandPalettePlugin } from "@bpmnkit/plugins/command-palette"
+import { createCommandPaletteEditorPlugin } from "@bpmnkit/plugins/command-palette-editor"
 import { createConfigPanelPlugin } from "@bpmnkit/plugins/config-panel"
 import { createConfigPanelBpmnPlugin } from "@bpmnkit/plugins/config-panel-bpmn"
+import { createConnectorCatalogPlugin } from "@bpmnkit/plugins/connector-catalog"
 import { QueryClientProvider } from "@tanstack/react-query"
 import { BookOpen, ExternalLink, Link2, Rocket, Save } from "lucide-react"
 import { render } from "preact"
@@ -475,6 +478,75 @@ export function ModelDetail() {
 			if (dock.collapsed) dock.expand()
 		})
 
+		// ── Command palette bridge ────────────────────────────────────────────
+		// Routes editor plugin commands into the Studio global command palette.
+		const bridgePalette: CommandPalettePlugin = {
+			name: "studio-palette-bridge",
+			install() {},
+			addCommands(cmds) {
+				const items = cmds.map((cmd) => ({
+					id: cmd.id,
+					label: cmd.title,
+					description: cmd.description,
+					group: "Editor",
+					action: cmd.action,
+				}))
+				return useUiStore.getState().addContextCommands(items)
+			},
+			pushView(cmds, opts) {
+				useUiStore.getState().pushPaletteView({
+					items: cmds.map((cmd) => ({
+						id: cmd.id,
+						label: cmd.title,
+						description: cmd.description,
+						group: "",
+						action: cmd.action,
+					})),
+					placeholder: opts?.placeholder,
+					onConfirm: opts?.onConfirm,
+				})
+			},
+		}
+
+		// Extra editor context commands not covered by the editor plugin
+		const deregisterExtra = useUiStore.getState().addContextCommands([
+			{
+				id: "editor:export-bpmn",
+				label: "Export as BPMN XML",
+				description: "Download diagram file",
+				group: "Editor",
+				action() {
+					const xml = editorRef.current?.exportXml()
+					if (!xml) return
+					const blob = new Blob([xml], { type: "application/xml" })
+					const url = URL.createObjectURL(blob)
+					const a = document.createElement("a")
+					a.href = url
+					a.download = `${model?.name ?? "diagram"}.bpmn`
+					a.click()
+					URL.revokeObjectURL(url)
+				},
+			},
+			{
+				id: "editor:auto-layout",
+				label: "Auto Layout",
+				description: "Arrange elements automatically",
+				group: "Editor",
+				action() {
+					editorRef.current?.autoLayout()
+				},
+			},
+			{
+				id: "editor:zoom-fit",
+				label: "Zoom to Fit",
+				description: "Fit entire diagram in view",
+				group: "Editor",
+				action() {
+					editorRef.current?.fitView()
+				},
+			},
+		])
+
 		// ── Plugins ───────────────────────────────────────────────────────────
 		const configPanel = createConfigPanelPlugin({
 			getDefinitions: () => editorRef.current?.getDefinitions() ?? null,
@@ -501,11 +573,17 @@ export function ModelDetail() {
 		}
 
 		// ── Editor ────────────────────────────────────────────────────────────
+		const paletteEditorPlugin = createCommandPaletteEditorPlugin(
+			bridgePalette,
+			() => editorRef.current,
+		)
+		const connectorCatalog = createConnectorCatalogPlugin(configPanelBpmn, bridgePalette)
+
 		const editor = new BpmnEditor({
 			container,
 			theme: useThemeStore.getState().theme,
 			fit: "center",
-			plugins: [bridgePlugin, configPanel, configPanelBpmn],
+			plugins: [paletteEditorPlugin, bridgePlugin, configPanel, configPanelBpmn, connectorCatalog],
 		})
 		initEditorHud(editor, {
 			onToggleSidebar: () => {
@@ -541,7 +619,9 @@ export function ModelDetail() {
 			render(null, dock.docsPane)
 			dock.el.remove()
 			dockRef.current = null
-			editor.destroy()
+			editor.destroy() // triggers paletteEditorPlugin.uninstall() → clears element commands
+			deregisterExtra()
+			useUiStore.getState().clearContextCommands()
 			editorRef.current = null
 		}
 	}, [id, loaded])

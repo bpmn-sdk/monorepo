@@ -1,10 +1,14 @@
+import { BpmnCanvas } from "@bpmnkit/canvas"
 import { InstancesStore, createInstanceDetailView } from "@bpmnkit/operate"
+import { createTokenHighlightPlugin } from "@bpmnkit/plugins/token-highlight"
 import { RotateCw, XCircle } from "lucide-react"
 import { useEffect, useRef } from "preact/hooks"
 import { Link, useLocation, useParams } from "wouter"
 import { getActiveProfile, getProxyUrl } from "../api/client.js"
 import {
 	useCancelInstance,
+	useDefinitionXml,
+	useElementInstances,
 	useIncidents,
 	useInstance,
 	useInstanceVariables,
@@ -23,7 +27,40 @@ function WasmInstanceDetail({ instanceKey }: { instanceKey: string }) {
 	const { data: instance, isLoading } = useInstance(instanceKey)
 	const { data: variablesData } = useInstanceVariables(instanceKey)
 	const { data: incidentsData } = useIncidents({ processInstanceKey: instanceKey })
+	const { data: elementInstancesData } = useElementInstances(instanceKey)
+	const { data: xmlData } = useDefinitionXml(instance?.processDefinitionKey ?? "")
+	const { theme } = useThemeStore()
 	const cancel = useCancelInstance()
+	const canvasContainerRef = useRef<HTMLDivElement>(null)
+	const canvasRef = useRef<BpmnCanvas | null>(null)
+
+	useEffect(() => {
+		const container = canvasContainerRef.current
+		if (!container || !xmlData) return
+		canvasRef.current?.destroy()
+
+		const tokenHighlight = createTokenHighlightPlugin()
+		const canvas = new BpmnCanvas({
+			container,
+			theme,
+			grid: false,
+			fit: "contain",
+			plugins: [tokenHighlight],
+		})
+		canvas.load(xmlData)
+
+		const items = elementInstancesData?.items ?? []
+		const activeIds = items.filter((e) => e.state === "ACTIVE").map((e) => e.elementId)
+		const visitedIds = items.filter((e) => e.state !== "ACTIVE").map((e) => e.elementId)
+		if (activeIds.length > 0) tokenHighlight.api.setActive(activeIds)
+		if (visitedIds.length > 0) tokenHighlight.api.addVisited(visitedIds)
+
+		canvasRef.current = canvas
+		return () => {
+			canvas.destroy()
+			canvasRef.current = null
+		}
+	}, [xmlData, theme, elementInstancesData])
 
 	async function handleCancel() {
 		try {
@@ -36,6 +73,13 @@ function WasmInstanceDetail({ instanceKey }: { instanceKey: string }) {
 
 	const variables = variablesData?.items ?? []
 	const incidents = incidentsData?.items ?? []
+
+	const stateColor =
+		instance?.state === "ACTIVE"
+			? "text-success"
+			: instance?.state === "COMPLETED"
+				? "text-muted"
+				: "text-danger"
 
 	if (isLoading) {
 		return (
@@ -53,29 +97,33 @@ function WasmInstanceDetail({ instanceKey }: { instanceKey: string }) {
 		)
 	}
 
-	const stateColor =
-		instance.state === "ACTIVE"
-			? "text-success"
-			: instance.state === "COMPLETED"
-				? "text-muted"
-				: "text-danger"
-
 	return (
-		<div className="h-full overflow-y-auto p-6">
-			<div className="max-w-2xl mx-auto flex flex-col gap-6">
+		<div className="h-full flex">
+			{/* Left: BPMN canvas with token overlay */}
+			<div className="flex-1 relative border-r border-border bg-surface-2">
+				<div ref={canvasContainerRef} className="absolute inset-0" />
+				{!xmlData && (
+					<div className="absolute inset-0 flex items-center justify-center">
+						<p className="text-sm text-muted">No diagram available.</p>
+					</div>
+				)}
+			</div>
+
+			{/* Right: info panel */}
+			<div className="w-80 flex flex-col overflow-y-auto p-5 gap-5">
 				{/* Header */}
-				<div className="flex items-start justify-between gap-4">
+				<div className="flex items-start justify-between gap-3">
 					<div>
-						<h2 className="text-lg font-semibold text-fg font-mono">
+						<h2 className="text-sm font-semibold text-fg font-mono">
 							{instance.processInstanceKey}
 						</h2>
-						<p className="text-sm text-muted mt-0.5">
-							{instance.processDefinitionId}
-							<span className={`ml-3 text-xs font-medium ${stateColor}`}>{instance.state}</span>
+						<p className="text-xs text-muted mt-0.5">{instance.processDefinitionId}</p>
+						<p className="text-xs mt-0.5">
+							<span className={`font-medium ${stateColor}`}>{instance.state}</span>
 						</p>
 						{instance.startDate && (
 							<p className="text-xs text-muted mt-0.5">
-								Started {new Date(instance.startDate).toLocaleString()}
+								{new Date(instance.startDate).toLocaleString()}
 							</p>
 						)}
 					</div>
@@ -85,7 +133,7 @@ function WasmInstanceDetail({ instanceKey }: { instanceKey: string }) {
 							variant="outline"
 							onClick={() => void handleCancel()}
 							disabled={cancel.isPending}
-							className="text-danger border-danger hover:bg-danger/10"
+							className="text-danger border-danger hover:bg-danger/10 shrink-0"
 						>
 							{cancel.isPending ? (
 								<>
@@ -112,8 +160,6 @@ function WasmInstanceDetail({ instanceKey }: { instanceKey: string }) {
 									<tr className="bg-surface-2 border-b border-border">
 										<th className="px-3 py-2 text-left font-medium text-muted">Type</th>
 										<th className="px-3 py-2 text-left font-medium text-muted">Element</th>
-										<th className="px-3 py-2 text-left font-medium text-muted">Message</th>
-										<th className="px-3 py-2 text-left font-medium text-muted">State</th>
 									</tr>
 								</thead>
 								<tbody>
@@ -121,8 +167,6 @@ function WasmInstanceDetail({ instanceKey }: { instanceKey: string }) {
 										<tr key={inc.incidentKey} className="border-b border-border last:border-0">
 											<td className="px-3 py-2 text-danger">{inc.errorType}</td>
 											<td className="px-3 py-2 font-mono text-muted">{inc.elementId}</td>
-											<td className="px-3 py-2 text-muted">{inc.errorMessage || "—"}</td>
-											<td className="px-3 py-2">{inc.state}</td>
 										</tr>
 									))}
 								</tbody>
@@ -158,7 +202,6 @@ function WasmInstanceDetail({ instanceKey }: { instanceKey: string }) {
 					)}
 				</div>
 
-				{/* Back link */}
 				<Link href="/instances" className="text-xs text-accent hover:underline self-start">
 					← All instances
 				</Link>

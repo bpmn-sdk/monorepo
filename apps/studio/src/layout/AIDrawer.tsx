@@ -26,13 +26,21 @@ function getContextLabel(path: string): string {
 }
 
 export function AIDrawer() {
-	const { aiOpen, closeAI } = useUiStore()
+	const { aiOpen, aiInitialPrompt, closeAI } = useUiStore()
 	const [location] = useLocation()
 	const [messages, setMessages] = useState<Message[]>([])
 	const [input, setInput] = useState("")
 	const [loading, setLoading] = useState(false)
 	const messagesEndRef = useRef<HTMLDivElement>(null)
 	const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+	// Pre-fill input when opened with an initial prompt (e.g. from "Generate from OpenAPI spec")
+	useEffect(() => {
+		if (aiOpen && aiInitialPrompt) {
+			setInput(aiInitialPrompt)
+			setTimeout(() => textareaRef.current?.focus(), 50)
+		}
+	}, [aiOpen, aiInitialPrompt])
 
 	const messageCount = messages.length
 	// biome-ignore lint/correctness/useExhaustiveDependencies: scroll triggered by message count change

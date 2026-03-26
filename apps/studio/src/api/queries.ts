@@ -5,6 +5,7 @@ import { keys } from "./keys.js"
 import type {
 	DashboardStats,
 	DecisionDefinition,
+	ElementInstance,
 	Incident,
 	Job,
 	PageResponse,
@@ -95,6 +96,19 @@ export function useInstanceVariables(key: string) {
 			}),
 		enabled: proxyEnabled && !!key,
 		staleTime: 15_000,
+	})
+}
+
+export function useElementInstances(processInstanceKey: string) {
+	const proxyEnabled = useProxyEnabled()
+	return useQuery({
+		queryKey: ["element-instances", processInstanceKey],
+		queryFn: () =>
+			proxyPost<PageResponse<ElementInstance>>("/api/element-instances/search", {
+				filter: { processInstanceKey },
+			}),
+		enabled: proxyEnabled && !!processInstanceKey,
+		staleTime: 10_000,
 	})
 }
 
