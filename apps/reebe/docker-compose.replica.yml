@@ -1,0 +1,66 @@
+# docker-compose.replica.yml — PostgreSQL primary + streaming replica for development.
+# Usage: docker compose -f docker-compose.replica.yml up
+#
+# Trade-off: reads on the replica may lag 0–500ms behind writes.
+# For consistency-critical reads after writes, route to the primary directly.
+
+version: "3.9"
+
+services:
+  postgres-primary:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: reebe
+      POSTGRES_PASSWORD: reebe
+      POSTGRES_DB: reebe
+    command: >
+      postgres
+        -c wal_level=replica
+        -c max_wal_senders=3
+        -c wal_keep_size=64
+        -c hot_standby=on
+    volumes:
+      - postgres_primary_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U reebe"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  postgres-replica:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: reebe
+      POSTGRES_PASSWORD: reebe
+      PGPASSWORD: reebe
+    command: >
+      bash -c "
+        until pg_basebackup -h postgres-primary -U reebe -D /var/lib/postgresql/data -P -Xs -R; do
+          echo 'Waiting for primary...'; sleep 2;
+        done && postgres
+      "
+    volumes:
+      - postgres_replica_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    depends_on:
+      postgres-primary:
+        condition: service_healthy
+
+  reebe:
+    image: reebe:latest
+    environment:
+      REEBE_DATABASE__URL: postgres://reebe:reebe@postgres-primary:5432/reebe
+      REEBE_DATABASE__REPLICA_URL: postgres://reebe:reebe@postgres-replica:5432/reebe
+      REEBE_PORT: "8080"
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres-primary:
+        condition: service_healthy
+
+volumes:
+  postgres_primary_data:
+  postgres_replica_data:

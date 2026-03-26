@@ -1,0 +1,32 @@
+# Reebe Workflow Engine Configuration
+
+[server]
+# Port for the REST API (Camunda 8 compatible at /v2/*)
+host = "0.0.0.0"
+port = 8080
+
+[database]
+# PostgreSQL connection URL
+url = "postgres://reebe:reebe@localhost:5432/reebe"
+# Connection pool settings
+max_connections = 20
+min_connections = 2
+connection_timeout_secs = 30
+
+[engine]
+# Number of partitions (for future clustering)
+partition_count = 1
+node_id = 0
+max_batch_size = 100
+timer_check_interval_ms = 100
+job_timeout_check_interval_ms = 1000
+
+[jobs]
+default_poll_timeout_ms = 30000
+max_activation_timeout_ms = 600000
+
+[logging]
+# Log level: trace, debug, info, warn, error
+level = "info"
+# Format: "json" or "text"
+format = "text"

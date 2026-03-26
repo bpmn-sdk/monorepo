@@ -1,0 +1,670 @@
+//! Implementation of the Zeebe Gateway gRPC service.
+
+use std::pin::Pin;
+use std::sync::Arc;
+use std::time::Duration;
+
+use tokio_stream::wrappers::ReceiverStream;
+use tokio_stream::Stream;
+use tonic::{Request, Response, Status};
+
+use reebe_engine::EngineHandle;
+use reebe_db::DbPool;
+
+pub mod proto {
+    pub mod gateway_protocol {
+        tonic::include_proto!("gateway_protocol");
+    }
+}
+
+use proto::gateway_protocol::gateway_server::Gateway;
+use proto::gateway_protocol::*;
+
+/// Shared state passed to every gRPC handler.
+#[derive(Clone)]
+pub struct GatewayState {
+    pub engine: Arc<EngineHandle>,
+    pub pool: DbPool,
+    pub partition_count: usize,
+}
+
+pub struct GatewayService {
+    state: GatewayState,
+}
+
+impl GatewayService {
+    pub fn new(state: GatewayState) -> Self {
+        Self { state }
+    }
+}
+
+// Helper: map engine error to gRPC Status
+fn engine_err(e: reebe_engine::error::EngineError) -> Status {
+    Status::internal(e.to_string())
+}
+
+// Helper: convert a DB Job to proto ActivatedJob
+fn job_to_proto(job: reebe_db::state::jobs::Job) -> ActivatedJob {
+    let deadline_ms = job
+        .deadline
+        .map(|d| d.timestamp_millis())
+        .unwrap_or(0);
+    ActivatedJob {
+        key: job.key,
+        r#type: job.job_type,
+        process_instance_key: job.process_instance_key,
+        bpmn_process_id: job.bpmn_process_id,
+        process_definition_version: 0, // populated via join in future
+        process_definition_key: job.process_definition_key,
+        element_id: job.element_id,
+        element_instance_key: job.element_instance_key,
+        custom_headers: job.custom_headers.to_string(),
+        worker: job.worker.unwrap_or_default(),
+        retries: job.retries,
+        deadline: deadline_ms,
+        variables: job.variables.to_string(),
+        tenant_id: job.tenant_id,
+    }
+}
+
+#[tonic::async_trait]
+impl Gateway for GatewayService {
+    // ── Topology ─────────────────────────────────────────────────────────────
+
+    async fn topology(
+        &self,
+        _request: Request<TopologyRequest>,
+    ) -> Result<Response<TopologyResponse>, Status> {
+        let owned = self.state.engine.owned_partitions.read().await.clone();
+        let partitions: Vec<Partition> = if owned.is_empty() {
+            vec![Partition {
+                partition_id: 1,
+                role: partition::PartitionBrokerRole::Leader as i32,
+                health: partition::PartitionBrokerHealth::Healthy as i32,
+            }]
+        } else {
+            owned
+                .iter()
+                .map(|&pid| Partition {
+                    partition_id: pid as i32,
+                    role: partition::PartitionBrokerRole::Leader as i32,
+                    health: partition::PartitionBrokerHealth::Healthy as i32,
+                })
+                .collect()
+        };
+
+        let partitions_count = owned.len().max(1) as i32;
+        Ok(Response::new(TopologyResponse {
+            brokers: vec![BrokerInfo {
+                node_id: 0,
+                host: "localhost".to_string(),
+                port: 26500,
+                partitions,
+                version: env!("CARGO_PKG_VERSION").to_string(),
+            }],
+            cluster_size: 1,
+            partitions_count,
+            replication_factor: 1,
+            gateway_version: env!("CARGO_PKG_VERSION").to_string(),
+        }))
+    }
+
+    // ── Deploy ────────────────────────────────────────────────────────────────
+
+    async fn deploy_process(
+        &self,
+        request: Request<DeployProcessRequest>,
+    ) -> Result<Response<DeployProcessResponse>, Status> {
+        let req = request.into_inner();
+        let mut process_metas = Vec::new();
+        let mut deploy_key = 0i64;
+
+        for proc in req.processes {
+            let bpmn_xml = String::from_utf8(proc.definition)
+                .map_err(|_| Status::invalid_argument("BPMN definition is not valid UTF-8"))?;
+            let payload = serde_json::json!({
+                "resourceName": proc.name,
+                "bpmnXml": bpmn_xml,
+                "tenantId": "<default>",
+            });
+            let result = self.state.engine
+                .send_command("DEPLOYMENT".to_string(), "CREATE".to_string(), payload, "<default>".to_string())
+                .await
+                .map_err(engine_err)?;
+
+            deploy_key = result["deploymentKey"].as_i64().unwrap_or(0);
+            let bpmn_process_id = result["bpmnProcessId"].as_str().unwrap_or("").to_string();
+            let version = result["version"].as_i64().unwrap_or(1) as i32;
+            let pd_key = result["processDefinitionKey"].as_i64().unwrap_or(0);
+
+            process_metas.push(ProcessMetadata {
+                bpmn_process_id,
+                version,
+                process_definition_key: pd_key,
+                resource_name: proc.name,
+                tenant_id: "<default>".to_string(),
+            });
+        }
+
+        Ok(Response::new(DeployProcessResponse {
+            key: deploy_key,
+            processes: process_metas,
+        }))
+    }
+
+    async fn deploy_resource(
+        &self,
+        request: Request<DeployResourceRequest>,
+    ) -> Result<Response<DeployResourceResponse>, Status> {
+        let req = request.into_inner();
+        let tenant_id = if req.tenant_id.is_empty() { "<default>".to_string() } else { req.tenant_id.clone() };
+        let mut deployments = Vec::new();
+        let mut deploy_key = 0i64;
+
+        for resource in req.resources {
+            let bpmn_xml = String::from_utf8(resource.content)
+                .map_err(|_| Status::invalid_argument("Resource content is not valid UTF-8"))?;
+            let payload = serde_json::json!({
+                "resourceName": resource.name,
+                "bpmnXml": bpmn_xml,
+                "tenantId": tenant_id,
+            });
+            let result = self.state.engine
+                .send_command("DEPLOYMENT".to_string(), "CREATE".to_string(), payload, tenant_id.clone())
+                .await
+                .map_err(engine_err)?;
+
+            deploy_key = result["deploymentKey"].as_i64().unwrap_or(0);
+            let bpmn_process_id = result["bpmnProcessId"].as_str().unwrap_or("").to_string();
+            let version = result["version"].as_i64().unwrap_or(1) as i32;
+            let pd_key = result["processDefinitionKey"].as_i64().unwrap_or(0);
+
+            deployments.push(Deployment {
+                metadata: Some(deployment::Metadata::Process(ProcessMetadata {
+                    bpmn_process_id,
+                    version,
+                    process_definition_key: pd_key,
+                    resource_name: resource.name,
+                    tenant_id: tenant_id.clone(),
+                })),
+            });
+        }
+
+        Ok(Response::new(DeployResourceResponse {
+            key: deploy_key,
+            deployments,
+            tenant_id,
+        }))
+    }
+
+    // ── Process Instances ─────────────────────────────────────────────────────
+
+    async fn create_process_instance(
+        &self,
+        request: Request<CreateProcessInstanceRequest>,
+    ) -> Result<Response<CreateProcessInstanceResponse>, Status> {
+        let req = request.into_inner();
+        let tenant_id = if req.tenant_id.is_empty() { "<default>".to_string() } else { req.tenant_id.clone() };
+
+        let payload = serde_json::json!({
+            "processDefinitionKey": req.process_definition_key,
+            "bpmnProcessId": req.bpmn_process_id,
+            "version": req.version,
+            "variables": req.variables,
+            "tenantId": tenant_id,
+        });
+
+        let result = self.state.engine
+            .send_command("PROCESS_INSTANCE".to_string(), "CREATE".to_string(), payload, tenant_id.clone())
+            .await
+            .map_err(engine_err)?;
+
+        Ok(Response::new(CreateProcessInstanceResponse {
+            process_definition_key: result["processDefinitionKey"].as_i64().unwrap_or(req.process_definition_key),
+            bpmn_process_id: result["bpmnProcessId"].as_str().unwrap_or(&req.bpmn_process_id).to_string(),
+            version: result["version"].as_i64().unwrap_or(req.version as i64) as i32,
+            process_instance_key: result["processInstanceKey"].as_i64().unwrap_or(0),
+            tenant_id,
+        }))
+    }
+
+    async fn create_process_instance_with_result(
+        &self,
+        request: Request<CreateProcessInstanceWithResultRequest>,
+    ) -> Result<Response<CreateProcessInstanceWithResultResponse>, Status> {
+        let req = request.into_inner();
+        let timeout_ms = if req.request_timeout > 0 { req.request_timeout as u64 } else { 30_000 };
+        let inner = req.request.ok_or_else(|| Status::invalid_argument("Missing request field"))?;
+        let tenant_id = if inner.tenant_id.is_empty() { "<default>".to_string() } else { inner.tenant_id.clone() };
+
+        let payload = serde_json::json!({
+            "processDefinitionKey": inner.process_definition_key,
+            "bpmnProcessId": inner.bpmn_process_id,
+            "version": inner.version,
+            "variables": inner.variables,
+            "tenantId": tenant_id,
+        });
+
+        let result = self.state.engine
+            .send_command("PROCESS_INSTANCE".to_string(), "CREATE".to_string(), payload, tenant_id.clone())
+            .await
+            .map_err(engine_err)?;
+
+        let instance_key = result["processInstanceKey"].as_i64().unwrap_or(0);
+        let pd_key = result["processDefinitionKey"].as_i64().unwrap_or(inner.process_definition_key);
+        let bpmn_process_id = result["bpmnProcessId"].as_str().unwrap_or(&inner.bpmn_process_id).to_string();
+        let version = result["version"].as_i64().unwrap_or(inner.version as i64) as i32;
+
+        // Poll until instance completes or timeout
+        let pool = self.state.pool.clone();
+        let final_vars = tokio::time::timeout(
+            Duration::from_millis(timeout_ms),
+            wait_for_instance_completion(&pool, instance_key),
+        )
+        .await
+        .unwrap_or(Ok("{}".to_string()))
+        .unwrap_or_default();
+
+        Ok(Response::new(CreateProcessInstanceWithResultResponse {
+            process_definition_key: pd_key,
+            bpmn_process_id,
+            version,
+            process_instance_key: instance_key,
+            tenant_id,
+            variables: final_vars,
+        }))
+    }
+
+    async fn cancel_process_instance(
+        &self,
+        request: Request<CancelProcessInstanceRequest>,
+    ) -> Result<Response<CancelProcessInstanceResponse>, Status> {
+        let req = request.into_inner();
+        let payload = serde_json::json!({ "processInstanceKey": req.process_instance_key.to_string() });
+        self.state.engine
+            .send_command("PROCESS_INSTANCE".to_string(), "CANCEL".to_string(), payload, "<default>".to_string())
+            .await
+            .map_err(engine_err)?;
+        Ok(Response::new(CancelProcessInstanceResponse {}))
+    }
+
+    async fn modify_process_instance(
+        &self,
+        request: Request<ModifyProcessInstanceRequest>,
+    ) -> Result<Response<ModifyProcessInstanceResponse>, Status> {
+        let req = request.into_inner();
+        let payload = serde_json::json!({
+            "processInstanceKey": req.process_instance_key.to_string(),
+            "activateInstructions": req.activate_instructions.iter().map(|i| serde_json::json!({
+                "elementId": i.element_id,
+                "ancestorElementInstanceKey": i.ancestor_element_instance_key,
+            })).collect::<Vec<_>>(),
+            "terminateInstructions": req.terminate_instructions.iter().map(|i| serde_json::json!({
+                "elementInstanceKey": i.element_instance_key,
+            })).collect::<Vec<_>>(),
+        });
+        self.state.engine
+            .send_command("PROCESS_INSTANCE_MODIFICATION".to_string(), "MODIFY".to_string(), payload, "<default>".to_string())
+            .await
+            .map_err(engine_err)?;
+        Ok(Response::new(ModifyProcessInstanceResponse {}))
+    }
+
+    async fn migrate_process_instance(
+        &self,
+        request: Request<MigrateProcessInstanceRequest>,
+    ) -> Result<Response<MigrateProcessInstanceResponse>, Status> {
+        let req = request.into_inner();
+        let plan = req.migration_plan.unwrap_or_default();
+        let payload = serde_json::json!({
+            "processInstanceKey": req.process_instance_key.to_string(),
+            "migrationPlan": {
+                "targetProcessDefinitionKey": plan.target_process_definition_key,
+                "mappingInstructions": plan.mapping_instructions.iter().map(|m| serde_json::json!({
+                    "sourceElementId": m.source_element_id,
+                    "targetElementId": m.target_element_id,
+                })).collect::<Vec<_>>(),
+            },
+        });
+        self.state.engine
+            .send_command("PROCESS_INSTANCE_MIGRATION".to_string(), "MIGRATE".to_string(), payload, "<default>".to_string())
+            .await
+            .map_err(engine_err)?;
+        Ok(Response::new(MigrateProcessInstanceResponse {}))
+    }
+
+    // ── Jobs ──────────────────────────────────────────────────────────────────
+
+    type ActivateJobsStream = Pin<Box<dyn Stream<Item = Result<ActivateJobsResponse, Status>> + Send>>;
+
+    async fn activate_jobs(
+        &self,
+        request: Request<ActivateJobsRequest>,
+    ) -> Result<Response<Self::ActivateJobsStream>, Status> {
+        let req = request.into_inner();
+        let max_jobs = req.max_jobs_to_activate.max(1) as i64;
+        let job_type = req.r#type.clone();
+        let worker = req.worker.clone();
+        let timeout_ms = req.timeout;
+        let request_timeout_ms = req.request_timeout;
+
+        let pool = self.state.pool.clone();
+        let notifier = self.state.engine.job_notifier.get_or_create(&job_type);
+        let (tx, rx) = tokio::sync::mpsc::channel(10);
+
+        tokio::spawn(async move {
+            // Try immediate activation
+            match reebe_db::state::jobs::activate_jobs(&pool, &job_type, &worker, max_jobs, timeout_ms).await {
+                Ok(jobs) if !jobs.is_empty() => {
+                    let _ = tx.send(Ok(ActivateJobsResponse {
+                        jobs: jobs.into_iter().map(job_to_proto).collect(),
+                    })).await;
+                    return;
+                }
+                Err(e) => {
+                    let _ = tx.send(Err(Status::internal(e.to_string()))).await;
+                    return;
+                }
+                _ => {}
+            }
+
+            // No jobs found immediately
+            if request_timeout_ms <= 0 {
+                return; // immediate mode — close stream empty
+            }
+
+            // Long-poll
+            let _ = tokio::time::timeout(
+                Duration::from_millis(request_timeout_ms.unsigned_abs()),
+                notifier.notified(),
+            ).await;
+
+            // Try again
+            match reebe_db::state::jobs::activate_jobs(&pool, &job_type, &worker, max_jobs, timeout_ms).await {
+                Ok(jobs) if !jobs.is_empty() => {
+                    let _ = tx.send(Ok(ActivateJobsResponse {
+                        jobs: jobs.into_iter().map(job_to_proto).collect(),
+                    })).await;
+                }
+                _ => {} // empty or error — close stream
+            }
+        });
+
+        Ok(Response::new(Box::pin(ReceiverStream::new(rx))))
+    }
+
+    type StreamActivatedJobsStream = Pin<Box<dyn Stream<Item = Result<ActivatedJob, Status>> + Send>>;
+
+    async fn stream_activated_jobs(
+        &self,
+        request: Request<StreamActivatedJobsRequest>,
+    ) -> Result<Response<Self::StreamActivatedJobsStream>, Status> {
+        let req = request.into_inner();
+        let job_type = req.r#type.clone();
+        let worker = req.worker.clone();
+        let timeout_ms = req.timeout;
+
+        let pool = self.state.pool.clone();
+        let notifier = self.state.engine.job_notifier.get_or_create(&job_type);
+        let (tx, rx) = tokio::sync::mpsc::channel(64);
+
+        tokio::spawn(async move {
+            loop {
+                // Try to activate a batch
+                match reebe_db::state::jobs::activate_jobs(&pool, &job_type, &worker, 32, timeout_ms).await {
+                    Ok(jobs) => {
+                        for job in jobs {
+                            if tx.send(Ok(job_to_proto(job))).await.is_err() {
+                                return; // client disconnected
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        let _ = tx.send(Err(Status::internal(e.to_string()))).await;
+                        return;
+                    }
+                }
+                // Wait for the next job to become available
+                notifier.notified().await;
+            }
+        });
+
+        Ok(Response::new(Box::pin(ReceiverStream::new(rx))))
+    }
+
+    async fn complete_job(
+        &self,
+        request: Request<CompleteJobRequest>,
+    ) -> Result<Response<CompleteJobResponse>, Status> {
+        let req = request.into_inner();
+        let payload = serde_json::json!({
+            "jobKey": req.job_key.to_string(),
+            "variables": req.variables,
+        });
+        self.state.engine
+            .send_command("JOB".to_string(), "COMPLETE".to_string(), payload, "<default>".to_string())
+            .await
+            .map_err(engine_err)?;
+        Ok(Response::new(CompleteJobResponse {}))
+    }
+
+    async fn fail_job(
+        &self,
+        request: Request<FailJobRequest>,
+    ) -> Result<Response<FailJobResponse>, Status> {
+        let req = request.into_inner();
+        let payload = serde_json::json!({
+            "jobKey": req.job_key.to_string(),
+            "retries": req.retries,
+            "errorMessage": req.error_message,
+            "retryBackOff": req.retry_back_off,
+            "variables": req.variables,
+        });
+        self.state.engine
+            .send_command("JOB".to_string(), "FAIL".to_string(), payload, "<default>".to_string())
+            .await
+            .map_err(engine_err)?;
+        Ok(Response::new(FailJobResponse {}))
+    }
+
+    async fn throw_error(
+        &self,
+        request: Request<ThrowErrorRequest>,
+    ) -> Result<Response<ThrowErrorResponse>, Status> {
+        let req = request.into_inner();
+        let payload = serde_json::json!({
+            "jobKey": req.job_key.to_string(),
+            "errorCode": req.error_code,
+            "errorMessage": req.error_message,
+            "variables": req.variables,
+        });
+        self.state.engine
+            .send_command("JOB".to_string(), "THROW_ERROR".to_string(), payload, "<default>".to_string())
+            .await
+            .map_err(engine_err)?;
+        Ok(Response::new(ThrowErrorResponse {}))
+    }
+
+    async fn update_job_retries(
+        &self,
+        request: Request<UpdateJobRetriesRequest>,
+    ) -> Result<Response<UpdateJobRetriesResponse>, Status> {
+        let req = request.into_inner();
+        let payload = serde_json::json!({
+            "jobKey": req.job_key.to_string(),
+            "retries": req.retries,
+        });
+        self.state.engine
+            .send_command("JOB".to_string(), "UPDATE_RETRIES".to_string(), payload, "<default>".to_string())
+            .await
+            .map_err(engine_err)?;
+        Ok(Response::new(UpdateJobRetriesResponse {}))
+    }
+
+    async fn update_job_timeout(
+        &self,
+        request: Request<UpdateJobTimeoutRequest>,
+    ) -> Result<Response<UpdateJobTimeoutResponse>, Status> {
+        let req = request.into_inner();
+        let payload = serde_json::json!({
+            "jobKey": req.job_key.to_string(),
+            "timeout": req.timeout,
+        });
+        self.state.engine
+            .send_command("JOB".to_string(), "UPDATE_TIMEOUT".to_string(), payload, "<default>".to_string())
+            .await
+            .map_err(engine_err)?;
+        Ok(Response::new(UpdateJobTimeoutResponse {}))
+    }
+
+    // ── Variables ─────────────────────────────────────────────────────────────
+
+    async fn set_variables(
+        &self,
+        request: Request<SetVariablesRequest>,
+    ) -> Result<Response<SetVariablesResponse>, Status> {
+        let req = request.into_inner();
+        let payload = serde_json::json!({
+            "elementInstanceKey": req.element_instance_key.to_string(),
+            "variables": req.variables,
+            "local": req.local,
+        });
+        let result = self.state.engine
+            .send_command("VARIABLE_DOCUMENT".to_string(), "UPDATE".to_string(), payload, "<default>".to_string())
+            .await
+            .map_err(engine_err)?;
+        Ok(Response::new(SetVariablesResponse {
+            key: result["key"].as_i64().unwrap_or(0),
+        }))
+    }
+
+    // ── Messages ──────────────────────────────────────────────────────────────
+
+    async fn publish_message(
+        &self,
+        request: Request<PublishMessageRequest>,
+    ) -> Result<Response<PublishMessageResponse>, Status> {
+        let req = request.into_inner();
+        let tenant_id = if req.tenant_id.is_empty() { "<default>".to_string() } else { req.tenant_id.clone() };
+        let payload = serde_json::json!({
+            "messageName": req.name,
+            "correlationKey": req.correlation_key,
+            "timeToLive": req.time_to_live,
+            "messageId": req.message_id,
+            "variables": req.variables,
+            "tenantId": tenant_id,
+        });
+        let result = self.state.engine
+            .send_command("MESSAGE".to_string(), "PUBLISH".to_string(), payload, tenant_id.clone())
+            .await
+            .map_err(engine_err)?;
+        Ok(Response::new(PublishMessageResponse {
+            key: result["messageKey"].as_i64().unwrap_or(0),
+            tenant_id,
+        }))
+    }
+
+    // ── Incidents ─────────────────────────────────────────────────────────────
+
+    async fn resolve_incident(
+        &self,
+        request: Request<ResolveIncidentRequest>,
+    ) -> Result<Response<ResolveIncidentResponse>, Status> {
+        let req = request.into_inner();
+        let payload = serde_json::json!({ "incidentKey": req.incident_key.to_string() });
+        self.state.engine
+            .send_command("INCIDENT".to_string(), "RESOLVE".to_string(), payload, "<default>".to_string())
+            .await
+            .map_err(engine_err)?;
+        Ok(Response::new(ResolveIncidentResponse {}))
+    }
+
+    // ── Signals ───────────────────────────────────────────────────────────────
+
+    async fn broadcast_signal(
+        &self,
+        request: Request<BroadcastSignalRequest>,
+    ) -> Result<Response<BroadcastSignalResponse>, Status> {
+        let req = request.into_inner();
+        let tenant_id = if req.tenant_id.is_empty() { "<default>".to_string() } else { req.tenant_id.clone() };
+        let payload = serde_json::json!({
+            "signalName": req.signal_name,
+            "variables": req.variables,
+            "tenantId": tenant_id,
+        });
+        let result = self.state.engine
+            .send_command("SIGNAL".to_string(), "BROADCAST".to_string(), payload, tenant_id.clone())
+            .await
+            .map_err(engine_err)?;
+        Ok(Response::new(BroadcastSignalResponse {
+            key: result["signalKey"].as_i64().unwrap_or(0),
+            tenant_id,
+        }))
+    }
+
+    // ── Decisions ─────────────────────────────────────────────────────────────
+
+    async fn evaluate_decision(
+        &self,
+        request: Request<EvaluateDecisionRequest>,
+    ) -> Result<Response<EvaluateDecisionResponse>, Status> {
+        let req = request.into_inner();
+        let tenant_id = if req.tenant_id.is_empty() { "<default>".to_string() } else { req.tenant_id.clone() };
+        let payload = serde_json::json!({
+            "decisionKey": req.decision_key,
+            "decisionId": req.decision_id,
+            "variables": req.variables,
+            "tenantId": tenant_id,
+        });
+        let result = self.state.engine
+            .send_command("DECISION".to_string(), "EVALUATE".to_string(), payload, tenant_id.clone())
+            .await
+            .map_err(engine_err)?;
+        Ok(Response::new(EvaluateDecisionResponse {
+            decision_key: result["decisionKey"].as_i64().unwrap_or(0),
+            decision_id: result["decisionId"].as_str().unwrap_or("").to_string(),
+            decision_name: result["decisionName"].as_str().unwrap_or("").to_string(),
+            decision_version: result["decisionVersion"].as_i64().unwrap_or(0) as i32,
+            decision_requirements_key: result["decisionRequirementsKey"].as_i64().unwrap_or(0),
+            decision_requirements_id: result["decisionRequirementsId"].as_str().unwrap_or("").to_string(),
+            decision_output: result["decisionOutput"].as_str().unwrap_or("null").to_string(),
+            evaluated_decisions: vec![],
+            failed_decision_id: result["failedDecisionId"].as_str().unwrap_or("").to_string(),
+            failure_message: result["failureMessage"].as_str().unwrap_or("").to_string(),
+            tenant_id,
+            process_instance_key: result["processInstanceKey"].as_i64().unwrap_or(0),
+        }))
+    }
+
+    // ── Resources ─────────────────────────────────────────────────────────────
+
+    async fn delete_resource(
+        &self,
+        request: Request<DeleteResourceRequest>,
+    ) -> Result<Response<DeleteResourceResponse>, Status> {
+        let req = request.into_inner();
+        let payload = serde_json::json!({ "resourceKey": req.resource_key.to_string() });
+        self.state.engine
+            .send_command("RESOURCE".to_string(), "DELETE".to_string(), payload, "<default>".to_string())
+            .await
+            .map_err(engine_err)?;
+        Ok(Response::new(DeleteResourceResponse {}))
+    }
+}
+
+/// Poll the DB until a process instance reaches a terminal state.
+async fn wait_for_instance_completion(pool: &DbPool, instance_key: i64) -> Result<String, String> {
+    use reebe_db::state::process_instances::ProcessInstanceRepository;
+    let repo = ProcessInstanceRepository::new(pool);
+    loop {
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        match repo.get_by_key(instance_key).await {
+            Ok(pi) if matches!(pi.state.as_str(), "COMPLETED" | "TERMINATED" | "CANCELED") => {
+                // Future: fetch and return variables from the root scope
+                return Ok("{}".to_string());
+            }
+            Ok(_) => {} // still running, keep polling
+            Err(e) => return Err(e.to_string()),
+        }
+    }
+}

@@ -1,0 +1,71 @@
+# Default: list commands
+default:
+    @just --list
+
+# Build release binary
+build:
+    cargo build --release -p reebe-server
+
+# Run in development mode
+dev:
+    RUST_LOG=reebe=debug,tower_http=trace,sqlx=warn cargo run -p reebe-server
+
+# Flush the database and start fresh
+dev-fresh:
+    docker compose down -v
+    docker compose up -d postgres
+    @echo "Waiting for postgres to be ready..."
+    @until docker compose exec postgres pg_isready -U reebe -d reebe -q; do sleep 0.5; done
+    RUST_LOG=reebe=debug,tower_http=trace,sqlx=warn cargo run -p reebe-server
+
+# Run all tests
+test:
+    cargo test --workspace
+
+# Run tests with output
+test-verbose:
+    cargo test --workspace -- --nocapture
+
+# Check for compilation errors
+check:
+    cargo check --workspace
+
+# Format code
+fmt:
+    cargo fmt --all
+
+# Lint
+lint:
+    cargo clippy --workspace -- -D warnings
+
+# Start docker-compose (postgres)
+db-up:
+    docker compose up -d postgres
+
+# Stop docker-compose
+db-down:
+    docker compose down
+
+# Run with docker-compose
+up:
+    docker compose up
+
+# Stop all docker-compose services
+down:
+    docker compose down -v
+
+# Run with embedded SQLite — no external database needed
+dev-embedded:
+    RUST_LOG=reebe=debug,tower_http=trace,sqlx=warn cargo run --no-default-features --features embedded -p reebe-server
+
+# Run throughput benchmark against a running server (options forwarded to reebe-bench)
+bench *args:
+    cargo run --release -p reebe-bench -- {{args}}
+
+# Build the WASM playground package
+build-wasm:
+    wasm-pack build crates/reebe-wasm --target web --scope bpmnkit --out-dir ../reebe-wasm
+
+# Check the WASM crate for compile errors (no wasm-pack needed)
+check-wasm:
+    cargo check -p reebe-wasm

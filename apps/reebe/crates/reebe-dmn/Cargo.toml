@@ -1,0 +1,13 @@
+[package]
+name = "reebe-dmn"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "DMN 1.3 decision evaluator for the Reebe workflow engine (stub)"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+quick-xml = { version = "0.36", features = ["serialize"] }
+reebe-feel = { workspace = true }

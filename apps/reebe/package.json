@@ -1,0 +1,11 @@
+{
+  "name": "@bpmnkit/reebe",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "cargo build --release -p reebe-server",
+    "build:wasm": "wasm-pack build crates/reebe-wasm --target web --scope bpmnkit --out-dir ../reebe-wasm",
+    "check": "cargo check --workspace",
+    "test": "cargo test --workspace"
+  }
+}

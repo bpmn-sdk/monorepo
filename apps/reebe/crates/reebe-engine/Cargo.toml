@@ -1,0 +1,48 @@
+[package]
+name = "reebe-engine"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Core workflow engine for the Reebe workflow engine"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+chrono = { workspace = true }
+tracing = { workspace = true }
+uuid = { workspace = true }
+async-trait = { workspace = true }
+dashmap = { workspace = true }
+reebe-protocol = { workspace = true }
+reebe-bpmn = { workspace = true }
+reebe-feel = { workspace = true }
+reebe-dmn = { workspace = true }
+reebe-db = { workspace = true }
+base64 = { workspace = true }
+metrics = { workspace = true }
+
+# Native (non-WASM): full tokio + sqlx for replay
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+tokio = { version = "1", features = ["full"] }
+sqlx = { version = "0.8", features = ["runtime-tokio", "chrono", "json"] }
+
+# WASM: only sync primitives (Mutex, Notify stubs)
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+tokio = { version = "1", default-features = false, features = ["sync"] }
+
+[features]
+default = ["postgres"]
+postgres = ["reebe-db/postgres"]
+sqlite = ["reebe-db/sqlite"]
+memory = ["reebe-db/memory"]
+
+[dev-dependencies]
+tokio = { workspace = true }
+base64 = { workspace = true }
+reebe-db = { workspace = true, features = ["postgres"] }
+criterion = { version = "0.5", features = ["async_tokio"] }
+
+[[bench]]
+name = "throughput"
+harness = false

@@ -1,0 +1,422 @@
+syntax = "proto3";
+package gateway_protocol;
+
+option java_multiple_files = true;
+option java_package = "io.camunda.zeebe.gateway.protocol";
+option java_outer_classname = "GatewayOuterClass";
+
+service Gateway {
+  // Topology
+  rpc Topology(TopologyRequest) returns (TopologyResponse) {}
+  // Deployments
+  rpc DeployProcess(DeployProcessRequest) returns (DeployProcessResponse) {}
+  rpc DeployResource(DeployResourceRequest) returns (DeployResourceResponse) {}
+  // Process instances
+  rpc CreateProcessInstance(CreateProcessInstanceRequest) returns (CreateProcessInstanceResponse) {}
+  rpc CreateProcessInstanceWithResult(CreateProcessInstanceWithResultRequest) returns (CreateProcessInstanceWithResultResponse) {}
+  rpc CancelProcessInstance(CancelProcessInstanceRequest) returns (CancelProcessInstanceResponse) {}
+  rpc ModifyProcessInstance(ModifyProcessInstanceRequest) returns (ModifyProcessInstanceResponse) {}
+  rpc MigrateProcessInstance(MigrateProcessInstanceRequest) returns (MigrateProcessInstanceResponse) {}
+  // Jobs
+  rpc ActivateJobs(ActivateJobsRequest) returns (stream ActivateJobsResponse) {}
+  rpc StreamActivatedJobs(StreamActivatedJobsRequest) returns (stream ActivatedJob) {}
+  rpc CompleteJob(CompleteJobRequest) returns (CompleteJobResponse) {}
+  rpc FailJob(FailJobRequest) returns (FailJobResponse) {}
+  rpc ThrowError(ThrowErrorRequest) returns (ThrowErrorResponse) {}
+  rpc UpdateJobRetries(UpdateJobRetriesRequest) returns (UpdateJobRetriesResponse) {}
+  rpc UpdateJobTimeout(UpdateJobTimeoutRequest) returns (UpdateJobTimeoutResponse) {}
+  // Variables
+  rpc SetVariables(SetVariablesRequest) returns (SetVariablesResponse) {}
+  // Messages
+  rpc PublishMessage(PublishMessageRequest) returns (PublishMessageResponse) {}
+  // Incidents
+  rpc ResolveIncident(ResolveIncidentRequest) returns (ResolveIncidentResponse) {}
+  // Signals
+  rpc BroadcastSignal(BroadcastSignalRequest) returns (BroadcastSignalResponse) {}
+  // Decisions
+  rpc EvaluateDecision(EvaluateDecisionRequest) returns (EvaluateDecisionResponse) {}
+  // Resources
+  rpc DeleteResource(DeleteResourceRequest) returns (DeleteResourceResponse) {}
+}
+
+// ── Topology ──────────────────────────────────────────────────────────────────
+
+message TopologyRequest {}
+
+message TopologyResponse {
+  repeated BrokerInfo brokers = 1;
+  int32 clusterSize = 2;
+  int32 partitionsCount = 3;
+  int32 replicationFactor = 4;
+  string gatewayVersion = 5;
+}
+
+message BrokerInfo {
+  int32 nodeId = 1;
+  string host = 2;
+  int32 port = 3;
+  repeated Partition partitions = 4;
+  string version = 5;
+}
+
+message Partition {
+  enum PartitionBrokerRole {
+    LEADER = 0;
+    BROKER = 1;
+    INACTIVE = 2;
+  }
+  enum PartitionBrokerHealth {
+    HEALTHY = 0;
+    UNHEALTHY = 1;
+    DEAD = 2;
+  }
+  int32 partitionId = 1;
+  PartitionBrokerRole role = 2;
+  PartitionBrokerHealth health = 3;
+}
+
+// ── Deploy ────────────────────────────────────────────────────────────────────
+
+message DeployProcessRequest {
+  repeated ProcessRequestObject processes = 1;
+}
+
+message ProcessRequestObject {
+  string name = 1;
+  bytes definition = 2;
+}
+
+message DeployProcessResponse {
+  int64 key = 1;
+  repeated ProcessMetadata processes = 2;
+}
+
+message DeployResourceRequest {
+  repeated Resource resources = 1;
+  string tenantId = 2;
+}
+
+message Resource {
+  string name = 1;
+  bytes content = 2;
+}
+
+message DeployResourceResponse {
+  int64 key = 1;
+  repeated Deployment deployments = 2;
+  string tenantId = 3;
+}
+
+message Deployment {
+  oneof metadata {
+    ProcessMetadata process = 1;
+    DecisionMetadata decision = 2;
+    DecisionRequirementsMetadata decisionRequirements = 3;
+    FormMetadata form = 4;
+  }
+}
+
+message ProcessMetadata {
+  string bpmnProcessId = 1;
+  int32 version = 2;
+  int64 processDefinitionKey = 3;
+  string resourceName = 4;
+  string tenantId = 5;
+}
+
+message DecisionMetadata {
+  string dmnDecisionId = 1;
+  string dmnDecisionName = 2;
+  int32 version = 3;
+  int64 decisionKey = 4;
+  string dmnDecisionRequirementsId = 5;
+  int64 decisionRequirementsKey = 6;
+  string tenantId = 7;
+}
+
+message DecisionRequirementsMetadata {
+  string dmnDecisionRequirementsId = 1;
+  string dmnDecisionRequirementsName = 2;
+  int32 version = 3;
+  int64 decisionRequirementsKey = 4;
+  string resourceName = 5;
+  string tenantId = 6;
+}
+
+message FormMetadata {
+  string formId = 1;
+  int32 version = 2;
+  int64 formKey = 3;
+  string resourceName = 4;
+  string tenantId = 5;
+}
+
+// ── Process Instances ─────────────────────────────────────────────────────────
+
+message CreateProcessInstanceRequest {
+  int64 processDefinitionKey = 1;
+  string bpmnProcessId = 2;
+  int32 version = 3;
+  string variables = 4;
+  string tenantId = 6;
+}
+
+message CreateProcessInstanceResponse {
+  int64 processDefinitionKey = 1;
+  string bpmnProcessId = 2;
+  int32 version = 3;
+  int64 processInstanceKey = 4;
+  string tenantId = 5;
+}
+
+message CreateProcessInstanceWithResultRequest {
+  CreateProcessInstanceRequest request = 1;
+  int64 requestTimeout = 2;
+  repeated string fetchVariables = 3;
+}
+
+message CreateProcessInstanceWithResultResponse {
+  int64 processDefinitionKey = 1;
+  string bpmnProcessId = 2;
+  int32 version = 3;
+  int64 processInstanceKey = 4;
+  string tenantId = 5;
+  string variables = 6;
+}
+
+message CancelProcessInstanceRequest {
+  int64 processInstanceKey = 1;
+}
+
+message CancelProcessInstanceResponse {}
+
+message ModifyProcessInstanceRequest {
+  int64 processInstanceKey = 1;
+  repeated ActivateInstruction activateInstructions = 2;
+  repeated TerminateInstruction terminateInstructions = 3;
+}
+
+message ActivateInstruction {
+  string elementId = 1;
+  int64 ancestorElementInstanceKey = 2;
+  repeated VariableInstruction variableInstructions = 3;
+}
+
+message TerminateInstruction {
+  int64 elementInstanceKey = 1;
+}
+
+message VariableInstruction {
+  string variables = 1;
+  string scopeId = 2;
+}
+
+message ModifyProcessInstanceResponse {}
+
+message MigrateProcessInstanceRequest {
+  int64 processInstanceKey = 1;
+  MigrationPlan migrationPlan = 2;
+}
+
+message MigrationPlan {
+  int64 targetProcessDefinitionKey = 1;
+  repeated MappingInstruction mappingInstructions = 2;
+}
+
+message MappingInstruction {
+  string sourceElementId = 1;
+  string targetElementId = 2;
+}
+
+message MigrateProcessInstanceResponse {}
+
+// ── Jobs ──────────────────────────────────────────────────────────────────────
+
+message ActivateJobsRequest {
+  string type = 1;
+  string worker = 2;
+  int64 timeout = 3;
+  int32 maxJobsToActivate = 4;
+  repeated string fetchVariable = 5;
+  int64 requestTimeout = 6;
+  repeated string tenantIds = 7;
+}
+
+message ActivateJobsResponse {
+  repeated ActivatedJob jobs = 1;
+}
+
+message StreamActivatedJobsRequest {
+  string type = 1;
+  string worker = 2;
+  int64 timeout = 3;
+  repeated string fetchVariable = 5;
+  repeated string tenantIds = 6;
+}
+
+message ActivatedJob {
+  int64 key = 1;
+  string type = 2;
+  int64 processInstanceKey = 3;
+  string bpmnProcessId = 4;
+  int32 processDefinitionVersion = 5;
+  int64 processDefinitionKey = 6;
+  string elementId = 7;
+  int64 elementInstanceKey = 8;
+  string customHeaders = 9;
+  string worker = 10;
+  int32 retries = 11;
+  int64 deadline = 12;
+  string variables = 13;
+  string tenantId = 14;
+}
+
+message CompleteJobRequest {
+  int64 jobKey = 1;
+  string variables = 2;
+}
+
+message CompleteJobResponse {}
+
+message FailJobRequest {
+  int64 jobKey = 1;
+  int32 retries = 2;
+  string errorMessage = 3;
+  int64 retryBackOff = 4;
+  string variables = 5;
+}
+
+message FailJobResponse {}
+
+message ThrowErrorRequest {
+  int64 jobKey = 1;
+  string errorCode = 2;
+  string errorMessage = 3;
+  string variables = 4;
+}
+
+message ThrowErrorResponse {}
+
+message UpdateJobRetriesRequest {
+  int64 jobKey = 1;
+  int32 retries = 2;
+}
+
+message UpdateJobRetriesResponse {}
+
+message UpdateJobTimeoutRequest {
+  int64 jobKey = 1;
+  int64 timeout = 2;
+}
+
+message UpdateJobTimeoutResponse {}
+
+// ── Variables ─────────────────────────────────────────────────────────────────
+
+message SetVariablesRequest {
+  int64 elementInstanceKey = 1;
+  string variables = 2;
+  bool local = 3;
+}
+
+message SetVariablesResponse {
+  int64 key = 1;
+}
+
+// ── Messages ──────────────────────────────────────────────────────────────────
+
+message PublishMessageRequest {
+  string name = 1;
+  string correlationKey = 2;
+  int64 timeToLive = 3;
+  string messageId = 4;
+  string variables = 5;
+  string tenantId = 6;
+}
+
+message PublishMessageResponse {
+  int64 key = 1;
+  string tenantId = 2;
+}
+
+// ── Incidents ─────────────────────────────────────────────────────────────────
+
+message ResolveIncidentRequest {
+  int64 incidentKey = 1;
+}
+
+message ResolveIncidentResponse {}
+
+// ── Signals ───────────────────────────────────────────────────────────────────
+
+message BroadcastSignalRequest {
+  string signalName = 1;
+  string variables = 2;
+  string tenantId = 3;
+}
+
+message BroadcastSignalResponse {
+  int64 key = 1;
+  string tenantId = 2;
+}
+
+// ── Decisions ─────────────────────────────────────────────────────────────────
+
+message EvaluateDecisionRequest {
+  int64 decisionKey = 1;
+  string decisionId = 2;
+  string variables = 3;
+  string tenantId = 4;
+}
+
+message EvaluateDecisionResponse {
+  int64 decisionKey = 1;
+  string decisionId = 2;
+  string decisionName = 3;
+  int32 decisionVersion = 4;
+  int64 decisionRequirementsKey = 5;
+  string decisionRequirementsId = 6;
+  string decisionOutput = 7;
+  repeated EvaluatedDecision evaluatedDecisions = 8;
+  string failedDecisionId = 9;
+  string failureMessage = 10;
+  string tenantId = 11;
+  int64 processInstanceKey = 12;
+}
+
+message EvaluatedDecision {
+  int64 decisionKey = 1;
+  string decisionId = 2;
+  string decisionName = 3;
+  int32 decisionVersion = 4;
+  string decisionType = 5;
+  string decisionOutput = 6;
+  repeated MatchedDecisionRule matchedRules = 7;
+  repeated EvaluatedDecisionInput evaluatedInputs = 8;
+}
+
+message MatchedDecisionRule {
+  string ruleId = 1;
+  int32 ruleIndex = 2;
+  repeated EvaluatedDecisionOutput evaluatedOutputs = 3;
+}
+
+message EvaluatedDecisionInput {
+  string inputId = 1;
+  string inputName = 2;
+  string inputValue = 3;
+}
+
+message EvaluatedDecisionOutput {
+  string outputId = 1;
+  string outputName = 2;
+  string outputValue = 3;
+}
+
+// ── Resources ─────────────────────────────────────────────────────────────────
+
+message DeleteResourceRequest {
+  int64 resourceKey = 1;
+}
+
+message DeleteResourceResponse {}
