@@ -69,6 +69,15 @@ export interface Variable {
 	type?: string
 }
 
+export interface ElementInstance {
+	elementInstanceKey: string
+	processInstanceKey: string
+	processDefinitionKey: string
+	elementId: string
+	elementType: string
+	state: string
+}
+
 export interface PageResponse<T> {
 	items: T[]
 	page?: { totalItems: number }

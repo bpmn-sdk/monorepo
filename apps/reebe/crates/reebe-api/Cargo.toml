@@ -1,0 +1,37 @@
+[package]
+name = "reebe-api"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "REST API layer for the Reebe workflow engine"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+chrono = { workspace = true }
+tracing = { workspace = true }
+uuid = { workspace = true }
+axum = { workspace = true }
+tower = { workspace = true }
+tower-http = { workspace = true }
+base64 = { workspace = true }
+dashmap = { workspace = true }
+async-trait = { workspace = true }
+jsonwebtoken = { workspace = true }
+reqwest = { workspace = true }
+argon2 = { workspace = true }
+sqlx = { version = "0.8", features = ["runtime-tokio", "chrono", "uuid", "json"] }
+metrics = { workspace = true }
+metrics-exporter-prometheus = { workspace = true }
+reebe-protocol = { workspace = true }
+reebe-engine = { workspace = true, default-features = false }
+reebe-db = { workspace = true, default-features = false }
+reebe-dmn = { workspace = true }
+reebe-feel = { workspace = true }
+
+[features]
+default = ["postgres"]
+postgres = ["reebe-db/postgres", "reebe-engine/postgres"]
+sqlite = ["reebe-db/sqlite", "reebe-engine/sqlite"]

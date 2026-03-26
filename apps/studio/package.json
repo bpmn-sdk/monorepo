@@ -12,6 +12,7 @@
 	},
 	"dependencies": {
 		"@bpmnkit/api": "workspace:*",
+		"@bpmnkit/reebe-wasm": "workspace:*",
 		"@bpmnkit/operate": "workspace:*",
 		"@bpmnkit/canvas": "workspace:*",
 		"@bpmnkit/core": "workspace:*",

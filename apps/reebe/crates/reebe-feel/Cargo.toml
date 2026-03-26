@@ -1,0 +1,15 @@
+[package]
+name = "reebe-feel"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "FEEL (Friendly Enough Expression Language) evaluator for the Reebe workflow engine"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+chrono = { workspace = true }
+
+[dev-dependencies]
+chrono = { workspace = true }

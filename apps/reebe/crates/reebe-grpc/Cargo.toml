@@ -1,0 +1,26 @@
+[package]
+name = "reebe-grpc"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Zeebe-compatible gRPC gateway for the Reebe workflow engine"
+
+[build-dependencies]
+tonic-build = "0.12"
+protoc-bin-vendored = "3"
+
+[dependencies]
+tonic = { version = "0.12", features = ["transport"] }
+prost = "0.13"
+tokio = { workspace = true }
+tokio-stream = "0.1"
+serde_json = { workspace = true }
+tracing = { workspace = true }
+chrono = { workspace = true }
+reebe-engine = { workspace = true, default-features = false }
+reebe-db = { workspace = true, default-features = false }
+
+[features]
+default = ["postgres"]
+postgres = ["reebe-db/postgres", "reebe-engine/postgres"]
+sqlite = ["reebe-db/sqlite", "reebe-engine/sqlite"]

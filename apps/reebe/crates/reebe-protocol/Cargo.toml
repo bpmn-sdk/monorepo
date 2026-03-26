@@ -1,0 +1,12 @@
+[package]
+name = "reebe-protocol"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Record types, intents, and value types for the Reebe workflow engine"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+chrono = { workspace = true }

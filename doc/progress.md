@@ -1,5 +1,81 @@
 # Progress
 
+## 2026-03-26 — Fix: reebe-wasm timer events firing immediately instead of after duration
+
+- **`apps/reebe/crates/reebe-engine/src/processor/bpmn_element.rs`**: `eval_timer_due_date()` uses `reebe_feel::parse_and_evaluate()` for the `duration("PT1M")` fallback path, but `parse_and_evaluate()` treats any expression without a leading `=` as a literal string — returning `Ok(String("duration(\"PT1M\")"))` instead of evaluating it. Since neither path matched `FeelValue::Duration`, the fallback triggered (`due_date = now`), making every timer fire immediately. Fixed by switching the fallback path to `reebe_feel::evaluate()`, which always runs the FEEL evaluator. Rebuilt wasm binary.
+
+## 2026-03-26 — Fix: reebe-wasm intermediate timer events never firing
+
+Two bugs combined to prevent intermediate timer events from completing:
+
+1. **`apps/reebe/crates/reebe-wasm/src/lib.rs`**: `tick()` read `self.clock.now()` before syncing it to real wall-clock time, so `get_due_timers()` queried with a stale timestamp and found nothing even after the real due date had passed. Fixed by syncing the virtual clock to real time at the start of `tick()` (same guard used in `submit_and_drain`). Rebuilt wasm binary.
+2. **`apps/studio/src/api/wasm-adapter.ts`**: Nothing in the studio ever called `engine.tick()` — timers were created correctly but never processed. Fixed by adding a `setInterval(tickEngine, 2000)` in `initWasmEngine()` that polls every 2 seconds and calls `queryClient.invalidateQueries({ refetchType: "active" })` after ticking so the UI refreshes automatically when timers fire.
+
+## 2026-03-26 — Connector catalog: brand icons on imported service tasks
+
+- **`packages/connector-gen/src/catalog.ts`**: Added `BRAND_COLORS` map (Simple Icons palette) for 50+ catalog entries. Added `getCatalogIconUri(id)` helper that generates a base64 SVG data URI — a rounded square in the brand's primary color with the service's initial letter.
+- **`packages/connector-gen/src/types.ts`**: Added `icon?: string` to `GeneratorOptions`.
+- **`packages/connector-gen/src/build-template.ts`**: `buildTemplate` now sets `icon: { contents: opts.icon }` on the returned `ConnectorTemplate` when an icon is provided.
+- **`packages/connector-gen/src/browser.ts`** and **`index.ts`**: `generateFromCatalog` now resolves the catalog entry icon via `getCatalogIconUri` and passes it as `opts.icon` — can be overridden by callers. Exported `getCatalogIconUri`.
+
+## 2026-03-26 — Fix: reebe-wasm process instance start dates all identical
+
+- **`apps/reebe/crates/reebe-wasm/src/lib.rs`**: The `VirtualClock` was initialized at engine startup and never auto-advanced, so `state.clock.now()` always returned the same frozen timestamp — every created process instance got the identical `start_date`. Fixed in `submit_and_drain` by syncing the virtual clock forward to real wall-clock time before each operation (only advances, never resets — `advance_clock` timer simulation still works correctly). Rebuilt wasm binary.
+
+## 2026-03-26 — Studio: connector catalog in command palette
+
+- **`apps/studio/src/pages/ModelDetail.tsx`**: Added `createConnectorCatalogPlugin(configPanelBpmn, bridgePalette)` to the editor plugin list. The catalog plugin registers 40+ "Import API: …" commands (GitHub, Stripe, Slack, OpenAI, etc.) plus "Import from OpenAPI URL…" and "Import from OpenAPI file…" through `bridgePalette`, so they appear in the Studio Ctrl+K palette under the "Editor" group. Removed the placeholder `editor:generate-openapi` stub that routed to the AI drawer instead.
+
+## 2026-03-26 — Studio: context-aware command palette (editor commands in global palette)
+
+- **`apps/studio/src/stores/ui.ts`**: Added `contextCommands`, `paletteViewStack`, `aiInitialPrompt` state. New actions: `addContextCommands()` (returns deregister fn), `clearContextCommands()`, `pushPaletteView()`, `popPaletteView()`, `openAI(prompt?)`.
+- **`apps/studio/src/components/CommandPalette.tsx`**: Rebuilt to support view stack — context commands appear grouped alongside static items; when `paletteViewStack` has entries the top view is shown (list or text-input mode); Escape pops the stack; back chevron button added.
+- **`apps/studio/src/pages/ModelDetail.tsx`**: On editor mount, creates a `bridgePalette` shim (`CommandPalettePlugin`) that routes `addCommands()` → `addContextCommands()` and `pushView()` → `pushPaletteView()`. Passes it to `createCommandPaletteEditorPlugin` so all element-creation commands flow into the global Studio palette when on the editor page. Also registers extra commands: Export BPMN, Auto Layout, Zoom to Fit, and "Generate from OpenAPI spec" (opens AI drawer with pre-filled prompt). All are deregistered on editor destroy.
+- **`apps/studio/src/layout/AIDrawer.tsx`**: Pre-fills input with `aiInitialPrompt` when the drawer opens with an initial prompt.
+
+## 2026-03-26 — reebe-wasm: BPMN canvas in definition and instance detail pages
+
+- **`apps/studio/src/pages/DefinitionDetail.tsx` (`WasmDefinitionDetail`)**: Added `BpmnCanvas` side-by-side layout — diagram fills the left panel, info/start-instance/instances list in a right sidebar. Canvas is created/destroyed in a `useEffect` keyed on `xmlData` and `theme`.
+- **`apps/studio/src/pages/InstanceDetail.tsx` (`WasmInstanceDetail`)**: Added `BpmnCanvas` + `createTokenHighlightPlugin` — diagram shows active elements (blue) and visited elements (grey). Token state comes from `useElementInstances`. Uses the instance's `processDefinitionKey` to fetch XML via `useDefinitionXml`.
+- **`apps/studio/src/api/wasm-adapter.ts`**: Added `WasmElementInstance` snapshot interface and `/api/element-instances/search` route — filters by `processInstanceKey`, maps snake_case Rust fields to `ElementInstance` API shape.
+- **`apps/studio/src/api/types.ts`**: Added `ElementInstance` type.
+- **`apps/studio/src/api/queries.ts`**: Added `useElementInstances(processInstanceKey)` hook.
+
+## 2026-03-26 — Fix: reebe-wasm create_process_instance wrong value_type
+
+- **`apps/reebe/crates/reebe-wasm/src/lib.rs`**: `create_process_instance()` was submitting with `value_type = "PROCESS_INSTANCE"` but `ProcessInstanceCreationProcessor.accepts()` checks for `"PROCESS_INSTANCE_CREATION"`. The processor never ran, `first_response` stayed `None`, and `submit_and_drain` returned `{}` — making `processInstanceKey` undefined and falling back to `"0"`. Fixed by using the correct value_type `"PROCESS_INSTANCE_CREATION"`.
+- Rebuilt `apps/reebe-wasm` wasm binary.
+
+## 2026-03-26 — Fix: reebe-wasm instance key + wasm-native InstanceDetail
+
+- **`apps/studio/src/api/wasm-adapter.ts`**: Fixed `create_process_instance` response parsing — the engine returns `{ processInstanceKey: "..." }` not `{ key: ... }`. Using the wrong field returned `"0"` for every instance key, making all created instances unfindable.
+- **`apps/studio/src/pages/InstanceDetail.tsx`**: Added `WasmInstanceDetail` component (mirrors `WasmDefinitionDetail` pattern). When the reebe-wasm profile is active, renders a native view showing instance state, incidents, variables, and a cancel button — instead of `createInstanceDetailView` from `@bpmnkit/operate` which makes raw HTTP calls to the proxy, bypassing the wasm adapter.
+
+## 2026-03-26 — Fix: reebe-wasm serde_wasm_bindgen JSON serialization
+
+- **`apps/reebe/crates/reebe-wasm/src/lib.rs`**: Replaced all `serde_wasm_bindgen::to_value(&x)` calls with a `json_compatible()` serializer. The default serializer converts Rust `Map`/`serde_json::Value::Object` into JS `Map` objects (not plain objects), so `JSON.stringify(result)` returned `{}` — silently hiding deploy responses and all engine command results. Added `to_js()` and `to_js_result()` helpers using `Serializer::json_compatible()`.
+- **`apps/studio/src/pages/DefinitionDetail.tsx`**: Fixed `handleStart` error display — use `String(err)` instead of generic fallback since wasm engine throws strings.
+- Rebuilt `apps/reebe-wasm` wasm binary (`pnpm build:wasm`).
+
+## 2026-03-26 — reebe-wasm: logging + error display fixes
+
+- **`apps/studio/src/api/wasm-adapter.ts`**: Added `[reebe-wasm]` prefixed logging for every route (`→ METHOD /path` on entry, `← METHOD /path → result` on exit, errors via `console.error`). Deploy handler logs xml length, raw result, and `localDefs` size after each deploy. All wasm engine call sites now catch thrown values and re-throw as proper `Error` objects.
+- **`apps/studio/src/stores/cluster.ts`**: Added `[reebe-wasm]` log lines for engine init start/success/failure in both `loadProfiles()` and `setActiveProfile()`.
+- **`apps/studio/src/pages/ModelDetail.tsx`**: Fixed error display — wasm engine throws JS strings (not `Error` objects), so the catch block now uses `String(err)` instead of the generic `"Deploy failed"` fallback.
+
+## 2026-03-26 — Fix: reebe-wasm deploy base64 encoding
+
+- **`apps/reebe/crates/reebe-wasm/src/lib.rs`**: `deploy()` was passing raw BPMN XML as the `content` field, but `DeploymentProcessor` always base64-decodes content (matching the real deployment pipeline). Fixed by base64-encoding the XML before submitting the DEPLOYMENT/CREATE record.
+- **`apps/reebe/crates/reebe-wasm/Cargo.toml`**: Added `base64 = { workspace = true }` direct dependency.
+- Rebuilt `apps/reebe-wasm` wasm binary.
+
+## 2026-03-26 — Studio: reebe-wasm in-browser engine integration
+
+- **`apps/reebe-wasm` stub files**: Added `reebe_wasm.js` (stub throwing a helpful error) and `reebe_wasm.d.ts` (full TypeScript type declarations) so the package can be imported before the WASM binary is built. `wasm-pack` overwrites these on actual build.
+- **`apps/studio/src/api/wasm-adapter.ts`**: New adapter that routes studio API calls to the in-browser `WasmEngine`. Translates snake_case Rust snapshot fields to the camelCase Camunda 8 REST shape. Tracks process definitions locally (not in engine snapshot). Handles all major routes: process definitions, instances, incidents, jobs, variables, and deploy (multipart).
+- **`apps/studio/src/api/client.ts`**: All proxy functions (`proxyFetch`, `proxyPost`, `proxyPostMultipart`, `proxyDelete`, `proxyFetchText`) now check `isWasmProfile()` and route to `wasmRoute()` instead of the HTTP proxy when the `reebe-wasm` profile is active.
+- **`apps/studio/src/stores/cluster.ts`**: `"reebe-wasm"` pseudo-profile is always present in the profile list (appended after real profiles, or shown alone when proxy is offline). Selecting it calls `initWasmEngine()` which dynamically imports `@bpmnkit/reebe-wasm`, calls `init()`, and creates the `WasmEngine` singleton. Status becomes `"connected"` once the engine is ready, enabling all TanStack Query hooks normally.
+
 ## 2026-03-25 — Studio: breadcrumbs show process name
 
 - **InstanceDetail breadcrumb**: uses `useInstance(key)` to resolve `processDefinitionId`; falls back to numeric key while loading.

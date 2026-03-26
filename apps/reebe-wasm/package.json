@@ -1,0 +1,17 @@
+{
+  "name": "reebe-wasm",
+  "type": "module",
+  "description": "WebAssembly playground for the Reebe BPMN workflow engine",
+  "version": "0.1.0",
+  "license": "Apache-2.0",
+  "files": [
+    "reebe_wasm_bg.wasm",
+    "reebe_wasm.js",
+    "reebe_wasm.d.ts"
+  ],
+  "main": "reebe_wasm.js",
+  "types": "reebe_wasm.d.ts",
+  "sideEffects": [
+    "./snippets/*"
+  ]
+}

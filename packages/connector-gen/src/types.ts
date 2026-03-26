@@ -216,6 +216,8 @@ export interface GeneratorOptions {
 	filter?: string
 	/** Pre-select a specific auth type */
 	defaultAuthType?: AuthHint
+	/** Icon data URI (e.g. "data:image/svg+xml;base64,...") applied to all generated templates */
+	icon?: string
 }
 
 export interface WriteOptions {

@@ -1,0 +1,27 @@
+# docker-compose.sqlite.yml — Zero-dependency single-container setup using SQLite.
+# Requires reebe compiled with: cargo build --no-default-features --features sqlite
+#
+# Limitations vs PostgreSQL mode:
+#   - Single-node only (no horizontal scaling, no advisory locks)
+#   - No LISTEN/NOTIFY (5ms polling fallback)
+#   - No read replica
+#   - Not recommended for production workloads > ~200 PI/s
+#   - WAL mode enabled for concurrent reads
+#
+# Usage: docker compose -f docker-compose.sqlite.yml up
+
+version: "3.9"
+
+services:
+  reebe:
+    image: reebe:sqlite
+    environment:
+      REEBE_DATABASE__URL: "sqlite:/data/reebe.db"
+      REEBE_PORT: "8080"
+    volumes:
+      - reebe_data:/data
+    ports:
+      - "8080:8080"
+
+volumes:
+  reebe_data:

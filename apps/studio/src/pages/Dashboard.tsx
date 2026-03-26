@@ -22,8 +22,8 @@ import {
 	useUserTasks,
 } from "../api/queries.js"
 import type { DashboardStats, ProcessDefinition } from "../api/types.js"
-import { ErrorState } from "../components/ErrorState.js"
 import { StatusPill } from "../components/StatusPill.js"
+import { useClusterStore } from "../stores/cluster.js"
 import { useModeStore } from "../stores/mode.js"
 import { useModelsStore } from "../stores/models.js"
 import { useUiStore } from "../stores/ui.js"
@@ -149,6 +149,7 @@ function StatCard({
 	href,
 	danger,
 	sparkline,
+	offline,
 	children,
 }: {
 	icon: typeof Play
@@ -157,14 +158,15 @@ function StatCard({
 	href: string
 	danger?: boolean
 	sparkline?: ComponentChildren
+	offline?: boolean
 	children: ComponentChildren
 }) {
-	const isDangerous = danger && (value ?? 0) > 0
+	const isDangerous = !offline && danger && (value ?? 0) > 0
 	return (
 		<div
-			className={`flex flex-col rounded-lg border bg-surface overflow-hidden transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg ${
-				isDangerous ? "border-danger/50" : "border-border"
-			}`}
+			className={`flex flex-col rounded-lg border bg-surface overflow-hidden transition-all duration-200 ${
+				offline ? "opacity-60" : "hover:-translate-y-0.5 hover:shadow-lg"
+			} ${isDangerous ? "border-danger/50" : "border-border"}`}
 		>
 			<Link
 				href={href}
@@ -180,7 +182,9 @@ function StatCard({
 				</div>
 				<div className="flex-1 min-w-0">
 					<div className="text-2xl font-bold text-fg">
-						{value === undefined ? (
+						{offline ? (
+							<span className="text-muted font-normal">—</span>
+						) : value === undefined ? (
 							<span className="h-7 w-12 animate-pulse rounded bg-surface-2 inline-block" />
 						) : (
 							value.toLocaleString()
@@ -188,11 +192,11 @@ function StatCard({
 					</div>
 					<div className="text-sm text-muted">{label}</div>
 				</div>
-				{sparkline}
+				{!offline && sparkline}
 			</Link>
 
 			<div className="border-t border-border/60 px-4 py-3 flex-1 flex flex-col gap-1.5">
-				{children}
+				{offline ? <p className="text-xs text-muted">No data — proxy not running.</p> : children}
 			</div>
 		</div>
 	)
@@ -206,7 +210,7 @@ interface ChatMessage {
 	streaming?: boolean
 }
 
-function AiChat({ stats }: { stats: DashboardStats | undefined }) {
+function AiChat({ stats, disabled }: { stats: DashboardStats | undefined; disabled?: boolean }) {
 	const [messages, setMessages] = useState<ChatMessage[]>([])
 	const [input, setInput] = useState("")
 	const [busy, setBusy] = useState(false)
@@ -350,14 +354,16 @@ function AiChat({ stats }: { stats: DashboardStats | undefined }) {
 					value={input}
 					onInput={(e) => setInput((e.target as HTMLInputElement).value)}
 					onKeyDown={handleKeyDown}
-					placeholder="Ask about your cluster or what to do next…"
-					disabled={busy}
+					placeholder={
+						disabled ? "Proxy not available" : "Ask about your cluster or what to do next…"
+					}
+					disabled={busy || disabled}
 					className="flex-1 rounded border border-border bg-surface px-3 py-1.5 text-sm text-fg placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-50"
 				/>
 				<button
 					type="button"
 					onClick={() => void send()}
-					disabled={busy || !input.trim()}
+					disabled={busy || disabled || !input.trim()}
 					className="flex items-center gap-1.5 rounded border border-border px-3 py-1.5 text-sm text-muted hover:text-fg disabled:opacity-40 transition-colors"
 					aria-label="Send message"
 				>
@@ -371,7 +377,7 @@ function AiChat({ stats }: { stats: DashboardStats | undefined }) {
 // ── Dashboard ──────────────────────────────────────────────────────────────────
 
 export function Dashboard() {
-	const { data: stats, isLoading, isError, refetch, dataUpdatedAt } = useDashboardStats()
+	const { data: stats, isLoading, refetch, dataUpdatedAt } = useDashboardStats()
 	const { data: recentDefs } = useDefinitions()
 	const { data: activeIncidents } = useIncidents({ state: "ACTIVE" })
 	const { data: recentInstances } = useInstances({ state: "ACTIVE" })
@@ -380,8 +386,13 @@ export function Dashboard() {
 	const { models } = useModelsStore()
 	const { mode } = useModeStore()
 	const { setBreadcrumbs } = useUiStore()
+	const { status, loadProfiles } = useClusterStore()
 	const [refreshing, setRefreshing] = useState(false)
 	const [timeSeries, setTimeSeries] = useState<TsPoint[]>(loadTimeSeries)
+
+	const isOffline = status === "offline"
+	// Show skeletons during initial proxy check or while connected query loads
+	const isDataLoading = status === "loading" || isLoading
 
 	useEffect(() => {
 		setBreadcrumbs([{ label: "Dashboard" }])
@@ -398,20 +409,12 @@ export function Dashboard() {
 
 	async function handleRefresh() {
 		setRefreshing(true)
-		await refetch()
+		if (isOffline) {
+			await loadProfiles()
+		} else {
+			await refetch()
+		}
 		setRefreshing(false)
-	}
-
-	if (isError) {
-		return (
-			<ErrorState
-				title="Could not reach the cluster"
-				description="The proxy server may not be running, or your cluster connection is misconfigured. Start the proxy and check your settings."
-				hint="pnpm proxy"
-				onRetry={() => void handleRefresh()}
-				settingsHint
-			/>
-		)
 	}
 
 	const definitionGroups = groupDefinitions(recentDefs?.items ?? [])
@@ -422,17 +425,18 @@ export function Dashboard() {
 		<div className="p-6 max-w-6xl mx-auto animate-in fade-in slide-in-from-bottom-2 duration-300 flex flex-col gap-6">
 			<div className="flex items-center gap-3">
 				<div className="flex-1">
-					<AiChat stats={stats} />
+					<AiChat stats={stats} disabled={isOffline} />
 				</div>
 				<button
 					type="button"
 					onClick={() => void handleRefresh()}
-					disabled={refreshing || isLoading}
+					disabled={refreshing || isDataLoading}
 					className="flex items-center gap-1.5 rounded border border-border px-2.5 py-1 text-sm text-muted hover:text-fg disabled:opacity-50 transition-colors duration-150 shrink-0"
-					aria-label="Refresh dashboard"
+					aria-label={isOffline ? "Retry proxy connection" : "Refresh dashboard"}
+					title={isOffline ? "Retry proxy connection" : undefined}
 				>
 					<RefreshCw size={14} className={refreshing ? "animate-spin" : ""} />
-					Refresh
+					{isOffline ? "Retry" : "Refresh"}
 				</button>
 			</div>
 
@@ -443,9 +447,10 @@ export function Dashboard() {
 				{mode === "operator" && (
 					<StatCard
 						icon={CheckSquare}
-						value={isLoading ? undefined : stats?.pendingTasks}
+						value={isDataLoading ? undefined : stats?.pendingTasks}
 						label="Pending Tasks"
 						href="/tasks"
+						offline={isOffline}
 						danger={
 							recentTasks
 								? recentTasks.items.some((t) => t.dueDate && new Date(t.dueDate) < new Date())
@@ -484,9 +489,10 @@ export function Dashboard() {
 				{/* Active Incidents — prominent in both modes */}
 				<StatCard
 					icon={AlertTriangle}
-					value={isLoading ? undefined : stats?.activeIncidents}
+					value={isDataLoading ? undefined : stats?.activeIncidents}
 					label="Active Incidents"
 					href="/incidents"
+					offline={isOffline}
 					danger
 					sparkline={<Sparkline values={incidentValues} stroke="var(--bpmnkit-danger)" />}
 				>
@@ -511,9 +517,10 @@ export function Dashboard() {
 				{/* Running Instances — Dev: slot 1; Ops: slot 3 */}
 				<StatCard
 					icon={Play}
-					value={isLoading ? undefined : stats?.runningInstances}
+					value={isDataLoading ? undefined : stats?.runningInstances}
 					label="Running Instances"
 					href="/instances"
+					offline={isOffline}
 					sparkline={<Sparkline values={runningValues} stroke="var(--bpmnkit-accent)" />}
 				>
 					{!recentInstances ? (
@@ -537,9 +544,10 @@ export function Dashboard() {
 				{mode === "developer" && (
 					<StatCard
 						icon={CheckSquare}
-						value={isLoading ? undefined : stats?.pendingTasks}
+						value={isDataLoading ? undefined : stats?.pendingTasks}
 						label="Pending Tasks"
 						href="/tasks"
+						offline={isOffline}
 					>
 						{!recentTasks ? (
 							<SkeletonList />
@@ -563,9 +571,10 @@ export function Dashboard() {
 				{/* Deployed Definitions */}
 				<StatCard
 					icon={Layers}
-					value={isLoading ? undefined : stats?.deployedDefinitions}
+					value={isDataLoading ? undefined : stats?.deployedDefinitions}
 					label="Deployed Definitions"
 					href="/definitions"
+					offline={isOffline}
 				>
 					{!recentDefs ? (
 						<SkeletonList />
@@ -589,9 +598,10 @@ export function Dashboard() {
 				{/* Active Jobs — Dev: technical detail; Ops: last slot */}
 				<StatCard
 					icon={Zap}
-					value={isLoading ? undefined : stats?.activeJobs}
+					value={isDataLoading ? undefined : stats?.activeJobs}
 					label="Active Jobs"
 					href="/instances"
+					offline={isOffline}
 				>
 					{!recentJobs ? (
 						<SkeletonList />

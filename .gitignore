@@ -4,3 +4,9 @@ dist
 *.tsbuildinfo
 .swarm
 target
+apps/reebe-wasm/*.wasm
+apps/reebe-wasm/*.js
+apps/reebe-wasm/*.d.ts
+apps/reebe-wasm/snippets/
+# Rust build output
+apps/reebe/target/

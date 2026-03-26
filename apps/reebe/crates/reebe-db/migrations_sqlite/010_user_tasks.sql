@@ -1,0 +1,21 @@
+CREATE TABLE IF NOT EXISTS user_tasks (
+    key                    INTEGER  PRIMARY KEY,
+    partition_id           INTEGER  NOT NULL DEFAULT 1,
+    process_instance_key   INTEGER  NOT NULL,
+    element_instance_key   INTEGER  NOT NULL,
+    process_definition_key INTEGER  NOT NULL,
+    bpmn_process_id        TEXT     NOT NULL,
+    element_id             TEXT     NOT NULL,
+    assignee               TEXT,
+    candidate_groups       TEXT     NOT NULL DEFAULT '[]',
+    candidate_users        TEXT     NOT NULL DEFAULT '[]',
+    due_date               TEXT,
+    follow_up_date         TEXT,
+    form_key               TEXT,
+    state                  TEXT     NOT NULL DEFAULT 'CREATED',
+    custom_headers         TEXT     NOT NULL DEFAULT '{}',
+    created_at             TEXT     NOT NULL DEFAULT (datetime('now')),
+    completed_at           TEXT,
+    variables              TEXT     NOT NULL DEFAULT '{}',
+    tenant_id              TEXT     NOT NULL DEFAULT '<default>'
+);

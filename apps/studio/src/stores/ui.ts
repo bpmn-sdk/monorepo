@@ -7,6 +7,20 @@ export interface Breadcrumb {
 	href?: string
 }
 
+export interface ContextCommand {
+	id: string
+	label: string
+	description?: string
+	group: string
+	action: () => void
+}
+
+export interface PaletteView {
+	items: ContextCommand[]
+	placeholder?: string
+	onConfirm?: (value: string) => void
+}
+
 function loadSidebarExpanded(): boolean {
 	try {
 		const v = localStorage.getItem(SIDEBAR_KEY)
@@ -19,11 +33,14 @@ function loadSidebarExpanded(): boolean {
 
 interface UiState {
 	aiOpen: boolean
+	aiInitialPrompt: string | null
 	commandPaletteOpen: boolean
 	sidebarExpanded: boolean
 	breadcrumbs: Breadcrumb[]
+	contextCommands: ContextCommand[]
+	paletteViewStack: PaletteView[]
 	toggleAI(): void
-	openAI(): void
+	openAI(prompt?: string): void
 	closeAI(): void
 	toggleCommandPalette(): void
 	openCommandPalette(): void
@@ -31,20 +48,33 @@ interface UiState {
 	toggleSidebar(): void
 	setSidebarExpanded(v: boolean): void
 	setBreadcrumbs(crumbs: Breadcrumb[]): void
+	/** Append context commands. Returns a deregister function. */
+	addContextCommands(cmds: ContextCommand[]): () => void
+	clearContextCommands(): void
+	pushPaletteView(view: PaletteView): void
+	popPaletteView(): void
 }
 
-export const useUiStore = create<UiState>()((set) => ({
+export const useUiStore = create<UiState>()((set, get) => ({
 	aiOpen: false,
+	aiInitialPrompt: null,
 	commandPaletteOpen: false,
 	sidebarExpanded: loadSidebarExpanded(),
 	breadcrumbs: [],
+	contextCommands: [],
+	paletteViewStack: [],
 
 	toggleAI: () => set((s) => ({ aiOpen: !s.aiOpen })),
-	openAI: () => set({ aiOpen: true }),
-	closeAI: () => set({ aiOpen: false }),
-	toggleCommandPalette: () => set((s) => ({ commandPaletteOpen: !s.commandPaletteOpen })),
+	openAI: (prompt) => set({ aiOpen: true, aiInitialPrompt: prompt ?? null }),
+	closeAI: () => set({ aiOpen: false, aiInitialPrompt: null }),
+
+	toggleCommandPalette: () =>
+		set((s) => ({
+			commandPaletteOpen: !s.commandPaletteOpen,
+			paletteViewStack: s.commandPaletteOpen ? [] : s.paletteViewStack,
+		})),
 	openCommandPalette: () => set({ commandPaletteOpen: true }),
-	closeCommandPalette: () => set({ commandPaletteOpen: false }),
+	closeCommandPalette: () => set({ commandPaletteOpen: false, paletteViewStack: [] }),
 
 	toggleSidebar: () =>
 		set((s) => {
@@ -67,4 +97,26 @@ export const useUiStore = create<UiState>()((set) => ({
 	},
 
 	setBreadcrumbs: (crumbs) => set({ breadcrumbs: crumbs }),
+
+	addContextCommands: (cmds) => {
+		set((s) => ({ contextCommands: [...s.contextCommands, ...cmds] }))
+		return () => {
+			const ids = new Set(cmds.map((c) => c.id))
+			set((s) => ({ contextCommands: s.contextCommands.filter((c) => !ids.has(c.id)) }))
+		}
+	},
+
+	clearContextCommands: () => set({ contextCommands: [], paletteViewStack: [] }),
+
+	pushPaletteView: (view) =>
+		set((s) => ({ paletteViewStack: [...s.paletteViewStack, view], commandPaletteOpen: true })),
+
+	popPaletteView: () => {
+		const { paletteViewStack } = get()
+		if (paletteViewStack.length <= 1) {
+			set({ paletteViewStack: [] })
+		} else {
+			set({ paletteViewStack: paletteViewStack.slice(0, -1) })
+		}
+	},
 }))

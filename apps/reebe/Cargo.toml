@@ -1,0 +1,95 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/reebe-protocol",
+    "crates/reebe-feel",
+    "crates/reebe-bpmn",
+    "crates/reebe-dmn",
+    "crates/reebe-db",
+    "crates/reebe-engine",
+    "crates/reebe-api",
+    "crates/reebe-server",
+    "crates/reebe-grpc",
+    "crates/reebe-bench",
+    "crates/reebe-wasm",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+authors = ["Reebe Contributors"]
+
+[workspace.dependencies]
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Error handling
+thiserror = "1"
+anyhow = "1"
+
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+
+# Date/time
+chrono = { version = "0.4", features = ["serde"] }
+
+# XML parsing
+quick-xml = { version = "0.36", features = ["serialize"] }
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+
+# Metrics
+metrics = "0.24"
+metrics-exporter-prometheus = "0.15"
+
+# UUID
+uuid = { version = "1", features = ["v4", "serde"] }
+
+# Regex
+regex = "1"
+
+# gRPC
+tonic = { version = "0.12", features = ["transport"] }
+prost = "0.13"
+tokio-stream = "0.1"
+
+# HTTP
+axum = { version = "0.7", features = ["multipart", "tokio"] }
+tower = "0.4"
+tower-http = { version = "0.5", features = ["cors", "trace", "timeout"] }
+
+# Dashmap
+dashmap = "6"
+
+# Base64
+base64 = "0.22"
+
+# JWT / Auth
+jsonwebtoken = "9"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+argon2 = "0.5"
+
+# CLI
+clap = { version = "4", features = ["derive", "env"] }
+
+# Config
+config = "0.14"
+
+# OS directories
+directories = "5"
+
+# async-trait
+async-trait = "0.1"
+
+# Workspace crates
+reebe-protocol = { path = "crates/reebe-protocol" }
+reebe-feel = { path = "crates/reebe-feel" }
+reebe-bpmn = { path = "crates/reebe-bpmn" }
+reebe-dmn = { path = "crates/reebe-dmn" }
+reebe-db = { path = "crates/reebe-db", default-features = false }
+reebe-engine = { path = "crates/reebe-engine", default-features = false }
+reebe-api = { path = "crates/reebe-api", default-features = false }

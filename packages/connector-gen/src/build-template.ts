@@ -572,6 +572,7 @@ export function buildTemplate(op: OperationWithMeta, opts: GeneratorOptions): Co
 		elementType: { value: "bpmn:ServiceTask" },
 		groups,
 		properties,
+		...(opts.icon ? { icon: { contents: opts.icon } } : {}),
 	}
 }
 
