@@ -1113,9 +1113,11 @@ fn eval_timer_due_date(expression: &str, ctx: &reebe_feel::FeelContext, now: chr
         }
     }
 
-    // Try wrapping in duration("...") for plain ISO 8601 duration strings like "PT5S"
+    // Try wrapping in duration("...") for plain ISO 8601 duration strings like "PT5S".
+    // Use evaluate() directly — parse_and_evaluate() treats non-'=' strings as literals,
+    // so it would return String("duration(...)") without evaluating the function call.
     let wrapped = format!("duration(\"{}\")", expression.trim_matches('"'));
-    if let Ok(val) = reebe_feel::parse_and_evaluate(&wrapped, ctx) {
+    if let Ok(val) = reebe_feel::evaluate(&wrapped, ctx) {
         if let reebe_feel::FeelValue::Duration(ms) = val {
             return now + chrono::Duration::milliseconds(ms);
         }

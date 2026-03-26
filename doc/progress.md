@@ -1,5 +1,9 @@
 # Progress
 
+## 2026-03-26 — Fix: reebe-wasm timer events firing immediately instead of after duration
+
+- **`apps/reebe/crates/reebe-engine/src/processor/bpmn_element.rs`**: `eval_timer_due_date()` uses `reebe_feel::parse_and_evaluate()` for the `duration("PT1M")` fallback path, but `parse_and_evaluate()` treats any expression without a leading `=` as a literal string — returning `Ok(String("duration(\"PT1M\")"))` instead of evaluating it. Since neither path matched `FeelValue::Duration`, the fallback triggered (`due_date = now`), making every timer fire immediately. Fixed by switching the fallback path to `reebe_feel::evaluate()`, which always runs the FEEL evaluator. Rebuilt wasm binary.
+
 ## 2026-03-26 — Fix: reebe-wasm intermediate timer events never firing
 
 Two bugs combined to prevent intermediate timer events from completing:
