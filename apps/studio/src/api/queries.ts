@@ -252,6 +252,21 @@ export function useProfiles() {
 
 // ── Mutations ──────────────────────────────────────────────────────────────────
 
+export function useCreateProcessInstance() {
+	const qc = useQueryClient()
+	return useMutation({
+		mutationFn: (params: {
+			processDefinitionKey?: string
+			bpmnProcessId?: string
+			variables?: Record<string, unknown>
+		}) => proxyPost<{ processInstanceKey: string }>("/api/process-instances", params),
+		onSuccess: () => {
+			void qc.invalidateQueries({ queryKey: ["instances"] })
+			void qc.invalidateQueries({ queryKey: ["dashboard"] })
+		},
+	})
+}
+
 export function useDeployProcess() {
 	const qc = useQueryClient()
 	return useMutation({

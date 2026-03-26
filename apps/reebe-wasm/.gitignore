@@ -1,6 +1,1 @@
-*.wasm
-reebe_wasm.js
-reebe_wasm_bg.js
-reebe_wasm.d.ts
-reebe_wasm_bg.wasm.d.ts
-snippets/
+*

@@ -2,6 +2,7 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum DbError {
+    #[cfg(any(feature = "postgres", feature = "sqlite"))]
     #[error("Database error: {0}")]
     Sqlx(#[from] sqlx::Error),
     #[error("Record not found: {0}")]

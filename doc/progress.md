@@ -1,5 +1,40 @@
 # Progress
 
+## 2026-03-26 — Fix: reebe-wasm create_process_instance wrong value_type
+
+- **`apps/reebe/crates/reebe-wasm/src/lib.rs`**: `create_process_instance()` was submitting with `value_type = "PROCESS_INSTANCE"` but `ProcessInstanceCreationProcessor.accepts()` checks for `"PROCESS_INSTANCE_CREATION"`. The processor never ran, `first_response` stayed `None`, and `submit_and_drain` returned `{}` — making `processInstanceKey` undefined and falling back to `"0"`. Fixed by using the correct value_type `"PROCESS_INSTANCE_CREATION"`.
+- Rebuilt `apps/reebe-wasm` wasm binary.
+
+## 2026-03-26 — Fix: reebe-wasm instance key + wasm-native InstanceDetail
+
+- **`apps/studio/src/api/wasm-adapter.ts`**: Fixed `create_process_instance` response parsing — the engine returns `{ processInstanceKey: "..." }` not `{ key: ... }`. Using the wrong field returned `"0"` for every instance key, making all created instances unfindable.
+- **`apps/studio/src/pages/InstanceDetail.tsx`**: Added `WasmInstanceDetail` component (mirrors `WasmDefinitionDetail` pattern). When the reebe-wasm profile is active, renders a native view showing instance state, incidents, variables, and a cancel button — instead of `createInstanceDetailView` from `@bpmnkit/operate` which makes raw HTTP calls to the proxy, bypassing the wasm adapter.
+
+## 2026-03-26 — Fix: reebe-wasm serde_wasm_bindgen JSON serialization
+
+- **`apps/reebe/crates/reebe-wasm/src/lib.rs`**: Replaced all `serde_wasm_bindgen::to_value(&x)` calls with a `json_compatible()` serializer. The default serializer converts Rust `Map`/`serde_json::Value::Object` into JS `Map` objects (not plain objects), so `JSON.stringify(result)` returned `{}` — silently hiding deploy responses and all engine command results. Added `to_js()` and `to_js_result()` helpers using `Serializer::json_compatible()`.
+- **`apps/studio/src/pages/DefinitionDetail.tsx`**: Fixed `handleStart` error display — use `String(err)` instead of generic fallback since wasm engine throws strings.
+- Rebuilt `apps/reebe-wasm` wasm binary (`pnpm build:wasm`).
+
+## 2026-03-26 — reebe-wasm: logging + error display fixes
+
+- **`apps/studio/src/api/wasm-adapter.ts`**: Added `[reebe-wasm]` prefixed logging for every route (`→ METHOD /path` on entry, `← METHOD /path → result` on exit, errors via `console.error`). Deploy handler logs xml length, raw result, and `localDefs` size after each deploy. All wasm engine call sites now catch thrown values and re-throw as proper `Error` objects.
+- **`apps/studio/src/stores/cluster.ts`**: Added `[reebe-wasm]` log lines for engine init start/success/failure in both `loadProfiles()` and `setActiveProfile()`.
+- **`apps/studio/src/pages/ModelDetail.tsx`**: Fixed error display — wasm engine throws JS strings (not `Error` objects), so the catch block now uses `String(err)` instead of the generic `"Deploy failed"` fallback.
+
+## 2026-03-26 — Fix: reebe-wasm deploy base64 encoding
+
+- **`apps/reebe/crates/reebe-wasm/src/lib.rs`**: `deploy()` was passing raw BPMN XML as the `content` field, but `DeploymentProcessor` always base64-decodes content (matching the real deployment pipeline). Fixed by base64-encoding the XML before submitting the DEPLOYMENT/CREATE record.
+- **`apps/reebe/crates/reebe-wasm/Cargo.toml`**: Added `base64 = { workspace = true }` direct dependency.
+- Rebuilt `apps/reebe-wasm` wasm binary.
+
+## 2026-03-26 — Studio: reebe-wasm in-browser engine integration
+
+- **`apps/reebe-wasm` stub files**: Added `reebe_wasm.js` (stub throwing a helpful error) and `reebe_wasm.d.ts` (full TypeScript type declarations) so the package can be imported before the WASM binary is built. `wasm-pack` overwrites these on actual build.
+- **`apps/studio/src/api/wasm-adapter.ts`**: New adapter that routes studio API calls to the in-browser `WasmEngine`. Translates snake_case Rust snapshot fields to the camelCase Camunda 8 REST shape. Tracks process definitions locally (not in engine snapshot). Handles all major routes: process definitions, instances, incidents, jobs, variables, and deploy (multipart).
+- **`apps/studio/src/api/client.ts`**: All proxy functions (`proxyFetch`, `proxyPost`, `proxyPostMultipart`, `proxyDelete`, `proxyFetchText`) now check `isWasmProfile()` and route to `wasmRoute()` instead of the HTTP proxy when the `reebe-wasm` profile is active.
+- **`apps/studio/src/stores/cluster.ts`**: `"reebe-wasm"` pseudo-profile is always present in the profile list (appended after real profiles, or shown alone when proxy is offline). Selecting it calls `initWasmEngine()` which dynamically imports `@bpmnkit/reebe-wasm`, calls `init()`, and creates the `WasmEngine` singleton. Status becomes `"connected"` once the engine is ready, enabling all TanStack Query hooks normally.
+
 ## 2026-03-25 — Studio: breadcrumbs show process name
 
 - **InstanceDetail breadcrumb**: uses `useInstance(key)` to resolve `processDefinitionId`; falls back to numeric key while loading.

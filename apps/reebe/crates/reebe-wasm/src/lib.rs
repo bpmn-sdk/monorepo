@@ -1,6 +1,7 @@
 use std::sync::Arc;
-use wasm_bindgen::prelude::*;
+use base64::Engine as Base64Engine;
 use serde::{Deserialize, Serialize};
+use wasm_bindgen::prelude::*;
 use reebe_db::{InMemoryBackend, StateBackend};
 use reebe_db::records::DbRecord;
 use reebe_engine::{
@@ -15,6 +16,21 @@ use reebe_engine::{
 
 fn block<F: std::future::Future>(f: F) -> F::Output {
     futures::executor::block_on(f)
+}
+
+/// Serialize any `Serialize` type to a JsValue using the JSON-compatible mode
+/// so that Rust maps/objects become plain JS objects (not JS Map instances).
+/// JSON.stringify on a JS Map gives {}, which is incorrect.
+fn to_js(val: &impl Serialize) -> JsValue {
+    let serializer = serde_wasm_bindgen::Serializer::json_compatible();
+    val.serialize(&serializer).unwrap_or(JsValue::NULL)
+}
+
+/// Same as `to_js` but propagates serialization errors as a JS Err.
+fn to_js_result(val: &impl Serialize) -> Result<JsValue, JsValue> {
+    let serializer = serde_wasm_bindgen::Serializer::json_compatible();
+    val.serialize(&serializer)
+        .map_err(|e| JsValue::from_str(&e.to_string()))
 }
 
 #[derive(Serialize, Deserialize)]
@@ -72,14 +88,15 @@ impl WasmEngine {
 
     /// Deploy a BPMN XML string. Returns a JSON object with deployment info.
     pub fn deploy(&mut self, bpmn_xml: &str) -> Result<JsValue, JsValue> {
+        let encoded = base64::engine::general_purpose::STANDARD.encode(bpmn_xml.as_bytes());
         let result = self.submit_and_drain(
             "DEPLOYMENT", "CREATE",
             serde_json::json!({
-                "resources": [{ "name": "process.bpmn", "content": bpmn_xml }]
+                "resources": [{ "name": "process.bpmn", "content": encoded }]
             }),
             "<default>",
         ).map_err(|e| JsValue::from_str(&e))?;
-        Ok(serde_wasm_bindgen::to_value(&result).unwrap_or(JsValue::NULL))
+        to_js_result(&result)
     }
 
     /// Create a process instance. `variables` is a JSON string.
@@ -87,7 +104,7 @@ impl WasmEngine {
         let vars: serde_json::Value = serde_json::from_str(variables)
             .unwrap_or(serde_json::Value::Object(Default::default()));
         let result = self.submit_and_drain(
-            "PROCESS_INSTANCE", "CREATE",
+            "PROCESS_INSTANCE_CREATION", "CREATE",
             serde_json::json!({
                 "bpmnProcessId": bpmn_process_id,
                 "version": -1,
@@ -95,7 +112,7 @@ impl WasmEngine {
             }),
             "<default>",
         ).map_err(|e| JsValue::from_str(&e))?;
-        Ok(serde_wasm_bindgen::to_value(&result).unwrap_or(JsValue::NULL))
+        to_js_result(&result)
     }
 
     /// Cancel a process instance by its key.
@@ -106,7 +123,7 @@ impl WasmEngine {
             serde_json::json!({ "processInstanceKey": key.to_string() }),
             "<default>",
         ).map_err(|e| JsValue::from_str(&e))?;
-        Ok(serde_wasm_bindgen::to_value(&result).unwrap_or(JsValue::NULL))
+        to_js_result(&result)
     }
 
     /// Activate a job. Returns the job activation info.
@@ -121,7 +138,7 @@ impl WasmEngine {
             }),
             "<default>",
         ).map_err(|e| JsValue::from_str(&e))?;
-        Ok(serde_wasm_bindgen::to_value(&result).unwrap_or(JsValue::NULL))
+        to_js_result(&result)
     }
 
     /// Complete a job. `variables` is a JSON string.
@@ -137,7 +154,7 @@ impl WasmEngine {
             }),
             "<default>",
         ).map_err(|e| JsValue::from_str(&e))?;
-        Ok(serde_wasm_bindgen::to_value(&result).unwrap_or(JsValue::NULL))
+        to_js_result(&result)
     }
 
     /// Fail a job.
@@ -152,7 +169,7 @@ impl WasmEngine {
             }),
             "<default>",
         ).map_err(|e| JsValue::from_str(&e))?;
-        Ok(serde_wasm_bindgen::to_value(&result).unwrap_or(JsValue::NULL))
+        to_js_result(&result)
     }
 
     /// Throw a BPMN error from a job.
@@ -167,7 +184,7 @@ impl WasmEngine {
             }),
             "<default>",
         ).map_err(|e| JsValue::from_str(&e))?;
-        Ok(serde_wasm_bindgen::to_value(&result).unwrap_or(JsValue::NULL))
+        to_js_result(&result)
     }
 
     /// Publish a message. `variables` is a JSON string.
@@ -184,7 +201,7 @@ impl WasmEngine {
             }),
             "<default>",
         ).map_err(|e| JsValue::from_str(&e))?;
-        Ok(serde_wasm_bindgen::to_value(&result).unwrap_or(JsValue::NULL))
+        to_js_result(&result)
     }
 
     /// Broadcast a signal. `variables` is a JSON string.
@@ -199,7 +216,7 @@ impl WasmEngine {
             }),
             "<default>",
         ).map_err(|e| JsValue::from_str(&e))?;
-        Ok(serde_wasm_bindgen::to_value(&result).unwrap_or(JsValue::NULL))
+        to_js_result(&result)
     }
 
     /// Advance the virtual clock by `ms` milliseconds, then process due timers.
@@ -237,7 +254,7 @@ impl WasmEngine {
             event_log: self.backend.list_records(),
             timers: self.backend.list_timers(),
         };
-        serde_wasm_bindgen::to_value(&snap).unwrap_or(JsValue::NULL)
+        to_js(&snap)
     }
 
     /// Get jobs that are in ACTIVATABLE state for a given job type.
@@ -246,19 +263,19 @@ impl WasmEngine {
             .into_iter()
             .filter(|j| j.state == "ACTIVATABLE" && j.job_type == job_type)
             .collect();
-        serde_wasm_bindgen::to_value(&jobs).unwrap_or(JsValue::NULL)
+        to_js(&jobs)
     }
 
     /// Get all jobs regardless of state.
     pub fn get_all_jobs(&self) -> JsValue {
         let jobs = self.backend.list_jobs();
-        serde_wasm_bindgen::to_value(&jobs).unwrap_or(JsValue::NULL)
+        to_js(&jobs)
     }
 
     /// Get the event log (all partition_records entries).
     pub fn get_event_log(&self) -> JsValue {
         let records = self.backend.list_records();
-        serde_wasm_bindgen::to_value(&records).unwrap_or(JsValue::NULL)
+        to_js(&records)
     }
 }
 

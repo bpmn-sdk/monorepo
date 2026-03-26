@@ -208,6 +208,9 @@ importers:
       '@bpmnkit/profiles':
         specifier: workspace:*
         version: link:../../packages/profiles
+      '@bpmnkit/reebe-wasm':
+        specifier: workspace:*
+        version: link:../reebe-wasm
       '@bpmnkit/ui':
         specifier: workspace:*
         version: link:../../packages/ui

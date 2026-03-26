@@ -2609,6 +2609,7 @@ dependencies = [
 name = "reebe-wasm"
 version = "0.1.0"
 dependencies = [
+ "base64 0.22.1",
  "chrono",
  "futures",
  "reebe-db",
@@ -2616,6 +2617,7 @@ dependencies = [
  "serde",
  "serde-wasm-bindgen",
  "serde_json",
+ "uuid",
  "wasm-bindgen",
 ]
 

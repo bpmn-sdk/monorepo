@@ -47,7 +47,7 @@ function StudioDeployPane({ modelId, getXml }: { modelId: string; getXml: () => 
 			await refetch()
 			toast.success("Deployed successfully")
 		} catch (err) {
-			toast.error(err instanceof Error ? err.message : "Deploy failed")
+			toast.error(err instanceof Error ? err.message : String(err))
 		}
 	}
 
