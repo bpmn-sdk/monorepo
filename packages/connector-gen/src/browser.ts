@@ -10,7 +10,7 @@
  */
 
 export { buildTemplate, buildTemplates } from "./build-template.js"
-export { CATALOG, getCatalogEntry } from "./catalog.js"
+export { CATALOG, getCatalogEntry, getCatalogIconUri } from "./catalog.js"
 export type { CatalogEntry } from "./catalog.js"
 export {
 	detectDefaultAuth,
@@ -53,7 +53,7 @@ export { CONNECTOR_SCHEMA } from "./types.js"
 
 import { buildTemplates } from "./build-template.js"
 import type { CatalogEntry } from "./catalog.js"
-import { CATALOG, getCatalogEntry } from "./catalog.js"
+import { CATALOG, getCatalogEntry, getCatalogIconUri } from "./catalog.js"
 import { detectDefaultAuth, getOperations, parseOpenApi } from "./parse-openapi.js"
 import type { ConnectorTemplate, GeneratorOptions } from "./types.js"
 
@@ -100,6 +100,7 @@ export async function generateFromCatalog(
 	const opts: GenerateOptions = {
 		idPrefix: overrides.idPrefix ?? entry.idPrefix,
 		defaultAuthType: overrides.defaultAuthType ?? entry.defaultAuth,
+		icon: overrides.icon ?? getCatalogIconUri(id),
 		...overrides,
 	}
 	const { templates } = await generateFromUrl(entry.url, opts)

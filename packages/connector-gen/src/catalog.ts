@@ -847,3 +847,81 @@ export const CATALOG: CatalogEntry[] = [
 export function getCatalogEntry(id: string): CatalogEntry | undefined {
 	return CATALOG.find((e) => e.id === id)
 }
+
+// ── Icons ─────────────────────────────────────────────────────────────────────
+
+/** Brand colors sourced from Simple Icons (simpleicons.org). All chosen for legible white text. */
+const BRAND_COLORS: Record<string, string> = {
+	github: "#24292e",
+	cloudflare: "#F38020",
+	stripe: "#635BFF",
+	notion: "#191919",
+	resend: "#191919",
+	openai: "#10A37F",
+	figma: "#F24E1E",
+	twilio: "#F22F46",
+	slack: "#4A154B",
+	jira: "#0052CC",
+	hubspot: "#FF7A59",
+	discord: "#5865F2",
+	pagerduty: "#06AC38",
+	zoom: "#2D8CFF",
+	mailchimp: "#C21A01",
+	asana: "#F06A6A",
+	sendgrid: "#1A82E2",
+	paypal: "#003087",
+	plaid: "#00A67E",
+	vercel: "#191919",
+	anthropic: "#C97045",
+	shopify: "#7AB648",
+	datadog: "#632CA6",
+	sentry: "#362D59",
+	intercom: "#1F8DED",
+	contentful: "#2478CC",
+	airtable: "#1071C9",
+	twitch: "#9146FF",
+	klaviyo: "#1E1E2E",
+	brex: "#3B2FC9",
+	box: "#0061D5",
+	spotify: "#1DB954",
+	gitlab: "#FC6D26",
+	netlify: "#00C7B7",
+	launchdarkly: "#405BFF",
+	postmark: "#E77925",
+	circleci: "#343434",
+	grafana: "#F46800",
+	digitalocean: "#0080FF",
+	linode: "#00B050",
+	square: "#3E4348",
+	zendesk: "#03363D",
+	bitbucket: "#0052CC",
+	miro: "#050038",
+	okta: "#007DC1",
+	meraki: "#1BA0D7",
+	docker: "#2496ED",
+	kubernetes: "#326CE5",
+	freshdesk: "#27B2AA",
+	dropbox: "#0061FF",
+	xero: "#13B5EA",
+	bigcommerce: "#34313F",
+	recurly: "#FF5B59",
+	ably: "#FF5416",
+	openfga: "#3E4A61",
+}
+
+/**
+ * Returns a base64 SVG data URI icon for a catalog entry — a rounded square
+ * in the brand's primary color with the first letter of the service name.
+ */
+export function getCatalogIconUri(id: string): string | undefined {
+	const color = BRAND_COLORS[id]
+	if (!color) return undefined
+	const entry = getCatalogEntry(id)
+	if (!entry) return undefined
+	const letter = entry.name
+		.replace(/^[^A-Za-z]*/, "")
+		.charAt(0)
+		.toUpperCase()
+	const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect width="24" height="24" rx="5" fill="${color}"/><text x="12" y="17" font-family="ui-sans-serif,system-ui,sans-serif" font-size="13" font-weight="700" fill="white" text-anchor="middle">${letter}</text></svg>`
+	return `data:image/svg+xml;base64,${btoa(svg)}`
+}

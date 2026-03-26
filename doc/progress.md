@@ -1,5 +1,23 @@
 # Progress
 
+## 2026-03-26 — Fix: reebe-wasm intermediate timer events never firing
+
+Two bugs combined to prevent intermediate timer events from completing:
+
+1. **`apps/reebe/crates/reebe-wasm/src/lib.rs`**: `tick()` read `self.clock.now()` before syncing it to real wall-clock time, so `get_due_timers()` queried with a stale timestamp and found nothing even after the real due date had passed. Fixed by syncing the virtual clock to real time at the start of `tick()` (same guard used in `submit_and_drain`). Rebuilt wasm binary.
+2. **`apps/studio/src/api/wasm-adapter.ts`**: Nothing in the studio ever called `engine.tick()` — timers were created correctly but never processed. Fixed by adding a `setInterval(tickEngine, 2000)` in `initWasmEngine()` that polls every 2 seconds and calls `queryClient.invalidateQueries({ refetchType: "active" })` after ticking so the UI refreshes automatically when timers fire.
+
+## 2026-03-26 — Connector catalog: brand icons on imported service tasks
+
+- **`packages/connector-gen/src/catalog.ts`**: Added `BRAND_COLORS` map (Simple Icons palette) for 50+ catalog entries. Added `getCatalogIconUri(id)` helper that generates a base64 SVG data URI — a rounded square in the brand's primary color with the service's initial letter.
+- **`packages/connector-gen/src/types.ts`**: Added `icon?: string` to `GeneratorOptions`.
+- **`packages/connector-gen/src/build-template.ts`**: `buildTemplate` now sets `icon: { contents: opts.icon }` on the returned `ConnectorTemplate` when an icon is provided.
+- **`packages/connector-gen/src/browser.ts`** and **`index.ts`**: `generateFromCatalog` now resolves the catalog entry icon via `getCatalogIconUri` and passes it as `opts.icon` — can be overridden by callers. Exported `getCatalogIconUri`.
+
+## 2026-03-26 — Fix: reebe-wasm process instance start dates all identical
+
+- **`apps/reebe/crates/reebe-wasm/src/lib.rs`**: The `VirtualClock` was initialized at engine startup and never auto-advanced, so `state.clock.now()` always returned the same frozen timestamp — every created process instance got the identical `start_date`. Fixed in `submit_and_drain` by syncing the virtual clock forward to real wall-clock time before each operation (only advances, never resets — `advance_clock` timer simulation still works correctly). Rebuilt wasm binary.
+
 ## 2026-03-26 — Studio: connector catalog in command palette
 
 - **`apps/studio/src/pages/ModelDetail.tsx`**: Added `createConnectorCatalogPlugin(configPanelBpmn, bridgePalette)` to the editor plugin list. The catalog plugin registers 40+ "Import API: …" commands (GitHub, Stripe, Slack, OpenAI, etc.) plus "Import from OpenAPI URL…" and "Import from OpenAPI file…" through `bridgePalette`, so they appear in the Studio Ctrl+K palette under the "Editor" group. Removed the placeholder `editor:generate-openapi` stub that routed to the AI drawer instead.

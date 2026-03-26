@@ -7,6 +7,7 @@
  */
 
 import type { WasmEngine } from "@bpmnkit/reebe-wasm"
+import { queryClient } from "./queryClient.js"
 import type {
 	ElementInstance,
 	Incident,
@@ -94,12 +95,25 @@ function logError(...args: unknown[]) {
 // ── Engine singleton ─────────────────────────────────────────────────────────
 
 let engine: WasmEngine | null = null
+let timerPollId: ReturnType<typeof setInterval> | null = null
 
 /** Locally-tracked process definitions (not in engine snapshot). */
 const localDefs = new Map<
 	string,
 	{ key: string; bpmnProcessId: string; version: number; xml: string; deployedAt: string }
 >()
+
+/** Tick the engine and refresh active queries if any timers fired. */
+function tickEngine(): void {
+	if (!engine) return
+	try {
+		engine.tick()
+		// Invalidate active queries so the UI reflects any timer-triggered state changes
+		void queryClient.invalidateQueries({ refetchType: "active" })
+	} catch {
+		// Ignore tick errors — engine may not be ready
+	}
+}
 
 export async function initWasmEngine(): Promise<void> {
 	if (engine) {
@@ -110,6 +124,10 @@ export async function initWasmEngine(): Promise<void> {
 	const mod = await import("@bpmnkit/reebe-wasm")
 	await mod.default()
 	engine = new mod.WasmEngine()
+	// Poll for due timers every 2 seconds so intermediate timer events fire automatically
+	if (timerPollId === null) {
+		timerPollId = setInterval(tickEngine, 2000)
+	}
 	log("WasmEngine ready")
 }
 

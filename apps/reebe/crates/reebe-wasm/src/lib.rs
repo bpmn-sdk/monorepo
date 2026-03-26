@@ -227,6 +227,11 @@ impl WasmEngine {
 
     /// Process all due timers at the current virtual clock time.
     pub fn tick(&mut self) -> Result<JsValue, JsValue> {
+        // Sync to real wall-clock time before firing due timers
+        let real_now = chrono::Utc::now();
+        if real_now > self.clock.now() {
+            self.clock.set(real_now);
+        }
         let now = self.clock.now();
         let timers = block(self.backend.get_due_timers(now, 100))
             .map_err(|e| JsValue::from_str(&e.to_string()))?;
@@ -289,6 +294,12 @@ impl WasmEngine {
         payload: serde_json::Value,
         tenant_id: &str,
     ) -> Result<serde_json::Value, String> {
+        // Sync virtual clock to real wall-clock time (only advance — preserves advance_clock behavior)
+        let real_now = chrono::Utc::now();
+        if real_now > self.clock.now() {
+            self.clock.set(real_now);
+        }
+
         // Reserve position + key for the initial command
         let (position, key) = block(self.backend.next_position_and_key(self.partition_id))
             .map_err(|e| e.to_string())?;

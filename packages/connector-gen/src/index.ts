@@ -1,5 +1,5 @@
 export { buildTemplate, buildTemplates } from "./build-template.js"
-export { CATALOG, getCatalogEntry } from "./catalog.js"
+export { CATALOG, getCatalogEntry, getCatalogIconUri } from "./catalog.js"
 export type { CatalogEntry } from "./catalog.js"
 export { CONNECTOR_STATS } from "./stats.js"
 export {
@@ -45,7 +45,7 @@ export { writeTemplates } from "./write-templates.js"
 
 import { buildTemplates } from "./build-template.js"
 import type { CatalogEntry } from "./catalog.js"
-import { CATALOG, getCatalogEntry } from "./catalog.js"
+import { CATALOG, getCatalogEntry, getCatalogIconUri } from "./catalog.js"
 import { detectDefaultAuth, getOperations, parseOpenApi } from "./parse-openapi.js"
 import type { ConnectorTemplate, GeneratorOptions, WriteOptions } from "./types.js"
 import { writeTemplates } from "./write-templates.js"
@@ -103,6 +103,7 @@ export async function generateFromCatalog(
 	const opts: GenerateOptions = {
 		idPrefix: overrides.idPrefix ?? entry.idPrefix,
 		defaultAuthType: overrides.defaultAuthType ?? entry.defaultAuth,
+		icon: overrides.icon ?? getCatalogIconUri(id),
 		...overrides,
 	}
 	const { templates, files } = await generateFromUrl(entry.url, opts)
