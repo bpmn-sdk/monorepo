@@ -25,7 +25,7 @@ const ROUTE_MAP: Record<string, string> = {
 
 export function Shell({ children }: ShellProps) {
 	const [, navigate] = useLocation()
-	const { toggleCommandPalette, toggleAI, toggleSidebar } = useUiStore()
+	const { toggleCommandPalette, toggleAI, toggleSidebar, zenMode } = useUiStore()
 
 	// Global keyboard shortcuts
 	useEffect(() => {
@@ -84,11 +84,11 @@ export function Shell({ children }: ShellProps) {
 
 	return (
 		<div className="flex h-full flex-col overflow-hidden">
-			<TopBar />
+			{!zenMode && <TopBar />}
 			<div className="flex flex-1 overflow-hidden">
-				<Sidebar />
+				{!zenMode && <Sidebar />}
 				<main className="flex-1 overflow-y-auto bg-bg">{children}</main>
-				<AIDrawer />
+				{!zenMode && <AIDrawer />}
 			</div>
 			<ToastContainer />
 			<CommandPalette />

@@ -58,6 +58,8 @@ interface PaletteInput {
 
 export interface PresentationOptions {
 	palette?: PaletteInput | null
+	onEnter?: () => void
+	onExit?: () => void
 }
 
 // ── CSS ───────────────────────────────────────────────────────────────────────
@@ -69,6 +71,10 @@ const CSS = `
   position: fixed !important;
   inset: 0 !important;
   z-index: 9000 !important;
+}
+.bpmnkit-pres-fullscreen #hud-top-center,
+.bpmnkit-pres-fullscreen #hud-bottom-center {
+  display: none !important;
 }
 .bpmnkit-pres-overlay {
   position: absolute; inset: 0; pointer-events: none; z-index: 500;
@@ -376,6 +382,8 @@ class PresentationMinimap {
 
 class PresentationMode {
 	private readonly canvasApi: CanvasApi
+	private readonly onEnter?: () => void
+	private readonly onExit?: () => void
 
 	private isActive = false
 	private graph: FlowGraph = new Map()
@@ -401,8 +409,10 @@ class PresentationMode {
 	private offViewport: (() => void) | null = null
 	private keyHandler: ((e: KeyboardEvent) => void) | null = null
 
-	constructor(api: CanvasApi) {
+	constructor(api: CanvasApi, opts?: { onEnter?: () => void; onExit?: () => void }) {
 		this.canvasApi = api
+		this.onEnter = opts?.onEnter
+		this.onExit = opts?.onExit
 	}
 
 	setDefs(defs: BpmnDefinitions): void {
@@ -416,6 +426,7 @@ class PresentationMode {
 		if (this.isActive) return
 		if (this.canvasApi.getShapes().length === 0) return
 		this.isActive = true
+		this.onEnter?.()
 		this.visited.clear()
 		this.history = []
 		this.currentId = null
@@ -457,6 +468,7 @@ class PresentationMode {
 
 		this.canvasApi.container.classList.remove("bpmnkit-pres-fullscreen")
 		document.body.style.overflow = ""
+		this.onExit?.()
 
 		this.visited.clear()
 		this.history = []
@@ -674,7 +686,9 @@ class PresentationMode {
 		}
 
 		if (choices.length > 1) {
-			this.hintsEl.appendChild(hint(`<kbd>→</kbd> Next &nbsp;<kbd>1</kbd>–<kbd>${choices.length}</kbd> Choose path`))
+			this.hintsEl.appendChild(
+				hint(`<kbd>→</kbd> Next &nbsp;<kbd>1</kbd>–<kbd>${choices.length}</kbd> Choose path`),
+			)
 		} else if (choices.length === 1) {
 			this.hintsEl.appendChild(hint("<kbd>→</kbd> Next"))
 		} else {
@@ -772,7 +786,7 @@ export function createPresentationPlugin(options: PresentationOptions = {}): Pre
 		api,
 
 		install(canvasApi) {
-			mode = new PresentationMode(canvasApi)
+			mode = new PresentationMode(canvasApi, { onEnter: options.onEnter, onExit: options.onExit })
 
 			unsubs.push(
 				canvasApi.on("diagram:load", (defs) => mode?.setDefs(defs)),

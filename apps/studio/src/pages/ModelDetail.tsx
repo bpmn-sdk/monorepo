@@ -536,7 +536,7 @@ export function ModelDetail() {
 	const [activeInstanceKey, setActiveInstanceKey] = useState<string | null>(null)
 	const [runVariables, setRunVariables] = useState(model?.runVariables ?? "{}")
 	const { theme } = useThemeStore()
-	const { setBreadcrumbs } = useUiStore()
+	const { setBreadcrumbs, zenMode } = useUiStore()
 	const activeProfile = useClusterStore((s) => s.activeProfile)
 	const isWasm = activeProfile === "reebe-wasm"
 	const deploy = useDeployProcess()
@@ -686,7 +686,17 @@ export function ModelDetail() {
 			() => editorRef.current,
 		)
 		const connectorCatalog = createConnectorCatalogPlugin(configPanelBpmn, bridgePalette)
-		const presentation = createPresentationPlugin({ palette: bridgePalette })
+		const presentation = createPresentationPlugin({
+			palette: bridgePalette,
+			onEnter: () => {
+				if (dockRef.current) dockRef.current.el.style.display = "none"
+				useUiStore.getState().enterZenMode()
+			},
+			onExit: () => {
+				if (dockRef.current) dockRef.current.el.style.display = ""
+				useUiStore.getState().exitZenMode()
+			},
+		})
 		presentationApiRef.current = presentation.api
 
 		const editor = new BpmnEditor({
@@ -867,62 +877,68 @@ export function ModelDetail() {
 
 	return (
 		<div className="flex flex-col h-full">
-			{/* Save bar — h-10 (40px); dock starts at DOCK_TOP = TopBar(48) + this(40) = 88px */}
-			<div className="flex items-center h-10 shrink-0 gap-3 px-3 border-b border-border bg-surface">
-				{runMode ? (
-					<Button size="sm" variant="ghost" onClick={() => setRunMode(false)}>
-						<ArrowLeft size={14} />
-						Edit
-					</Button>
-				) : (
-					<>
-						<span
-							className={`text-xs transition-colors ${
-								saveStatus === "saved"
-									? "text-success"
-									: saveStatus === "saving"
-										? "text-warn"
-										: "text-muted"
-							}`}
-						>
-							{saveStatus === "saved" ? "Saved" : saveStatus === "saving" ? "Saving…" : "Unsaved"}
-						</span>
-						<Button size="sm" variant="ghost" onClick={() => void doSave()}>
-							<Save size={14} />
-							Save
+			{/* Save bar — hidden in zen/presentation mode */}
+			{!zenMode && (
+				<div className="flex items-center h-10 shrink-0 gap-3 px-3 border-b border-border bg-surface">
+					{runMode ? (
+						<Button size="sm" variant="ghost" onClick={() => setRunMode(false)}>
+							<ArrowLeft size={14} />
+							Edit
 						</Button>
-					</>
-				)}
-				{!runMode && (
-					<div className="ml-auto flex items-center gap-2">
-						<Button size="sm" variant="ghost" onClick={() => presentationApiRef.current?.enter()}>
-							<MonitorPlay size={14} />
-							Present
-						</Button>
-						{isWasm && (
-							<>
-								<Button
-									size="sm"
-									variant="outline"
-									onClick={() => void handleDeploy()}
-									disabled={isPending}
-								>
-									{deploy.isPending ? (
-										<RotateCw size={13} className="animate-spin" />
-									) : (
-										<Rocket size={13} />
-									)}
-									Deploy
-								</Button>
-								<Button size="sm" onClick={() => void handleDeployAndRun()} disabled={isPending}>
-									{isPending ? <RotateCw size={13} className="animate-spin" /> : <Play size={13} />}
-									Deploy &amp; Run
-								</Button>
-							</>
-						)}
-					</div>
-				)}
-			</div>
+					) : (
+						<>
+							<span
+								className={`text-xs transition-colors ${
+									saveStatus === "saved"
+										? "text-success"
+										: saveStatus === "saving"
+											? "text-warn"
+											: "text-muted"
+								}`}
+							>
+								{saveStatus === "saved" ? "Saved" : saveStatus === "saving" ? "Saving…" : "Unsaved"}
+							</span>
+							<Button size="sm" variant="ghost" onClick={() => void doSave()}>
+								<Save size={14} />
+								Save
+							</Button>
+						</>
+					)}
+					{!runMode && (
+						<div className="ml-auto flex items-center gap-2">
+							<Button size="sm" variant="ghost" onClick={() => presentationApiRef.current?.enter()}>
+								<MonitorPlay size={14} />
+								Present
+							</Button>
+							{isWasm && (
+								<>
+									<Button
+										size="sm"
+										variant="outline"
+										onClick={() => void handleDeploy()}
+										disabled={isPending}
+									>
+										{deploy.isPending ? (
+											<RotateCw size={13} className="animate-spin" />
+										) : (
+											<Rocket size={13} />
+										)}
+										Deploy
+									</Button>
+									<Button size="sm" onClick={() => void handleDeployAndRun()} disabled={isPending}>
+										{isPending ? (
+											<RotateCw size={13} className="animate-spin" />
+										) : (
+											<Play size={13} />
+										)}
+										Deploy &amp; Run
+									</Button>
+								</>
+							)}
+						</div>
+					)}
+				</div>
+			)}
 
 			{/* Editor — hidden in run mode but kept mounted */}
 			<div
