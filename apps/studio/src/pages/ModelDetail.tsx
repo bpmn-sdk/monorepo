@@ -6,6 +6,7 @@ import { createCommandPaletteEditorPlugin } from "@bpmnkit/plugins/command-palet
 import { createConfigPanelPlugin } from "@bpmnkit/plugins/config-panel"
 import { createConfigPanelBpmnPlugin } from "@bpmnkit/plugins/config-panel-bpmn"
 import { createConnectorCatalogPlugin } from "@bpmnkit/plugins/connector-catalog"
+import { type PresentationApi, createPresentationPlugin } from "@bpmnkit/plugins/presentation"
 import { QueryClientProvider } from "@tanstack/react-query"
 import {
 	ArrowLeft,
@@ -13,6 +14,7 @@ import {
 	CheckCircle,
 	ExternalLink,
 	Link2,
+	MonitorPlay,
 	Play,
 	Rocket,
 	RotateCw,
@@ -526,6 +528,7 @@ export function ModelDetail() {
 	const editorContainerRef = useRef<HTMLDivElement>(null)
 	const editorRef = useRef<BpmnEditor | null>(null)
 	const dockRef = useRef<SideDock | null>(null)
+	const presentationApiRef = useRef<PresentationApi | null>(null)
 	const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 	const runVarsSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 	const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "unsaved">("saved")
@@ -683,12 +686,21 @@ export function ModelDetail() {
 			() => editorRef.current,
 		)
 		const connectorCatalog = createConnectorCatalogPlugin(configPanelBpmn, bridgePalette)
+		const presentation = createPresentationPlugin({ palette: bridgePalette })
+		presentationApiRef.current = presentation.api
 
 		const editor = new BpmnEditor({
 			container,
 			theme: useThemeStore.getState().theme,
 			fit: "center",
-			plugins: [paletteEditorPlugin, bridgePlugin, configPanel, configPanelBpmn, connectorCatalog],
+			plugins: [
+				paletteEditorPlugin,
+				bridgePlugin,
+				configPanel,
+				configPanelBpmn,
+				connectorCatalog,
+				presentation,
+			],
 		})
 		initEditorHud(editor, {
 			onToggleSidebar: () => {
@@ -728,6 +740,7 @@ export function ModelDetail() {
 			deregisterExtra()
 			useUiStore.getState().clearContextCommands()
 			editorRef.current = null
+			presentationApiRef.current = null
 		}
 	}, [id, loaded])
 
@@ -880,25 +893,33 @@ export function ModelDetail() {
 						</Button>
 					</>
 				)}
-				{isWasm && !runMode && (
+				{!runMode && (
 					<div className="ml-auto flex items-center gap-2">
-						<Button
-							size="sm"
-							variant="outline"
-							onClick={() => void handleDeploy()}
-							disabled={isPending}
-						>
-							{deploy.isPending ? (
-								<RotateCw size={13} className="animate-spin" />
-							) : (
-								<Rocket size={13} />
-							)}
-							Deploy
+						<Button size="sm" variant="ghost" onClick={() => presentationApiRef.current?.enter()}>
+							<MonitorPlay size={14} />
+							Present
 						</Button>
-						<Button size="sm" onClick={() => void handleDeployAndRun()} disabled={isPending}>
-							{isPending ? <RotateCw size={13} className="animate-spin" /> : <Play size={13} />}
-							Deploy &amp; Run
-						</Button>
+						{isWasm && (
+							<>
+								<Button
+									size="sm"
+									variant="outline"
+									onClick={() => void handleDeploy()}
+									disabled={isPending}
+								>
+									{deploy.isPending ? (
+										<RotateCw size={13} className="animate-spin" />
+									) : (
+										<Rocket size={13} />
+									)}
+									Deploy
+								</Button>
+								<Button size="sm" onClick={() => void handleDeployAndRun()} disabled={isPending}>
+									{isPending ? <RotateCw size={13} className="animate-spin" /> : <Play size={13} />}
+									Deploy &amp; Run
+								</Button>
+							</>
+						)}
 					</div>
 				)}
 			</div>

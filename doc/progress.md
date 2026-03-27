@@ -1,5 +1,58 @@
 # Progress
 
+## 2026-03-27 — Studio: command palette redesign
+
+Rewrote `apps/studio/src/components/CommandPalette.tsx` with best-in-class UX patterns inspired by Linear, Raycast, and VS Code:
+
+- **Custom dialog chrome**: replaced generic `DialogContent` (which had an X close button and center-screen positioning) with `DialogPrimitive.Content` directly — panel now sits at `top-[16%]` (upper-third, like Raycast/Linear) with a larger max-width of `620px` and `shadow-2xl`.
+- **Search icon**: `Search` icon in the input row replaces the empty left side; back-navigation shows `ChevronLeft` in view-stack mode.
+- **Fuzzy word-prefix matching**: in addition to substring match, each space-separated token in the query must be a prefix of some word in the label — e.g. `"mo"` matches `"Go to Models"`.
+- **Match highlighting**: matched substring is rendered in `font-semibold text-accent` so users instantly see why a result matched.
+- **Styled `<kbd>` shortcut badges**: shortcuts (e.g. `g m`) render as individual raised `<kbd>` elements with border and monospace font instead of plain text.
+- **Mouse hover syncs selection**: `onMouseEnter` on each item updates `selectedIdx`, keeping keyboard and mouse in sync.
+- **Scroll-into-view**: `useEffect` on `selectedIdx` scrolls the selected item into view with `scrollIntoView({ block: "nearest" })`.
+- **Footer hint bar**: `↑ ↓ Navigate  ↵ Select` shown at the bottom when results exist; `Esc Back` added in view-stack mode.
+- **Better empty state**: centered icon + contextual `No results for "…"` message.
+- **Group headers**: `text-[10px] font-semibold uppercase tracking-widest text-muted/60` — tighter visual hierarchy than before.
+- **`Esc` badge in search row**: right side of the input row shows an `Esc` `<kbd>` as a persistent reminder.
+
+## 2026-03-27 — Plugin: presentation mode UX refinements
+
+Updated `packages/plugins/src/presentation/index.ts`:
+
+- **Fullscreen**: entering presentation mode now applies `position: fixed; inset: 0; z-index: 9000` to the canvas container via `.bpmnkit-pres-fullscreen`, hiding all surrounding Studio UI (toolbars, sidebar, dock). `document.body.style.overflow` is set to `hidden` on enter and restored on exit.
+- **No element highlighting**: removed the SVG spotlight mask, dim overlay, glow filter, and animated border entirely. The current element is now shown by smooth pan/zoom centering only — no visual effects on the BPMN shapes themselves.
+- **Back navigation**: `←` (ArrowLeft) navigates back through a history stack. Each forward move pushes the previous node. The hints bar shows `← Back` when history is non-empty.
+- **Cleanup**: removed unused `_instanceCount`, `uid`, `spotlightG` field, `buildSvgLayers()`, and `updateSpotlight()`.
+
+## 2026-03-27 — Studio: presentation mode integration
+
+Integrated the presentation plugin into two additional studio views:
+
+- **`apps/studio/src/pages/ModelDetail.tsx`**: Added a `presentationApiRef` to track the plugin instance across renders. The "Present" button is now visible in the save bar on the right side for all profiles (not wasm-only) — `Cmd+K → Start Presentation Mode` still works too. Deploy/Deploy & Run buttons remain wasm-only. The ref is cleared on editor teardown.
+
+- **`apps/studio/src/pages/DefinitionDetail.tsx`** (wasm path, `WasmDefinitionDetail`): Added `createPresentationPlugin()` to the `BpmnCanvas` plugins list. A "Present" button appears overlaid in the top-right corner of the canvas area whenever XML is loaded. The `presentationApiRef` is created and cleaned up alongside the canvas.
+
+## 2026-03-27 — Plugin: presentation mode + Studio Deploy & Run fixes
+
+**Presentation mode plugin** — `packages/plugins/src/presentation/index.ts`:
+- New `@bpmnkit/plugins/presentation` export. Works as a `CanvasPlugin` for both `BpmnCanvas` and `BpmnEditor`.
+- Walks the BPMN flow graph from start event to end event one node at a time.
+- **Spotlight**: dims the entire canvas (SVG mask) with a cut-out over the current node; animated glowing accent border highlights it; visited nodes show a subtle green tint.
+- **Minimap**: always-visible 160×100 overview using `CanvasApi.getShapes()`/`getEdges()` — current node shown in accent colour, visited in green, viewport as a labelled rectangle. Click-to-navigate supported.
+- **Progress indicator**: thin accent progress bar (top edge) + `N / total` label (centre-top) updated as nodes are visited.
+- **Gateway choices**: when the current node has multiple outgoing paths, numbered SVG badges (circles with 1, 2…) appear above each target node with optional condition-expression labels.
+- **Keyboard**: `→`/`Enter` = next (single path), `1`–`9` = pick branch, `↑`/`↓` = zoom in/out, `Esc` = exit. Context-sensitive hints bar updates per state.
+- **Smooth pan/zoom**: CSS `cubic-bezier` transition on the viewport SVG group when centring on a new node.
+- Registers "Start Presentation Mode" command in the palette when `options.palette` is provided.
+- Integrated into `apps/studio/src/pages/ModelDetail.tsx` — the command is available via `Cmd+K → Start Presentation Mode`.
+
+**Deploy & Run fix** — `apps/studio/src/pages/ModelDetail.tsx`:
+- `handleDeployAndRun` now captures `deployResult.processes[0].bpmnProcessId` and passes it to `createInstance`; previously passed no process identifier, causing the wasm adapter to throw.
+
+**Toast z-index fix** — `apps/studio/src/components/Toast.tsx`:
+- Raised from `z-[100]` to `z-[10200]` so toasts render above the side dock (`z-index: 9999`) and all editor overlays.
+
 ## 2026-03-27 — Studio: run mode (Deploy & Run) for reebe-wasm
 
 Added a fast feedback loop for the reebe-wasm profile in the model editor:

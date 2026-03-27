@@ -1,6 +1,7 @@
 import { BpmnCanvas } from "@bpmnkit/canvas"
 import { DefinitionsStore, createDefinitionDetailView } from "@bpmnkit/operate"
-import { Play, RotateCw } from "lucide-react"
+import { type PresentationApi, createPresentationPlugin } from "@bpmnkit/plugins/presentation"
+import { MonitorPlay, Play, RotateCw } from "lucide-react"
 import { useEffect, useRef, useState } from "preact/hooks"
 import { Link, useLocation, useParams } from "wouter"
 import { getActiveProfile, getProxyUrl } from "../api/client.js"
@@ -34,17 +35,27 @@ function WasmDefinitionDetail({ definitionKey }: { definitionKey: string }) {
 	const [, navigate] = useLocation()
 	const canvasContainerRef = useRef<HTMLDivElement>(null)
 	const canvasRef = useRef<BpmnCanvas | null>(null)
+	const presentationApiRef = useRef<PresentationApi | null>(null)
 
 	useEffect(() => {
 		const container = canvasContainerRef.current
 		if (!container || !xmlData) return
 		canvasRef.current?.destroy()
-		const canvas = new BpmnCanvas({ container, theme, grid: false, fit: "contain" })
+		const presentation = createPresentationPlugin()
+		presentationApiRef.current = presentation.api
+		const canvas = new BpmnCanvas({
+			container,
+			theme,
+			grid: false,
+			fit: "contain",
+			plugins: [presentation],
+		})
 		canvas.load(xmlData)
 		canvasRef.current = canvas
 		return () => {
 			canvas.destroy()
 			canvasRef.current = null
+			presentationApiRef.current = null
 		}
 	}, [xmlData, theme])
 
@@ -98,6 +109,14 @@ function WasmDefinitionDetail({ definitionKey }: { definitionKey: string }) {
 				{!xmlData && (
 					<div className="absolute inset-0 flex items-center justify-center">
 						<p className="text-sm text-muted">No diagram available.</p>
+					</div>
+				)}
+				{xmlData && (
+					<div className="absolute top-3 right-3 z-10">
+						<Button size="sm" variant="outline" onClick={() => presentationApiRef.current?.enter()}>
+							<MonitorPlay size={13} />
+							Present
+						</Button>
 					</div>
 				)}
 			</div>

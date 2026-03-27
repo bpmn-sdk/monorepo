@@ -80,6 +80,10 @@
 			"import": "./dist/pattern-advisor/index.js",
 			"types": "./dist/pattern-advisor/index.d.ts"
 		},
+		"./presentation": {
+			"import": "./dist/presentation/index.js",
+			"types": "./dist/presentation/index.d.ts"
+		},
 		"./process-runner": {
 			"import": "./dist/process-runner/index.js",
 			"types": "./dist/process-runner/index.d.ts"
