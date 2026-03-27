@@ -1,5 +1,6 @@
 import { Link } from "wouter"
 import { useClusterStore } from "../stores/cluster.js"
+import { ProfileTag } from "./ProfileTag.js"
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -21,13 +22,13 @@ export function ClusterPicker() {
 				className="flex items-center gap-1.5 rounded px-2 py-1 text-sm text-fg hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-accent"
 				aria-label="Select cluster profile"
 			>
-				<span className={`h-2 w-2 rounded-full ${statusColor}`} aria-hidden="true" />
+				<span className={`h-2 w-2 rounded-full shrink-0 ${statusColor}`} aria-hidden="true" />
 				<span className="max-w-32 truncate">
 					{activeProfile ?? (status === "offline" ? "No cluster" : "Select profile")}
 				</span>
 				<span className="text-muted">▾</span>
 			</DropdownMenuTrigger>
-			<DropdownMenuContent align="start" className="min-w-48">
+			<DropdownMenuContent align="start" className="min-w-52">
 				{profiles.length === 0 ? (
 					<>
 						<DropdownMenuLabel>No profiles found</DropdownMenuLabel>
@@ -40,14 +41,27 @@ export function ClusterPicker() {
 							<DropdownMenuItem
 								key={p.name}
 								onSelect={() => setActiveProfile(p.name)}
-								className="gap-2"
+								className="flex flex-col items-start gap-1 py-2"
 							>
-								{p.name === activeProfile && (
-									<span className="text-accent" aria-label="Active">
-										●
+								<div className="flex w-full items-center gap-2">
+									{p.name === activeProfile && (
+										<span className="text-accent shrink-0" aria-label="Active">
+											●
+										</span>
+									)}
+									<span
+										className={`flex-1 truncate ${p.name === activeProfile ? "font-medium" : ""}`}
+									>
+										{p.name}
 									</span>
+								</div>
+								{p.tags && p.tags.length > 0 && (
+									<div className="flex flex-wrap gap-1 pl-4">
+										{p.tags.map((t) => (
+											<ProfileTag key={t} tag={t} />
+										))}
+									</div>
 								)}
-								<span className={p.name === activeProfile ? "font-medium" : ""}>{p.name}</span>
 							</DropdownMenuItem>
 						))}
 						<DropdownMenuSeparator />

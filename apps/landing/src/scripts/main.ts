@@ -733,8 +733,7 @@ function setupCompareSlider(): void {
 
 	let dragging = false
 
-	// Clamp to 5–95% so the knob is always reachable on mobile (never slides
-	// off the edge where fat-finger or OS edge-swipe gestures would steal it).
+	// Clamp to 5–95% so the knob is always reachable on mobile.
 	const setPos = (clientX: number) => {
 		const rect = slider.getBoundingClientRect()
 		const pct = Math.max(5, Math.min(95, ((clientX - rect.left) / rect.width) * 100))
@@ -744,9 +743,6 @@ function setupCompareSlider(): void {
 	slider.addEventListener("pointerdown", (e) => {
 		dragging = true
 		slider.setPointerCapture(e.pointerId)
-		// Disable all browser touch handling during the drag so the browser
-		// cannot cancel or steal the pointer sequence mid-swipe on mobile.
-		slider.style.touchAction = "none"
 		setPos(e.clientX)
 	})
 
@@ -756,9 +752,6 @@ function setupCompareSlider(): void {
 
 	const stop = () => {
 		dragging = false
-		// Restore the CSS-defined touch-action (pan-y) so vertical scrolling
-		// past the slider works normally when the user is not dragging.
-		slider.style.touchAction = ""
 	}
 	slider.addEventListener("pointerup", stop)
 	slider.addEventListener("pointercancel", stop)

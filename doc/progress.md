@@ -1,5 +1,168 @@
 # Progress
 
+## 2026-03-27 — Studio: motion & view transitions
+
+Added animations throughout the Studio app — previously all `animate-in`/`fade-in-0`/`slide-in-from-*` Tailwind classes were dead code because `tailwindcss-animate` was not installed.
+
+**Animation utilities** (`apps/studio/src/styles/globals.css`):
+- Implemented the `animate-in`/`animate-out` pattern directly via Tailwind v4 `@utility` directives and `@keyframes enter`/`exit`, using CSS variables (`--tw-enter-opacity`, `--tw-enter-scale`, `--tw-enter-translate-*`, etc.) so utilities compose freely.
+- Animation duration driven by `--tw-duration` (set by `duration-*` classes), so `animate-in slide-in-from-bottom-2 duration-300` now actually controls timing.
+- All existing `fade-in-0`, `zoom-in-95`, `slide-in-from-top-*`, `slide-out-to-*` classes now produce real CSS.
+
+**View Transitions API** (`apps/studio/src/lib/transition.ts` + Shell.tsx + Sidebar.tsx + CommandPalette.tsx):
+- New `navigateWithTransition(path, navigate)` utility wraps navigation in `document.startViewTransition()` with `flushSync` for synchronous Preact state updates.
+- Shell.tsx captures all internal `<a>` link clicks in the capture phase, prevents wouter's double-navigation, and runs them through `navigateWithTransition`.
+- Shell.tsx keyboard `g+letter` shortcuts and Sidebar.tsx nav buttons also use `navigateWithTransition`.
+- CommandPalette navigation actions use `navigateWithTransition` via the wrapped `nav` function.
+- Page cross-fade: old content fades up and out (100ms), new content fades up from below (220ms). Respects `prefers-reduced-motion`.
+
+**AIDrawer** (`apps/studio/src/layout/AIDrawer.tsx`):
+- Fixed broken animation: `hidden` class was killing the CSS transition entirely. Replaced with `max-width: 0 → max-width: 280px` transition with `overflow-hidden`. Inner div maintains fixed 280px width so content never reflows. `pointer-events-none` prevents interaction when closed.
+
+**Toast** (`apps/studio/src/components/Toast.tsx` + `stores/toast.ts`):
+- Added `dying` state to `ToastMessage`. When `removeToast` is called or the 5s auto-remove fires, the toast is first marked `dying: true` (triggering `animate-out slide-out-to-right-4 fade-out-0`), then removed from the array after the animation completes (220ms).
+- Toast entrance: `animate-in slide-in-from-right-4 fade-in-0 duration-300`.
+
+**CommandPalette** (`apps/studio/src/components/CommandPalette.tsx`):
+- Backdrop now uses `backdrop-blur-sm` for a frosted-glass effect.
+- Panel entrance: `slide-in-from-top-4` (more dramatic, was `slide-in-from-top-2`).
+- Panel exit: `slide-out-to-top-2 zoom-out-95 fade-out-0` — previously had no slide direction on close.
+- Both overlay and content now use `duration-200`.
+
+## 2026-03-27 — Studio: Dashboard redesign
+
+Complete rewrite of `apps/studio/src/pages/Dashboard.tsx`:
+
+- **`StatusHeader`**: Profile name + animated status dot + `ProfileTag` badges + "Updated X ago" (ticks every 10s) + Refresh/Retry button.
+- **`IncidentBanner`**: Full-width red dismissible banner when active incidents > 0; re-surfaces automatically when the count rises.
+- **`OfflinePanel`**: Replaces the card grid when the proxy is unreachable; shows `pnpm proxy` command, Settings link, and retry button.
+- **`GettingStarted`**: 3-step onboarding strip (Create model → Deploy → Start instance); shown only on empty connected clusters.
+- **`StatCard` live-alert dot**: Pinging `animate-ping` + `animate-pulse` red dot on cards in danger state.
+- **Improved empty states**: All list panels (instances, definitions, local models) show contextual CTA links.
+- **Removed `AiChat`**: Inline chat removed — redundant with the global AI Drawer (⌘J).
+
+## 2026-03-27 — Studio + plugins: zen mode (distraction-free presentation)
+
+- **`packages/plugins/src/presentation/index.ts`**: Added `onEnter`/`onExit` callbacks to `PresentationOptions`; CSS hides `#hud-top-center` and `#hud-bottom-center` inside `.bpmnkit-pres-fullscreen`; command palette entry kept as "Start Presentation Mode".
+- **`apps/studio/src/stores/ui.ts`**: Added `zenMode` boolean + `enterZenMode()`/`exitZenMode()` actions.
+- **`apps/studio/src/layout/Shell.tsx`**: `TopBar`, `Sidebar`, and `AIDrawer` are hidden when `zenMode` is true.
+- **`apps/studio/src/pages/ModelDetail.tsx`**: Presentation plugin `onEnter` hides the SideDock and calls `enterZenMode()`; `onExit` restores them; save bar hidden during zen mode.
+
+## 2026-03-27 — Profile enrichment: description and tags
+
+Added optional `description` and `tags` fields to profiles across the full stack:
+
+- **`packages/profiles`**: `Profile` type gains `description?: string` and `tags?: string[]`; `ProfileMeta` stores them; `saveProfile` accepts an `opts` argument; new `setProfileMeta` function updates meta without touching connection config; `setProfileMeta` exported from the package index.
+- **`apps/proxy`**: `/profiles` response now includes `description` and `tags`.
+- **`apps/studio`**: `Profile` type updated; `ClusterPicker` dropdown renders colour-coded `ProfileTag` badges per tag; Settings page adds a Tags column and shows description as a subtitle under the profile name; new `ProfileTag` component (`prod` = danger/red, `stage` = warn/yellow, `dev` = success/green, custom = muted).
+- **`apps/cli`**: `profile create` accepts `--description` and `--tags` flags; new `profile meta` subcommand updates description/tags on an existing profile; `profile list` now shows a TAGS column; `profile show` prints description and tags when set.
+
+## 2026-03-27 — Plugins: editable element name in config panel header
+
+`packages/plugins/src/config-panel/renderer.ts` + `css.ts`:
+
+- The static `<div class="bpmnkit-cfg-full-name">` that showed `(unnamed)` when an element had no name is now an `<input type="text">` with `data-field-key="name"`.
+- Typing in the input calls `_applyField("name", value)`, which writes the change back to the BPMN definitions via the existing adapter write path — the same path used by the body "Name" field.
+- `Enter` and `Escape` blur the input (natural confirm/cancel).
+- The input carries `data-field-key="name"` so `_refreshInputs()` keeps it in sync with external changes without interrupting an in-progress edit (active-element guard).
+- In `readonly` mode the input gets `readOnly = true`.
+- CSS: the input is styled to look like the previous heading — transparent background, no border — with a subtle `border-bottom` that appears on hover and turns accent-coloured on focus. Placeholder `(unnamed)` is shown in a dimmed colour. Light and neon theme overrides added.
+
+## 2026-03-27 — Studio: command palette redesign
+
+Rewrote `apps/studio/src/components/CommandPalette.tsx` with best-in-class UX patterns inspired by Linear, Raycast, and VS Code:
+
+- **Custom dialog chrome**: replaced generic `DialogContent` (which had an X close button and center-screen positioning) with `DialogPrimitive.Content` directly — panel now sits at `top-[16%]` (upper-third, like Raycast/Linear) with a larger max-width of `620px` and `shadow-2xl`.
+- **Search icon**: `Search` icon in the input row replaces the empty left side; back-navigation shows `ChevronLeft` in view-stack mode.
+- **Fuzzy word-prefix matching**: in addition to substring match, each space-separated token in the query must be a prefix of some word in the label — e.g. `"mo"` matches `"Go to Models"`.
+- **Match highlighting**: matched substring is rendered in `font-semibold text-accent` so users instantly see why a result matched.
+- **Styled `<kbd>` shortcut badges**: shortcuts (e.g. `g m`) render as individual raised `<kbd>` elements with border and monospace font instead of plain text.
+- **Mouse hover syncs selection**: `onMouseEnter` on each item updates `selectedIdx`, keeping keyboard and mouse in sync.
+- **Scroll-into-view**: `useEffect` on `selectedIdx` scrolls the selected item into view with `scrollIntoView({ block: "nearest" })`.
+- **Footer hint bar**: `↑ ↓ Navigate  ↵ Select` shown at the bottom when results exist; `Esc Back` added in view-stack mode.
+- **Better empty state**: centered icon + contextual `No results for "…"` message.
+- **Group headers**: `text-[10px] font-semibold uppercase tracking-widest text-muted/60` — tighter visual hierarchy than before.
+- **`Esc` badge in search row**: right side of the input row shows an `Esc` `<kbd>` as a persistent reminder.
+
+## 2026-03-27 — Plugin: presentation mode UX refinements
+
+Updated `packages/plugins/src/presentation/index.ts`:
+
+- **Fullscreen**: entering presentation mode now applies `position: fixed; inset: 0; z-index: 9000` to the canvas container via `.bpmnkit-pres-fullscreen`, hiding all surrounding Studio UI (toolbars, sidebar, dock). `document.body.style.overflow` is set to `hidden` on enter and restored on exit.
+- **No element highlighting**: removed the SVG spotlight mask, dim overlay, glow filter, and animated border entirely. The current element is now shown by smooth pan/zoom centering only — no visual effects on the BPMN shapes themselves.
+- **Back navigation**: `←` (ArrowLeft) navigates back through a history stack. Each forward move pushes the previous node. The hints bar shows `← Back` when history is non-empty.
+- **Cleanup**: removed unused `_instanceCount`, `uid`, `spotlightG` field, `buildSvgLayers()`, and `updateSpotlight()`.
+
+## 2026-03-27 — Studio: presentation mode integration
+
+Integrated the presentation plugin into two additional studio views:
+
+- **`apps/studio/src/pages/ModelDetail.tsx`**: Added a `presentationApiRef` to track the plugin instance across renders. The "Present" button is now visible in the save bar on the right side for all profiles (not wasm-only) — `Cmd+K → Start Presentation Mode` still works too. Deploy/Deploy & Run buttons remain wasm-only. The ref is cleared on editor teardown.
+
+- **`apps/studio/src/pages/DefinitionDetail.tsx`** (wasm path, `WasmDefinitionDetail`): Added `createPresentationPlugin()` to the `BpmnCanvas` plugins list. A "Present" button appears overlaid in the top-right corner of the canvas area whenever XML is loaded. The `presentationApiRef` is created and cleaned up alongside the canvas.
+
+## 2026-03-27 — Plugin: presentation mode + Studio Deploy & Run fixes
+
+**Presentation mode plugin** — `packages/plugins/src/presentation/index.ts`:
+- New `@bpmnkit/plugins/presentation` export. Works as a `CanvasPlugin` for both `BpmnCanvas` and `BpmnEditor`.
+- Walks the BPMN flow graph from start event to end event one node at a time.
+- **Spotlight**: dims the entire canvas (SVG mask) with a cut-out over the current node; animated glowing accent border highlights it; visited nodes show a subtle green tint.
+- **Minimap**: always-visible 160×100 overview using `CanvasApi.getShapes()`/`getEdges()` — current node shown in accent colour, visited in green, viewport as a labelled rectangle. Click-to-navigate supported.
+- **Progress indicator**: thin accent progress bar (top edge) + `N / total` label (centre-top) updated as nodes are visited.
+- **Gateway choices**: when the current node has multiple outgoing paths, numbered SVG badges (circles with 1, 2…) appear above each target node with optional condition-expression labels.
+- **Keyboard**: `→`/`Enter` = next (single path), `1`–`9` = pick branch, `↑`/`↓` = zoom in/out, `Esc` = exit. Context-sensitive hints bar updates per state.
+- **Smooth pan/zoom**: CSS `cubic-bezier` transition on the viewport SVG group when centring on a new node.
+- Registers "Start Presentation Mode" command in the palette when `options.palette` is provided.
+- Integrated into `apps/studio/src/pages/ModelDetail.tsx` — the command is available via `Cmd+K → Start Presentation Mode`.
+
+**Deploy & Run fix** — `apps/studio/src/pages/ModelDetail.tsx`:
+- `handleDeployAndRun` now captures `deployResult.processes[0].bpmnProcessId` and passes it to `createInstance`; previously passed no process identifier, causing the wasm adapter to throw.
+
+**Toast z-index fix** — `apps/studio/src/components/Toast.tsx`:
+- Raised from `z-[100]` to `z-[10200]` so toasts render above the side dock (`z-index: 9999`) and all editor overlays.
+
+## 2026-03-27 — Studio: run mode (Deploy & Run) for reebe-wasm
+
+Added a fast feedback loop for the reebe-wasm profile in the model editor:
+
+- **`apps/studio/src/storage/types.ts`**: Added `runVariables?: string` field to `ModelFile` — persisted JSON string for instance start variables, stored in IndexedDB alongside the model.
+
+- **`apps/studio/src/pages/InstanceDetail.tsx`**: Exported `WasmInstanceDetail` (was previously unexported). Added `initialVariables`, `onVariablesChange`, and `hideNavLink` props so it can be embedded inside ModelDetail's run mode view.
+
+- **`apps/studio/src/pages/ModelDetail.tsx`**:
+  - When `activeProfile === "reebe-wasm"`, the save bar shows two right-aligned buttons: **Deploy** (deploys the current XML) and **Deploy & Run** (saves → deploys → starts a new instance → enters run mode).
+  - Run mode: hides the editor container (stays mounted to avoid destroy/recreate) and shows `WasmInstanceDetail` with a live token-highlight canvas and variable/incident panels. The dock is hidden in run mode.
+  - **← Edit** button in the save bar exits run mode and returns to the editor.
+  - `runVariables` are persisted in IndexedDB with a 1-second debounce when changed inside the run mode sidebar.
+
+## 2026-03-27 — Studio: canvas zoom, instance sidebar, editor deploy UX
+
+Three UX improvements to apps/studio:
+
+**Canvas zoom at 100%** — `apps/studio/src/pages/InstanceDetail.tsx`: Changed `fit: "contain"` to `fit: "center"` on the BpmnCanvas in `WasmInstanceDetail`. `"contain"` scales the diagram down to fill the viewport; `"center"` renders at 100% zoom and centers the diagram. (The editor in ModelDetail already used `"center"`.)
+
+**Instance view sidebar** — `apps/studio/src/pages/InstanceDetail.tsx`:
+- Variables now render inside a consistent bordered table panel (same structure as incidents), with an "No variables" empty row instead of bare text outside the panel.
+- Added a "Start new instance" section (bordered card with variables JSON textarea + Start button) that calls `useCreateProcessInstance` with the current instance's `processDefinitionKey`. On success, shows a link to the new instance.
+
+**Editor deploy pane** — `apps/studio/src/pages/ModelDetail.tsx` (`StudioDeployPane`):
+- When the model is already deployed (definitions query returns results), shows a `Deployed — vN` badge in green and changes the button label to "Re-deploy".
+- Added a "Start instance" card below the deploy button (only visible when deployed) with a variables textarea and Start button, identical in UX to DefinitionDetail's start panel. Uses the latest deployed version's `processDefinitionKey`.
+
+## 2026-03-27 — reebe-wasm: embedded worker with REST connector execution
+
+Implemented an in-browser Zeebe worker so the wasm engine automatically handles service tasks and executes real HTTP for REST connectors (`io.camunda:http-json:1`):
+
+- **`apps/reebe/crates/reebe-engine/src/processor/bpmn_element.rs`**: Fixed output mapping Bug 1 — the `complete_element` handler now merges job-returned variables from the `COMPLETE_ELEMENT` payload into the FEEL context before evaluating output mappings. Previously, expressions like `=response.body.id` always failed because the job result variables were not in scope. Rebuilt wasm binary.
+- **`apps/studio/src/api/wasm-adapter.ts`**:
+  - Expanded `WasmJob` interface with `element_instance_key`, `element_id`, `custom_headers`.
+  - Expanded `WasmVariable` interface with `scope_key` to enable filtering by element-instance scope.
+  - Added `JobResult` tracking (`Map<number, JobResult>`) and exported `getJobResults(processInstanceKey?)` for the UI.
+  - Added `pollJobs()` — after each timer tick, polls all ACTIVATABLE jobs and auto-handles them: generic service tasks are auto-completed with `{}`; `io.camunda:http-json:1` jobs extract connector inputs from element-scoped variables (`url`, `method`, `headers`, `body`, `authentication`) and execute real HTTP. Three-tier fallback: (1) direct browser fetch, (2) proxy CORS bypass, (3) default empty response.
+  - Converted `tickEngine` to async (`tickEngineAsync`) so it awaits `pollJobs()` before invalidating TanStack Query caches — jobs are always handled before the UI refreshes.
+- **`apps/proxy/src/index.ts`**: Added `POST /http-request` route — accepts `{ url, method, headers, body }`, proxies to the target URL server-side (bypasses browser CORS restrictions), and returns the upstream response with `Access-Control-Allow-Origin: *`.
+- **`apps/studio/src/pages/InstanceDetail.tsx`**: In `WasmInstanceDetail`, added a "Simulation mode" info banner and a "Job executions" table showing per-job result badges (Simulated / REST 200 / REST error) sourced from `getJobResults()`.
+
 ## 2026-03-26 — Fix: reebe-wasm timer events firing immediately instead of after duration
 
 - **`apps/reebe/crates/reebe-engine/src/processor/bpmn_element.rs`**: `eval_timer_due_date()` uses `reebe_feel::parse_and_evaluate()` for the `duration("PT1M")` fallback path, but `parse_and_evaluate()` treats any expression without a leading `=` as a literal string — returning `Ok(String("duration(\"PT1M\")"))` instead of evaluating it. Since neither path matched `FeelValue::Duration`, the fallback triggered (`due_date = now`), making every timer fire immediately. Fixed by switching the fallback path to `reebe_feel::evaluate()`, which always runs the FEEL evaluator. Rebuilt wasm binary.

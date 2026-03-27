@@ -14,6 +14,8 @@ export interface Profile {
 	config: CamundaClientInput
 	createdAt: string | null
 	source?: "modeler"
+	description?: string
+	tags?: string[]
 }
 
 export interface AuditEntry {
@@ -32,10 +34,17 @@ export interface Settings {
 
 const DEFAULT_AUDIT_LOG_SIZE = 15
 
+interface ProfileMeta {
+	createdAt: string
+	apiType?: ApiType
+	description?: string
+	tags?: string[]
+}
+
 interface ConfigStore {
 	profiles: Record<string, CamundaClientInput>
 	active: string | null
-	meta: Record<string, { createdAt: string; apiType?: ApiType }>
+	meta: Record<string, ProfileMeta>
 	settings?: Partial<Settings>
 	auditLog?: Record<string, AuditEntry[]>
 }
@@ -81,6 +90,8 @@ export function listProfiles(): Profile[] {
 		apiType: store.meta[name]?.apiType ?? "c8",
 		config,
 		createdAt: store.meta[name]?.createdAt ?? null,
+		description: store.meta[name]?.description,
+		tags: store.meta[name]?.tags,
 	}))
 
 	// Merge Camunda Modeler connections; own profiles take precedence by name
@@ -99,6 +110,8 @@ export function getProfile(name: string): Profile | undefined {
 		apiType: store.meta[name]?.apiType ?? "c8",
 		config,
 		createdAt: store.meta[name]?.createdAt ?? null,
+		description: store.meta[name]?.description,
+		tags: store.meta[name]?.tags,
 	}
 }
 
@@ -116,6 +129,7 @@ export function saveProfile(
 	name: string,
 	config: CamundaClientInput,
 	apiType: ApiType = "c8",
+	opts?: { description?: string; tags?: string[] },
 ): void {
 	const store = readStore()
 	store.profiles[name] = config
@@ -124,9 +138,26 @@ export function saveProfile(
 	} else {
 		store.meta[name].apiType = apiType
 	}
+	if (opts?.description !== undefined) store.meta[name].description = opts.description || undefined
+	if (opts?.tags !== undefined) store.meta[name].tags = opts.tags.length > 0 ? opts.tags : undefined
 	// Auto-activate if this is the first profile
 	if (store.active === null) store.active = name
 	writeStore(store)
+}
+
+/** Update description and/or tags on an existing profile without touching its connection config. */
+export function setProfileMeta(
+	name: string,
+	opts: { description?: string; tags?: string[] },
+): boolean {
+	const store = readStore()
+	if (!(name in store.profiles)) return false
+	const meta = store.meta[name]
+	if (!meta) return false
+	if (opts.description !== undefined) meta.description = opts.description || undefined
+	if (opts.tags !== undefined) meta.tags = opts.tags.length > 0 ? opts.tags : undefined
+	writeStore(store)
+	return true
 }
 
 export function deleteProfile(name: string): boolean {

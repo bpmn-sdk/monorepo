@@ -68,3 +68,137 @@ a,
 [role="button"] {
 	cursor: pointer;
 }
+
+/* ── Animation keyframes ───────────────────────────────────────────────── */
+
+/*
+ * These keyframes + @utility rules implement the tailwindcss-animate API
+ * using Tailwind v4's native CSS-first approach. The enter/exit keyframes
+ * read CSS variables set by the companion utilities (fade-in-0, zoom-in-95,
+ * slide-in-from-*, etc.) so multiple utilities can be composed together.
+ *
+ * animation-duration is driven by --tw-duration so that Tailwind's duration-*
+ * classes control animation speed, not just transition speed.
+ */
+@keyframes enter {
+	from {
+		opacity: var(--tw-enter-opacity, 1);
+		transform: translate3d(var(--tw-enter-translate-x, 0), var(--tw-enter-translate-y, 0), 0)
+			scale3d(var(--tw-enter-scale, 1), var(--tw-enter-scale, 1), var(--tw-enter-scale, 1))
+			rotate(var(--tw-enter-rotate, 0));
+	}
+}
+
+@keyframes exit {
+	to {
+		opacity: var(--tw-exit-opacity, 1);
+		transform: translate3d(var(--tw-exit-translate-x, 0), var(--tw-exit-translate-y, 0), 0)
+			scale3d(var(--tw-exit-scale, 1), var(--tw-exit-scale, 1), var(--tw-exit-scale, 1))
+			rotate(var(--tw-exit-rotate, 0));
+	}
+}
+
+/* ── Core animate utilities ────────────────────────────────────────────── */
+
+@utility animate-in {
+	animation-name: enter;
+	animation-duration: var(--tw-duration, 150ms);
+	animation-fill-mode: both;
+	--tw-enter-opacity: initial;
+	--tw-enter-scale: initial;
+	--tw-enter-rotate: initial;
+	--tw-enter-translate-x: initial;
+	--tw-enter-translate-y: initial;
+}
+
+@utility animate-out {
+	animation-name: exit;
+	animation-duration: var(--tw-duration, 150ms);
+	animation-fill-mode: both;
+	--tw-exit-opacity: initial;
+	--tw-exit-scale: initial;
+	--tw-exit-rotate: initial;
+	--tw-exit-translate-x: initial;
+	--tw-exit-translate-y: initial;
+}
+
+/* ── Fade ──────────────────────────────────────────────────────────────── */
+
+@utility fade-in {
+	--tw-enter-opacity: 0;
+}
+@utility fade-in-0 {
+	--tw-enter-opacity: 0;
+}
+@utility fade-out-0 {
+	--tw-exit-opacity: 0;
+}
+
+/* ── Scale ─────────────────────────────────────────────────────────────── */
+
+@utility zoom-in-95 {
+	--tw-enter-scale: 0.95;
+}
+@utility zoom-out-95 {
+	--tw-exit-scale: 0.95;
+}
+
+/* ── Slide ─────────────────────────────────────────────────────────────── */
+
+@utility slide-in-from-top-1 {
+	--tw-enter-translate-y: -0.25rem;
+}
+@utility slide-in-from-top-2 {
+	--tw-enter-translate-y: -0.5rem;
+}
+@utility slide-in-from-top-4 {
+	--tw-enter-translate-y: -1rem;
+}
+@utility slide-in-from-bottom-2 {
+	--tw-enter-translate-y: 0.5rem;
+}
+@utility slide-in-from-right-4 {
+	--tw-enter-translate-x: 1rem;
+}
+@utility slide-out-to-top-2 {
+	--tw-exit-translate-y: -0.5rem;
+}
+@utility slide-out-to-right-4 {
+	--tw-exit-translate-x: 1rem;
+}
+
+/* ── View Transitions ──────────────────────────────────────────────────── */
+
+/*
+ * Page cross-fade: old content fades up and out, new content fades up and in.
+ * The asymmetric timing (100ms out / 200ms in) makes the incoming page feel
+ * more intentional than the departing one.
+ */
+@keyframes vt-out {
+	to {
+		opacity: 0;
+		transform: translateY(-4px);
+	}
+}
+
+@keyframes vt-in {
+	from {
+		opacity: 0;
+		transform: translateY(8px);
+	}
+}
+
+::view-transition-old(root) {
+	animation: 100ms ease-in vt-out;
+}
+
+::view-transition-new(root) {
+	animation: 220ms ease-out vt-in;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	::view-transition-old(root),
+	::view-transition-new(root) {
+		animation: none;
+	}
+}

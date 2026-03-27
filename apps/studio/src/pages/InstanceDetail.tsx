@@ -1,18 +1,20 @@
 import { BpmnCanvas } from "@bpmnkit/canvas"
 import { InstancesStore, createInstanceDetailView } from "@bpmnkit/operate"
 import { createTokenHighlightPlugin } from "@bpmnkit/plugins/token-highlight"
-import { RotateCw, XCircle } from "lucide-react"
-import { useEffect, useRef } from "preact/hooks"
+import { Play, RotateCw, XCircle } from "lucide-react"
+import { useEffect, useRef, useState } from "preact/hooks"
 import { Link, useLocation, useParams } from "wouter"
 import { getActiveProfile, getProxyUrl } from "../api/client.js"
 import {
 	useCancelInstance,
+	useCreateProcessInstance,
 	useDefinitionXml,
 	useElementInstances,
 	useIncidents,
 	useInstance,
 	useInstanceVariables,
 } from "../api/queries.js"
+import { type JobResult, getJobResults } from "../api/wasm-adapter.js"
 import { Button } from "../components/ui/button.js"
 import { useModelsStore } from "../stores/models.js"
 import { useThemeStore } from "../stores/theme.js"
@@ -23,7 +25,19 @@ type OperateView = ReturnType<typeof createInstanceDetailView>
 
 // ── Wasm-native instance detail ───────────────────────────────────────────────
 
-function WasmInstanceDetail({ instanceKey }: { instanceKey: string }) {
+interface WasmInstanceDetailProps {
+	instanceKey: string
+	initialVariables?: string
+	onVariablesChange?: (v: string) => void
+	hideNavLink?: boolean
+}
+
+export function WasmInstanceDetail({
+	instanceKey,
+	initialVariables,
+	onVariablesChange,
+	hideNavLink,
+}: WasmInstanceDetailProps) {
 	const { data: instance, isLoading } = useInstance(instanceKey)
 	const { data: variablesData } = useInstanceVariables(instanceKey)
 	const { data: incidentsData } = useIncidents({ processInstanceKey: instanceKey })
@@ -31,8 +45,17 @@ function WasmInstanceDetail({ instanceKey }: { instanceKey: string }) {
 	const { data: xmlData } = useDefinitionXml(instance?.processDefinitionKey ?? "")
 	const { theme } = useThemeStore()
 	const cancel = useCancelInstance()
+	const createInstance = useCreateProcessInstance()
 	const canvasContainerRef = useRef<HTMLDivElement>(null)
 	const canvasRef = useRef<BpmnCanvas | null>(null)
+	const [startVars, setStartVars] = useState(initialVariables ?? "{}")
+	const [startError, setStartError] = useState<string | null>(null)
+	const [startedKey, setStartedKey] = useState<string | null>(null)
+
+	function handleVarsChange(v: string) {
+		setStartVars(v)
+		onVariablesChange?.(v)
+	}
 
 	useEffect(() => {
 		const container = canvasContainerRef.current
@@ -44,7 +67,7 @@ function WasmInstanceDetail({ instanceKey }: { instanceKey: string }) {
 			container,
 			theme,
 			grid: false,
-			fit: "contain",
+			fit: "center",
 			plugins: [tokenHighlight],
 		})
 		canvas.load(xmlData)
@@ -71,8 +94,31 @@ function WasmInstanceDetail({ instanceKey }: { instanceKey: string }) {
 		}
 	}
 
+	async function handleStart() {
+		setStartError(null)
+		setStartedKey(null)
+		let vars: Record<string, unknown> = {}
+		try {
+			const trimmed = startVars.trim()
+			if (trimmed && trimmed !== "{}") vars = JSON.parse(trimmed)
+		} catch {
+			setStartError("Variables must be valid JSON")
+			return
+		}
+		try {
+			const result = await createInstance.mutateAsync({
+				processDefinitionKey: instance?.processDefinitionKey,
+				variables: vars,
+			})
+			setStartedKey(result.processInstanceKey)
+		} catch (err) {
+			setStartError(err instanceof Error ? err.message : String(err))
+		}
+	}
+
 	const variables = variablesData?.items ?? []
 	const incidents = incidentsData?.items ?? []
+	const jobExecutions = getJobResults(Number(instanceKey))
 
 	const stateColor =
 		instance?.state === "ACTIVE"
@@ -150,6 +196,97 @@ function WasmInstanceDetail({ instanceKey }: { instanceKey: string }) {
 					)}
 				</div>
 
+				{/* Wasm simulation banner */}
+				<div className="rounded-lg border border-accent/30 bg-accent/5 px-3 py-2 text-xs text-muted">
+					<span className="font-semibold text-accent">Simulation mode</span> — Service tasks are
+					auto-completed; REST connectors execute real HTTP requests.
+				</div>
+
+				{/* Start new instance */}
+				<div className="border border-border rounded-lg p-3 flex flex-col gap-3">
+					<p className="text-xs font-semibold text-muted uppercase tracking-wider flex items-center gap-1.5">
+						<Play size={11} />
+						Start new instance
+					</p>
+					<div className="flex flex-col gap-1">
+						<label className="text-xs text-muted" htmlFor="instance-vars">
+							Variables (JSON)
+						</label>
+						<textarea
+							id="instance-vars"
+							value={startVars}
+							onInput={(e) => handleVarsChange((e.target as HTMLTextAreaElement).value)}
+							rows={2}
+							className="w-full rounded-md border border-border bg-surface px-3 py-2 text-xs font-mono text-fg placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-accent resize-none"
+							placeholder="{}"
+						/>
+					</div>
+					{startError && <p className="text-xs text-danger">{startError}</p>}
+					{startedKey && (
+						<p className="text-xs text-success">
+							Started —{" "}
+							<Link href={`/instances/${startedKey}`} className="underline hover:text-accent">
+								view #{startedKey}
+							</Link>
+						</p>
+					)}
+					<Button
+						size="sm"
+						onClick={() => void handleStart()}
+						disabled={createInstance.isPending}
+						className="self-start"
+					>
+						{createInstance.isPending ? (
+							<>
+								<RotateCw size={13} className="animate-spin" />
+								Starting…
+							</>
+						) : (
+							<>
+								<Play size={13} />
+								Start
+							</>
+						)}
+					</Button>
+				</div>
+
+				{/* Job executions */}
+				{jobExecutions.length > 0 && (
+					<div className="flex flex-col gap-2">
+						<p className="text-xs font-semibold text-muted uppercase tracking-wider">
+							Job executions
+						</p>
+						<div className="border border-border rounded-lg overflow-hidden">
+							<table className="w-full text-xs">
+								<thead>
+									<tr className="bg-surface-2 border-b border-border">
+										<th className="px-3 py-2 text-left font-medium text-muted">Element</th>
+										<th className="px-3 py-2 text-left font-medium text-muted">Result</th>
+									</tr>
+								</thead>
+								<tbody>
+									{jobExecutions.map((r: JobResult) => (
+										<tr key={r.jobKey} className="border-b border-border last:border-0">
+											<td className="px-3 py-2 font-mono text-fg">{r.elementId}</td>
+											<td className="px-3 py-2">
+												{r.kind === "simulated" && <span className="text-muted">Simulated</span>}
+												{r.kind === "rest-ok" && (
+													<span className="text-success">REST {r.status}</span>
+												)}
+												{r.kind === "rest-error" && (
+													<span className="text-danger">
+														{r.status ? `REST ${r.status}` : "REST error"}
+													</span>
+												)}
+											</td>
+										</tr>
+									))}
+								</tbody>
+							</table>
+						</div>
+					</div>
+				)}
+
 				{/* Incidents */}
 				{incidents.length > 0 && (
 					<div className="flex flex-col gap-2">
@@ -176,11 +313,9 @@ function WasmInstanceDetail({ instanceKey }: { instanceKey: string }) {
 				)}
 
 				{/* Variables */}
-				<div className="flex flex-col gap-2">
-					<p className="text-xs font-semibold text-muted uppercase tracking-wider">Variables</p>
-					{variables.length === 0 ? (
-						<p className="text-xs text-muted">No variables.</p>
-					) : (
+				{variables.length > 0 && (
+					<div className="flex flex-col gap-2">
+						<p className="text-xs font-semibold text-muted uppercase tracking-wider">Variables</p>
 						<div className="border border-border rounded-lg overflow-hidden">
 							<table className="w-full text-xs">
 								<thead>
@@ -199,12 +334,14 @@ function WasmInstanceDetail({ instanceKey }: { instanceKey: string }) {
 								</tbody>
 							</table>
 						</div>
-					)}
-				</div>
+					</div>
+				)}
 
-				<Link href="/instances" className="text-xs text-accent hover:underline self-start">
-					← All instances
-				</Link>
+				{!hideNavLink && (
+					<Link href="/instances" className="text-xs text-accent hover:underline self-start">
+						← All instances
+					</Link>
+				)}
 			</div>
 		</div>
 	)

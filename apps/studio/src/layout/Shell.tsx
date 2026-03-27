@@ -3,6 +3,7 @@ import { useEffect } from "preact/hooks"
 import { useLocation } from "wouter"
 import { CommandPalette } from "../components/CommandPalette.js"
 import { ToastContainer } from "../components/Toast.js"
+import { navigateWithTransition } from "../lib/transition.js"
 import { useUiStore } from "../stores/ui.js"
 import { AIDrawer } from "./AIDrawer.js"
 import { Sidebar } from "./Sidebar.js"
@@ -25,9 +26,9 @@ const ROUTE_MAP: Record<string, string> = {
 
 export function Shell({ children }: ShellProps) {
 	const [, navigate] = useLocation()
-	const { toggleCommandPalette, toggleAI, toggleSidebar } = useUiStore()
+	const { toggleCommandPalette, toggleAI, toggleSidebar, zenMode } = useUiStore()
 
-	// Global keyboard shortcuts
+	// Global keyboard shortcuts + link-click interceptor for view transitions
 	useEffect(() => {
 		let gPressed = false
 		let gTimer: ReturnType<typeof setTimeout> | null = null
@@ -74,21 +75,53 @@ export function Shell({ children }: ShellProps) {
 				gPressed = false
 				if (gTimer) clearTimeout(gTimer)
 				const path = ROUTE_MAP[e.key]
-				if (path) navigate(path)
+				if (path) navigateWithTransition(path, navigate)
 			}
 		}
 
+		// Intercept all internal <a> clicks in the capture phase so that
+		// preventDefault() prevents wouter's Link from double-navigating.
+		function handleLinkClick(e: MouseEvent) {
+			if (e.defaultPrevented) return
+			if (e.button !== 0) return
+			if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return
+
+			const a = (e.target as Element).closest("a")
+			if (!a) return
+
+			const href = a.getAttribute("href")
+			if (!href || href.startsWith("javascript:") || href.startsWith("#")) return
+
+			let url: URL
+			try {
+				url = new URL(href, window.location.href)
+			} catch {
+				return
+			}
+
+			if (url.origin !== window.location.origin) return
+			if (a.target && a.target !== "_self") return
+
+			e.preventDefault()
+			const path = url.pathname + url.search + url.hash
+			navigateWithTransition(path, navigate)
+		}
+
 		window.addEventListener("keydown", handleKeyDown)
-		return () => window.removeEventListener("keydown", handleKeyDown)
+		window.addEventListener("click", handleLinkClick, true)
+		return () => {
+			window.removeEventListener("keydown", handleKeyDown)
+			window.removeEventListener("click", handleLinkClick, true)
+		}
 	}, [navigate, toggleCommandPalette, toggleAI, toggleSidebar])
 
 	return (
 		<div className="flex h-full flex-col overflow-hidden">
-			<TopBar />
+			{!zenMode && <TopBar />}
 			<div className="flex flex-1 overflow-hidden">
-				<Sidebar />
+				{!zenMode && <Sidebar />}
 				<main className="flex-1 overflow-y-auto bg-bg">{children}</main>
-				<AIDrawer />
+				{!zenMode && <AIDrawer />}
 			</div>
 			<ToastContainer />
 			<CommandPalette />

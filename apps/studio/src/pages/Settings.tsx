@@ -1,5 +1,6 @@
 import { useEffect, useState } from "preact/hooks"
 import { useProfiles } from "../api/queries.js"
+import { ProfileTag } from "../components/ProfileTag.js"
 import { ThemePicker } from "../components/ThemePicker.js"
 import { Button } from "../components/ui/button.js"
 import { Input } from "../components/ui/input.js"
@@ -74,16 +75,33 @@ export function Settings() {
 							<thead>
 								<tr className="border-b border-border bg-surface-2 text-left text-xs text-muted">
 									<th className="px-4 py-2 font-medium">Name</th>
+									<th className="px-4 py-2 font-medium">Tags</th>
 									<th className="px-4 py-2 font-medium">Type</th>
 									<th className="px-4 py-2 font-medium">Active</th>
 								</tr>
 							</thead>
 							<tbody>
 								{profiles.map((p) => (
-									<tr key={p.name} className="border-b border-border/50">
-										<td className="px-4 py-2 font-medium text-fg">{p.name}</td>
-										<td className="px-4 py-2 text-muted">{p.apiType ?? "—"}</td>
-										<td className="px-4 py-2">
+									<tr key={p.name} className="border-b border-border/50 last:border-0">
+										<td className="px-4 py-2.5">
+											<div className="font-medium text-fg">{p.name}</div>
+											{p.description && (
+												<div className="text-xs text-muted mt-0.5">{p.description}</div>
+											)}
+										</td>
+										<td className="px-4 py-2.5">
+											{p.tags && p.tags.length > 0 ? (
+												<div className="flex flex-wrap gap-1">
+													{p.tags.map((t) => (
+														<ProfileTag key={t} tag={t} />
+													))}
+												</div>
+											) : (
+												<span className="text-xs text-muted">—</span>
+											)}
+										</td>
+										<td className="px-4 py-2.5 text-muted text-xs">{p.apiType ?? "—"}</td>
+										<td className="px-4 py-2.5">
 											<button
 												type="button"
 												onClick={() => setActiveProfile(p.name)}

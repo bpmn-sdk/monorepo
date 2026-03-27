@@ -35,11 +35,15 @@ interface WasmJob {
 	job_type: string
 	state: string
 	process_instance_key: number
+	element_instance_key: number
+	element_id: string
+	custom_headers: Record<string, unknown>
 }
 
 interface WasmVariable {
 	name: string
 	value: unknown
+	scope_key: number
 	process_instance_key: number
 }
 
@@ -92,6 +96,27 @@ function logError(...args: unknown[]) {
 	console.error(TAG, ...args)
 }
 
+// ── Job result tracking ───────────────────────────────────────────────────────
+
+export interface JobResult {
+	jobKey: number
+	elementId: string
+	jobType: string
+	kind: "simulated" | "rest-ok" | "rest-error"
+	status?: number
+	error?: string
+	processInstanceKey: number
+}
+
+const jobResults = new Map<number, JobResult>()
+
+export function getJobResults(processInstanceKey?: number): JobResult[] {
+	const all = [...jobResults.values()]
+	return processInstanceKey != null
+		? all.filter((r) => r.processInstanceKey === processInstanceKey)
+		: all
+}
+
 // ── Engine singleton ─────────────────────────────────────────────────────────
 
 let engine: WasmEngine | null = null
@@ -103,16 +128,201 @@ const localDefs = new Map<
 	{ key: string; bpmnProcessId: string; version: number; xml: string; deployedAt: string }
 >()
 
-/** Tick the engine and refresh active queries if any timers fired. */
-function tickEngine(): void {
+const HTTP_JOB_TYPE = "io.camunda:http-json:1"
+const PROXY_HTTP_URL = "http://localhost:3033/http-request"
+/** Jobs currently being handled to avoid double-activation. */
+const inFlight = new Set<number>()
+
+async function pollJobs(): Promise<void> {
+	if (!engine) return
+	const eng = engine
+	const snap = eng.snapshot() as WasmSnapshot
+	const activatable = snap.jobs.filter((j) => j.state === "ACTIVATABLE")
+	for (const job of activatable) {
+		if (inFlight.has(job.key)) continue
+		inFlight.add(job.key)
+		void handleJob(eng, job, snap.variables).finally(() => inFlight.delete(job.key))
+	}
+}
+
+async function handleJob(eng: WasmEngine, job: WasmJob, allVars: WasmVariable[]): Promise<void> {
+	try {
+		eng.activate_job(job.key, "reebe-wasm-worker", 30_000)
+	} catch {
+		return
+	}
+	if (job.job_type === HTTP_JOB_TYPE) {
+		await handleHttpJob(eng, job, allVars)
+	} else {
+		try {
+			eng.complete_job(job.key, "{}")
+			jobResults.set(job.key, {
+				jobKey: job.key,
+				elementId: job.element_id,
+				jobType: job.job_type,
+				kind: "simulated",
+				processInstanceKey: job.process_instance_key,
+			})
+		} catch {
+			// ignore — job may have been completed elsewhere
+		}
+	}
+}
+
+async function handleHttpJob(
+	eng: WasmEngine,
+	job: WasmJob,
+	allVars: WasmVariable[],
+): Promise<void> {
+	// Build variable map: element-scoped vars first, then process-scoped as fallback
+	const varMap: Record<string, unknown> = {}
+	for (const v of allVars.filter((v) => v.scope_key === job.process_instance_key)) {
+		varMap[v.name] = v.value
+	}
+	for (const v of allVars.filter((v) => v.scope_key === job.element_instance_key)) {
+		varMap[v.name] = v.value
+	}
+
+	const url = typeof varMap.url === "string" ? varMap.url : undefined
+	const method = typeof varMap.method === "string" ? varMap.method.toUpperCase() : "GET"
+	const reqBody =
+		method !== "GET" && method !== "HEAD" && varMap.body !== undefined
+			? JSON.stringify(varMap.body)
+			: undefined
+
+	const headers: Record<string, string> = { "content-type": "application/json" }
+	const headersRaw = varMap.headers
+	if (headersRaw && typeof headersRaw === "object") {
+		for (const [k, v] of Object.entries(headersRaw as Record<string, unknown>)) {
+			if (typeof v === "string") headers[k] = v
+		}
+	}
+	const auth = varMap.authentication
+	if (auth && typeof auth === "object") {
+		const a = auth as Record<string, unknown>
+		if (a.type === "bearer" && typeof a.token === "string") {
+			headers.authorization = `Bearer ${a.token}`
+		} else if (
+			a.type === "basic" &&
+			typeof a.username === "string" &&
+			typeof a.password === "string"
+		) {
+			headers.authorization = `Basic ${btoa(`${a.username}:${a.password}`)}`
+		}
+	}
+	for (const [k, v] of Object.entries(job.custom_headers ?? {})) {
+		if (typeof v === "string") headers[k] = v
+	}
+
+	if (!url) {
+		// No URL configured — complete with a default simulated response
+		try {
+			eng.complete_job(
+				job.key,
+				JSON.stringify({ response: { status: 200, body: {}, headers: {} } }),
+			)
+		} catch {
+			/* ignore */
+		}
+		jobResults.set(job.key, {
+			jobKey: job.key,
+			elementId: job.element_id,
+			jobType: job.job_type,
+			kind: "simulated",
+			processInstanceKey: job.process_instance_key,
+		})
+		return
+	}
+
+	type HttpResponse = { status: number; body: unknown; headers: Record<string, string> }
+	let response: HttpResponse | null = null
+	let fetchError: string | null = null
+
+	// Tier 1: direct browser fetch
+	try {
+		const res = await fetch(url, { method, headers, body: reqBody })
+		const text = await res.text()
+		let body: unknown = text
+		try {
+			body = JSON.parse(text)
+		} catch {
+			/* use text */
+		}
+		response = { status: res.status, body, headers: Object.fromEntries(res.headers.entries()) }
+	} catch (err) {
+		fetchError = String(err)
+		log(`HTTP job ${job.key}: direct fetch failed (${fetchError}), trying proxy…`)
+		// Tier 2: CORS-bypass proxy
+		try {
+			const proxyRes = await fetch(PROXY_HTTP_URL, {
+				method: "POST",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify({ url, method, headers, body: reqBody }),
+			})
+			const text = await proxyRes.text()
+			let body: unknown = text
+			try {
+				body = JSON.parse(text)
+			} catch {
+				/* use text */
+			}
+			response = {
+				status: proxyRes.status,
+				body,
+				headers: Object.fromEntries(proxyRes.headers.entries()),
+			}
+			fetchError = null
+		} catch (proxyErr) {
+			log(`HTTP job ${job.key}: proxy also failed: ${String(proxyErr)}`)
+		}
+	}
+
+	if (response) {
+		try {
+			eng.complete_job(job.key, JSON.stringify({ response }))
+			jobResults.set(job.key, {
+				jobKey: job.key,
+				elementId: job.element_id,
+				jobType: job.job_type,
+				kind: response.status < 400 ? "rest-ok" : "rest-error",
+				status: response.status,
+				processInstanceKey: job.process_instance_key,
+			})
+		} catch (e) {
+			logError(`HTTP job ${job.key}: complete_job failed:`, e)
+		}
+	} else {
+		// Tier 3: both failed — complete with empty simulated response
+		try {
+			eng.complete_job(job.key, JSON.stringify({ response: { status: 0, body: {}, headers: {} } }))
+		} catch {
+			/* ignore */
+		}
+		jobResults.set(job.key, {
+			jobKey: job.key,
+			elementId: job.element_id,
+			jobType: job.job_type,
+			kind: "rest-error",
+			error: fetchError ?? "Proxy unavailable",
+			processInstanceKey: job.process_instance_key,
+		})
+	}
+}
+
+/** Tick the engine (timers + jobs) and refresh active queries. */
+async function tickEngineAsync(): Promise<void> {
 	if (!engine) return
 	try {
 		engine.tick()
-		// Invalidate active queries so the UI reflects any timer-triggered state changes
-		void queryClient.invalidateQueries({ refetchType: "active" })
 	} catch {
 		// Ignore tick errors — engine may not be ready
 	}
+	await pollJobs()
+	void queryClient.invalidateQueries({ refetchType: "active" })
+}
+
+function tickEngine(): void {
+	void tickEngineAsync()
 }
 
 export async function initWasmEngine(): Promise<void> {

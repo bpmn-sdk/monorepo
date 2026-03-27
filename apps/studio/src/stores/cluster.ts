@@ -12,6 +12,8 @@ export interface Profile {
 	name: string
 	apiType: string
 	active?: boolean
+	description?: string
+	tags?: string[]
 }
 
 type Status = "connected" | "offline" | "loading"

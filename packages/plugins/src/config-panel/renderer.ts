@@ -743,11 +743,25 @@ export class ConfigPanelRenderer {
 			info.appendChild(templateLabel)
 		}
 
-		const nameLabel = document.createElement("div")
-		nameLabel.className = "bpmnkit-cfg-full-name"
-		nameLabel.textContent = this._elementName || "(unnamed)"
+		const nameInput = document.createElement("input")
+		nameInput.type = "text"
+		nameInput.className = "bpmnkit-cfg-full-name"
+		nameInput.setAttribute("data-field-key", "name")
+		nameInput.value = this._elementName
+		nameInput.placeholder = "(unnamed)"
+		nameInput.setAttribute("spellcheck", "false")
+		nameInput.setAttribute("autocomplete", "off")
+		if (this._readonly) nameInput.readOnly = true
 
-		info.appendChild(nameLabel)
+		nameInput.addEventListener("input", () => {
+			this._elementName = nameInput.value
+			this._applyField("name", nameInput.value)
+		})
+		nameInput.addEventListener("keydown", (e) => {
+			if (e.key === "Enter" || e.key === "Escape") nameInput.blur()
+		})
+
+		info.appendChild(nameInput)
 		header.appendChild(info)
 
 		// Docs link — shown when the schema provides a documentation URL

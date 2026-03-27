@@ -36,6 +36,7 @@ interface UiState {
 	aiInitialPrompt: string | null
 	commandPaletteOpen: boolean
 	sidebarExpanded: boolean
+	zenMode: boolean
 	breadcrumbs: Breadcrumb[]
 	contextCommands: ContextCommand[]
 	paletteViewStack: PaletteView[]
@@ -53,6 +54,8 @@ interface UiState {
 	clearContextCommands(): void
 	pushPaletteView(view: PaletteView): void
 	popPaletteView(): void
+	enterZenMode(): void
+	exitZenMode(): void
 }
 
 export const useUiStore = create<UiState>()((set, get) => ({
@@ -60,6 +63,7 @@ export const useUiStore = create<UiState>()((set, get) => ({
 	aiInitialPrompt: null,
 	commandPaletteOpen: false,
 	sidebarExpanded: loadSidebarExpanded(),
+	zenMode: false,
 	breadcrumbs: [],
 	contextCommands: [],
 	paletteViewStack: [],
@@ -107,6 +111,9 @@ export const useUiStore = create<UiState>()((set, get) => ({
 	},
 
 	clearContextCommands: () => set({ contextCommands: [], paletteViewStack: [] }),
+
+	enterZenMode: () => set({ zenMode: true }),
+	exitZenMode: () => set({ zenMode: false }),
 
 	pushPaletteView: (view) =>
 		set((s) => ({ paletteViewStack: [...s.paletteViewStack, view], commandPaletteOpen: true })),

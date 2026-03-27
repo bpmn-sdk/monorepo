@@ -6,20 +6,34 @@ import { createCommandPaletteEditorPlugin } from "@bpmnkit/plugins/command-palet
 import { createConfigPanelPlugin } from "@bpmnkit/plugins/config-panel"
 import { createConfigPanelBpmnPlugin } from "@bpmnkit/plugins/config-panel-bpmn"
 import { createConnectorCatalogPlugin } from "@bpmnkit/plugins/connector-catalog"
+import { type PresentationApi, createPresentationPlugin } from "@bpmnkit/plugins/presentation"
 import { QueryClientProvider } from "@tanstack/react-query"
-import { BookOpen, ExternalLink, Link2, Rocket, Save } from "lucide-react"
+import {
+	ArrowLeft,
+	BookOpen,
+	CheckCircle,
+	ExternalLink,
+	Link2,
+	MonitorPlay,
+	Play,
+	Rocket,
+	RotateCw,
+	Save,
+} from "lucide-react"
 import { render } from "preact"
-import { useEffect, useRef, useState } from "preact/hooks"
+import { useCallback, useEffect, useRef, useState } from "preact/hooks"
 import { Link, useParams } from "wouter"
-import { useDefinitions, useDeployProcess } from "../api/queries.js"
+import { useCreateProcessInstance, useDefinitions, useDeployProcess } from "../api/queries.js"
 import { queryClient } from "../api/queryClient.js"
 import { Button } from "../components/ui/button.js"
 import { Input } from "../components/ui/input.js"
 import type { ModelFile } from "../storage/types.js"
+import { useClusterStore } from "../stores/cluster.js"
 import { useModelsStore } from "../stores/models.js"
 import { useThemeStore } from "../stores/theme.js"
 import { toast } from "../stores/toast.js"
 import { useUiStore } from "../stores/ui.js"
+import { WasmInstanceDetail } from "./InstanceDetail.js"
 
 // TopBar = h-12 (48px), save bar = h-10 (40px)
 const DOCK_TOP = 88
@@ -30,10 +44,17 @@ function StudioDeployPane({ modelId, getXml }: { modelId: string; getXml: () => 
 	const { models, saveModel, upsertModel } = useModelsStore()
 	const model = models.find((m) => m.id === modelId)
 	const [processIdInput, setProcessIdInput] = useState(model?.processDefinitionId ?? "")
+	const [startVars, setStartVars] = useState("{}")
+	const [startError, setStartError] = useState<string | null>(null)
+	const [startedKey, setStartedKey] = useState<string | null>(null)
 	const { data, refetch } = useDefinitions(
 		model?.processDefinitionId ? { bpmnProcessId: model.processDefinitionId } : undefined,
 	)
 	const deploy = useDeployProcess()
+	const createInstance = useCreateProcessInstance()
+
+	const latestDef = data?.items[0]
+	const isDeployed = !!latestDef
 
 	async function handleLink() {
 		if (!model) return
@@ -54,6 +75,29 @@ function StudioDeployPane({ modelId, getXml }: { modelId: string; getXml: () => 
 		}
 	}
 
+	async function handleStart() {
+		if (!latestDef) return
+		setStartError(null)
+		setStartedKey(null)
+		let vars: Record<string, unknown> = {}
+		try {
+			const trimmed = startVars.trim()
+			if (trimmed && trimmed !== "{}") vars = JSON.parse(trimmed)
+		} catch {
+			setStartError("Variables must be valid JSON")
+			return
+		}
+		try {
+			const result = await createInstance.mutateAsync({
+				processDefinitionKey: latestDef.processDefinitionKey,
+				variables: vars,
+			})
+			setStartedKey(result.processInstanceKey)
+		} catch (err) {
+			setStartError(err instanceof Error ? err.message : String(err))
+		}
+	}
+
 	return (
 		<div className="p-4 flex flex-col gap-5 overflow-y-auto h-full">
 			<div>
@@ -61,15 +105,70 @@ function StudioDeployPane({ modelId, getXml }: { modelId: string; getXml: () => 
 					<Rocket size={11} />
 					Deploy
 				</p>
+				{isDeployed && (
+					<p className="text-xs text-success flex items-center gap-1 mb-2">
+						<CheckCircle size={11} />
+						Deployed — v{latestDef.version}
+					</p>
+				)}
 				<Button
 					size="sm"
 					onClick={() => void handleDeploy()}
 					disabled={deploy.isPending}
 					className="w-full"
 				>
-					{deploy.isPending ? "Deploying…" : "Deploy to Camunda"}
+					{deploy.isPending ? "Deploying…" : isDeployed ? "Re-deploy" : "Deploy to Camunda"}
 				</Button>
 			</div>
+
+			{isDeployed && (
+				<div className="border border-border rounded-lg p-3 flex flex-col gap-3">
+					<p className="text-xs font-semibold text-muted uppercase tracking-wider flex items-center gap-1.5">
+						<Play size={11} />
+						Start instance
+					</p>
+					<div className="flex flex-col gap-1">
+						<label className="text-xs text-muted" htmlFor="deploy-pane-vars">
+							Variables (JSON)
+						</label>
+						<textarea
+							id="deploy-pane-vars"
+							value={startVars}
+							onInput={(e) => setStartVars((e.target as HTMLTextAreaElement).value)}
+							rows={2}
+							className="w-full rounded-md border border-border bg-surface px-3 py-2 text-xs font-mono text-fg placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-accent resize-none"
+							placeholder="{}"
+						/>
+					</div>
+					{startError && <p className="text-xs text-danger">{startError}</p>}
+					{startedKey && (
+						<p className="text-xs text-success">
+							Started —{" "}
+							<Link href={`/instances/${startedKey}`} className="underline hover:text-accent">
+								view #{startedKey}
+							</Link>
+						</p>
+					)}
+					<Button
+						size="sm"
+						onClick={() => void handleStart()}
+						disabled={createInstance.isPending}
+						className="self-start"
+					>
+						{createInstance.isPending ? (
+							<>
+								<RotateCw size={13} className="animate-spin" />
+								Starting…
+							</>
+						) : (
+							<>
+								<Play size={13} />
+								Start
+							</>
+						)}
+					</Button>
+				</div>
+			)}
 
 			<div>
 				<p className="text-xs font-semibold text-muted uppercase tracking-wider mb-2 flex items-center gap-1">
@@ -93,7 +192,7 @@ function StudioDeployPane({ modelId, getXml }: { modelId: string; getXml: () => 
 			{model?.processDefinitionId && (
 				<div>
 					<p className="text-xs font-semibold text-muted uppercase tracking-wider mb-2">
-						Deployed Versions
+						Deployed versions
 					</p>
 					{!data?.items.length ? (
 						<p className="text-xs text-muted">No deployed versions found.</p>
@@ -429,10 +528,19 @@ export function ModelDetail() {
 	const editorContainerRef = useRef<HTMLDivElement>(null)
 	const editorRef = useRef<BpmnEditor | null>(null)
 	const dockRef = useRef<SideDock | null>(null)
+	const presentationApiRef = useRef<PresentationApi | null>(null)
 	const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+	const runVarsSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 	const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "unsaved">("saved")
+	const [runMode, setRunMode] = useState(false)
+	const [activeInstanceKey, setActiveInstanceKey] = useState<string | null>(null)
+	const [runVariables, setRunVariables] = useState(model?.runVariables ?? "{}")
 	const { theme } = useThemeStore()
-	const { setBreadcrumbs } = useUiStore()
+	const { setBreadcrumbs, zenMode } = useUiStore()
+	const activeProfile = useClusterStore((s) => s.activeProfile)
+	const isWasm = activeProfile === "reebe-wasm"
+	const deploy = useDeployProcess()
+	const createInstance = useCreateProcessInstance()
 
 	useEffect(() => {
 		setBreadcrumbs([{ label: "Models", href: "/models" }, { label: model?.name ?? id }])
@@ -578,12 +686,31 @@ export function ModelDetail() {
 			() => editorRef.current,
 		)
 		const connectorCatalog = createConnectorCatalogPlugin(configPanelBpmn, bridgePalette)
+		const presentation = createPresentationPlugin({
+			palette: bridgePalette,
+			onEnter: () => {
+				if (dockRef.current) dockRef.current.el.style.display = "none"
+				useUiStore.getState().enterZenMode()
+			},
+			onExit: () => {
+				if (dockRef.current) dockRef.current.el.style.display = ""
+				useUiStore.getState().exitZenMode()
+			},
+		})
+		presentationApiRef.current = presentation.api
 
 		const editor = new BpmnEditor({
 			container,
 			theme: useThemeStore.getState().theme,
 			fit: "center",
-			plugins: [paletteEditorPlugin, bridgePlugin, configPanel, configPanelBpmn, connectorCatalog],
+			plugins: [
+				paletteEditorPlugin,
+				bridgePlugin,
+				configPanel,
+				configPanelBpmn,
+				connectorCatalog,
+				presentation,
+			],
 		})
 		initEditorHud(editor, {
 			onToggleSidebar: () => {
@@ -623,6 +750,7 @@ export function ModelDetail() {
 			deregisterExtra()
 			useUiStore.getState().clearContextCommands()
 			editorRef.current = null
+			presentationApiRef.current = null
 		}
 	}, [id, loaded])
 
@@ -630,6 +758,80 @@ export function ModelDetail() {
 	useEffect(() => {
 		editorRef.current?.setTheme(theme)
 	}, [theme])
+
+	// Hide/show dock when entering/exiting run mode
+	useEffect(() => {
+		dockRef.current?.setVisible(!runMode)
+	}, [runMode])
+
+	const handleDeployAndRun = useCallback(async () => {
+		const editor = editorRef.current
+		if (!editor || !model) return
+		// Save first
+		const xml = editor.exportXml()
+		if (!xml) return
+		try {
+			setSaveStatus("saving")
+			const updated = await saveModel({ ...model, content: xml })
+			upsertModel(updated)
+			setSaveStatus("saved")
+		} catch {
+			setSaveStatus("unsaved")
+			toast.error("Failed to save model")
+			return
+		}
+		// Deploy
+		let bpmnProcessId: string | undefined
+		try {
+			const deployResult = await deploy.mutateAsync({ xml, fileName: `${model.name}.bpmn` })
+			bpmnProcessId = deployResult.processes?.[0]?.bpmnProcessId
+		} catch (err) {
+			toast.error(err instanceof Error ? err.message : String(err))
+			return
+		}
+		if (!bpmnProcessId) {
+			toast.error("Deploy did not return a process ID")
+			return
+		}
+		// Start instance
+		let vars: Record<string, unknown> = {}
+		try {
+			const trimmed = runVariables.trim()
+			if (trimmed && trimmed !== "{}") vars = JSON.parse(trimmed)
+		} catch {
+			toast.error("Variables must be valid JSON")
+			return
+		}
+		try {
+			const result = await createInstance.mutateAsync({ bpmnProcessId, variables: vars })
+			setActiveInstanceKey(result.processInstanceKey)
+			setRunMode(true)
+		} catch (err) {
+			toast.error(err instanceof Error ? err.message : String(err))
+		}
+	}, [model, saveModel, upsertModel, deploy, createInstance, runVariables])
+
+	const handleDeploy = useCallback(async () => {
+		const editor = editorRef.current
+		if (!editor || !model) return
+		const xml = editor.exportXml()
+		if (!xml) return
+		try {
+			await deploy.mutateAsync({ xml, fileName: `${model.name}.bpmn` })
+			toast.success("Deployed")
+		} catch (err) {
+			toast.error(err instanceof Error ? err.message : String(err))
+		}
+	}, [model, deploy])
+
+	function handleRunVariablesChange(v: string) {
+		setRunVariables(v)
+		if (runVarsSaveTimerRef.current) clearTimeout(runVarsSaveTimerRef.current)
+		runVarsSaveTimerRef.current = setTimeout(() => {
+			if (!model) return
+			void saveModel({ ...model, runVariables: v }).then(upsertModel)
+		}, 1000)
+	}
 
 	// ⌘S saves immediately
 	// biome-ignore lint/correctness/useExhaustiveDependencies: doSave reads from refs; id/model trigger re-registration
@@ -671,29 +873,90 @@ export function ModelDetail() {
 		)
 	}
 
+	const isPending = deploy.isPending || createInstance.isPending
+
 	return (
 		<div className="flex flex-col h-full">
-			{/* Save bar — h-10 (40px); dock starts at DOCK_TOP = TopBar(48) + this(40) = 88px */}
-			<div className="flex items-center h-10 shrink-0 gap-3 px-3 border-b border-border bg-surface">
-				<span
-					className={`text-xs transition-colors ${
-						saveStatus === "saved"
-							? "text-success"
-							: saveStatus === "saving"
-								? "text-warn"
-								: "text-muted"
-					}`}
-				>
-					{saveStatus === "saved" ? "Saved" : saveStatus === "saving" ? "Saving…" : "Unsaved"}
-				</span>
-				<Button size="sm" variant="ghost" onClick={() => void doSave()}>
-					<Save size={14} />
-					Save
-				</Button>
-			</div>
+			{/* Save bar — hidden in zen/presentation mode */}
+			{!zenMode && (
+				<div className="flex items-center h-10 shrink-0 gap-3 px-3 border-b border-border bg-surface">
+					{runMode ? (
+						<Button size="sm" variant="ghost" onClick={() => setRunMode(false)}>
+							<ArrowLeft size={14} />
+							Edit
+						</Button>
+					) : (
+						<>
+							<span
+								className={`text-xs transition-colors ${
+									saveStatus === "saved"
+										? "text-success"
+										: saveStatus === "saving"
+											? "text-warn"
+											: "text-muted"
+								}`}
+							>
+								{saveStatus === "saved" ? "Saved" : saveStatus === "saving" ? "Saving…" : "Unsaved"}
+							</span>
+							<Button size="sm" variant="ghost" onClick={() => void doSave()}>
+								<Save size={14} />
+								Save
+							</Button>
+						</>
+					)}
+					{!runMode && (
+						<div className="ml-auto flex items-center gap-2">
+							<Button size="sm" variant="ghost" onClick={() => presentationApiRef.current?.enter()}>
+								<MonitorPlay size={14} />
+								Present
+							</Button>
+							{isWasm && (
+								<>
+									<Button
+										size="sm"
+										variant="outline"
+										onClick={() => void handleDeploy()}
+										disabled={isPending}
+									>
+										{deploy.isPending ? (
+											<RotateCw size={13} className="animate-spin" />
+										) : (
+											<Rocket size={13} />
+										)}
+										Deploy
+									</Button>
+									<Button size="sm" onClick={() => void handleDeployAndRun()} disabled={isPending}>
+										{isPending ? (
+											<RotateCw size={13} className="animate-spin" />
+										) : (
+											<Play size={13} />
+										)}
+										Deploy &amp; Run
+									</Button>
+								</>
+							)}
+						</div>
+					)}
+				</div>
+			)}
 
-			{/* Editor — full width; dock floats over the right edge */}
-			<div ref={editorContainerRef} className="flex-1 overflow-hidden relative min-h-0" />
+			{/* Editor — hidden in run mode but kept mounted */}
+			<div
+				ref={editorContainerRef}
+				className={`flex-1 overflow-hidden relative min-h-0 ${runMode ? "hidden" : ""}`}
+			/>
+
+			{/* Run mode — live instance view */}
+			{runMode && activeInstanceKey && (
+				<div className="flex-1 overflow-hidden min-h-0">
+					<WasmInstanceDetail
+						instanceKey={activeInstanceKey}
+						initialVariables={runVariables}
+						onVariablesChange={handleRunVariablesChange}
+						hideNavLink
+					/>
+				</div>
+			)}
 		</div>
 	)
 }
