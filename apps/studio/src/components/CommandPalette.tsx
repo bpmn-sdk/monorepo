@@ -1,5 +1,5 @@
 import * as DialogPrimitive from "@radix-ui/react-dialog"
-import { ChevronLeft, Search } from "lucide-react"
+import { ChevronLeft, Search, Sparkles } from "lucide-react"
 import { useEffect, useRef, useState } from "preact/hooks"
 import { useLocation } from "wouter"
 import type { ContextCommand } from "../stores/ui.js"
@@ -177,6 +177,20 @@ export function CommandPalette({ onNavigate }: CommandPaletteProps) {
 
 	const filtered = listItems.filter((item) => matchesQuery(item.label, query))
 
+	// Pinned "Ask AI" row — visible in root mode whenever the user has typed something
+	const trimmedQuery = query.trim()
+	const showAskAi = !isInView && trimmedQuery.length > 0
+
+	// Total navigable slots (filtered results + optional Ask AI row)
+	const totalItems = filtered.length + (showAskAi ? 1 : 0)
+	// Index of the Ask AI row in the navigable list
+	const askAiIdx = filtered.length
+
+	function executeAskAi() {
+		openAI(trimmedQuery)
+		closeCommandPalette()
+	}
+
 	// ── Focus & reset ─────────────────────────────────────────────────────────
 
 	useEffect(() => {
@@ -239,14 +253,18 @@ export function CommandPalette({ onNavigate }: CommandPaletteProps) {
 		}
 		if (e.key === "ArrowDown") {
 			e.preventDefault()
-			setSelectedIdx((i) => Math.min(i + 1, filtered.length - 1))
+			setSelectedIdx((i) => Math.min(i + 1, totalItems - 1))
 		} else if (e.key === "ArrowUp") {
 			e.preventDefault()
 			setSelectedIdx((i) => Math.max(i - 1, 0))
 		} else if (e.key === "Enter") {
 			e.preventDefault()
-			const item = filtered[selectedIdx]
-			if (item) execute(item)
+			if (showAskAi && selectedIdx === askAiIdx) {
+				executeAskAi()
+			} else {
+				const item = filtered[selectedIdx]
+				if (item) execute(item)
+			}
 		}
 	}
 
@@ -307,10 +325,16 @@ export function CommandPalette({ onNavigate }: CommandPaletteProps) {
 					{/* Command list */}
 					{!isTextInput && (
 						<div ref={listRef} className="max-h-[380px] overflow-y-auto p-1.5">
-							{filtered.length === 0 && (
+							{filtered.length === 0 && !showAskAi && (
 								<div className="flex flex-col items-center gap-2 px-4 py-10 text-center">
 									<Search size={18} className="text-muted/40" />
 									<p className="text-sm text-muted">No results for &ldquo;{query}&rdquo;</p>
+								</div>
+							)}
+
+							{filtered.length === 0 && showAskAi && (
+								<div className="px-3 pb-1 pt-2.5 text-[10px] font-semibold uppercase tracking-widest text-muted/60 select-none">
+									No matching commands
 								</div>
 							)}
 
@@ -380,6 +404,29 @@ export function CommandPalette({ onNavigate }: CommandPaletteProps) {
 											</div>
 										)
 									})}
+
+							{/* Pinned Ask AI row — always shown when there is a query */}
+							{showAskAi && (
+								<>
+									{filtered.length > 0 && <div className="mx-1.5 my-1 border-t border-border" />}
+									<button
+										type="button"
+										data-selected={selectedIdx === askAiIdx}
+										onClick={executeAskAi}
+										onMouseEnter={() => setSelectedIdx(askAiIdx)}
+										className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-left transition-colors ${
+											selectedIdx === askAiIdx
+												? "bg-accent/10 text-fg"
+												: "text-fg hover:bg-surface-2"
+										}`}
+									>
+										<Sparkles size={14} className="text-accent shrink-0" />
+										<span className="flex-1 truncate">
+											Ask AI: <span className="text-muted italic">{trimmedQuery}</span>
+										</span>
+									</button>
+								</>
+							)}
 						</div>
 					)}
 
@@ -399,7 +446,7 @@ export function CommandPalette({ onNavigate }: CommandPaletteProps) {
 					)}
 
 					{/* Footer — keyboard hints */}
-					{!isTextInput && filtered.length > 0 && (
+					{!isTextInput && totalItems > 0 && (
 						<div className="flex items-center gap-3 border-t border-border px-4 py-2 text-[11px] text-muted select-none">
 							<span className="flex items-center gap-1">
 								<HintKbd>↑</HintKbd>

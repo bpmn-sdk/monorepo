@@ -1,5 +1,16 @@
 # Progress
 
+## 2026-03-27 — Plugins: editable element name in config panel header
+
+`packages/plugins/src/config-panel/renderer.ts` + `css.ts`:
+
+- The static `<div class="bpmnkit-cfg-full-name">` that showed `(unnamed)` when an element had no name is now an `<input type="text">` with `data-field-key="name"`.
+- Typing in the input calls `_applyField("name", value)`, which writes the change back to the BPMN definitions via the existing adapter write path — the same path used by the body "Name" field.
+- `Enter` and `Escape` blur the input (natural confirm/cancel).
+- The input carries `data-field-key="name"` so `_refreshInputs()` keeps it in sync with external changes without interrupting an in-progress edit (active-element guard).
+- In `readonly` mode the input gets `readOnly = true`.
+- CSS: the input is styled to look like the previous heading — transparent background, no border — with a subtle `border-bottom` that appears on hover and turns accent-coloured on focus. Placeholder `(unnamed)` is shown in a dimmed colour. Light and neon theme overrides added.
+
 ## 2026-03-27 — Studio: command palette redesign
 
 Rewrote `apps/studio/src/components/CommandPalette.tsx` with best-in-class UX patterns inspired by Linear, Raycast, and VS Code:
