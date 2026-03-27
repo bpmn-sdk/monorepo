@@ -13,6 +13,7 @@ export {
 	listProfiles,
 	saveProfile,
 	saveSettings,
+	setProfileMeta,
 	useProfile,
 } from "./profile.js"
 export { createAdminClientFromProfile, createClientFromProfile } from "./client.js"

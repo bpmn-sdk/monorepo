@@ -1,5 +1,14 @@
 # Progress
 
+## 2026-03-27 — Profile enrichment: description and tags
+
+Added optional `description` and `tags` fields to profiles across the full stack:
+
+- **`packages/profiles`**: `Profile` type gains `description?: string` and `tags?: string[]`; `ProfileMeta` stores them; `saveProfile` accepts an `opts` argument; new `setProfileMeta` function updates meta without touching connection config; `setProfileMeta` exported from the package index.
+- **`apps/proxy`**: `/profiles` response now includes `description` and `tags`.
+- **`apps/studio`**: `Profile` type updated; `ClusterPicker` dropdown renders colour-coded `ProfileTag` badges per tag; Settings page adds a Tags column and shows description as a subtitle under the profile name; new `ProfileTag` component (`prod` = danger/red, `stage` = warn/yellow, `dev` = success/green, custom = muted).
+- **`apps/cli`**: `profile create` accepts `--description` and `--tags` flags; new `profile meta` subcommand updates description/tags on an existing profile; `profile list` now shows a TAGS column; `profile show` prints description and tags when set.
+
 ## 2026-03-27 — Plugins: editable element name in config panel header
 
 `packages/plugins/src/config-panel/renderer.ts` + `css.ts`:

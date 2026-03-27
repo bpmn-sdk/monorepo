@@ -89,4 +89,6 @@ export interface Profile {
 	apiType?: string
 	baseUrl?: string | null
 	authType?: string
+	description?: string
+	tags?: string[]
 }

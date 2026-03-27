@@ -314,6 +314,8 @@ const server = http.createServer(async (req, res) => {
 			apiType: p.apiType,
 			baseUrl: p.config.baseUrl ?? null,
 			authType: p.config.auth?.type ?? "none",
+			description: p.description,
+			tags: p.tags,
 		}))
 		res.writeHead(200, { "Content-Type": "application/json" })
 		res.end(JSON.stringify(payload))

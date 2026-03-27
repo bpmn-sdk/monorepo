@@ -8,6 +8,7 @@ import {
 	getProfile,
 	listProfiles,
 	saveProfile,
+	setProfileMeta,
 	useProfile,
 } from "@bpmnkit/profiles"
 import type { ApiType } from "@bpmnkit/profiles"
@@ -21,6 +22,21 @@ const API_TYPE_FLAG: FlagSpec = {
 	placeholder: "TYPE",
 	enum: ["c8", "admin"],
 }
+
+const META_FLAGS: FlagSpec[] = [
+	{
+		name: "description",
+		description: "Short description of the profile",
+		type: "string",
+		placeholder: "TEXT",
+	},
+	{
+		name: "tags",
+		description: "Comma-separated tags (predefined: dev, stage, prod)",
+		type: "string",
+		placeholder: "TAGS",
+	},
+]
 
 const AUTH_FLAGS: FlagSpec[] = [
 	{
@@ -205,7 +221,7 @@ export const profileGroup: CommandGroup = {
 			name: "create",
 			description: "Create or update a profile",
 			args: [{ name: "name", description: "Profile name", required: true }],
-			flags: [API_TYPE_FLAG, ...AUTH_FLAGS],
+			flags: [API_TYPE_FLAG, ...AUTH_FLAGS, ...META_FLAGS],
 			examples: [
 				{
 					description: "Bearer token profile",
@@ -232,7 +248,15 @@ export const profileGroup: CommandGroup = {
 				const rawApiType = (ctx.flags["api-type"] as string | undefined) ?? "c8"
 				const apiType: ApiType = rawApiType === "admin" ? "admin" : "c8"
 				const config: CamundaClientInput = { baseUrl, auth }
-				saveProfile(name, config, apiType)
+				const description = ctx.flags.description as string | undefined
+				const tagsRaw = ctx.flags.tags as string | undefined
+				const tags = tagsRaw
+					? tagsRaw
+							.split(",")
+							.map((t) => t.trim())
+							.filter(Boolean)
+					: undefined
+				saveProfile(name, config, apiType, { description, tags })
 				ctx.output.ok(`Profile "${name}" saved [${apiType}] (${getConfigFilePath()})`)
 			},
 		},
@@ -256,6 +280,7 @@ export const profileGroup: CommandGroup = {
 							apiType: p.apiType,
 							baseUrl: p.config.baseUrl ?? "(from env/file)",
 							authType: (p.config.auth as { type?: string } | undefined)?.type ?? "—",
+							tags: p.tags && p.tags.length > 0 ? p.tags.join(", ") : "—",
 						})),
 					},
 					[
@@ -264,6 +289,7 @@ export const profileGroup: CommandGroup = {
 						{ key: "apiType", header: "API" },
 						{ key: "baseUrl", header: "BASE URL", maxWidth: 50 },
 						{ key: "authType", header: "AUTH TYPE" },
+						{ key: "tags", header: "TAGS" },
 					],
 				)
 			},
@@ -307,6 +333,9 @@ export const profileGroup: CommandGroup = {
 				const active = getActiveName()
 				const isActive = profile.name === active
 				ctx.output.info(`Profile: ${profile.name}${isActive ? " (active)" : ""}`)
+				if (profile.description) ctx.output.info(`Description: ${profile.description}`)
+				if (profile.tags && profile.tags.length > 0)
+					ctx.output.info(`Tags: ${profile.tags.join(", ")}`)
 				ctx.output.printItem(profile.config)
 			},
 		},
@@ -348,6 +377,34 @@ export const profileGroup: CommandGroup = {
 				saveProfile(name, config, apiType)
 				ctx.output.ok(`Profile "${name}" imported [${apiType}] (${getConfigFilePath()})`)
 				ctx.output.info(`baseUrl: ${config.baseUrl ?? ""}`)
+			},
+		},
+		{
+			name: "meta",
+			description: "Update description or tags on an existing profile",
+			args: [{ name: "name", description: "Profile name", required: true }],
+			flags: META_FLAGS,
+			examples: [
+				{
+					description: "Set description and tags",
+					command: 'casen profile meta prod --description "Production cluster" --tags prod',
+				},
+			],
+			async run(ctx) {
+				const name = ctx.positional[0]
+				if (!name) throw new Error("Missing required argument: <name>")
+				const description = ctx.flags.description as string | undefined
+				const tagsRaw = ctx.flags.tags as string | undefined
+				const tags = tagsRaw
+					? tagsRaw
+							.split(",")
+							.map((t) => t.trim())
+							.filter(Boolean)
+					: undefined
+				if (!setProfileMeta(name, { description, tags })) {
+					throw new Error(`Profile "${name}" not found.`)
+				}
+				ctx.output.ok(`Profile "${name}" updated`)
 			},
 		},
 		{
