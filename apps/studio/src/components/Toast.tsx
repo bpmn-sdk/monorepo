@@ -16,6 +16,10 @@ export function ToastContainer() {
 				<div
 					key={t.id}
 					className={`flex min-w-64 max-w-sm items-start gap-3 rounded-lg border p-3 shadow-lg ${
+						t.dying
+							? "animate-out fade-out-0 slide-out-to-right-4 duration-200"
+							: "animate-in slide-in-from-right-4 fade-in-0 duration-300"
+					} ${
 						t.type === "success"
 							? "border-success/30 bg-surface text-success"
 							: t.type === "error"

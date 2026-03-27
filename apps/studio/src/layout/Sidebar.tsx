@@ -23,6 +23,7 @@ import {
 	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from "../components/ui/dropdown-menu.js"
+import { navigateWithTransition } from "../lib/transition.js"
 import { useClusterStore } from "../stores/cluster.js"
 import { useModeStore } from "../stores/mode.js"
 import { useUiStore } from "../stores/ui.js"
@@ -252,7 +253,7 @@ export function Sidebar() {
 						<div key={item.path} className={`group relative ${dimmed ? "opacity-40" : ""}`}>
 							<button
 								type="button"
-								onClick={() => navigate(item.path)}
+								onClick={() => navigateWithTransition(item.path, navigate)}
 								aria-label={item.label}
 								aria-current={active ? "page" : undefined}
 								className={`relative flex w-full items-center gap-3 rounded-md h-9 px-2.5 transition-all duration-150 ${

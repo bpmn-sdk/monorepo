@@ -1,5 +1,6 @@
 import { Link } from "wouter"
 import { useClusterStore } from "../stores/cluster.js"
+import { ProfileTag } from "./ProfileTag.js"
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -8,7 +9,6 @@ import {
 	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from "./ui/dropdown-menu.js"
-import { ProfileTag } from "./ProfileTag.js"
 
 export function ClusterPicker() {
 	const { profiles, activeProfile, status, setActiveProfile } = useClusterStore()
@@ -49,7 +49,9 @@ export function ClusterPicker() {
 											●
 										</span>
 									)}
-									<span className={`flex-1 truncate ${p.name === activeProfile ? "font-medium" : ""}`}>
+									<span
+										className={`flex-1 truncate ${p.name === activeProfile ? "font-medium" : ""}`}
+									>
 										{p.name}
 									</span>
 								</div>

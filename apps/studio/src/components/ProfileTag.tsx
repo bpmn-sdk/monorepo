@@ -9,7 +9,9 @@ export function ProfileTag({ tag }: { tag: string }) {
 					? "bg-success/15 text-success"
 					: "bg-surface-2 text-muted"
 	return (
-		<span className={`inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-medium leading-none ${cls}`}>
+		<span
+			className={`inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-medium leading-none ${cls}`}
+		>
 			{tag}
 		</span>
 	)

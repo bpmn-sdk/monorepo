@@ -2,6 +2,7 @@ import * as DialogPrimitive from "@radix-ui/react-dialog"
 import { ChevronLeft, Search, Sparkles } from "lucide-react"
 import { useEffect, useRef, useState } from "preact/hooks"
 import { useLocation } from "wouter"
+import { navigateWithTransition } from "../lib/transition.js"
 import type { ContextCommand } from "../stores/ui.js"
 import { useUiStore } from "../stores/ui.js"
 
@@ -98,7 +99,7 @@ export function CommandPalette({ onNavigate }: CommandPaletteProps) {
 	const inputRef = useRef<HTMLInputElement>(null)
 	const listRef = useRef<HTMLDivElement>(null)
 
-	const nav = onNavigate ?? navigate
+	const nav = onNavigate ?? ((path: string) => navigateWithTransition(path, navigate))
 
 	const staticItems: CommandItem[] = [
 		{ id: "dash", label: "Go to Dashboard", group: "Navigation", action: () => nav("/") },
@@ -280,13 +281,13 @@ export function CommandPalette({ onNavigate }: CommandPaletteProps) {
 		>
 			<DialogPrimitive.Portal>
 				{/* Backdrop */}
-				<DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/50 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
+				<DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 duration-200" />
 
 				{/* Panel — positioned at ~16 % from top, like Raycast/Linear */}
 				<DialogPrimitive.Content
 					onKeyDown={handleKeyDown}
 					aria-label="Command palette"
-					className="fixed left-1/2 top-[16%] z-50 w-[calc(100%-2rem)] max-w-[620px] -translate-x-1/2 rounded-xl border border-border bg-surface shadow-2xl ring-1 ring-black/5 focus:outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=open]:slide-in-from-top-2"
+					className="fixed left-1/2 top-[16%] z-50 w-[calc(100%-2rem)] max-w-[620px] -translate-x-1/2 rounded-xl border border-border bg-surface shadow-2xl ring-1 ring-black/5 focus:outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=open]:slide-in-from-top-4 data-[state=closed]:slide-out-to-top-2 duration-200"
 				>
 					<DialogPrimitive.Title className="sr-only">Command Palette</DialogPrimitive.Title>
 					<DialogPrimitive.Description className="sr-only">

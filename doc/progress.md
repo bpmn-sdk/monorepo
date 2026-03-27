@@ -1,5 +1,53 @@
 # Progress
 
+## 2026-03-27 — Studio: motion & view transitions
+
+Added animations throughout the Studio app — previously all `animate-in`/`fade-in-0`/`slide-in-from-*` Tailwind classes were dead code because `tailwindcss-animate` was not installed.
+
+**Animation utilities** (`apps/studio/src/styles/globals.css`):
+- Implemented the `animate-in`/`animate-out` pattern directly via Tailwind v4 `@utility` directives and `@keyframes enter`/`exit`, using CSS variables (`--tw-enter-opacity`, `--tw-enter-scale`, `--tw-enter-translate-*`, etc.) so utilities compose freely.
+- Animation duration driven by `--tw-duration` (set by `duration-*` classes), so `animate-in slide-in-from-bottom-2 duration-300` now actually controls timing.
+- All existing `fade-in-0`, `zoom-in-95`, `slide-in-from-top-*`, `slide-out-to-*` classes now produce real CSS.
+
+**View Transitions API** (`apps/studio/src/lib/transition.ts` + Shell.tsx + Sidebar.tsx + CommandPalette.tsx):
+- New `navigateWithTransition(path, navigate)` utility wraps navigation in `document.startViewTransition()` with `flushSync` for synchronous Preact state updates.
+- Shell.tsx captures all internal `<a>` link clicks in the capture phase, prevents wouter's double-navigation, and runs them through `navigateWithTransition`.
+- Shell.tsx keyboard `g+letter` shortcuts and Sidebar.tsx nav buttons also use `navigateWithTransition`.
+- CommandPalette navigation actions use `navigateWithTransition` via the wrapped `nav` function.
+- Page cross-fade: old content fades up and out (100ms), new content fades up from below (220ms). Respects `prefers-reduced-motion`.
+
+**AIDrawer** (`apps/studio/src/layout/AIDrawer.tsx`):
+- Fixed broken animation: `hidden` class was killing the CSS transition entirely. Replaced with `max-width: 0 → max-width: 280px` transition with `overflow-hidden`. Inner div maintains fixed 280px width so content never reflows. `pointer-events-none` prevents interaction when closed.
+
+**Toast** (`apps/studio/src/components/Toast.tsx` + `stores/toast.ts`):
+- Added `dying` state to `ToastMessage`. When `removeToast` is called or the 5s auto-remove fires, the toast is first marked `dying: true` (triggering `animate-out slide-out-to-right-4 fade-out-0`), then removed from the array after the animation completes (220ms).
+- Toast entrance: `animate-in slide-in-from-right-4 fade-in-0 duration-300`.
+
+**CommandPalette** (`apps/studio/src/components/CommandPalette.tsx`):
+- Backdrop now uses `backdrop-blur-sm` for a frosted-glass effect.
+- Panel entrance: `slide-in-from-top-4` (more dramatic, was `slide-in-from-top-2`).
+- Panel exit: `slide-out-to-top-2 zoom-out-95 fade-out-0` — previously had no slide direction on close.
+- Both overlay and content now use `duration-200`.
+
+## 2026-03-27 — Studio: Dashboard redesign
+
+Complete rewrite of `apps/studio/src/pages/Dashboard.tsx`:
+
+- **`StatusHeader`**: Profile name + animated status dot + `ProfileTag` badges + "Updated X ago" (ticks every 10s) + Refresh/Retry button.
+- **`IncidentBanner`**: Full-width red dismissible banner when active incidents > 0; re-surfaces automatically when the count rises.
+- **`OfflinePanel`**: Replaces the card grid when the proxy is unreachable; shows `pnpm proxy` command, Settings link, and retry button.
+- **`GettingStarted`**: 3-step onboarding strip (Create model → Deploy → Start instance); shown only on empty connected clusters.
+- **`StatCard` live-alert dot**: Pinging `animate-ping` + `animate-pulse` red dot on cards in danger state.
+- **Improved empty states**: All list panels (instances, definitions, local models) show contextual CTA links.
+- **Removed `AiChat`**: Inline chat removed — redundant with the global AI Drawer (⌘J).
+
+## 2026-03-27 — Studio + plugins: zen mode (distraction-free presentation)
+
+- **`packages/plugins/src/presentation/index.ts`**: Added `onEnter`/`onExit` callbacks to `PresentationOptions`; CSS hides `#hud-top-center` and `#hud-bottom-center` inside `.bpmnkit-pres-fullscreen`; command palette entry kept as "Start Presentation Mode".
+- **`apps/studio/src/stores/ui.ts`**: Added `zenMode` boolean + `enterZenMode()`/`exitZenMode()` actions.
+- **`apps/studio/src/layout/Shell.tsx`**: `TopBar`, `Sidebar`, and `AIDrawer` are hidden when `zenMode` is true.
+- **`apps/studio/src/pages/ModelDetail.tsx`**: Presentation plugin `onEnter` hides the SideDock and calls `enterZenMode()`; `onExit` restores them; save bar hidden during zen mode.
+
 ## 2026-03-27 — Profile enrichment: description and tags
 
 Added optional `description` and `tags` fields to profiles across the full stack:

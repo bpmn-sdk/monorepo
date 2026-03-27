@@ -6,7 +6,7 @@ A unified Preact web application replacing fragmented Camunda tooling (Modeler, 
 
 - **Shell**: 3-column layout (Sidebar / main content / AI Drawer), theme switching (light/dark/neon), developer/operator mode toggle that reorders sidebar navigation.
 - **Cluster connection**: proxy-based (localhost:3033), profile selection via `ClusterPicker` dropdown, `x-profile` header on all requests.
-- **Dashboard**: stat cards (running instances, incidents, tasks, definitions), recent activity lists, auto-refresh every 15s.
+- **Dashboard**: `StatusHeader` (profile, status dot, tags, last-updated ticker, refresh button), `IncidentBanner` (dismissible full-width alert), `OfflinePanel` (proxy-down replacement), `GettingStarted` strip (3-step onboarding for empty clusters), stat cards with pinging live-alert dot, improved empty states with CTAs, sparkline time-series, auto-refresh every 15s.
 - **Models**: local BPMN/DMN/Form files stored in IndexedDB. Grid and list views, `DiagramPreview` via offscreen BpmnCanvas + IntersectionObserver, create/import/delete with confirmation dialogs.
 - **Model Editor**: full-height `BpmnEditor`, 2-second debounced auto-save, ⌘S immediate save, deployed-versions sidebar panel.
 - **Definitions**: searchable/filterable table of deployed process definitions; detail page with BpmnCanvas + token-highlight + metadata sidebar.
@@ -15,7 +15,8 @@ A unified Preact web application replacing fragmented Camunda tooling (Modeler, 
 - **User Tasks**: filterable table with overdue highlighting, detail page with form rendering via `@bpmnkit/plugins/form-viewer`, claim/unclaim/complete actions.
 - **Decisions**: browsable DMN decision table list and detail view.
 - **AI Drawer**: context-aware chat via proxy SSE streaming endpoint, persists conversation in-session.
-- **Command Palette**: ⌘K dialog with arrow-key navigation, navigation shortcuts, AI trigger.
+- **Command Palette**: ⌘K dialog with arrow-key navigation, fuzzy word-prefix matching, match highlighting, styled `<kbd>` shortcuts, footer hint bar.
+- **Zen / Presentation Mode**: ⌘K → "Start Presentation Mode" hides all Studio chrome (TopBar, Sidebar, AI Drawer, save bar, editor HUD toolbars) for a distraction-free BPMN view.
 - **`@bpmnkit/user-tasks`**: standalone vanilla TS widget (`createUserTaskWidget`) for embedding task completion forms in any host page.
 
 ## Hot Reload Live Mode (2026-03-22) — `packages/plugins/live-mode`
