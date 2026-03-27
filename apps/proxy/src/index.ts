@@ -986,6 +986,50 @@ const server = http.createServer(async (req, res) => {
 		return
 	}
 
+	// ── POST /http-request — CORS bypass for wasm worker REST connectors ─────
+	if (url.pathname === "/http-request" && req.method === "POST") {
+		const body = await readBody(req)
+		let targetUrl: string
+		let method: string
+		let headers: Record<string, string>
+		let reqBody: string | undefined
+		try {
+			const parsed = JSON.parse(body) as {
+				url: string
+				method?: string
+				headers?: Record<string, string>
+				body?: string
+			}
+			targetUrl = parsed.url
+			method = (parsed.method ?? "GET").toUpperCase()
+			headers = parsed.headers ?? {}
+			reqBody = parsed.body
+		} catch {
+			res.writeHead(400, { "Content-Type": "application/json" })
+			res.end(JSON.stringify({ error: "Invalid JSON body" }))
+			return
+		}
+		console.log(`[http-request] ${method} ${targetUrl}`)
+		try {
+			const upstream = await fetch(targetUrl, {
+				method,
+				headers,
+				body: method !== "GET" && method !== "HEAD" ? reqBody : undefined,
+			})
+			const responseText = await upstream.text()
+			const contentType = upstream.headers.get("content-type") ?? "application/json"
+			res.writeHead(upstream.status, {
+				"Content-Type": contentType,
+				"Access-Control-Allow-Origin": "*",
+			})
+			res.end(responseText)
+		} catch (err) {
+			res.writeHead(502, { "Content-Type": "application/json" })
+			res.end(JSON.stringify({ error: `Upstream unreachable: ${String(err)}` }))
+		}
+		return
+	}
+
 	res.writeHead(404)
 	res.end("Not Found")
 })

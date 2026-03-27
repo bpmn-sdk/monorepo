@@ -851,6 +851,13 @@ impl BpmnElementProcessor {
                                 for v in vars {
                                     ctx_map.insert(v.name, v.value);
                                 }
+                                // Merge job-returned variables from the COMPLETE_ELEMENT payload so
+                                // that output mappings like `=response.body.id` can reference them.
+                                if let Some(job_vars) = payload.get("variables").and_then(|v| v.as_object()) {
+                                    for (k, v) in job_vars {
+                                        ctx_map.insert(k.clone(), v.clone());
+                                    }
+                                }
                                 let ctx_val = serde_json::Value::Object(ctx_map);
                                 let ctx = reebe_feel::FeelContext::from_json(ctx_val);
 

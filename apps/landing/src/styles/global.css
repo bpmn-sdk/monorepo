@@ -232,12 +232,14 @@ a:hover {
 	gap: 2px;
 	transform: translateY(-6px);
 	opacity: 0;
+	pointer-events: none;
 	transition: transform 0.2s ease, opacity 0.2s ease;
 }
 
 .nav-mobile-menu.open {
 	transform: translateY(0);
 	opacity: 1;
+	pointer-events: auto;
 }
 
 .nav-mobile-link {
@@ -995,7 +997,7 @@ a:hover {
 	margin: 0 auto;
 	cursor: col-resize;
 	user-select: none;
-	touch-action: pan-y;
+	touch-action: none;
 }
 
 /* Inner wrapper clips the panels but NOT the divider knob.

@@ -1,5 +1,47 @@
 # Progress
 
+## 2026-03-27 — Studio: run mode (Deploy & Run) for reebe-wasm
+
+Added a fast feedback loop for the reebe-wasm profile in the model editor:
+
+- **`apps/studio/src/storage/types.ts`**: Added `runVariables?: string` field to `ModelFile` — persisted JSON string for instance start variables, stored in IndexedDB alongside the model.
+
+- **`apps/studio/src/pages/InstanceDetail.tsx`**: Exported `WasmInstanceDetail` (was previously unexported). Added `initialVariables`, `onVariablesChange`, and `hideNavLink` props so it can be embedded inside ModelDetail's run mode view.
+
+- **`apps/studio/src/pages/ModelDetail.tsx`**:
+  - When `activeProfile === "reebe-wasm"`, the save bar shows two right-aligned buttons: **Deploy** (deploys the current XML) and **Deploy & Run** (saves → deploys → starts a new instance → enters run mode).
+  - Run mode: hides the editor container (stays mounted to avoid destroy/recreate) and shows `WasmInstanceDetail` with a live token-highlight canvas and variable/incident panels. The dock is hidden in run mode.
+  - **← Edit** button in the save bar exits run mode and returns to the editor.
+  - `runVariables` are persisted in IndexedDB with a 1-second debounce when changed inside the run mode sidebar.
+
+## 2026-03-27 — Studio: canvas zoom, instance sidebar, editor deploy UX
+
+Three UX improvements to apps/studio:
+
+**Canvas zoom at 100%** — `apps/studio/src/pages/InstanceDetail.tsx`: Changed `fit: "contain"` to `fit: "center"` on the BpmnCanvas in `WasmInstanceDetail`. `"contain"` scales the diagram down to fill the viewport; `"center"` renders at 100% zoom and centers the diagram. (The editor in ModelDetail already used `"center"`.)
+
+**Instance view sidebar** — `apps/studio/src/pages/InstanceDetail.tsx`:
+- Variables now render inside a consistent bordered table panel (same structure as incidents), with an "No variables" empty row instead of bare text outside the panel.
+- Added a "Start new instance" section (bordered card with variables JSON textarea + Start button) that calls `useCreateProcessInstance` with the current instance's `processDefinitionKey`. On success, shows a link to the new instance.
+
+**Editor deploy pane** — `apps/studio/src/pages/ModelDetail.tsx` (`StudioDeployPane`):
+- When the model is already deployed (definitions query returns results), shows a `Deployed — vN` badge in green and changes the button label to "Re-deploy".
+- Added a "Start instance" card below the deploy button (only visible when deployed) with a variables textarea and Start button, identical in UX to DefinitionDetail's start panel. Uses the latest deployed version's `processDefinitionKey`.
+
+## 2026-03-27 — reebe-wasm: embedded worker with REST connector execution
+
+Implemented an in-browser Zeebe worker so the wasm engine automatically handles service tasks and executes real HTTP for REST connectors (`io.camunda:http-json:1`):
+
+- **`apps/reebe/crates/reebe-engine/src/processor/bpmn_element.rs`**: Fixed output mapping Bug 1 — the `complete_element` handler now merges job-returned variables from the `COMPLETE_ELEMENT` payload into the FEEL context before evaluating output mappings. Previously, expressions like `=response.body.id` always failed because the job result variables were not in scope. Rebuilt wasm binary.
+- **`apps/studio/src/api/wasm-adapter.ts`**:
+  - Expanded `WasmJob` interface with `element_instance_key`, `element_id`, `custom_headers`.
+  - Expanded `WasmVariable` interface with `scope_key` to enable filtering by element-instance scope.
+  - Added `JobResult` tracking (`Map<number, JobResult>`) and exported `getJobResults(processInstanceKey?)` for the UI.
+  - Added `pollJobs()` — after each timer tick, polls all ACTIVATABLE jobs and auto-handles them: generic service tasks are auto-completed with `{}`; `io.camunda:http-json:1` jobs extract connector inputs from element-scoped variables (`url`, `method`, `headers`, `body`, `authentication`) and execute real HTTP. Three-tier fallback: (1) direct browser fetch, (2) proxy CORS bypass, (3) default empty response.
+  - Converted `tickEngine` to async (`tickEngineAsync`) so it awaits `pollJobs()` before invalidating TanStack Query caches — jobs are always handled before the UI refreshes.
+- **`apps/proxy/src/index.ts`**: Added `POST /http-request` route — accepts `{ url, method, headers, body }`, proxies to the target URL server-side (bypasses browser CORS restrictions), and returns the upstream response with `Access-Control-Allow-Origin: *`.
+- **`apps/studio/src/pages/InstanceDetail.tsx`**: In `WasmInstanceDetail`, added a "Simulation mode" info banner and a "Job executions" table showing per-job result badges (Simulated / REST 200 / REST error) sourced from `getJobResults()`.
+
 ## 2026-03-26 — Fix: reebe-wasm timer events firing immediately instead of after duration
 
 - **`apps/reebe/crates/reebe-engine/src/processor/bpmn_element.rs`**: `eval_timer_due_date()` uses `reebe_feel::parse_and_evaluate()` for the `duration("PT1M")` fallback path, but `parse_and_evaluate()` treats any expression without a leading `=` as a literal string — returning `Ok(String("duration(\"PT1M\")"))` instead of evaluating it. Since neither path matched `FeelValue::Duration`, the fallback triggered (`due_date = now`), making every timer fire immediately. Fixed by switching the fallback path to `reebe_feel::evaluate()`, which always runs the FEEL evaluator. Rebuilt wasm binary.

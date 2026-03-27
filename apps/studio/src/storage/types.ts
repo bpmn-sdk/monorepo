@@ -4,6 +4,8 @@ export interface ModelFile {
 	type: "bpmn" | "dmn" | "form"
 	content: string
 	processDefinitionId?: string
+	/** Persisted JSON string of variables used when starting new instances. */
+	runVariables?: string
 	createdAt: number
 	updatedAt: number
 	tags?: string[]
