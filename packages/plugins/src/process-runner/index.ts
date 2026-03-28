@@ -85,6 +85,12 @@ export interface ProcessRunnerOptions {
 	 */
 	runScenario?: (scenario: ScenarioLike) => Promise<ScenarioResultLike>
 	/**
+	 * Container element for the tests panel (e.g. dock.testsPane).
+	 * When provided, the Tests UI is mounted here instead of as a sub-tab
+	 * inside the play panel.
+	 */
+	testsContainer?: HTMLElement
+	/**
 	 * Called on diagram load to check for a companion .bpmn.tests.json sidecar.
 	 * Return parsed scenarios, or null if no sidecar exists.
 	 */
@@ -99,6 +105,13 @@ export interface ProcessRunnerOptions {
 	 * Used to map chaos injections to scenario mocks for export.
 	 */
 	getJobType?: (elementId: string) => string | null
+	/**
+	 * Returns the current BPMN definitions. When provided, the Tests editor
+	 * auto-populates task mocks from the diagram.
+	 */
+	getDefinitions?: () => {
+		processes: Array<{ flowElements: Array<{ id: string; name?: string; type: string }> }>
+	} | null
 }
 
 // ── IndexedDB persistence for input variables ───────────────────────────────
@@ -293,6 +306,13 @@ export function createProcessRunnerPlugin(
 	/** Input variables configured by the user (persisted in IndexedDB). */
 	const inputVars: Array<{ name: string; value: string }> = []
 
+	/** Which scenario is open in the editor (null = list view). */
+	let editingScenarioId: string | null = null
+	/** Element ID last clicked in the canvas while editing a scenario. */
+	let focusedElementId: string | null = null
+
+	const MOCKABLE_TASK_TYPES = new Set(["serviceTask", "sendTask", "businessRuleTask", "userTask"])
+
 	const toolbarEl = document.createElement("div")
 	toolbarEl.className = "bpmnkit-runner-toolbar"
 
@@ -324,13 +344,14 @@ export function createProcessRunnerPlugin(
 	const feelTabBtn = makeTabBtn("FEEL", false)
 	const errorsTabBtn = makeTabBtn("Errors", false)
 	const inputTabBtn = makeTabBtn("Input", false)
-	const testsTabBtn = makeTabBtn("Tests", false)
+	// Tests sub-tab only shown when there is no dedicated testsContainer
+	const testsTabBtn = options.testsContainer === undefined ? makeTabBtn("Tests", false) : null
 
 	playTabBarEl.appendChild(varTabBtn)
 	playTabBarEl.appendChild(feelTabBtn)
 	playTabBarEl.appendChild(errorsTabBtn)
 	playTabBarEl.appendChild(inputTabBtn)
-	playTabBarEl.appendChild(testsTabBtn)
+	if (testsTabBtn !== null) playTabBarEl.appendChild(testsTabBtn)
 
 	function makePaneEl(hidden: boolean): HTMLDivElement {
 		const d = document.createElement("div")
@@ -382,26 +403,35 @@ export function createProcessRunnerPlugin(
 	playPanelEl.appendChild(feelPaneEl)
 	playPanelEl.appendChild(errorsPaneEl)
 	playPanelEl.appendChild(ivarsPaneEl)
-	playPanelEl.appendChild(testsPaneEl)
+	// Mount tests pane into dedicated container when provided, otherwise keep as sub-tab
+	if (options.testsContainer !== undefined) {
+		testsPaneEl.classList.remove("bpmnkit-runner-play-pane--hidden")
+		options.testsContainer.appendChild(testsPaneEl)
+	} else {
+		playPanelEl.appendChild(testsPaneEl)
+	}
 
 	function switchPlayTab(tab: "variables" | "feel" | "errors" | "input" | "tests"): void {
 		varTabBtn.classList.toggle("bpmnkit-runner-play-tab--active", tab === "variables")
 		feelTabBtn.classList.toggle("bpmnkit-runner-play-tab--active", tab === "feel")
 		errorsTabBtn.classList.toggle("bpmnkit-runner-play-tab--active", tab === "errors")
 		inputTabBtn.classList.toggle("bpmnkit-runner-play-tab--active", tab === "input")
-		testsTabBtn.classList.toggle("bpmnkit-runner-play-tab--active", tab === "tests")
+		testsTabBtn?.classList.toggle("bpmnkit-runner-play-tab--active", tab === "tests")
 		varsPaneEl.classList.toggle("bpmnkit-runner-play-pane--hidden", tab !== "variables")
 		feelPaneEl.classList.toggle("bpmnkit-runner-play-pane--hidden", tab !== "feel")
 		errorsPaneEl.classList.toggle("bpmnkit-runner-play-pane--hidden", tab !== "errors")
 		ivarsPaneEl.classList.toggle("bpmnkit-runner-play-pane--hidden", tab !== "input")
-		testsPaneEl.classList.toggle("bpmnkit-runner-play-pane--hidden", tab !== "tests")
+		// testsPaneEl lives in the dock when testsContainer is set — don't hide/show it here
+		if (options.testsContainer === undefined) {
+			testsPaneEl.classList.toggle("bpmnkit-runner-play-pane--hidden", tab !== "tests")
+		}
 	}
 
 	varTabBtn.addEventListener("click", () => switchPlayTab("variables"))
 	feelTabBtn.addEventListener("click", () => switchPlayTab("feel"))
 	errorsTabBtn.addEventListener("click", () => switchPlayTab("errors"))
 	inputTabBtn.addEventListener("click", () => switchPlayTab("input"))
-	testsTabBtn.addEventListener("click", () => switchPlayTab("tests"))
+	testsTabBtn?.addEventListener("click", () => switchPlayTab("tests"))
 
 	// ── Time-travel helpers ─────────────────────────────────────────────────
 
@@ -710,12 +740,130 @@ export function createProcessRunnerPlugin(
 		ivarsPaneEl.appendChild(addBtn)
 	}
 
+	// ── Tests helpers ─────────────────────────────────────────────────────────
+
+	function parseVarValue(str: string): unknown {
+		const t = str.trim()
+		if (!t) return ""
+		try {
+			return JSON.parse(t)
+		} catch {
+			return t
+		}
+	}
+
+	function formatVarValue(val: unknown): string {
+		return typeof val === "string" ? val : JSON.stringify(val)
+	}
+
+	function makeSectionTitle(text: string): HTMLDivElement {
+		const el = document.createElement("div")
+		el.className = "bpmnkit-runner-tests-section-title"
+		el.textContent = text
+		return el
+	}
+
+	/** Renders a key=value editor widget. Calls onUpdate whenever entries change. */
+	function makeVarList(
+		vars: Record<string, unknown>,
+		addLabel: string,
+		onUpdate: (record: Record<string, unknown>) => void,
+	): HTMLElement {
+		const wrap = document.createElement("div")
+		wrap.className = "bpmnkit-runner-tests-varlist"
+		const entries: Array<{ key: string; val: string }> = Object.entries(vars).map(([k, v]) => ({
+			key: k,
+			val: formatVarValue(v),
+		}))
+
+		function save(): void {
+			const r: Record<string, unknown> = {}
+			for (const e of entries) {
+				if (e.key.trim()) r[e.key.trim()] = parseVarValue(e.val)
+			}
+			onUpdate(r)
+		}
+
+		function renderList(): void {
+			clearEl(wrap)
+			for (let i = 0; i < entries.length; i++) {
+				const entry = entries[i]
+				if (entry === undefined) continue
+				const row = document.createElement("div")
+				row.className = "bpmnkit-runner-play-ivar-row"
+
+				const nameInput = document.createElement("input")
+				nameInput.className = "bpmnkit-runner-play-ivar-name"
+				nameInput.placeholder = "name"
+				nameInput.value = entry.key
+				nameInput.addEventListener("input", () => {
+					if (entries[i] !== undefined) {
+						;(entries[i] as { key: string; val: string }).key = nameInput.value
+						save()
+					}
+				})
+
+				const eq = document.createElement("span")
+				eq.className = "bpmnkit-runner-play-ivar-eq"
+				eq.textContent = "="
+
+				const valInput = document.createElement("input")
+				valInput.className = "bpmnkit-runner-play-ivar-value"
+				valInput.placeholder = "value"
+				valInput.value = entry.val
+				valInput.addEventListener("input", () => {
+					if (entries[i] !== undefined) {
+						;(entries[i] as { key: string; val: string }).val = valInput.value
+						save()
+					}
+				})
+
+				const del = document.createElement("button")
+				del.className = "bpmnkit-runner-play-ivar-del"
+				del.textContent = "\u00D7"
+				del.addEventListener("click", () => {
+					entries.splice(i, 1)
+					renderList()
+					save()
+				})
+
+				row.appendChild(nameInput)
+				row.appendChild(eq)
+				row.appendChild(valInput)
+				row.appendChild(del)
+				wrap.appendChild(row)
+			}
+
+			const addBtn = document.createElement("button")
+			addBtn.className = "bpmnkit-runner-play-ivar-add"
+			addBtn.textContent = addLabel
+			addBtn.addEventListener("click", () => {
+				entries.push({ key: "", val: "" })
+				renderList()
+				const inputs = wrap.querySelectorAll<HTMLInputElement>(".bpmnkit-runner-play-ivar-name")
+				inputs[inputs.length - 1]?.focus()
+			})
+			wrap.appendChild(addBtn)
+		}
+
+		renderList()
+		return wrap
+	}
+
 	// ── Tests tab ────────────────────────────────────────────────────────────
 
 	const scenarios: ScenarioLike[] = []
 	const scenarioResults = new Map<string, ScenarioResultLike>()
 
 	function renderTests(): void {
+		if (editingScenarioId !== null) {
+			renderScenarioEditor()
+		} else {
+			renderScenarioList()
+		}
+	}
+
+	function renderScenarioList(): void {
 		clearEl(testsPaneEl)
 
 		if (options.runScenario === undefined) {
@@ -723,7 +871,7 @@ export function createProcessRunnerPlugin(
 			return
 		}
 
-		// Run all button
+		// Header
 		const headerEl = document.createElement("div")
 		headerEl.className = "bpmnkit-runner-tests-header"
 
@@ -745,7 +893,7 @@ export function createProcessRunnerPlugin(
 
 		const addBtn = document.createElement("button")
 		addBtn.className = "bpmnkit-runner-btn bpmnkit-runner-tests-add"
-		addBtn.textContent = "+ New scenario"
+		addBtn.textContent = "+ New"
 		addBtn.addEventListener("click", () => {
 			const id = `scenario-${Date.now()}`
 			scenarios.push({
@@ -756,11 +904,12 @@ export function createProcessRunnerPlugin(
 				expect: {},
 			})
 			void saveScenarios(currentProjectId, scenarios)
+			editingScenarioId = id
+			focusedElementId = null
 			renderTests()
 		})
 		headerEl.appendChild(addBtn)
 
-		// AI generate scenarios button
 		if (options.generateScenarios !== undefined) {
 			const genBtn = document.createElement("button")
 			genBtn.className = "bpmnkit-runner-btn bpmnkit-runner-tests-gen"
@@ -780,7 +929,6 @@ export function createProcessRunnerPlugin(
 			headerEl.appendChild(genBtn)
 		}
 
-		// Import chaos findings as draft scenarios
 		if (lastChaosInjections.length > 0 && options.getJobType !== undefined) {
 			const importChaosBtn = document.createElement("button")
 			importChaosBtn.className = "bpmnkit-runner-btn bpmnkit-runner-tests-chaos-import"
@@ -812,7 +960,7 @@ export function createProcessRunnerPlugin(
 		testsPaneEl.appendChild(headerEl)
 
 		if (scenarios.length === 0) {
-			testsPaneEl.appendChild(emptyEl("No test scenarios yet. Click + New scenario."))
+			testsPaneEl.appendChild(emptyEl("No test scenarios yet. Click + New."))
 			return
 		}
 
@@ -833,14 +981,18 @@ export function createProcessRunnerPlugin(
 			statusEl.className = "bpmnkit-runner-tests-status"
 			statusEl.textContent = result === undefined ? "\u25CB" : result.passed ? "\u2713" : "\u2717"
 
-			const nameInput = document.createElement("input")
-			nameInput.className = "bpmnkit-runner-tests-name"
-			nameInput.value = scenario.name
-			nameInput.addEventListener("input", () => {
-				if (scenarios[i] !== undefined) {
-					;(scenarios[i] as ScenarioLike).name = nameInput.value
-					void saveScenarios(currentProjectId, scenarios)
-				}
+			const nameEl = document.createElement("span")
+			nameEl.className = "bpmnkit-runner-tests-name-label"
+			nameEl.textContent = scenario.name
+
+			const editBtn = document.createElement("button")
+			editBtn.className = "bpmnkit-runner-btn bpmnkit-runner-tests-edit"
+			editBtn.textContent = "\u270E"
+			editBtn.title = "Edit scenario"
+			editBtn.addEventListener("click", () => {
+				editingScenarioId = scenario.id
+				focusedElementId = null
+				renderTests()
 			})
 
 			const runOneBtn = document.createElement("button")
@@ -868,12 +1020,13 @@ export function createProcessRunnerPlugin(
 			})
 
 			rowEl.appendChild(statusEl)
-			rowEl.appendChild(nameInput)
+			rowEl.appendChild(nameEl)
+			rowEl.appendChild(editBtn)
 			rowEl.appendChild(runOneBtn)
 			rowEl.appendChild(delBtn)
 			testsPaneEl.appendChild(rowEl)
 
-			// Expandable diff on failure
+			// Failure diff
 			if (result !== undefined && !result.passed) {
 				const diffEl = document.createElement("div")
 				diffEl.className = "bpmnkit-runner-tests-diff"
@@ -891,6 +1044,198 @@ export function createProcessRunnerPlugin(
 				}
 				testsPaneEl.appendChild(diffEl)
 			}
+		}
+	}
+
+	function renderScenarioEditor(): void {
+		clearEl(testsPaneEl)
+
+		const scenario = scenarios.find((s) => s.id === editingScenarioId)
+		if (scenario === undefined) {
+			editingScenarioId = null
+			renderScenarioList()
+			return
+		}
+
+		const result = scenarioResults.get(scenario.id)
+
+		// ── Editor header ───────────────────────────────────────────────────────
+		const headerEl = document.createElement("div")
+		headerEl.className = "bpmnkit-runner-tests-editor-header"
+
+		const backBtn = document.createElement("button")
+		backBtn.className = "bpmnkit-runner-btn bpmnkit-runner-tests-back"
+		backBtn.textContent = "\u2190 Back"
+		backBtn.addEventListener("click", () => {
+			editingScenarioId = null
+			focusedElementId = null
+			renderTests()
+		})
+		headerEl.appendChild(backBtn)
+
+		const nameInput = document.createElement("input")
+		nameInput.className = "bpmnkit-runner-tests-editor-name"
+		nameInput.value = scenario.name
+		nameInput.placeholder = "Scenario name"
+		nameInput.addEventListener("input", () => {
+			scenario.name = nameInput.value
+			void saveScenarios(currentProjectId, scenarios)
+		})
+		headerEl.appendChild(nameInput)
+
+		const runBtn = document.createElement("button")
+		runBtn.className = "bpmnkit-runner-btn bpmnkit-runner-tests-run-one"
+		runBtn.textContent = "\u25B6 Run"
+		runBtn.title = "Run this scenario"
+		if (options.runScenario !== undefined) {
+			runBtn.addEventListener("click", () => {
+				runBtn.disabled = true
+				void (options.runScenario as NonNullable<typeof options.runScenario>)(scenario).then(
+					(r) => {
+						scenarioResults.set(scenario.id, r)
+						renderTests()
+					},
+				)
+			})
+		} else {
+			runBtn.disabled = true
+		}
+		headerEl.appendChild(runBtn)
+
+		if (result !== undefined) {
+			const badge = document.createElement("span")
+			badge.className = `bpmnkit-runner-tests-editor-badge ${result.passed ? "bpmnkit-runner-tests-editor-badge--pass" : "bpmnkit-runner-tests-editor-badge--fail"}`
+			badge.textContent = result.passed ? "\u2713 passed" : "\u2717 failed"
+			headerEl.appendChild(badge)
+		}
+
+		testsPaneEl.appendChild(headerEl)
+
+		// ── Start Variables ──────────────────────────────────────────────────────
+		testsPaneEl.appendChild(makeSectionTitle("Start Variables"))
+		testsPaneEl.appendChild(
+			makeVarList(scenario.inputs ?? {}, "+ Add variable", (updated) => {
+				scenario.inputs = updated
+				void saveScenarios(currentProjectId, scenarios)
+			}),
+		)
+
+		// ── Task Mocks ──────────────────────────────────────────────────────────
+		const defs = options.getDefinitions?.() ?? null
+		const mockableTasks =
+			defs?.processes.flatMap((p) =>
+				p.flowElements.filter((e) => MOCKABLE_TASK_TYPES.has(e.type)),
+			) ?? []
+
+		if (mockableTasks.length > 0) {
+			testsPaneEl.appendChild(makeSectionTitle("Task Outputs"))
+
+			const hintEl = document.createElement("div")
+			hintEl.className = "bpmnkit-runner-tests-hint"
+			hintEl.textContent = "Click a task in the diagram to configure its mock output."
+			testsPaneEl.appendChild(hintEl)
+
+			for (const task of mockableTasks) {
+				const jobType = options.getJobType?.(task.id) ?? task.id
+				const mock = scenario.mocks?.[jobType] ?? {}
+				const isFocused = focusedElementId === task.id
+
+				const taskEl = document.createElement("div")
+				taskEl.className = `bpmnkit-runner-tests-task${isFocused ? " bpmnkit-runner-tests-task--focused" : ""}`
+				taskEl.dataset.elementId = task.id
+
+				const taskHeaderEl = document.createElement("div")
+				taskHeaderEl.className = "bpmnkit-runner-tests-task-header"
+
+				const taskNameEl = document.createElement("span")
+				taskNameEl.className = "bpmnkit-runner-tests-task-name"
+				taskNameEl.textContent = task.name ?? task.id
+
+				const typeEl = document.createElement("span")
+				typeEl.className = "bpmnkit-runner-tests-task-badge"
+				typeEl.textContent = task.type.replace("Task", "")
+
+				taskHeaderEl.appendChild(taskNameEl)
+				taskHeaderEl.appendChild(typeEl)
+				taskEl.appendChild(taskHeaderEl)
+
+				// Click header to focus/unfocus
+				taskHeaderEl.addEventListener("click", () => {
+					focusedElementId = isFocused ? null : task.id
+					renderTests()
+				})
+
+				if (isFocused) {
+					const bodyEl = document.createElement("div")
+					bodyEl.className = "bpmnkit-runner-tests-task-body"
+
+					// Output variables
+					bodyEl.appendChild(
+						makeVarList(mock.outputs ?? {}, "+ Add output", (updated) => {
+							if (scenario.mocks === undefined) scenario.mocks = {}
+							scenario.mocks[jobType] = { ...mock, outputs: updated }
+							void saveScenarios(currentProjectId, scenarios)
+						}),
+					)
+
+					// Error field
+					const errorRow = document.createElement("div")
+					errorRow.className = "bpmnkit-runner-tests-error-row"
+
+					const errorLabel = document.createElement("label")
+					errorLabel.className = "bpmnkit-runner-tests-error-label"
+					errorLabel.textContent = "Fail with error:"
+
+					const errorInput = document.createElement("input")
+					errorInput.className = "bpmnkit-runner-tests-error-input"
+					errorInput.placeholder = "error message (leave blank to complete)"
+					errorInput.value = mock.error ?? ""
+					errorInput.addEventListener("input", () => {
+						if (scenario.mocks === undefined) scenario.mocks = {}
+						const err = errorInput.value.trim() || undefined
+						scenario.mocks[jobType] = { ...mock, error: err }
+						void saveScenarios(currentProjectId, scenarios)
+					})
+
+					errorRow.appendChild(errorLabel)
+					errorRow.appendChild(errorInput)
+					bodyEl.appendChild(errorRow)
+
+					taskEl.appendChild(bodyEl)
+				}
+
+				testsPaneEl.appendChild(taskEl)
+			}
+		}
+
+		// ── Expected Variables ──────────────────────────────────────────────────
+		testsPaneEl.appendChild(makeSectionTitle("Expected Variables"))
+		testsPaneEl.appendChild(
+			makeVarList(scenario.expect?.variables ?? {}, "+ Add assertion", (updated) => {
+				if (scenario.expect === undefined) scenario.expect = {}
+				scenario.expect.variables = updated
+				void saveScenarios(currentProjectId, scenarios)
+			}),
+		)
+
+		// ── Failure details ─────────────────────────────────────────────────────
+		if (result !== undefined && !result.passed) {
+			testsPaneEl.appendChild(makeSectionTitle("Last Run Failures"))
+			const diffEl = document.createElement("div")
+			diffEl.className = "bpmnkit-runner-tests-diff"
+			for (const f of result.failures) {
+				const row = document.createElement("div")
+				row.className = "bpmnkit-runner-tests-diff-row"
+				row.textContent = `${f.field}: expected ${JSON.stringify(f.expected)}, got ${JSON.stringify(f.actual)}`
+				diffEl.appendChild(row)
+			}
+			for (const e of result.errors) {
+				const row = document.createElement("div")
+				row.className = "bpmnkit-runner-tests-diff-row bpmnkit-runner-tests-diff-error"
+				row.textContent = `Error${e.elementId !== undefined ? ` (${e.elementId})` : ""}: ${e.message}`
+				diffEl.appendChild(row)
+			}
+			testsPaneEl.appendChild(diffEl)
 		}
 	}
 
@@ -1282,6 +1627,16 @@ export function createProcessRunnerPlugin(
 					currentProcessId = typed.processes?.[0]?.id
 					engine.deploy({ bpmn: defs })
 					if (currentInstance !== null) cleanup()
+				}),
+				onAny("element:click", (evt: unknown) => {
+					if (editingScenarioId === null) return
+					const typed = evt as { element?: { id?: string; type?: string } }
+					const elementId = typed.element?.id
+					if (elementId === undefined) return
+					const elementType = typed.element?.type ?? ""
+					if (!MOCKABLE_TASK_TYPES.has(elementType)) return
+					focusedElementId = focusedElementId === elementId ? null : elementId
+					renderTests()
 				}),
 			)
 		},

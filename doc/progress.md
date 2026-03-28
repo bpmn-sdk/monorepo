@@ -1,5 +1,36 @@
 # Progress
 
+## 2026-03-28 — Visual scenario editor in Tests panel
+
+**`packages/plugins/src/process-runner/index.ts`**:
+- Replaced flat `renderTests()` with a dispatcher: shows list view or scenario editor based on `editingScenarioId`
+- `renderScenarioList()`: scenario rows now show a pencil "Edit" button (✎) that opens the editor; "+ New" immediately opens the new scenario in the editor
+- `renderScenarioEditor()`: full visual editor with:
+  - Header: back button, editable scenario name, run button, pass/fail badge
+  - **Start Variables** — key=value editor for process inputs
+  - **Task Outputs** — auto-populated from `getDefinitions()` option; each mockable task (service/send/businessRule/user) is a collapsible card; click to expand, configure output variables and optional error message; clicking the task element in the canvas also expands it
+  - **Expected Variables** — key=value editor for post-run variable assertions
+  - **Last Run Failures** — diff shown inline when the scenario last failed
+- Canvas `element:click` handler: when a scenario is open, clicking a mockable task element toggles `focusedElementId` and re-renders the editor
+- Added `getDefinitions` option to `ProcessRunnerOptions` for task auto-population
+
+**`packages/plugins/src/process-runner/css.ts`**:
+- Added CSS for scenario editor: header, back button, name input, pass/fail badge, section titles, task cards (normal + focused states), task body, error input row, light theme overrides
+
+**`apps/studio/src/pages/ModelDetail.tsx`**:
+- Passed `getDefinitions: () => editorRef.current?.getDefinitions() ?? null` to `createProcessRunnerPlugin`
+
+## 2026-03-28 — Process runner + scenario testing wired into Studio
+
+**`apps/studio/src/pages/ModelDetail.tsx`**:
+- Added `@bpmnkit/engine` dependency to `apps/studio/package.json`
+- Created `Engine`, `createTokenHighlightPlugin`, and `createProcessRunnerPlugin` inside the editor `useEffect`
+- Process runner wired with: `playContainer: dock.playPane`, `onShowPlayTab`/`onHidePlayTab` callbacks, `runScenario` (wraps `@bpmnkit/engine`'s `runScenario` with current definitions), `getProjectId: () => model.id`
+- Play button surfaced in HUD via `initEditorHud({ playButton: processRunner.playButton })`
+- Toolbar appended to `document.body` and removed on cleanup
+
+Users can now click the play button in the editor HUD to enter simulation mode, and use the "Tests" sub-tab in the Play panel to define and run scenario-based tests against the current diagram.
+
 ## 2026-03-28 — AI-assisted BPMN improvement pipeline
 
 **Token-efficient improve endpoint** (`apps/proxy/src/index.ts`, `apps/proxy/src/prompt.ts`):
