@@ -1,5 +1,11 @@
 # @bpmnkit/profiles
 
+## 0.0.11
+
+### Patch Changes
+
+- [#65](https://github.com/bpmnkit/monorepo/pull/65) [`58adc33`](https://github.com/bpmnkit/monorepo/commit/58adc33d1818367a68c27cc02aabec7e68aca002) Thanks [@urbanisierung](https://github.com/urbanisierung)! - Profile improvements
+
 ## 0.0.10
 
 ### Patch Changes
