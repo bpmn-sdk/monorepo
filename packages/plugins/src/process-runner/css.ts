@@ -572,6 +572,170 @@ const CSS = `
   background: rgba(245,158,11,0.12);
 }
 
+/* ── Scenario editor ─────────────────────────────────────────────────────── */
+.bpmnkit-runner-tests-editor-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+.bpmnkit-runner-tests-back {
+  font-size: 11px;
+  padding: 3px 8px;
+  flex-shrink: 0;
+}
+.bpmnkit-runner-tests-editor-name {
+  flex: 1;
+  min-width: 80px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 4px;
+  color: inherit;
+  font-size: 12px;
+  font-family: inherit;
+  padding: 4px 7px;
+}
+.bpmnkit-runner-tests-editor-name:focus { outline: none; border-color: var(--bpmnkit-accent, #6b9df7); }
+.bpmnkit-runner-tests-editor-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+.bpmnkit-runner-tests-editor-badge--pass { color: var(--bpmnkit-success, #22c55e); background: rgba(34,197,94,0.12); }
+.bpmnkit-runner-tests-editor-badge--fail { color: var(--bpmnkit-danger, #f87171); background: rgba(248,113,113,0.12); }
+
+.bpmnkit-runner-tests-section-title {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(255,255,255,0.3);
+  padding: 10px 0 4px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  margin-bottom: 6px;
+}
+.bpmnkit-runner-tests-varlist { margin-bottom: 4px; }
+
+.bpmnkit-runner-tests-hint {
+  font-size: 11px;
+  color: rgba(255,255,255,0.25);
+  margin-bottom: 6px;
+  font-style: italic;
+}
+
+.bpmnkit-runner-tests-task {
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 6px;
+  margin-bottom: 6px;
+  overflow: hidden;
+}
+.bpmnkit-runner-tests-task--focused {
+  border-color: var(--bpmnkit-accent, #6b9df7);
+}
+.bpmnkit-runner-tests-task-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  cursor: pointer;
+  user-select: none;
+  background: rgba(255,255,255,0.03);
+}
+.bpmnkit-runner-tests-task-header:hover { background: rgba(255,255,255,0.06); }
+.bpmnkit-runner-tests-task--focused .bpmnkit-runner-tests-task-header {
+  background: rgba(107,157,247,0.08);
+}
+.bpmnkit-runner-tests-task-name {
+  flex: 1;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.bpmnkit-runner-tests-task-badge {
+  font-size: 10px;
+  color: rgba(255,255,255,0.35);
+  background: rgba(255,255,255,0.06);
+  border-radius: 3px;
+  padding: 1px 5px;
+  flex-shrink: 0;
+}
+.bpmnkit-runner-tests-task-body {
+  padding: 8px 10px;
+  border-top: 1px solid rgba(255,255,255,0.06);
+}
+.bpmnkit-runner-tests-error-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+}
+.bpmnkit-runner-tests-error-label {
+  font-size: 11px;
+  color: rgba(255,255,255,0.4);
+  flex-shrink: 0;
+}
+.bpmnkit-runner-tests-error-input {
+  flex: 1;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 4px;
+  color: inherit;
+  font-size: 11px;
+  font-family: inherit;
+  padding: 3px 6px;
+}
+.bpmnkit-runner-tests-error-input:focus { outline: none; border-color: var(--bpmnkit-danger, #f87171); }
+
+.bpmnkit-runner-tests-name-label {
+  flex: 1;
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bpmnkit-runner-tests-edit {
+  background: none;
+  border: none;
+  color: rgba(255,255,255,0.4);
+  cursor: pointer;
+  padding: 2px 4px;
+  font-size: 13px;
+}
+.bpmnkit-runner-tests-edit:hover { color: var(--bpmnkit-accent, #6b9df7); }
+
+/* ── Light overrides (editor) ──────────────────────────────────────────────── */
+[data-bpmnkit-hud-theme="light"] .bpmnkit-runner-tests-editor-header { border-color: rgba(0,0,0,0.08); }
+[data-bpmnkit-hud-theme="light"] .bpmnkit-runner-tests-editor-name {
+  background: rgba(0,0,0,0.04);
+  border-color: rgba(0,0,0,0.12);
+  color: rgba(0,0,0,0.75);
+}
+[data-bpmnkit-hud-theme="light"] .bpmnkit-runner-tests-section-title { color: rgba(0,0,0,0.35); border-color: rgba(0,0,0,0.08); }
+[data-bpmnkit-hud-theme="light"] .bpmnkit-runner-tests-hint { color: rgba(0,0,0,0.3); }
+[data-bpmnkit-hud-theme="light"] .bpmnkit-runner-tests-task { border-color: rgba(0,0,0,0.1); }
+[data-bpmnkit-hud-theme="light"] .bpmnkit-runner-tests-task--focused { border-color: var(--bpmnkit-accent, #1a56db); }
+[data-bpmnkit-hud-theme="light"] .bpmnkit-runner-tests-task-header { background: rgba(0,0,0,0.02); }
+[data-bpmnkit-hud-theme="light"] .bpmnkit-runner-tests-task-header:hover { background: rgba(0,0,0,0.05); }
+[data-bpmnkit-hud-theme="light"] .bpmnkit-runner-tests-task--focused .bpmnkit-runner-tests-task-header { background: rgba(26,86,219,0.06); }
+[data-bpmnkit-hud-theme="light"] .bpmnkit-runner-tests-task-badge { color: rgba(0,0,0,0.4); background: rgba(0,0,0,0.06); }
+[data-bpmnkit-hud-theme="light"] .bpmnkit-runner-tests-task-body { border-color: rgba(0,0,0,0.08); }
+[data-bpmnkit-hud-theme="light"] .bpmnkit-runner-tests-error-label { color: rgba(0,0,0,0.45); }
+[data-bpmnkit-hud-theme="light"] .bpmnkit-runner-tests-error-input {
+  background: rgba(0,0,0,0.04);
+  border-color: rgba(0,0,0,0.12);
+  color: rgba(0,0,0,0.75);
+}
+[data-bpmnkit-hud-theme="light"] .bpmnkit-runner-tests-name-label { color: rgba(0,0,0,0.75); }
+[data-bpmnkit-hud-theme="light"] .bpmnkit-runner-tests-edit { color: rgba(0,0,0,0.3); }
+[data-bpmnkit-hud-theme="light"] .bpmnkit-runner-tests-edit:hover { color: var(--bpmnkit-accent, #1a56db); }
+
 /* ── Chaos run summary banner ─────────────────────────────────────────────── */
 .bpmnkit-runner-chaos-summary {
   font-size: 11px;

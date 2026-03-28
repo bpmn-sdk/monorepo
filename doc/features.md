@@ -12,6 +12,24 @@ Token-efficient pipeline for AI-powered BPMN analysis and improvement.
 - **CLI `bpmn improve <file> [--auto]`** (`apps/cli`): streams AI explanation + shows diff; `--auto` writes result back to file; `--server` for custom proxy URL.
 - **CLI `bpmn lint --fix`** (`apps/cli`): applies all auto-fixable static analysis findings and writes the BPMN file in place.
 
+## Studio Process Runner + Scenario Testing (2026-03-28) — `apps/studio`, `packages/plugins`
+
+Play mode and scenario-based BPMN testing are wired into the Studio model editor.
+
+- **Play button in HUD**: click to enter in-browser simulation — runs the current diagram against the TypeScript engine (`@bpmnkit/engine`) with real-time token highlights.
+- **Play panel sub-tabs**: Variables, FEEL, Errors, Input (configurable start variables).
+- **Tests as first-class dock tab**: dedicated "Tests" tab in the side dock, always accessible without entering play mode.
+- **Scenario runner**: each scenario runs against a fresh `@bpmnkit/reebe-wasm` WASM engine instance for authoritative, isolated results.
+- **Visual scenario editor**: click ✎ on any scenario to open a point-and-click editor:
+  - **Start Variables**: key=value editor for process inputs.
+  - **Task Outputs**: auto-populated task cards from the diagram; click a card (or click the element on the canvas) to configure output variables and optional error injection per task.
+  - **Expected Variables**: key=value assertions checked after the run.
+  - **Inline failure diff**: last run failures shown directly in the editor.
+- **Scenario-based testing**: define named test scenarios with input variables, per-task mock outputs/errors, and assertions (expected path + expected variables). Results show pass/fail with per-field diffs. Scenarios persist in IndexedDB scoped to the model.
+- **Run all / run one**: run all scenarios at once or individually, with live pass/fail status per scenario.
+- **Chaos import**: after a chaos run, import triggered injections as draft test scenarios.
+- **AI generate** (when configured): generate draft scenarios from the current BPMN via AI.
+
 ## BPMNkit Studio (2026-03-24) — `apps/studio` + `packages/user-tasks`
 
 A unified Preact web application replacing fragmented Camunda tooling (Modeler, Operate, Tasklist).

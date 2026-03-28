@@ -143,11 +143,12 @@ export interface SideDock {
 	playPane: HTMLDivElement
 	docsPane: HTMLDivElement
 	deployPane: HTMLDivElement
-	switchTab(tab: "properties" | "history" | "ai" | "play" | "docs" | "deploy"): void
+	testsPane: HTMLDivElement
+	switchTab(tab: "properties" | "history" | "ai" | "play" | "docs" | "deploy" | "tests"): void
 	expand(): void
 	collapse(): void
 	get collapsed(): boolean
-	get activeTab(): "properties" | "history" | "ai" | "play" | "docs" | "deploy"
+	get activeTab(): "properties" | "history" | "ai" | "play" | "docs" | "deploy" | "tests"
 	/** Update the info shown in the Properties empty state. */
 	setDiagramInfo(processName: string | null, fileName: string | null): void
 	/** Hide the empty state when a config panel is displayed. */
@@ -172,6 +173,10 @@ export interface SideDock {
 	setDocsTabClickHandler(fn: () => void): void
 	/** Register a callback invoked when the Deploy tab is clicked. */
 	setDeployTabClickHandler(fn: () => void): void
+	/** Show or hide the Tests tab. */
+	setTestsTabVisible(visible: boolean): void
+	/** Register a callback invoked when the Tests tab is clicked. */
+	setTestsTabClickHandler(fn: () => void): void
 }
 
 export function createSideDock(): SideDock {
@@ -221,12 +226,18 @@ export function createSideDock(): SideDock {
 	deployTab.className = "bpmnkit-side-dock__tab"
 	deployTab.textContent = "Deploy"
 
+	const testsTab = document.createElement("button")
+	testsTab.className = "bpmnkit-side-dock__tab"
+	testsTab.textContent = "Tests"
+	testsTab.style.display = "none"
+
 	tabStrip.appendChild(propertiesTab)
 	tabStrip.appendChild(historyTab)
 	tabStrip.appendChild(aiTab)
 	tabStrip.appendChild(playTab)
 	tabStrip.appendChild(docsTab)
 	tabStrip.appendChild(deployTab)
+	tabStrip.appendChild(testsTab)
 
 	// Properties pane — contains the info empty state
 	const propertiesPane = document.createElement("div")
@@ -287,6 +298,10 @@ export function createSideDock(): SideDock {
 	const deployPane = document.createElement("div")
 	deployPane.className = "bpmnkit-side-dock__pane bpmnkit-side-dock__pane--hidden"
 
+	// Tests pane
+	const testsPane = document.createElement("div")
+	testsPane.className = "bpmnkit-side-dock__pane bpmnkit-side-dock__pane--hidden"
+
 	el.appendChild(collapseHandle)
 	el.appendChild(resizeHandle)
 	el.appendChild(tabStrip)
@@ -296,16 +311,19 @@ export function createSideDock(): SideDock {
 	el.appendChild(playPane)
 	el.appendChild(docsPane)
 	el.appendChild(deployPane)
+	el.appendChild(testsPane)
 
 	// ── State ──
 	let _collapsed = false
 	let _width = DEFAULT_WIDTH
-	let _activeTab: "properties" | "history" | "ai" | "play" | "docs" | "deploy" = "properties"
+	let _activeTab: "properties" | "history" | "ai" | "play" | "docs" | "deploy" | "tests" =
+		"properties"
 	let _aiTabHandler: (() => void) | null = null
 	let _historyTabHandler: (() => void) | null = null
 	let _playTabHandler: (() => void) | null = null
 	let _docsTabHandler: (() => void) | null = null
 	let _deployTabHandler: (() => void) | null = null
+	let _testsTabHandler: (() => void) | null = null
 
 	function setDocWidth(w: number): void {
 		el.style.width = `${w}px`
@@ -342,7 +360,9 @@ export function createSideDock(): SideDock {
 	document.body.style.setProperty("--bpmnkit-dock-width", "0px")
 
 	// ── Tab switching ──
-	function switchTab(tab: "properties" | "history" | "ai" | "play" | "docs" | "deploy"): void {
+	function switchTab(
+		tab: "properties" | "history" | "ai" | "play" | "docs" | "deploy" | "tests",
+	): void {
 		_activeTab = tab
 		propertiesTab.classList.toggle("active", tab === "properties")
 		historyTab.classList.toggle("active", tab === "history")
@@ -350,12 +370,14 @@ export function createSideDock(): SideDock {
 		playTab.classList.toggle("active", tab === "play")
 		docsTab.classList.toggle("active", tab === "docs")
 		deployTab.classList.toggle("active", tab === "deploy")
+		testsTab.classList.toggle("active", tab === "tests")
 		propertiesPane.classList.toggle("bpmnkit-side-dock__pane--hidden", tab !== "properties")
 		historyPane.classList.toggle("bpmnkit-side-dock__pane--hidden", tab !== "history")
 		aiPane.classList.toggle("bpmnkit-side-dock__pane--hidden", tab !== "ai")
 		playPane.classList.toggle("bpmnkit-side-dock__pane--hidden", tab !== "play")
 		docsPane.classList.toggle("bpmnkit-side-dock__pane--hidden", tab !== "docs")
 		deployPane.classList.toggle("bpmnkit-side-dock__pane--hidden", tab !== "deploy")
+		testsPane.classList.toggle("bpmnkit-side-dock__pane--hidden", tab !== "tests")
 	}
 
 	// ── Expand / collapse ──
@@ -443,6 +465,17 @@ export function createSideDock(): SideDock {
 		_deployTabHandler = fn
 	}
 
+	function setTestsTabVisible(visible: boolean): void {
+		testsTab.style.display = visible ? "" : "none"
+		if (!visible && testsTab.classList.contains("active")) {
+			switchTab("properties")
+		}
+	}
+
+	function setTestsTabClickHandler(fn: () => void): void {
+		_testsTabHandler = fn
+	}
+
 	function setVisible(visible: boolean): void {
 		if (visible) {
 			el.style.display = ""
@@ -474,6 +507,10 @@ export function createSideDock(): SideDock {
 	deployTab.addEventListener("click", () => {
 		switchTab("deploy")
 		_deployTabHandler?.()
+	})
+	testsTab.addEventListener("click", () => {
+		switchTab("tests")
+		_testsTabHandler?.()
 	})
 	collapseHandle.addEventListener("click", () => {
 		if (_collapsed) expand()
@@ -515,6 +552,7 @@ export function createSideDock(): SideDock {
 		playPane,
 		docsPane,
 		deployPane,
+		testsPane,
 		switchTab,
 		expand,
 		collapse,
@@ -530,6 +568,8 @@ export function createSideDock(): SideDock {
 		setPlayTabClickHandler,
 		setDocsTabClickHandler,
 		setDeployTabClickHandler,
+		setTestsTabVisible,
+		setTestsTabClickHandler,
 		get collapsed() {
 			return _collapsed
 		},

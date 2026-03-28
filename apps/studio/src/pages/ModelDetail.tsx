@@ -1,12 +1,15 @@
 import type { CanvasPlugin } from "@bpmnkit/canvas"
 import { BpmnEditor, createSideDock, initEditorHud } from "@bpmnkit/editor"
 import type { SideDock } from "@bpmnkit/editor"
+import { Engine } from "@bpmnkit/engine"
 import type { CommandPalettePlugin } from "@bpmnkit/plugins/command-palette"
 import { createCommandPaletteEditorPlugin } from "@bpmnkit/plugins/command-palette-editor"
 import { createConfigPanelPlugin } from "@bpmnkit/plugins/config-panel"
 import { createConfigPanelBpmnPlugin } from "@bpmnkit/plugins/config-panel-bpmn"
 import { createConnectorCatalogPlugin } from "@bpmnkit/plugins/connector-catalog"
 import { type PresentationApi, createPresentationPlugin } from "@bpmnkit/plugins/presentation"
+import { createProcessRunnerPlugin } from "@bpmnkit/plugins/process-runner"
+import { createTokenHighlightPlugin } from "@bpmnkit/plugins/token-highlight"
 import { QueryClientProvider } from "@tanstack/react-query"
 import {
 	ArrowLeft,
@@ -25,6 +28,7 @@ import { useCallback, useEffect, useRef, useState } from "preact/hooks"
 import { Link, useParams } from "wouter"
 import { useCreateProcessInstance, useDefinitions, useDeployProcess } from "../api/queries.js"
 import { queryClient } from "../api/queryClient.js"
+import { runScenarioWasm } from "../api/run-scenario-wasm.js"
 import { Button } from "../components/ui/button.js"
 import { Input } from "../components/ui/input.js"
 import type { ModelFile } from "../storage/types.js"
@@ -562,7 +566,7 @@ export function ModelDetail() {
 		// History requires file-storage context — not available in Studio
 		dock.setVisible(true)
 		dock.setHistoryTabEnabled(false)
-		// Play mode not integrated in Studio
+		// Play tab shown only when process runner enters play mode
 		dock.setPlayTabVisible(false)
 		// AI is handled by the Studio AI drawer — remove the dock's own AI tab
 		dock.setAiTabVisible(false)
@@ -657,6 +661,41 @@ export function ModelDetail() {
 			},
 		])
 
+		// ── Process runner ────────────────────────────────────────────────────
+		const engine = new Engine()
+		const tokenHighlight = createTokenHighlightPlugin()
+		const processRunner = createProcessRunnerPlugin({
+			engine,
+			tokenHighlight,
+			playContainer: dock.playPane,
+			testsContainer: dock.testsPane,
+			onShowPlayTab() {
+				dock.setPlayTabVisible(true)
+				if (dock.collapsed) dock.expand()
+				dock.switchTab("play")
+			},
+			onHidePlayTab() {
+				dock.setPlayTabVisible(false)
+			},
+			runScenario: (scenario) => {
+				const xml = editorRef.current?.exportXml()
+				if (!xml) return Promise.reject(new Error("No diagram loaded"))
+				return runScenarioWasm(xml, scenario)
+			},
+			getProjectId: () => model.id,
+			getDefinitions: () => editorRef.current?.getDefinitions() ?? null,
+		})
+		processRunner.toolbar.classList.add("bpmnkit-runner-toolbar--hud-bottom")
+		processRunner.toolbar.style.display = "none"
+		document.body.appendChild(processRunner.toolbar)
+		dock.setPlayTabClickHandler(() => {
+			if (dock.collapsed) dock.expand()
+		})
+		dock.setTestsTabVisible(true)
+		dock.setTestsTabClickHandler(() => {
+			if (dock.collapsed) dock.expand()
+		})
+
 		// ── Plugins ───────────────────────────────────────────────────────────
 		const configPanel = createConfigPanelPlugin({
 			getDefinitions: () => editorRef.current?.getDefinitions() ?? null,
@@ -712,9 +751,12 @@ export function ModelDetail() {
 				configPanelBpmn,
 				connectorCatalog,
 				presentation,
+				tokenHighlight,
+				processRunner,
 			],
 		})
 		initEditorHud(editor, {
+			playButton: processRunner.playButton,
 			onToggleSidebar: () => {
 				if (dock.collapsed) dock.expand()
 				else dock.collapse()
@@ -762,6 +804,7 @@ export function ModelDetail() {
 			off()
 			offSelect()
 			if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
+			processRunner.toolbar.remove()
 			render(null, dock.deployPane)
 			render(null, dock.docsPane)
 			dock.el.remove()
