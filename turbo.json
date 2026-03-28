@@ -2,15 +2,10 @@
 	"$schema": "https://turbo.build/schema.json",
 	"tasks": {
 		"build:wasm": {
-      "dependsOn": [],
-      "inputs": [
-        "crates/**/*.rs",
-        "crates/**/Cargo.toml",
-        "Cargo.toml",
-        "Cargo.lock"
-      ],
-      "outputs": ["../reebe-wasm/reebe_wasm*", "../reebe-wasm/snippets/**"]
-    },
+			"dependsOn": [],
+			"inputs": ["crates/**/*.rs", "crates/**/Cargo.toml", "Cargo.toml", "Cargo.lock"],
+			"outputs": ["../reebe-wasm/reebe_wasm*", "../reebe-wasm/snippets/**"]
+		},
 		"build": {
 			"dependsOn": ["^build", "^build:wasm"],
 			"outputs": ["dist/**"]

@@ -31,7 +31,9 @@
 			"**/.astro/**",
 			"**/src/generated/**",
 			"**/swagger/**",
-			"apps/proxy-rs/target/**"
+			"apps/proxy-rs/target/**",
+			"apps/reebe-wasm/**",
+			"apps/reebe/packages/reebe-wasm/src/wasm/**"
 		]
 	}
 }

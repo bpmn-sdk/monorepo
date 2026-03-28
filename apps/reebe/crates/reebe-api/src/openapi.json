@@ -1,737 +1,761 @@
 {
-  "openapi": "3.1.0",
-  "info": {
-    "title": "Reebe Workflow Engine API",
-    "description": "Drop-in REST API replacement for the Zeebe workflow engine (Camunda 8). Compatible with all Camunda 8 REST clients.",
-    "version": "0.1.0",
-    "license": {
-      "name": "Apache 2.0",
-      "url": "https://www.apache.org/licenses/LICENSE-2.0"
-    }
-  },
-  "servers": [
-    { "url": "http://localhost:8080", "description": "Local development" }
-  ],
-  "components": {
-    "schemas": {
-      "ProblemDetail": {
-        "type": "object",
-        "description": "RFC 7807 problem details for HTTP APIs.",
-        "required": ["type", "title", "status"],
-        "properties": {
-          "type": { "type": "string", "example": "about:blank" },
-          "title": { "type": "string", "example": "Bad Request" },
-          "status": { "type": "integer", "example": 400 },
-          "detail": { "type": "string", "example": "The request body is invalid." },
-          "instance": { "type": "string", "example": "/v2/process-instances" }
-        }
-      },
-      "TopologyResponse": {
-        "type": "object",
-        "properties": {
-          "clusterId": { "type": "string" },
-          "clusterName": { "type": "string" },
-          "partitionsCount": { "type": "integer" },
-          "replicationFactor": { "type": "integer" },
-          "gatewayVersion": { "type": "string" },
-          "brokers": {
-            "type": "array",
-            "items": { "$ref": "#/components/schemas/BrokerInfo" }
-          }
-        }
-      },
-      "BrokerInfo": {
-        "type": "object",
-        "properties": {
-          "nodeId": { "type": "integer" },
-          "host": { "type": "string" },
-          "port": { "type": "integer" },
-          "partitions": {
-            "type": "array",
-            "items": { "$ref": "#/components/schemas/PartitionInfo" }
-          },
-          "version": { "type": "string" }
-        }
-      },
-      "PartitionInfo": {
-        "type": "object",
-        "properties": {
-          "partitionId": { "type": "integer" },
-          "role": { "type": "string", "enum": ["LEADER", "FOLLOWER", "INACTIVE"] },
-          "health": { "type": "string", "enum": ["HEALTHY", "UNHEALTHY", "DEAD"] }
-        }
-      },
-      "DeployResourceRequest": {
-        "type": "object",
-        "required": ["resources"],
-        "properties": {
-          "resources": {
-            "type": "array",
-            "items": { "$ref": "#/components/schemas/Resource" }
-          },
-          "tenantId": { "type": "string", "default": "<default>" }
-        }
-      },
-      "Resource": {
-        "type": "object",
-        "required": ["name", "content"],
-        "properties": {
-          "name": { "type": "string", "example": "my-process.bpmn" },
-          "content": {
-            "type": "string",
-            "description": "Base64-encoded resource content (BPMN XML).",
-            "example": "PD94bWwgdmVyc2lvbj0iMS4wIj8+"
-          }
-        }
-      },
-      "DeploymentResponse": {
-        "type": "object",
-        "properties": {
-          "deploymentKey": { "type": "string" },
-          "tenantId": { "type": "string" },
-          "deployments": {
-            "type": "array",
-            "items": { "$ref": "#/components/schemas/ProcessDeployment" }
-          }
-        }
-      },
-      "ProcessDeployment": {
-        "type": "object",
-        "properties": {
-          "processDefinitionKey": { "type": "string" },
-          "bpmnProcessId": { "type": "string" },
-          "version": { "type": "integer" },
-          "resourceName": { "type": "string" },
-          "tenantId": { "type": "string" }
-        }
-      },
-      "CreateProcessInstanceRequest": {
-        "type": "object",
-        "properties": {
-          "bpmnProcessId": { "type": "string" },
-          "processDefinitionKey": { "type": "string" },
-          "version": {
-            "type": "integer",
-            "description": "Use -1 for the latest version.",
-            "default": -1
-          },
-          "variables": {
-            "type": "object",
-            "additionalProperties": true
-          },
-          "tenantId": { "type": "string" }
-        }
-      },
-      "ProcessInstanceResponse": {
-        "type": "object",
-        "properties": {
-          "processInstanceKey": { "type": "string" },
-          "processDefinitionKey": { "type": "string" },
-          "bpmnProcessId": { "type": "string" },
-          "version": { "type": "integer" },
-          "tenantId": { "type": "string" }
-        }
-      },
-      "ProcessInstanceState": {
-        "type": "string",
-        "enum": ["ACTIVE", "COMPLETED", "CANCELED", "TERMINATED"]
-      },
-      "ProcessInstanceDetails": {
-        "allOf": [
-          { "$ref": "#/components/schemas/ProcessInstanceResponse" },
-          {
-            "type": "object",
-            "properties": {
-              "state": { "$ref": "#/components/schemas/ProcessInstanceState" },
-              "parentProcessInstanceKey": { "type": "string" },
-              "parentElementInstanceKey": { "type": "string" },
-              "startDate": { "type": "string", "format": "date-time" },
-              "endDate": { "type": "string", "format": "date-time" }
-            }
-          }
-        ]
-      },
-      "CancelProcessInstanceRequest": {
-        "type": "object",
-        "properties": {
-          "operationReference": { "type": "integer" }
-        }
-      },
-      "ActivateJobsRequest": {
-        "type": "object",
-        "required": ["type", "timeout", "maxJobsToActivate"],
-        "properties": {
-          "type": { "type": "string", "example": "my-job-type" },
-          "worker": { "type": "string", "example": "my-worker" },
-          "timeout": {
-            "type": "integer",
-            "format": "int64",
-            "description": "A job returned after this call will not be activated by another call until the timeout (in ms) has been reached.",
-            "example": 300000
-          },
-          "maxJobsToActivate": { "type": "integer", "format": "int32", "example": 32 },
-          "fetchVariable": {
-            "type": "array",
-            "items": { "type": "string" }
-          },
-          "requestTimeout": {
-            "type": "integer",
-            "format": "int64",
-            "description": "The request will be completed when at least one job is activated or after the requestTimeout (in ms). If 0, a default timeout is used. If negative, long polling is disabled.",
-            "example": 10000
-          },
-          "tenantIds": {
-            "type": "array",
-            "description": "A list of IDs of tenants for which to activate jobs.",
-            "items": { "type": "string" }
-          }
-        }
-      },
-      "JobActivationResult": {
-        "type": "object",
-        "required": ["jobs"],
-        "properties": {
-          "jobs": {
-            "type": "array",
-            "items": { "$ref": "#/components/schemas/ActivatedJob" }
-          }
-        }
-      },
-      "ActivatedJob": {
-        "type": "object",
-        "required": ["jobKey", "type", "processInstanceKey", "processDefinitionKey", "processDefinitionId", "processDefinitionVersion", "elementId", "elementInstanceKey", "worker", "retries", "deadline", "variables", "customHeaders", "tenantId", "kind"],
-        "properties": {
-          "jobKey": { "type": "string" },
-          "type": { "type": "string" },
-          "processInstanceKey": { "type": "string" },
-          "processDefinitionKey": { "type": "string" },
-          "processDefinitionId": { "type": "string", "description": "The bpmn process ID of the job's process definition." },
-          "processDefinitionVersion": { "type": "integer", "format": "int32" },
-          "elementId": { "type": "string" },
-          "elementInstanceKey": { "type": "string" },
-          "worker": { "type": "string" },
-          "retries": { "type": "integer", "format": "int32" },
-          "deadline": { "type": "integer", "format": "int64", "description": "When the job can be activated again, as a UNIX epoch timestamp in ms." },
-          "variables": { "type": "object", "additionalProperties": true },
-          "customHeaders": { "type": "object", "additionalProperties": true },
-          "tenantId": { "type": "string" },
-          "kind": { "type": "string", "enum": ["BPMN_ELEMENT", "EXECUTION_LISTENER", "TASK_LISTENER", "AD_HOC_SUB_PROCESS"] },
-          "listenerEventType": { "type": "string", "nullable": true },
-          "rootProcessInstanceKey": { "type": "string", "nullable": true }
-        }
-      },
-      "CompleteJobRequest": {
-        "type": "object",
-        "properties": {
-          "variables": { "type": "object", "additionalProperties": true, "nullable": true }
-        }
-      },
-      "FailJobRequest": {
-        "type": "object",
-        "properties": {
-          "retries": { "type": "integer", "format": "int32", "default": 0 },
-          "errorMessage": { "type": "string" },
-          "retryBackOff": { "type": "integer", "format": "int64", "default": 0 },
-          "variables": { "type": "object", "additionalProperties": true }
-        }
-      },
-      "ThrowErrorRequest": {
-        "type": "object",
-        "required": ["errorCode"],
-        "properties": {
-          "errorCode": { "type": "string" },
-          "errorMessage": { "type": "string", "nullable": true },
-          "variables": { "type": "object", "additionalProperties": true, "nullable": true }
-        }
-      },
-      "PublishMessageRequest": {
-        "type": "object",
-        "required": ["name"],
-        "properties": {
-          "name": { "type": "string" },
-          "correlationKey": { "type": "string" },
-          "timeToLive": {
-            "type": "integer",
-            "description": "Message TTL in milliseconds.",
-            "example": 10000
-          },
-          "messageId": { "type": "string" },
-          "variables": { "type": "object", "additionalProperties": true },
-          "tenantId": { "type": "string" }
-        }
-      },
-      "PublishMessageResponse": {
-        "type": "object",
-        "properties": {
-          "messageKey": { "type": "string" },
-          "tenantId": { "type": "string" }
-        }
-      },
-      "BroadcastSignalRequest": {
-        "type": "object",
-        "required": ["signalName"],
-        "properties": {
-          "signalName": { "type": "string" },
-          "variables": { "type": "object", "additionalProperties": true },
-          "tenantId": { "type": "string" }
-        }
-      },
-      "BroadcastSignalResponse": {
-        "type": "object",
-        "properties": {
-          "key": { "type": "string" },
-          "tenantId": { "type": "string" }
-        }
-      },
-      "SearchRequest": {
-        "type": "object",
-        "properties": {
-          "filter": { "type": "object", "additionalProperties": true },
-          "sort": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "field": { "type": "string" },
-                "order": { "type": "string", "enum": ["asc", "desc"] }
-              }
-            }
-          },
-          "page": {
-            "type": "object",
-            "properties": {
-              "from": { "type": "integer" },
-              "limit": { "type": "integer" }
-            }
-          }
-        }
-      },
-      "IncidentSearchResponse": {
-        "type": "object",
-        "properties": {
-          "items": {
-            "type": "array",
-            "items": { "$ref": "#/components/schemas/Incident" }
-          },
-          "page": { "$ref": "#/components/schemas/PageInfo" }
-        }
-      },
-      "Incident": {
-        "type": "object",
-        "properties": {
-          "key": { "type": "string" },
-          "processDefinitionKey": { "type": "string" },
-          "bpmnProcessId": { "type": "string" },
-          "processInstanceKey": { "type": "string" },
-          "elementInstanceKey": { "type": "string" },
-          "elementId": { "type": "string" },
-          "errorType": { "type": "string" },
-          "errorMessage": { "type": "string" },
-          "state": { "type": "string", "enum": ["ACTIVE", "RESOLVED", "MIGRATED"] },
-          "creationTime": { "type": "string", "format": "date-time" },
-          "tenantId": { "type": "string" }
-        }
-      },
-      "PageInfo": {
-        "type": "object",
-        "properties": {
-          "totalItems": { "type": "integer" },
-          "firstSortValues": { "type": "array", "items": {} },
-          "lastSortValues": { "type": "array", "items": {} }
-        }
-      },
-      "HealthResponse": {
-        "type": "object",
-        "properties": {
-          "status": { "type": "string", "example": "UP" }
-        }
-      }
-    },
-    "responses": {
-      "NoContent": {
-        "description": "The request was processed successfully with no response body."
-      },
-      "BadRequest": {
-        "description": "The request is invalid.",
-        "content": {
-          "application/problem+json": {
-            "schema": { "$ref": "#/components/schemas/ProblemDetail" }
-          }
-        }
-      },
-      "NotFound": {
-        "description": "The requested resource was not found.",
-        "content": {
-          "application/problem+json": {
-            "schema": { "$ref": "#/components/schemas/ProblemDetail" }
-          }
-        }
-      },
-      "InternalServerError": {
-        "description": "An unexpected server error occurred.",
-        "content": {
-          "application/problem+json": {
-            "schema": { "$ref": "#/components/schemas/ProblemDetail" }
-          }
-        }
-      }
-    }
-  },
-  "paths": {
-    "/v2/topology": {
-      "get": {
-        "summary": "Get cluster topology",
-        "operationId": "getTopology",
-        "tags": ["System"],
-        "responses": {
-          "200": {
-            "description": "Cluster topology information.",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/TopologyResponse" }
-              }
-            }
-          },
-          "500": { "$ref": "#/components/responses/InternalServerError" }
-        }
-      }
-    },
-    "/v2/deployments": {
-      "post": {
-        "summary": "Deploy BPMN resources",
-        "operationId": "createDeployment",
-        "tags": ["Deployments"],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": { "$ref": "#/components/schemas/DeployResourceRequest" }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "The resources were deployed successfully.",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/DeploymentResponse" }
-              }
-            }
-          },
-          "400": { "$ref": "#/components/responses/BadRequest" },
-          "500": { "$ref": "#/components/responses/InternalServerError" }
-        }
-      }
-    },
-    "/v2/process-instances": {
-      "post": {
-        "summary": "Create a process instance",
-        "operationId": "createProcessInstance",
-        "tags": ["Process Instances"],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": { "$ref": "#/components/schemas/CreateProcessInstanceRequest" }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "The process instance was created successfully.",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ProcessInstanceResponse" }
-              }
-            }
-          },
-          "400": { "$ref": "#/components/responses/BadRequest" },
-          "404": { "$ref": "#/components/responses/NotFound" },
-          "500": { "$ref": "#/components/responses/InternalServerError" }
-        }
-      }
-    },
-    "/v2/process-instances/{key}": {
-      "get": {
-        "summary": "Get a process instance by key",
-        "operationId": "getProcessInstance",
-        "tags": ["Process Instances"],
-        "parameters": [
-          {
-            "name": "key",
-            "in": "path",
-            "required": true,
-            "schema": { "type": "string" }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "The process instance details.",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ProcessInstanceDetails" }
-              }
-            }
-          },
-          "404": { "$ref": "#/components/responses/NotFound" },
-          "500": { "$ref": "#/components/responses/InternalServerError" }
-        }
-      }
-    },
-    "/v2/process-instances/{key}/cancellation": {
-      "post": {
-        "summary": "Cancel a process instance",
-        "operationId": "cancelProcessInstance",
-        "tags": ["Process Instances"],
-        "parameters": [
-          {
-            "name": "key",
-            "in": "path",
-            "required": true,
-            "schema": { "type": "string" }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": { "$ref": "#/components/schemas/CancelProcessInstanceRequest" }
-            }
-          }
-        },
-        "responses": {
-          "204": { "$ref": "#/components/responses/NoContent" },
-          "404": { "$ref": "#/components/responses/NotFound" },
-          "500": { "$ref": "#/components/responses/InternalServerError" }
-        }
-      }
-    },
-    "/v2/jobs/activation": {
-      "post": {
-        "summary": "Activate jobs",
-        "description": "Iterate through all known partitions and activate jobs up to the requested maximum.",
-        "operationId": "activateJobs",
-        "tags": ["Jobs"],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": { "$ref": "#/components/schemas/ActivateJobsRequest" }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "The list of activated jobs.",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/JobActivationResult" }
-              }
-            }
-          },
-          "400": { "$ref": "#/components/responses/BadRequest" },
-          "500": { "$ref": "#/components/responses/InternalServerError" }
-        }
-      }
-    },
-    "/v2/jobs/{jobKey}/completion": {
-      "post": {
-        "summary": "Complete a job",
-        "operationId": "completeJob",
-        "tags": ["Jobs"],
-        "parameters": [
-          {
-            "name": "jobKey",
-            "in": "path",
-            "required": true,
-            "schema": { "type": "string" }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": { "$ref": "#/components/schemas/CompleteJobRequest" }
-            }
-          }
-        },
-        "responses": {
-          "204": { "$ref": "#/components/responses/NoContent" },
-          "404": { "$ref": "#/components/responses/NotFound" },
-          "500": { "$ref": "#/components/responses/InternalServerError" }
-        }
-      }
-    },
-    "/v2/jobs/{jobKey}/failure": {
-      "post": {
-        "summary": "Fail a job",
-        "operationId": "failJob",
-        "tags": ["Jobs"],
-        "parameters": [
-          {
-            "name": "jobKey",
-            "in": "path",
-            "required": true,
-            "schema": { "type": "string" }
-          }
-        ],
-        "requestBody": {
-          "required": false,
-          "content": {
-            "application/json": {
-              "schema": { "$ref": "#/components/schemas/FailJobRequest" }
-            }
-          }
-        },
-        "responses": {
-          "204": { "$ref": "#/components/responses/NoContent" },
-          "404": { "$ref": "#/components/responses/NotFound" },
-          "500": { "$ref": "#/components/responses/InternalServerError" }
-        }
-      }
-    },
-    "/v2/jobs/{jobKey}/error": {
-      "post": {
-        "summary": "Throw a BPMN error from a job",
-        "operationId": "throwError",
-        "tags": ["Jobs"],
-        "parameters": [
-          {
-            "name": "jobKey",
-            "in": "path",
-            "required": true,
-            "schema": { "type": "string" }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": { "$ref": "#/components/schemas/ThrowErrorRequest" }
-            }
-          }
-        },
-        "responses": {
-          "204": { "$ref": "#/components/responses/NoContent" },
-          "404": { "$ref": "#/components/responses/NotFound" },
-          "500": { "$ref": "#/components/responses/InternalServerError" }
-        }
-      }
-    },
-    "/v2/messages/publication": {
-      "post": {
-        "summary": "Publish a message",
-        "operationId": "publishMessage",
-        "tags": ["Messages"],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": { "$ref": "#/components/schemas/PublishMessageRequest" }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Message published successfully.",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/PublishMessageResponse" }
-              }
-            }
-          },
-          "400": { "$ref": "#/components/responses/BadRequest" },
-          "500": { "$ref": "#/components/responses/InternalServerError" }
-        }
-      }
-    },
-    "/v2/signals/broadcast": {
-      "post": {
-        "summary": "Broadcast a signal",
-        "operationId": "broadcastSignal",
-        "tags": ["Signals"],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": { "$ref": "#/components/schemas/BroadcastSignalRequest" }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Signal broadcast successfully.",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/BroadcastSignalResponse" }
-              }
-            }
-          },
-          "400": { "$ref": "#/components/responses/BadRequest" },
-          "500": { "$ref": "#/components/responses/InternalServerError" }
-        }
-      }
-    },
-    "/v2/incidents/search": {
-      "post": {
-        "summary": "Search incidents",
-        "operationId": "searchIncidents",
-        "tags": ["Incidents"],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": { "$ref": "#/components/schemas/SearchRequest" }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Incident search results.",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/IncidentSearchResponse" }
-              }
-            }
-          },
-          "500": { "$ref": "#/components/responses/InternalServerError" }
-        }
-      }
-    },
-    "/v2/incidents/{key}/resolution": {
-      "post": {
-        "summary": "Resolve an incident",
-        "operationId": "resolveIncident",
-        "tags": ["Incidents"],
-        "parameters": [
-          {
-            "name": "key",
-            "in": "path",
-            "required": true,
-            "schema": { "type": "string" }
-          }
-        ],
-        "responses": {
-          "204": { "$ref": "#/components/responses/NoContent" },
-          "404": { "$ref": "#/components/responses/NotFound" },
-          "500": { "$ref": "#/components/responses/InternalServerError" }
-        }
-      }
-    },
-    "/actuator/health": {
-      "get": {
-        "summary": "Health check",
-        "description": "Spring Boot actuator-compatible health endpoint.",
-        "operationId": "actuatorHealth",
-        "tags": ["System"],
-        "responses": {
-          "200": {
-            "description": "Service is healthy.",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/HealthResponse" }
-              }
-            }
-          }
-        }
-      }
-    }
-  }
+	"openapi": "3.1.0",
+	"info": {
+		"title": "Reebe Workflow Engine API",
+		"description": "Drop-in REST API replacement for the Zeebe workflow engine (Camunda 8). Compatible with all Camunda 8 REST clients.",
+		"version": "0.1.0",
+		"license": {
+			"name": "Apache 2.0",
+			"url": "https://www.apache.org/licenses/LICENSE-2.0"
+		}
+	},
+	"servers": [{ "url": "http://localhost:8080", "description": "Local development" }],
+	"components": {
+		"schemas": {
+			"ProblemDetail": {
+				"type": "object",
+				"description": "RFC 7807 problem details for HTTP APIs.",
+				"required": ["type", "title", "status"],
+				"properties": {
+					"type": { "type": "string", "example": "about:blank" },
+					"title": { "type": "string", "example": "Bad Request" },
+					"status": { "type": "integer", "example": 400 },
+					"detail": { "type": "string", "example": "The request body is invalid." },
+					"instance": { "type": "string", "example": "/v2/process-instances" }
+				}
+			},
+			"TopologyResponse": {
+				"type": "object",
+				"properties": {
+					"clusterId": { "type": "string" },
+					"clusterName": { "type": "string" },
+					"partitionsCount": { "type": "integer" },
+					"replicationFactor": { "type": "integer" },
+					"gatewayVersion": { "type": "string" },
+					"brokers": {
+						"type": "array",
+						"items": { "$ref": "#/components/schemas/BrokerInfo" }
+					}
+				}
+			},
+			"BrokerInfo": {
+				"type": "object",
+				"properties": {
+					"nodeId": { "type": "integer" },
+					"host": { "type": "string" },
+					"port": { "type": "integer" },
+					"partitions": {
+						"type": "array",
+						"items": { "$ref": "#/components/schemas/PartitionInfo" }
+					},
+					"version": { "type": "string" }
+				}
+			},
+			"PartitionInfo": {
+				"type": "object",
+				"properties": {
+					"partitionId": { "type": "integer" },
+					"role": { "type": "string", "enum": ["LEADER", "FOLLOWER", "INACTIVE"] },
+					"health": { "type": "string", "enum": ["HEALTHY", "UNHEALTHY", "DEAD"] }
+				}
+			},
+			"DeployResourceRequest": {
+				"type": "object",
+				"required": ["resources"],
+				"properties": {
+					"resources": {
+						"type": "array",
+						"items": { "$ref": "#/components/schemas/Resource" }
+					},
+					"tenantId": { "type": "string", "default": "<default>" }
+				}
+			},
+			"Resource": {
+				"type": "object",
+				"required": ["name", "content"],
+				"properties": {
+					"name": { "type": "string", "example": "my-process.bpmn" },
+					"content": {
+						"type": "string",
+						"description": "Base64-encoded resource content (BPMN XML).",
+						"example": "PD94bWwgdmVyc2lvbj0iMS4wIj8+"
+					}
+				}
+			},
+			"DeploymentResponse": {
+				"type": "object",
+				"properties": {
+					"deploymentKey": { "type": "string" },
+					"tenantId": { "type": "string" },
+					"deployments": {
+						"type": "array",
+						"items": { "$ref": "#/components/schemas/ProcessDeployment" }
+					}
+				}
+			},
+			"ProcessDeployment": {
+				"type": "object",
+				"properties": {
+					"processDefinitionKey": { "type": "string" },
+					"bpmnProcessId": { "type": "string" },
+					"version": { "type": "integer" },
+					"resourceName": { "type": "string" },
+					"tenantId": { "type": "string" }
+				}
+			},
+			"CreateProcessInstanceRequest": {
+				"type": "object",
+				"properties": {
+					"bpmnProcessId": { "type": "string" },
+					"processDefinitionKey": { "type": "string" },
+					"version": {
+						"type": "integer",
+						"description": "Use -1 for the latest version.",
+						"default": -1
+					},
+					"variables": {
+						"type": "object",
+						"additionalProperties": true
+					},
+					"tenantId": { "type": "string" }
+				}
+			},
+			"ProcessInstanceResponse": {
+				"type": "object",
+				"properties": {
+					"processInstanceKey": { "type": "string" },
+					"processDefinitionKey": { "type": "string" },
+					"bpmnProcessId": { "type": "string" },
+					"version": { "type": "integer" },
+					"tenantId": { "type": "string" }
+				}
+			},
+			"ProcessInstanceState": {
+				"type": "string",
+				"enum": ["ACTIVE", "COMPLETED", "CANCELED", "TERMINATED"]
+			},
+			"ProcessInstanceDetails": {
+				"allOf": [
+					{ "$ref": "#/components/schemas/ProcessInstanceResponse" },
+					{
+						"type": "object",
+						"properties": {
+							"state": { "$ref": "#/components/schemas/ProcessInstanceState" },
+							"parentProcessInstanceKey": { "type": "string" },
+							"parentElementInstanceKey": { "type": "string" },
+							"startDate": { "type": "string", "format": "date-time" },
+							"endDate": { "type": "string", "format": "date-time" }
+						}
+					}
+				]
+			},
+			"CancelProcessInstanceRequest": {
+				"type": "object",
+				"properties": {
+					"operationReference": { "type": "integer" }
+				}
+			},
+			"ActivateJobsRequest": {
+				"type": "object",
+				"required": ["type", "timeout", "maxJobsToActivate"],
+				"properties": {
+					"type": { "type": "string", "example": "my-job-type" },
+					"worker": { "type": "string", "example": "my-worker" },
+					"timeout": {
+						"type": "integer",
+						"format": "int64",
+						"description": "A job returned after this call will not be activated by another call until the timeout (in ms) has been reached.",
+						"example": 300000
+					},
+					"maxJobsToActivate": { "type": "integer", "format": "int32", "example": 32 },
+					"fetchVariable": {
+						"type": "array",
+						"items": { "type": "string" }
+					},
+					"requestTimeout": {
+						"type": "integer",
+						"format": "int64",
+						"description": "The request will be completed when at least one job is activated or after the requestTimeout (in ms). If 0, a default timeout is used. If negative, long polling is disabled.",
+						"example": 10000
+					},
+					"tenantIds": {
+						"type": "array",
+						"description": "A list of IDs of tenants for which to activate jobs.",
+						"items": { "type": "string" }
+					}
+				}
+			},
+			"JobActivationResult": {
+				"type": "object",
+				"required": ["jobs"],
+				"properties": {
+					"jobs": {
+						"type": "array",
+						"items": { "$ref": "#/components/schemas/ActivatedJob" }
+					}
+				}
+			},
+			"ActivatedJob": {
+				"type": "object",
+				"required": [
+					"jobKey",
+					"type",
+					"processInstanceKey",
+					"processDefinitionKey",
+					"processDefinitionId",
+					"processDefinitionVersion",
+					"elementId",
+					"elementInstanceKey",
+					"worker",
+					"retries",
+					"deadline",
+					"variables",
+					"customHeaders",
+					"tenantId",
+					"kind"
+				],
+				"properties": {
+					"jobKey": { "type": "string" },
+					"type": { "type": "string" },
+					"processInstanceKey": { "type": "string" },
+					"processDefinitionKey": { "type": "string" },
+					"processDefinitionId": {
+						"type": "string",
+						"description": "The bpmn process ID of the job's process definition."
+					},
+					"processDefinitionVersion": { "type": "integer", "format": "int32" },
+					"elementId": { "type": "string" },
+					"elementInstanceKey": { "type": "string" },
+					"worker": { "type": "string" },
+					"retries": { "type": "integer", "format": "int32" },
+					"deadline": {
+						"type": "integer",
+						"format": "int64",
+						"description": "When the job can be activated again, as a UNIX epoch timestamp in ms."
+					},
+					"variables": { "type": "object", "additionalProperties": true },
+					"customHeaders": { "type": "object", "additionalProperties": true },
+					"tenantId": { "type": "string" },
+					"kind": {
+						"type": "string",
+						"enum": ["BPMN_ELEMENT", "EXECUTION_LISTENER", "TASK_LISTENER", "AD_HOC_SUB_PROCESS"]
+					},
+					"listenerEventType": { "type": "string", "nullable": true },
+					"rootProcessInstanceKey": { "type": "string", "nullable": true }
+				}
+			},
+			"CompleteJobRequest": {
+				"type": "object",
+				"properties": {
+					"variables": { "type": "object", "additionalProperties": true, "nullable": true }
+				}
+			},
+			"FailJobRequest": {
+				"type": "object",
+				"properties": {
+					"retries": { "type": "integer", "format": "int32", "default": 0 },
+					"errorMessage": { "type": "string" },
+					"retryBackOff": { "type": "integer", "format": "int64", "default": 0 },
+					"variables": { "type": "object", "additionalProperties": true }
+				}
+			},
+			"ThrowErrorRequest": {
+				"type": "object",
+				"required": ["errorCode"],
+				"properties": {
+					"errorCode": { "type": "string" },
+					"errorMessage": { "type": "string", "nullable": true },
+					"variables": { "type": "object", "additionalProperties": true, "nullable": true }
+				}
+			},
+			"PublishMessageRequest": {
+				"type": "object",
+				"required": ["name"],
+				"properties": {
+					"name": { "type": "string" },
+					"correlationKey": { "type": "string" },
+					"timeToLive": {
+						"type": "integer",
+						"description": "Message TTL in milliseconds.",
+						"example": 10000
+					},
+					"messageId": { "type": "string" },
+					"variables": { "type": "object", "additionalProperties": true },
+					"tenantId": { "type": "string" }
+				}
+			},
+			"PublishMessageResponse": {
+				"type": "object",
+				"properties": {
+					"messageKey": { "type": "string" },
+					"tenantId": { "type": "string" }
+				}
+			},
+			"BroadcastSignalRequest": {
+				"type": "object",
+				"required": ["signalName"],
+				"properties": {
+					"signalName": { "type": "string" },
+					"variables": { "type": "object", "additionalProperties": true },
+					"tenantId": { "type": "string" }
+				}
+			},
+			"BroadcastSignalResponse": {
+				"type": "object",
+				"properties": {
+					"key": { "type": "string" },
+					"tenantId": { "type": "string" }
+				}
+			},
+			"SearchRequest": {
+				"type": "object",
+				"properties": {
+					"filter": { "type": "object", "additionalProperties": true },
+					"sort": {
+						"type": "array",
+						"items": {
+							"type": "object",
+							"properties": {
+								"field": { "type": "string" },
+								"order": { "type": "string", "enum": ["asc", "desc"] }
+							}
+						}
+					},
+					"page": {
+						"type": "object",
+						"properties": {
+							"from": { "type": "integer" },
+							"limit": { "type": "integer" }
+						}
+					}
+				}
+			},
+			"IncidentSearchResponse": {
+				"type": "object",
+				"properties": {
+					"items": {
+						"type": "array",
+						"items": { "$ref": "#/components/schemas/Incident" }
+					},
+					"page": { "$ref": "#/components/schemas/PageInfo" }
+				}
+			},
+			"Incident": {
+				"type": "object",
+				"properties": {
+					"key": { "type": "string" },
+					"processDefinitionKey": { "type": "string" },
+					"bpmnProcessId": { "type": "string" },
+					"processInstanceKey": { "type": "string" },
+					"elementInstanceKey": { "type": "string" },
+					"elementId": { "type": "string" },
+					"errorType": { "type": "string" },
+					"errorMessage": { "type": "string" },
+					"state": { "type": "string", "enum": ["ACTIVE", "RESOLVED", "MIGRATED"] },
+					"creationTime": { "type": "string", "format": "date-time" },
+					"tenantId": { "type": "string" }
+				}
+			},
+			"PageInfo": {
+				"type": "object",
+				"properties": {
+					"totalItems": { "type": "integer" },
+					"firstSortValues": { "type": "array", "items": {} },
+					"lastSortValues": { "type": "array", "items": {} }
+				}
+			},
+			"HealthResponse": {
+				"type": "object",
+				"properties": {
+					"status": { "type": "string", "example": "UP" }
+				}
+			}
+		},
+		"responses": {
+			"NoContent": {
+				"description": "The request was processed successfully with no response body."
+			},
+			"BadRequest": {
+				"description": "The request is invalid.",
+				"content": {
+					"application/problem+json": {
+						"schema": { "$ref": "#/components/schemas/ProblemDetail" }
+					}
+				}
+			},
+			"NotFound": {
+				"description": "The requested resource was not found.",
+				"content": {
+					"application/problem+json": {
+						"schema": { "$ref": "#/components/schemas/ProblemDetail" }
+					}
+				}
+			},
+			"InternalServerError": {
+				"description": "An unexpected server error occurred.",
+				"content": {
+					"application/problem+json": {
+						"schema": { "$ref": "#/components/schemas/ProblemDetail" }
+					}
+				}
+			}
+		}
+	},
+	"paths": {
+		"/v2/topology": {
+			"get": {
+				"summary": "Get cluster topology",
+				"operationId": "getTopology",
+				"tags": ["System"],
+				"responses": {
+					"200": {
+						"description": "Cluster topology information.",
+						"content": {
+							"application/json": {
+								"schema": { "$ref": "#/components/schemas/TopologyResponse" }
+							}
+						}
+					},
+					"500": { "$ref": "#/components/responses/InternalServerError" }
+				}
+			}
+		},
+		"/v2/deployments": {
+			"post": {
+				"summary": "Deploy BPMN resources",
+				"operationId": "createDeployment",
+				"tags": ["Deployments"],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": { "$ref": "#/components/schemas/DeployResourceRequest" }
+						}
+					}
+				},
+				"responses": {
+					"200": {
+						"description": "The resources were deployed successfully.",
+						"content": {
+							"application/json": {
+								"schema": { "$ref": "#/components/schemas/DeploymentResponse" }
+							}
+						}
+					},
+					"400": { "$ref": "#/components/responses/BadRequest" },
+					"500": { "$ref": "#/components/responses/InternalServerError" }
+				}
+			}
+		},
+		"/v2/process-instances": {
+			"post": {
+				"summary": "Create a process instance",
+				"operationId": "createProcessInstance",
+				"tags": ["Process Instances"],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": { "$ref": "#/components/schemas/CreateProcessInstanceRequest" }
+						}
+					}
+				},
+				"responses": {
+					"200": {
+						"description": "The process instance was created successfully.",
+						"content": {
+							"application/json": {
+								"schema": { "$ref": "#/components/schemas/ProcessInstanceResponse" }
+							}
+						}
+					},
+					"400": { "$ref": "#/components/responses/BadRequest" },
+					"404": { "$ref": "#/components/responses/NotFound" },
+					"500": { "$ref": "#/components/responses/InternalServerError" }
+				}
+			}
+		},
+		"/v2/process-instances/{key}": {
+			"get": {
+				"summary": "Get a process instance by key",
+				"operationId": "getProcessInstance",
+				"tags": ["Process Instances"],
+				"parameters": [
+					{
+						"name": "key",
+						"in": "path",
+						"required": true,
+						"schema": { "type": "string" }
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "The process instance details.",
+						"content": {
+							"application/json": {
+								"schema": { "$ref": "#/components/schemas/ProcessInstanceDetails" }
+							}
+						}
+					},
+					"404": { "$ref": "#/components/responses/NotFound" },
+					"500": { "$ref": "#/components/responses/InternalServerError" }
+				}
+			}
+		},
+		"/v2/process-instances/{key}/cancellation": {
+			"post": {
+				"summary": "Cancel a process instance",
+				"operationId": "cancelProcessInstance",
+				"tags": ["Process Instances"],
+				"parameters": [
+					{
+						"name": "key",
+						"in": "path",
+						"required": true,
+						"schema": { "type": "string" }
+					}
+				],
+				"requestBody": {
+					"content": {
+						"application/json": {
+							"schema": { "$ref": "#/components/schemas/CancelProcessInstanceRequest" }
+						}
+					}
+				},
+				"responses": {
+					"204": { "$ref": "#/components/responses/NoContent" },
+					"404": { "$ref": "#/components/responses/NotFound" },
+					"500": { "$ref": "#/components/responses/InternalServerError" }
+				}
+			}
+		},
+		"/v2/jobs/activation": {
+			"post": {
+				"summary": "Activate jobs",
+				"description": "Iterate through all known partitions and activate jobs up to the requested maximum.",
+				"operationId": "activateJobs",
+				"tags": ["Jobs"],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": { "$ref": "#/components/schemas/ActivateJobsRequest" }
+						}
+					}
+				},
+				"responses": {
+					"200": {
+						"description": "The list of activated jobs.",
+						"content": {
+							"application/json": {
+								"schema": { "$ref": "#/components/schemas/JobActivationResult" }
+							}
+						}
+					},
+					"400": { "$ref": "#/components/responses/BadRequest" },
+					"500": { "$ref": "#/components/responses/InternalServerError" }
+				}
+			}
+		},
+		"/v2/jobs/{jobKey}/completion": {
+			"post": {
+				"summary": "Complete a job",
+				"operationId": "completeJob",
+				"tags": ["Jobs"],
+				"parameters": [
+					{
+						"name": "jobKey",
+						"in": "path",
+						"required": true,
+						"schema": { "type": "string" }
+					}
+				],
+				"requestBody": {
+					"content": {
+						"application/json": {
+							"schema": { "$ref": "#/components/schemas/CompleteJobRequest" }
+						}
+					}
+				},
+				"responses": {
+					"204": { "$ref": "#/components/responses/NoContent" },
+					"404": { "$ref": "#/components/responses/NotFound" },
+					"500": { "$ref": "#/components/responses/InternalServerError" }
+				}
+			}
+		},
+		"/v2/jobs/{jobKey}/failure": {
+			"post": {
+				"summary": "Fail a job",
+				"operationId": "failJob",
+				"tags": ["Jobs"],
+				"parameters": [
+					{
+						"name": "jobKey",
+						"in": "path",
+						"required": true,
+						"schema": { "type": "string" }
+					}
+				],
+				"requestBody": {
+					"required": false,
+					"content": {
+						"application/json": {
+							"schema": { "$ref": "#/components/schemas/FailJobRequest" }
+						}
+					}
+				},
+				"responses": {
+					"204": { "$ref": "#/components/responses/NoContent" },
+					"404": { "$ref": "#/components/responses/NotFound" },
+					"500": { "$ref": "#/components/responses/InternalServerError" }
+				}
+			}
+		},
+		"/v2/jobs/{jobKey}/error": {
+			"post": {
+				"summary": "Throw a BPMN error from a job",
+				"operationId": "throwError",
+				"tags": ["Jobs"],
+				"parameters": [
+					{
+						"name": "jobKey",
+						"in": "path",
+						"required": true,
+						"schema": { "type": "string" }
+					}
+				],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": { "$ref": "#/components/schemas/ThrowErrorRequest" }
+						}
+					}
+				},
+				"responses": {
+					"204": { "$ref": "#/components/responses/NoContent" },
+					"404": { "$ref": "#/components/responses/NotFound" },
+					"500": { "$ref": "#/components/responses/InternalServerError" }
+				}
+			}
+		},
+		"/v2/messages/publication": {
+			"post": {
+				"summary": "Publish a message",
+				"operationId": "publishMessage",
+				"tags": ["Messages"],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": { "$ref": "#/components/schemas/PublishMessageRequest" }
+						}
+					}
+				},
+				"responses": {
+					"201": {
+						"description": "Message published successfully.",
+						"content": {
+							"application/json": {
+								"schema": { "$ref": "#/components/schemas/PublishMessageResponse" }
+							}
+						}
+					},
+					"400": { "$ref": "#/components/responses/BadRequest" },
+					"500": { "$ref": "#/components/responses/InternalServerError" }
+				}
+			}
+		},
+		"/v2/signals/broadcast": {
+			"post": {
+				"summary": "Broadcast a signal",
+				"operationId": "broadcastSignal",
+				"tags": ["Signals"],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": { "$ref": "#/components/schemas/BroadcastSignalRequest" }
+						}
+					}
+				},
+				"responses": {
+					"200": {
+						"description": "Signal broadcast successfully.",
+						"content": {
+							"application/json": {
+								"schema": { "$ref": "#/components/schemas/BroadcastSignalResponse" }
+							}
+						}
+					},
+					"400": { "$ref": "#/components/responses/BadRequest" },
+					"500": { "$ref": "#/components/responses/InternalServerError" }
+				}
+			}
+		},
+		"/v2/incidents/search": {
+			"post": {
+				"summary": "Search incidents",
+				"operationId": "searchIncidents",
+				"tags": ["Incidents"],
+				"requestBody": {
+					"content": {
+						"application/json": {
+							"schema": { "$ref": "#/components/schemas/SearchRequest" }
+						}
+					}
+				},
+				"responses": {
+					"200": {
+						"description": "Incident search results.",
+						"content": {
+							"application/json": {
+								"schema": { "$ref": "#/components/schemas/IncidentSearchResponse" }
+							}
+						}
+					},
+					"500": { "$ref": "#/components/responses/InternalServerError" }
+				}
+			}
+		},
+		"/v2/incidents/{key}/resolution": {
+			"post": {
+				"summary": "Resolve an incident",
+				"operationId": "resolveIncident",
+				"tags": ["Incidents"],
+				"parameters": [
+					{
+						"name": "key",
+						"in": "path",
+						"required": true,
+						"schema": { "type": "string" }
+					}
+				],
+				"responses": {
+					"204": { "$ref": "#/components/responses/NoContent" },
+					"404": { "$ref": "#/components/responses/NotFound" },
+					"500": { "$ref": "#/components/responses/InternalServerError" }
+				}
+			}
+		},
+		"/actuator/health": {
+			"get": {
+				"summary": "Health check",
+				"description": "Spring Boot actuator-compatible health endpoint.",
+				"operationId": "actuatorHealth",
+				"tags": ["System"],
+				"responses": {
+					"200": {
+						"description": "Service is healthy.",
+						"content": {
+							"application/json": {
+								"schema": { "$ref": "#/components/schemas/HealthResponse" }
+							}
+						}
+					}
+				}
+			}
+		}
+	}
 }
