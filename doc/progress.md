@@ -1,5 +1,43 @@
 # Progress
 
+## 2026-03-28 — AI-assisted BPMN improvement pipeline
+
+**Token-efficient improve endpoint** (`apps/proxy/src/index.ts`, `apps/proxy/src/prompt.ts`):
+- New `POST /improve` endpoint replaces `/chat?action=improve` with a 4-phase pipeline:
+  1. Auto-fix: `expand()` → `optimize()` → apply fixable findings → `compactify()` (no AI tokens spent)
+  2. Residual analysis: `optimize()` on the auto-fixed compact diagram → remaining findings
+  3. AI call: streams explanation text + outputs a `BpmnOperation[]` JSON block (~5× fewer output tokens than full XML regeneration)
+  4. Apply & emit: `applyOperations()` → `expand()` → `Bpmn.export()` → SSE `ops` + `xml` events
+- SSE events: `token` (explanation stream), `ops` (`{ ops, autoFixCount }`), `xml` (final improved BPMN), `done`
+- Works with all AI backends (no MCP dependency)
+
+**BpmnOperation type + applyOperations()** (`packages/core/src/bpmn/operations.ts`):
+- New `BpmnOperation` discriminated union (7 op types: `rename`, `update`, `delete`, `insert`, `add_flow`, `delete_flow`, `redirect_flow`)
+- `applyOperations(diagram, ops): CompactDiagram` — applies operations sequentially to a compact diagram
+- Exported from `@bpmnkit/core`
+
+**Sub-process support in compact format** (`packages/core/src/bpmn/compact.ts`):
+- `CompactElement.children?: { elements, flows }` — nested compact representation of sub-processes
+- `compactify()` now recurses into `flowElements` of sub-processes
+- `expand()` reconstructs sub-process flow elements and sequence flows from `children`
+
+**Canvas element highlights** (`packages/canvas/src/canvas.ts`, `packages/canvas/src/css.ts`):
+- `BpmnCanvas.highlight(ids, variant)` — marks elements with amber (`"changed"`) or green (`"new"`) outline
+- `BpmnCanvas.clearHighlights()` — removes all highlight classes
+- CSS classes: `.bpmnkit-highlight--changed` and `.bpmnkit-highlight--new`
+
+**AI panel improve flow** (`packages/plugins/src/ai-bridge/panel.ts`, `css.ts`):
+- "✦ Improve" button now calls `/improve` instead of `/chat?action=improve`
+- Streams explanation text while server runs auto-fix + AI phases
+- After stream: shows diff section with auto-fix count + list of AI-suggested operations (with +/−/~ prefixes)
+- Canvas preview rendered with changed elements highlighted in amber and new elements in green
+- "Apply to diagram" button uses the pre-computed XML from the server
+
+**CLI improve command + lint --fix** (`apps/cli/src/commands/lint.ts`):
+- `bpmn lint --fix` — applies all auto-fixable findings and writes the result back to the file
+- `bpmn improve <file>` — streams AI explanation + shows ops diff; requires `--auto` to write changes back
+- `--server` flag to override the default proxy URL (`http://localhost:3033`)
+
 ## 2026-03-28 — Studio: AI polish — z-index, shared history, XML preview, backend picker, thinking indicator
 
 **Command palette always on top** (`apps/studio/src/components/CommandPalette.tsx`):

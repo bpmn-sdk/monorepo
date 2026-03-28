@@ -1,5 +1,6 @@
 import { BpmnCanvas } from "@bpmnkit/canvas"
 import { compactify } from "@bpmnkit/core"
+import type { BpmnOperation } from "@bpmnkit/core"
 import * as DialogPrimitive from "@radix-ui/react-dialog"
 import { ArrowUpRight, ChevronLeft, Search, Sparkles } from "lucide-react"
 import { useEffect, useRef, useState } from "preact/hooks"
@@ -19,6 +20,8 @@ interface CommandItem {
 	group: string
 	action: () => void
 	shortcut?: string
+	/** If true, executing this item does not close the palette. */
+	preventClose?: boolean
 }
 
 // ── Matching ──────────────────────────────────────────────────────────────────
@@ -391,6 +394,256 @@ function InlineAiChat({ initialQuery, onOpenInSidebar, onBack }: InlineAiChatPro
 	)
 }
 
+// ── Improve mode helpers ──────────────────────────────────────────────────────
+
+function describeOpInline(op: BpmnOperation): string {
+	switch (op.op) {
+		case "rename":
+			return `Rename to "${op.name}"`
+		case "update":
+			return "Update element properties"
+		case "delete":
+			return "Remove element"
+		case "insert":
+			return `Add ${op.element.type}${op.element.name ? ` "${op.element.name}"` : ""}`
+		case "add_flow":
+			return `Add flow: ${op.from} → ${op.to}`
+		case "delete_flow":
+			return "Remove flow"
+		case "redirect_flow":
+			return "Redirect flow"
+	}
+}
+
+// ── Inline Improve Mode ───────────────────────────────────────────────────────
+
+interface InlineImproveModeProps {
+	onBack(): void
+	onOpenInSidebar(): void
+}
+
+function InlineImproveMode({ onBack, onOpenInSidebar }: InlineImproveModeProps) {
+	const { editorAiContext } = useUiStore()
+	const { theme } = useThemeStore()
+	const [text, setText] = useState("")
+	const [ops, setOps] = useState<BpmnOperation[]>([])
+	const [autoFixCount, setAutoFixCount] = useState(0)
+	const [xml, setXml] = useState<string | undefined>(undefined)
+	const [streaming, setStreaming] = useState(true)
+	const [errorMsg, setErrorMsg] = useState<string | undefined>(undefined)
+	const canvasContainerRef = useRef<HTMLDivElement>(null)
+
+	// biome-ignore lint/correctness/useExhaustiveDependencies: runs once on mount
+	useEffect(() => {
+		if (!editorAiContext) return
+		const defs = editorAiContext.getDefinitions()
+		if (!defs) return
+		const compact = compactify(defs)
+		const ctrl = new AbortController()
+
+		async function run() {
+			try {
+				const res = await fetch(`${getProxyUrl()}/improve`, {
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({ context: compact, instruction: null, backend: null }),
+					signal: ctrl.signal,
+				})
+				if (!res.ok || !res.body) throw new Error(`Server returned ${res.status}`)
+
+				const reader = res.body.getReader()
+				const decoder = new TextDecoder()
+				let buf = ""
+				while (true) {
+					const { done, value } = await reader.read()
+					if (done) break
+					buf += decoder.decode(value, { stream: true })
+					const parts = buf.split("\n\n")
+					buf = parts.pop() ?? ""
+					for (const part of parts) {
+						const line = part.startsWith("data: ") ? part.slice(6) : part
+						const trimmed = line.trim()
+						if (!trimmed) continue
+						try {
+							const event = JSON.parse(trimmed) as {
+								type: string
+								text?: string
+								message?: string
+								xml?: string
+								ops?: BpmnOperation[]
+								autoFixCount?: number
+							}
+							if (event.type === "token" && event.text) setText((t) => t + (event.text ?? ""))
+							if (event.type === "ops") {
+								setOps(event.ops ?? [])
+								setAutoFixCount(event.autoFixCount ?? 0)
+							}
+							if (event.type === "xml" && event.xml) setXml(event.xml)
+							if (event.type === "error") throw new Error(event.message ?? "AI error")
+						} catch (e) {
+							if (e instanceof SyntaxError) continue
+							throw e
+						}
+					}
+				}
+			} catch (err) {
+				if (err instanceof Error && err.name === "AbortError") return
+				setErrorMsg(err instanceof Error ? err.message : String(err))
+			} finally {
+				setStreaming(false)
+			}
+		}
+		void run()
+		return () => ctrl.abort()
+	}, [])
+
+	// Mount canvas + highlights when xml arrives
+	useEffect(() => {
+		if (!xml || !canvasContainerRef.current) return
+		const canvas = new BpmnCanvas({
+			container: canvasContainerRef.current,
+			xml,
+			grid: false,
+			fit: "contain",
+			theme: theme === "light" ? "light" : "dark",
+		})
+
+		const changedIds = ops
+			.filter(
+				(op) =>
+					op.op === "rename" ||
+					op.op === "update" ||
+					op.op === "delete_flow" ||
+					op.op === "redirect_flow",
+			)
+			.map((op) => op.id)
+		const newIds = [
+			...ops.filter((op) => op.op === "insert").map((op) => op.element.id),
+			...ops.filter((op) => op.op === "add_flow" && op.id).map((op) => (op as { id: string }).id),
+		]
+		requestAnimationFrame(() => {
+			if (changedIds.length > 0) canvas.highlight(changedIds, "changed")
+			if (newIds.length > 0) canvas.highlight(newIds, "new")
+		})
+
+		return () => canvas.destroy()
+	}, [xml, theme, ops])
+
+	return (
+		<div className="flex flex-col" style={{ maxHeight: 520 }}>
+			{/* Header */}
+			<div className="flex items-center gap-2 border-b border-border px-3 py-2.5">
+				<button
+					type="button"
+					onClick={onBack}
+					className="text-muted hover:text-fg shrink-0 transition-colors"
+					aria-label="Back to commands"
+				>
+					<ChevronLeft size={16} />
+				</button>
+				<Sparkles size={13} className="text-accent shrink-0" />
+				<span className="text-sm font-medium text-fg flex-1">Improve Diagram</span>
+				<button
+					type="button"
+					onClick={onOpenInSidebar}
+					className="flex items-center gap-1 text-xs text-muted hover:text-fg transition-colors shrink-0 ml-1"
+					title="Open AI sidebar"
+				>
+					<ArrowUpRight size={13} />
+					Sidebar
+				</button>
+			</div>
+
+			{/* Content */}
+			<div className="overflow-y-auto p-3 space-y-2.5 min-h-0" style={{ maxHeight: 420 }}>
+				{/* Explanation text */}
+				{(text || streaming) && (
+					<div className="rounded-lg bg-surface-2 px-3 py-2 text-sm text-fg whitespace-pre-wrap">
+						{text || <ThinkingDots />}
+					</div>
+				)}
+
+				{errorMsg && (
+					<div
+						className="rounded-lg px-3 py-2 text-sm"
+						style={{ color: "var(--bpmnkit-danger, #dc2626)" }}
+					>
+						{errorMsg}
+					</div>
+				)}
+
+				{/* Diff list */}
+				{(autoFixCount > 0 || ops.length > 0) && (
+					<div className="rounded-lg border border-border overflow-hidden text-xs">
+						{autoFixCount > 0 && (
+							<div
+								className="px-3 py-1.5 border-b border-border"
+								style={{
+									background: "rgba(22,163,74,0.08)",
+									color: "var(--bpmnkit-success, #16a34a)",
+								}}
+							>
+								✓ {autoFixCount} issue{autoFixCount === 1 ? "" : "s"} auto-fixed
+							</div>
+						)}
+						{ops.length > 0 && (
+							<ul className="divide-y divide-border/50">
+								{ops.map((op, i) => {
+									const prefix =
+										op.op === "insert" || op.op === "add_flow"
+											? "+"
+											: op.op === "delete" || op.op === "delete_flow"
+												? "−"
+												: "~"
+									const color =
+										prefix === "+"
+											? "var(--bpmnkit-success, #16a34a)"
+											: prefix === "−"
+												? "var(--bpmnkit-danger, #dc2626)"
+												: "var(--bpmnkit-warn, #d97706)"
+									return (
+										<li key={String(i)} className="flex items-start gap-2 px-3 py-1.5 text-fg/80">
+											<span className="font-mono font-bold shrink-0" style={{ color }}>
+												{prefix}
+											</span>
+											<span>{describeOpInline(op)}</span>
+										</li>
+									)
+								})}
+							</ul>
+						)}
+					</div>
+				)}
+
+				{/* Canvas preview */}
+				{xml && (
+					<div>
+						<div
+							ref={canvasContainerRef}
+							className="rounded border border-border overflow-hidden"
+							style={{ height: 160 }}
+						/>
+						<div className="flex items-center justify-between mt-1 px-0.5">
+							<span className="text-[11px] text-muted">Improved diagram</span>
+							<button
+								type="button"
+								onClick={() => editorAiContext?.loadXml(xml)}
+								className="text-[11px] font-medium text-accent hover:underline"
+							>
+								Apply to editor
+							</button>
+						</div>
+					</div>
+				)}
+
+				{!streaming && !xml && !errorMsg && (
+					<p className="text-xs text-muted text-center py-2">No changes suggested.</p>
+				)}
+			</div>
+		</div>
+	)
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 interface CommandPaletteProps {
@@ -406,12 +659,14 @@ export function CommandPalette({ onNavigate }: CommandPaletteProps) {
 		paletteViewStack,
 		popPaletteView,
 		aiMessages,
+		editorAiContext,
 	} = useUiStore()
 	const [, navigate] = useLocation()
 	const [query, setQuery] = useState("")
 	const [selectedIdx, setSelectedIdx] = useState(0)
 	const [chatMode, setChatMode] = useState(false)
 	const [chatQuery, setChatQuery] = useState("")
+	const [improveMode, setImproveMode] = useState(false)
 	const inputRef = useRef<HTMLInputElement>(null)
 	const listRef = useRef<HTMLDivElement>(null)
 
@@ -480,6 +735,17 @@ export function CommandPalette({ onNavigate }: CommandPaletteProps) {
 			group: "Actions",
 			action: () => openAI(),
 		},
+		...(editorAiContext
+			? [
+					{
+						id: "improve-diagram",
+						label: "✦ Improve Diagram",
+						group: "AI",
+						preventClose: true,
+						action: () => setImproveMode(true),
+					} satisfies CommandItem,
+				]
+			: []),
 	]
 
 	// ── Current view ─────────────────────────────────────────────────────────
@@ -531,8 +797,9 @@ export function CommandPalette({ onNavigate }: CommandPaletteProps) {
 			setSelectedIdx(0)
 			setTimeout(() => inputRef.current?.focus(), 10)
 		} else {
-			// Reset chat mode on close so re-opening doesn't re-send the initial query
+			// Reset modes on close so re-opening starts fresh
 			setChatMode(false)
+			setImproveMode(false)
 		}
 	}, [commandPaletteOpen])
 
@@ -552,6 +819,10 @@ export function CommandPalette({ onNavigate }: CommandPaletteProps) {
 	// ── Execute ───────────────────────────────────────────────────────────────
 
 	function execute(item: CommandItem | ContextCommand) {
+		if ("preventClose" in item && item.preventClose) {
+			item.action()
+			return
+		}
 		const stackBefore = useUiStore.getState().paletteViewStack.length
 		item.action()
 		const stackAfter = useUiStore.getState().paletteViewStack.length
@@ -622,7 +893,7 @@ export function CommandPalette({ onNavigate }: CommandPaletteProps) {
 
 				{/* Panel */}
 				<DialogPrimitive.Content
-					onKeyDown={chatMode ? undefined : handleKeyDown}
+					onKeyDown={chatMode || improveMode ? undefined : handleKeyDown}
 					aria-label="Command palette"
 					className="fixed left-1/2 top-[16%] z-[10001] w-[calc(100%-2rem)] max-w-[620px] -translate-x-1/2 rounded-xl border border-border bg-surface shadow-2xl ring-1 ring-black/5 focus:outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=open]:slide-in-from-top-4 data-[state=closed]:slide-out-to-top-2 duration-200"
 				>
@@ -631,7 +902,12 @@ export function CommandPalette({ onNavigate }: CommandPaletteProps) {
 						Search and execute commands
 					</DialogPrimitive.Description>
 
-					{chatMode ? (
+					{improveMode ? (
+						<InlineImproveMode
+							onBack={() => setImproveMode(false)}
+							onOpenInSidebar={handleOpenInSidebar}
+						/>
+					) : chatMode ? (
 						<InlineAiChat
 							key={chatQuery}
 							initialQuery={chatQuery}

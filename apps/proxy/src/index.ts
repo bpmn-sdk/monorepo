@@ -4,8 +4,8 @@ import http from "node:http"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
-import { Bpmn, expand, optimize } from "@bpmnkit/core"
-import type { CompactDiagram } from "@bpmnkit/core"
+import { Bpmn, applyOperations, compactify, expand, optimize } from "@bpmnkit/core"
+import type { BpmnOperation, CompactDiagram } from "@bpmnkit/core"
 import { createClientFromProfile } from "@bpmnkit/profiles"
 import {
 	getActiveName,
@@ -17,8 +17,10 @@ import {
 import * as claude from "./adapters/claude.js"
 import * as copilot from "./adapters/copilot.js"
 import * as gemini from "./adapters/gemini.js"
-import type { FindingInfo } from "./prompt.js"
+import type { FindingInfo, ImproveContext } from "./prompt.js"
 import {
+	buildImproveSystemPrompt,
+	buildImproveUserMessage,
 	buildIncidentSystemPrompt,
 	buildIncidentUserMessage,
 	buildMcpExplainPrompt,
@@ -91,6 +93,22 @@ function extractCompactDiagram(text: string): CompactDiagram | null {
 		) {
 			return parsed as CompactDiagram
 		}
+	} catch {
+		/* invalid JSON */
+	}
+	return null
+}
+
+/**
+ * Extract a BpmnOperation[] from LLM text output.
+ * Looks for the first ```json block containing a JSON array.
+ */
+function extractOperations(text: string): BpmnOperation[] | null {
+	const match = /```json\s*\n([\s\S]*?)\n```/.exec(text)
+	if (!match?.[1]) return null
+	try {
+		const parsed = JSON.parse(match[1]) as unknown
+		if (Array.isArray(parsed)) return parsed as BpmnOperation[]
 	} catch {
 		/* invalid JSON */
 	}
@@ -875,6 +893,143 @@ const server = http.createServer(async (req, res) => {
 		res.end(
 			JSON.stringify({ endpoint: finalSpec.endpoint, filter: finalSpec.filter, items, total }),
 		)
+		return
+	}
+
+	// ── POST /improve — structured AI-assisted BPMN improvement ─────────────────
+	// Token-efficient alternative to /chat?action=improve.
+	// Phase 1: optimize() auto-fix (no AI). Phase 2: AI outputs BpmnOperation[].
+	// Emits SSE: tokens (explanation) + ops event + xml event + done.
+	if (url.pathname === "/improve" && req.method === "POST") {
+		const body = await readBody(req)
+		let context: CompactDiagram
+		let instruction: string | null
+		let backend: string | null
+		try {
+			const parsed = JSON.parse(body) as {
+				context: CompactDiagram
+				instruction?: string | null
+				backend?: string | null
+			}
+			context = parsed.context
+			instruction = parsed.instruction ?? null
+			backend = parsed.backend ?? null
+		} catch {
+			res.writeHead(400)
+			res.end("Bad Request")
+			return
+		}
+
+		const available = await detectAll()
+		const detected = backend
+			? (available.find((a) => a.name === backend) ?? available[0])
+			: available[0]
+		if (!detected) {
+			res.writeHead(503)
+			res.end("No AI CLI available. Install claude, copilot, or gemini.")
+			return
+		}
+
+		// ── Phase 1: auto-fix ─────────────────────────────────────────────────
+		let fixedCompact = context
+		let autoFixCount = 0
+		try {
+			const defs = expand(context)
+			const report = optimize(defs)
+			const fixable = report.findings
+				.filter((f) => f.applyFix)
+				.sort((a, b) => {
+					const ord: Record<string, number> = { error: 0, warning: 1, info: 2 }
+					return (ord[a.severity] ?? 2) - (ord[b.severity] ?? 2)
+				})
+			for (const f of fixable) f.applyFix?.(defs)
+			autoFixCount = fixable.length
+			if (autoFixCount > 0) {
+				fixedCompact = compactify(defs)
+				console.log(`[server] /improve → auto-fixed ${autoFixCount} issue(s)`)
+			}
+		} catch (err) {
+			console.error("[server] /improve auto-fix failed:", String(err))
+		}
+
+		// ── Phase 2: collect remaining findings ───────────────────────────────
+		const findings: FindingInfo[] = []
+		try {
+			const remaining = optimize(expand(fixedCompact))
+			for (const f of remaining.findings) {
+				findings.push({
+					category: f.category,
+					severity: f.severity,
+					message: f.message,
+					suggestion: f.suggestion,
+					elementIds: f.elementIds,
+				})
+			}
+		} catch {
+			/* non-fatal */
+		}
+
+		console.log(
+			`[server] /improve → adapter: ${detected.name}, findings: ${findings.length}, autoFix: ${autoFixCount}`,
+		)
+
+		res.writeHead(200, {
+			"Content-Type": "text/event-stream",
+			"Cache-Control": "no-cache",
+			Connection: "keep-alive",
+		})
+
+		// ── Phase 3: AI call — outputs explanation + ```json operations block ─
+		const systemPrompt = buildImproveSystemPrompt()
+		const improveCtx: ImproveContext = {
+			compact: fixedCompact,
+			findings,
+			autoFixCount,
+			instruction,
+		}
+		const userMessage = buildImproveUserMessage(improveCtx)
+
+		const accumulated: string[] = []
+		try {
+			await detected.adapter.stream(
+				[{ role: "user", content: userMessage }],
+				systemPrompt,
+				null,
+				(token) => {
+					accumulated.push(token)
+					res.write(`data: ${JSON.stringify({ type: "token", text: token })}\n\n`)
+				},
+			)
+		} catch (err) {
+			const msg = err instanceof Error ? err.message : String(err)
+			console.error(`[server] /improve adapter error: ${msg}`)
+			res.write(`data: ${JSON.stringify({ type: "error", message: msg })}\n\n`)
+			res.write(`data: ${JSON.stringify({ type: "done" })}\n\n`)
+			res.end()
+			return
+		}
+
+		// ── Phase 4: parse ops, apply, expand, emit ───────────────────────────
+		const fullText = accumulated.join("")
+		const ops = extractOperations(fullText) ?? []
+		res.write(`data: ${JSON.stringify({ type: "ops", ops, autoFixCount })}\n\n`)
+
+		if (ops.length > 0 || autoFixCount > 0) {
+			try {
+				const finalCompact = ops.length > 0 ? applyOperations(fixedCompact, ops) : fixedCompact
+				const xml = Bpmn.export(expand(finalCompact))
+				res.write(`data: ${JSON.stringify({ type: "xml", xml })}\n\n`)
+				console.log(`[server] /improve → ${ops.length} ops applied, XML emitted`)
+			} catch (err) {
+				console.error("[server] /improve expand failed:", String(err))
+				res.write(
+					`data: ${JSON.stringify({ type: "error", message: `Failed to apply operations: ${String(err)}` })}\n\n`,
+				)
+			}
+		}
+
+		res.write(`data: ${JSON.stringify({ type: "done" })}\n\n`)
+		res.end()
 		return
 	}
 

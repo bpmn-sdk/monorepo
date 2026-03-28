@@ -1,5 +1,17 @@
 # Features
 
+## AI-Assisted BPMN Improvement (2026-03-28) — `apps/proxy`, `packages/core`, `packages/plugins`, `apps/cli`
+
+Token-efficient pipeline for AI-powered BPMN analysis and improvement.
+
+- **`POST /improve` proxy endpoint**: 4-phase pipeline — auto-fix (zero AI tokens), residual analysis, AI explanation + `BpmnOperation[]` output (~5× fewer tokens than full XML regeneration), apply ops and emit final XML via SSE.
+- **`BpmnOperation` + `applyOperations()`** (`packages/core`): discriminated union (7 op types) + pure functional apply step; exported from `@bpmnkit/core`.
+- **Sub-process support in compact format** (`packages/core/bpmn/compact.ts`): `CompactElement.children` for nested processes; `compactify()` recurses, `expand()` reconstructs.
+- **Canvas highlight API** (`packages/canvas`): `highlight(ids, variant)` marks elements amber (`"changed"`) or green (`"new"`); `clearHighlights()` removes all marks.
+- **AI panel improve flow** (`packages/plugins/ai-bridge`): "✦ Improve" streams explanation, shows auto-fix count + op diff list, renders canvas preview with highlights, "Apply to diagram" button.
+- **CLI `bpmn improve <file> [--auto]`** (`apps/cli`): streams AI explanation + shows diff; `--auto` writes result back to file; `--server` for custom proxy URL.
+- **CLI `bpmn lint --fix`** (`apps/cli`): applies all auto-fixable static analysis findings and writes the BPMN file in place.
+
 ## BPMNkit Studio (2026-03-24) — `apps/studio` + `packages/user-tasks`
 
 A unified Preact web application replacing fragmented Camunda tooling (Modeler, Operate, Tasklist).

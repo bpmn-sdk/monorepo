@@ -47,6 +47,8 @@ export interface CompactElement {
 	attachedTo?: string
 	/** Boundary event: false = non-interrupting */
 	interrupting?: boolean
+	/** Nested content for sub-process container types (subProcess, eventSubProcess, etc.) */
+	children?: { elements: CompactElement[]; flows: CompactFlow[] }
 }
 
 /** A sequence flow in compact form. */
@@ -132,6 +134,21 @@ function compactifyElement(el: BpmnFlowElement): CompactElement {
 	if (el.type === "boundaryEvent") {
 		result.attachedTo = el.attachedToRef
 		if (el.cancelActivity === false) result.interrupting = false
+	}
+
+	// Recurse into sub-process container children
+	if ("flowElements" in el && Array.isArray(el.flowElements) && el.flowElements.length > 0) {
+		const seqFlows: BpmnSequenceFlow[] =
+			"sequenceFlows" in el && Array.isArray(el.sequenceFlows) ? el.sequenceFlows : []
+		result.children = {
+			elements: el.flowElements.map(compactifyElement),
+			flows: seqFlows.map((sf) => {
+				const f: CompactFlow = { id: sf.id, from: sf.sourceRef, to: sf.targetRef }
+				if (sf.name) f.name = sf.name
+				if (sf.conditionExpression) f.condition = sf.conditionExpression.text
+				return f
+			}),
+		}
 	}
 
 	return result
@@ -254,6 +271,45 @@ function makeExtensions(el: CompactElement): XmlElement[] {
 	return ext
 }
 
+function buildSubContent(
+	children: { elements: CompactElement[]; flows: CompactFlow[] } | undefined,
+): {
+	flowElements: BpmnFlowElement[]
+	sequenceFlows: BpmnSequenceFlow[]
+	textAnnotations: BpmnTextAnnotation[]
+	associations: BpmnAssociation[]
+} {
+	if (!children || children.elements.length === 0) {
+		return { flowElements: [], sequenceFlows: [], textAnnotations: [], associations: [] }
+	}
+	const inc = new Map<string, string[]>()
+	const out = new Map<string, string[]>()
+	for (const f of children.flows) {
+		const o = out.get(f.from) ?? []
+		o.push(f.id)
+		out.set(f.from, o)
+		const i = inc.get(f.to) ?? []
+		i.push(f.id)
+		inc.set(f.to, i)
+	}
+	return {
+		flowElements: children.elements.map((child) =>
+			buildFlowElement(child, inc.get(child.id) ?? [], out.get(child.id) ?? []),
+		),
+		sequenceFlows: children.flows.map((f) => ({
+			id: f.id,
+			name: f.name,
+			sourceRef: f.from,
+			targetRef: f.to,
+			conditionExpression: f.condition ? { text: f.condition, attributes: {} } : undefined,
+			extensionElements: [],
+			unknownAttributes: {},
+		})),
+		textAnnotations: [],
+		associations: [],
+	}
+}
+
 function buildFlowElement(
 	el: CompactElement,
 	incoming: string[],
@@ -269,12 +325,7 @@ function buildFlowElement(
 	}
 	const eventDef = el.eventType ? makeEventDef(el.eventType) : undefined
 	const eventDefs: BpmnEventDefinition[] = eventDef ? [eventDef] : []
-	const subContent = {
-		flowElements: [] as BpmnFlowElement[],
-		sequenceFlows: [] as BpmnSequenceFlow[],
-		textAnnotations: [] as BpmnTextAnnotation[],
-		associations: [] as BpmnAssociation[],
-	}
+	const subContent = buildSubContent(el.children)
 
 	switch (el.type) {
 		case "startEvent":

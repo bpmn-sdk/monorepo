@@ -341,6 +341,30 @@ export class BpmnCanvas {
 		return () => set.delete(handler as (...args: unknown[]) => void)
 	}
 
+	/**
+	 * Highlights a set of elements by ID with a coloured outline.
+	 *
+	 * - `"changed"` — amber outline, for elements modified by AI
+	 * - `"new"` — green fill + outline, for elements added by AI
+	 *
+	 * Call {@link clearHighlights} to remove all highlights.
+	 * Highlights are cleared automatically on the next {@link load} / {@link loadDefinitions} call.
+	 */
+	highlight(ids: string[], variant: "changed" | "new"): void {
+		const cls = `bpmnkit-highlight--${variant}`
+		const idSet = new Set(ids)
+		for (const { id, element } of [...this._shapes, ...this._edges]) {
+			if (idSet.has(id)) element.classList.add(cls)
+		}
+	}
+
+	/** Removes all highlight classes added by {@link highlight}. */
+	clearHighlights(): void {
+		for (const { element } of [...this._shapes, ...this._edges]) {
+			element.classList.remove("bpmnkit-highlight--changed", "bpmnkit-highlight--new")
+		}
+	}
+
 	/** Destroys the canvas, removing all DOM nodes and event listeners. */
 	destroy(): void {
 		this._ro.disconnect()

@@ -1,3 +1,5 @@
+import type { CompactDiagram } from "@bpmnkit/core"
+
 // ── Shared format blocks (used by non-MCP fallback adapters) ──────────────────
 
 const COMPACT_FORMAT = [
@@ -301,6 +303,82 @@ export function buildOperateChatSystemPrompt(stats: OperateStats | null): string
 		"If asked about a specific instance/incident/task, say you can only see aggregate counts unless you query for details.",
 	)
 
+	return lines.join("\n")
+}
+
+// ── Improve prompt builders ───────────────────────────────────────────────────
+
+const OPERATIONS_FORMAT = `
+BpmnOperation types (use stable element IDs, never array positions):
+  { "op": "rename",        "id": "...", "name": "new name" }
+  { "op": "update",        "id": "...", "patch": { /* partial CompactElement fields */ } }
+  { "op": "delete",        "id": "..." }
+  { "op": "insert",        "element": { /* full CompactElement with new unique id */ }, "after"?: "id", "before"?: "id", "parent"?: "sub-process-id" }
+  { "op": "add_flow",      "from": "id", "to": "id", "condition"?: "FEEL expr", "name"?: "...", "parent"?: "sub-process-id" }
+  { "op": "delete_flow",   "id": "..." }
+  { "op": "redirect_flow", "id": "...", "from"?: "new-source-id", "to"?: "new-target-id" }`.trim()
+
+export function buildImproveSystemPrompt(): string {
+	return [
+		"You are a BPMN 2.0 process improvement expert.",
+		"",
+		"Output format — follow this EXACTLY:",
+		"1. Write 2–4 sentences explaining what you will change and why.",
+		"2. Then output a single ```json block containing ONLY a JSON array of BpmnOperation objects.",
+		"",
+		OPERATIONS_FORMAT,
+		"",
+		"Rules:",
+		"- Reference only IDs that exist in the provided model (except 'insert' adds new IDs).",
+		"- For 'insert': generate a short, unique camelCase ID (e.g. 'task_notify', 'gw_valid').",
+		"- Output ONLY the operations array in the ```json block — no prose inside it.",
+		"- If no changes are needed, output [].",
+		"",
+		"Apply Camunda BPMN best practices:",
+		'  • Tasks: "Verb Object" — "Verify Invoice", "Send Notification"',
+		'  • Start events: past participle — "Order Received", "Payment Initiated"',
+		'  • End events: object + state — "Order Fulfilled", "Payment Failed"',
+		'  • XOR split gateways: yes/no question ending in "?" — "Invoice valid?"',
+		'  • XOR split outgoing flows: label with condition — "Yes"/"No", "Approved"/"Rejected"',
+		"  • Join gateways: no label",
+		"  • Never send >1 incoming flow to a task without a join gateway first",
+	].join("\n")
+}
+
+export interface ImproveContext {
+	compact: CompactDiagram
+	findings: FindingInfo[]
+	autoFixCount: number
+	instruction?: string | null
+}
+
+export function buildImproveUserMessage(ctx: ImproveContext): string {
+	const lines: string[] = []
+
+	if (ctx.autoFixCount > 0) {
+		lines.push(
+			`Note: ${ctx.autoFixCount} structural issue(s) were already auto-fixed before this analysis.`,
+			"",
+		)
+	}
+
+	lines.push("Current process model:", "```json", JSON.stringify(ctx.compact, null, 2), "```", "")
+
+	if (ctx.findings.length > 0) {
+		lines.push("Detected issues to fix:")
+		for (const f of ctx.findings) {
+			const els = f.elementIds.length > 0 ? ` [elements: ${f.elementIds.join(", ")}]` : ""
+			lines.push(`- [${f.severity}/${f.category}] ${f.message}${els}`)
+			lines.push(`  → ${f.suggestion}`)
+		}
+		lines.push("")
+	}
+
+	if (ctx.instruction) {
+		lines.push(`Additional instructions: ${ctx.instruction}`, "")
+	}
+
+	lines.push("Explain your changes, then output the BpmnOperation array in a ```json block.")
 	return lines.join("\n")
 }
 
