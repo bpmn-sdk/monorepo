@@ -9,21 +9,13 @@ export default defineConfig({
 		outDir: "dist",
 		emptyOutDir: true,
 		chunkSizeWarningLimit: 600,
-		rollupOptions: {
+		rolldownOptions: {
 			output: {
-				manualChunks: {
-					"vendor-preact": ["preact", "preact/hooks", "preact/compat"],
-					"vendor-query": ["@tanstack/react-query"],
-					"vendor-ui": [
-						"@radix-ui/react-dialog",
-						"@radix-ui/react-dropdown-menu",
-						"@radix-ui/react-tooltip",
-						"@radix-ui/react-tabs",
-						"@radix-ui/react-separator",
-						"@radix-ui/react-slot",
-						"@radix-ui/react-popover",
-					],
-					"vendor-bpmnkit-core": ["@bpmnkit/core"],
+				manualChunks(id) {
+					if (id.includes("/preact") || id.includes("/preact/")) return "vendor-preact"
+					if (id.includes("/@tanstack/react-query")) return "vendor-query"
+					if (id.includes("/@radix-ui/")) return "vendor-ui"
+					if (id.includes("/@bpmnkit/core")) return "vendor-bpmnkit-core"
 				},
 			},
 		},
