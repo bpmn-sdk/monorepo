@@ -4,7 +4,7 @@ import type { BpmnDefinitions } from "@bpmnkit/core"
 import { saveCheckpoint } from "../history/index.js"
 import { injectAiBridgeStyles } from "./css.js"
 
-const DEFAULT_SERVER = "http://localhost:3033"
+export const DEFAULT_SERVER = "http://localhost:3033"
 
 export interface NodeContext {
 	id: string
@@ -12,7 +12,7 @@ export interface NodeContext {
 	name?: string
 }
 
-interface PanelOptions {
+export interface PanelOptions {
 	serverUrl: string
 	getDefinitions(): BpmnDefinitions | null
 	loadXml(xml: string): void
@@ -899,5 +899,3 @@ export function createAiPanel(options: PanelOptions): {
 
 	return { panel, open, close, setContext, submit }
 }
-
-export { DEFAULT_SERVER }

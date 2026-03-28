@@ -889,13 +889,16 @@ const server = http.createServer(async (req, res) => {
 			deployedDefinitions: number
 			activeJobs: number
 		} | null
+		let backend: string | null
 		try {
 			const parsed = JSON.parse(body) as {
 				messages: typeof messages
 				stats?: typeof stats
+				backend?: string | null
 			}
 			messages = parsed.messages
 			stats = parsed.stats ?? null
+			backend = parsed.backend ?? null
 		} catch {
 			res.writeHead(400)
 			res.end("Bad Request")
@@ -903,7 +906,9 @@ const server = http.createServer(async (req, res) => {
 		}
 
 		const available = await detectAll()
-		const detected = available[0]
+		const detected = backend
+			? (available.find((a) => a.name === backend) ?? available[0])
+			: available[0]
 		if (!detected) {
 			res.writeHead(503)
 			res.end("No AI adapter available. Install claude, copilot, or gemini.")

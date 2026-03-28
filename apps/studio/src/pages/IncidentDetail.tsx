@@ -3,6 +3,7 @@ import { createTokenHighlightPlugin } from "@bpmnkit/plugins/token-highlight"
 import { useEffect, useRef, useState } from "preact/hooks"
 import type { JSX } from "preact/jsx-runtime"
 import { Link, useParams } from "wouter"
+import { getProxyUrl } from "../api/client.js"
 import {
 	useDefinitionXml,
 	useIncident,
@@ -16,7 +17,7 @@ import { useThemeStore } from "../stores/theme.js"
 import { toast } from "../stores/toast.js"
 import { useUiStore } from "../stores/ui.js"
 
-type SidebarTab = "error" | "variables"
+type SidebarTab = "error" | "variables" | "ai"
 
 interface VariableItem {
 	name: string
@@ -165,6 +166,8 @@ export function IncidentDetail() {
 	const [tab, setTab] = useState<SidebarTab>("error")
 	const [varSearch, setVarSearch] = useState("")
 	const [modalVar, setModalVar] = useState<VariableItem | null>(null)
+	const [aiAnalysis, setAiAnalysis] = useState("")
+	const [aiLoading, setAiLoading] = useState(false)
 
 	// Resizable sidebar
 	const [sidebarW, setSidebarW] = useState(320)
@@ -247,6 +250,51 @@ export function IncidentDetail() {
 		}
 	}
 
+	async function analyzeIncident() {
+		if (aiLoading) return
+		setAiAnalysis("")
+		setAiLoading(true)
+		try {
+			const response = await fetch(`${getProxyUrl()}/operate/incident-assist`, {
+				method: "POST",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify({ incidentKey: key }),
+			})
+			if (!response.ok || !response.body) throw new Error(`HTTP ${response.status}`)
+
+			const reader = response.body.getReader()
+			const decoder = new TextDecoder()
+			let accumulated = ""
+			while (true) {
+				const { done, value } = await reader.read()
+				if (done) break
+				const chunk = decoder.decode(value, { stream: true })
+				for (const line of chunk.split("\n")) {
+					if (!line.startsWith("data: ")) continue
+					try {
+						const parsed = JSON.parse(line.slice(6)) as
+							| { type: "token"; text: string }
+							| { type: "done" }
+							| { type: "error"; message: string }
+						if (parsed.type === "done") break
+						if (parsed.type === "error") throw new Error(parsed.message)
+						if (parsed.type === "token") {
+							accumulated += parsed.text
+							setAiAnalysis(accumulated)
+						}
+					} catch (e) {
+						if (e instanceof SyntaxError) continue
+						throw e
+					}
+				}
+			}
+		} catch (err) {
+			setAiAnalysis(`Error: ${err instanceof Error ? err.message : String(err)}`)
+		} finally {
+			setAiLoading(false)
+		}
+	}
+
 	if (isError) {
 		return (
 			<ErrorState
@@ -314,6 +362,15 @@ export function IncidentDetail() {
 									{variables.length}
 								</span>
 							)}
+						</button>
+						<button
+							type="button"
+							onClick={() => setTab("ai")}
+							className={`flex-1 py-2 text-xs font-medium transition-colors ${
+								tab === "ai" ? "text-fg border-b-2 border-accent" : "text-muted hover:text-fg"
+							}`}
+						>
+							AI
 						</button>
 					</div>
 
@@ -420,6 +477,30 @@ export function IncidentDetail() {
 									})
 								)}
 							</div>
+						</div>
+					)}
+
+					{/* AI tab */}
+					{tab === "ai" && (
+						<div className="flex-1 flex flex-col overflow-hidden p-4 gap-3">
+							<button
+								type="button"
+								onClick={() => void analyzeIncident()}
+								disabled={aiLoading}
+								className="w-full rounded border border-border bg-surface-2 px-3 py-2 text-xs text-fg hover:bg-accent/10 transition-colors disabled:opacity-50"
+							>
+								{aiLoading ? "Analyzing…" : aiAnalysis ? "Re-analyze" : "Analyze with AI"}
+							</button>
+							{aiAnalysis && (
+								<pre className="flex-1 overflow-y-auto text-xs text-fg font-sans leading-relaxed whitespace-pre-wrap break-words">
+									{aiAnalysis}
+								</pre>
+							)}
+							{!aiAnalysis && !aiLoading && (
+								<p className="text-xs text-muted text-center mt-4">
+									AI will analyze the root cause, impact, and remediation steps.
+								</p>
+							)}
 						</div>
 					)}
 				</div>

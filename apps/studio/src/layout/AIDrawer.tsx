@@ -1,14 +1,12 @@
+import { BpmnCanvas } from "@bpmnkit/canvas"
+import { createAiPanel } from "@bpmnkit/plugins/ai-bridge"
 import { X } from "lucide-react"
 import { useEffect, useRef, useState } from "preact/hooks"
 import { useLocation } from "wouter"
 import { getProxyUrl } from "../api/client.js"
+import { useThemeStore } from "../stores/theme.js"
+import type { AiBackend, AiMessage } from "../stores/ui.js"
 import { useUiStore } from "../stores/ui.js"
-
-interface Message {
-	id: string
-	role: "user" | "assistant"
-	content: string
-}
 
 function getContextLabel(path: string): string {
 	if (path.startsWith("/definitions/")) return "Definition"
@@ -25,57 +23,196 @@ function getContextLabel(path: string): string {
 	return "Studio"
 }
 
-export function AIDrawer() {
-	const { aiOpen, aiInitialPrompt, closeAI } = useUiStore()
-	const [location] = useLocation()
-	const [messages, setMessages] = useState<Message[]>([])
+// ── Thinking indicator ────────────────────────────────────────────────────────
+
+function ThinkingDots() {
+	return (
+		<div className="flex items-center gap-1 py-1">
+			<span className="h-2 w-2 rounded-full bg-accent animate-bounce [animation-delay:-0.3s]" />
+			<span className="h-2 w-2 rounded-full bg-accent animate-bounce [animation-delay:-0.15s]" />
+			<span className="h-2 w-2 rounded-full bg-accent animate-bounce" />
+		</div>
+	)
+}
+
+// ── Backend selector ──────────────────────────────────────────────────────────
+
+function BackendSelector() {
+	const { aiBackend, aiAvailableBackends, setAiBackend, setAiAvailableBackends } = useUiStore()
+
+	// biome-ignore lint/correctness/useExhaustiveDependencies: fetch once on mount
+	useEffect(() => {
+		fetch(`${getProxyUrl()}/status`)
+			.then((r) => r.json())
+			.then((d: { available?: string[] }) => {
+				if (Array.isArray(d.available)) setAiAvailableBackends(d.available)
+			})
+			.catch(() => {})
+	}, [])
+
+	return (
+		<div className="relative inline-flex items-center">
+			<select
+				value={aiBackend}
+				onChange={(e) => setAiBackend((e.target as HTMLSelectElement).value as AiBackend)}
+				className="appearance-none bg-surface-2 border border-border rounded px-2 py-0.5 text-[11px] text-muted hover:text-fg cursor-pointer focus:outline-none focus:ring-1 focus:ring-accent pr-5"
+				aria-label="Select AI backend"
+			>
+				<option value="auto">
+					Auto (
+					{aiAvailableBackends[0]
+						? aiAvailableBackends[0].charAt(0).toUpperCase() + aiAvailableBackends[0].slice(1)
+						: "?"}
+					)
+				</option>
+				{aiAvailableBackends.map((b) => (
+					<option key={b} value={b}>
+						{b.charAt(0).toUpperCase() + b.slice(1)}
+					</option>
+				))}
+			</select>
+			<span className="pointer-events-none absolute right-1.5 text-[9px] text-muted">▾</span>
+		</div>
+	)
+}
+
+// ── BPMN XML preview ──────────────────────────────────────────────────────────
+
+function XmlPreview({ xml }: { xml: string }) {
+	const containerRef = useRef<HTMLDivElement>(null)
+	const { theme } = useThemeStore()
+
+	useEffect(() => {
+		const container = containerRef.current
+		if (!container) return
+		const canvas = new BpmnCanvas({
+			container,
+			theme: theme === "light" ? "light" : "dark",
+			grid: false,
+			fit: "contain",
+		})
+		void canvas.load(xml)
+		return () => canvas.destroy()
+	}, [xml, theme])
+
+	return (
+		<div
+			ref={containerRef}
+			className="mt-2 rounded border border-border overflow-hidden"
+			style={{ height: 160 }}
+		/>
+	)
+}
+
+// ── Editor AI panel (mounts createAiPanel docked) ────────────────────────────
+
+function EditorAiPanel({ onClose }: { onClose(): void }) {
+	const { editorAiContext, aiInitialPrompt } = useUiStore()
+	const containerRef = useRef<HTMLDivElement>(null)
+
+	// biome-ignore lint/correctness/useExhaustiveDependencies: panel created once per context
+	useEffect(() => {
+		if (!editorAiContext || !containerRef.current) return
+
+		const panel = createAiPanel({
+			serverUrl: getProxyUrl(),
+			getDefinitions: editorAiContext.getDefinitions,
+			loadXml: editorAiContext.loadXml,
+			getTheme: editorAiContext.getTheme,
+			createCompanionFile: editorAiContext.createCompanionFile,
+		})
+		panel.panel.classList.add("ai-panel--docked")
+		containerRef.current.appendChild(panel.panel)
+		panel.open()
+
+		if (aiInitialPrompt) panel.submit(aiInitialPrompt)
+
+		return () => panel.panel.remove()
+	}, [editorAiContext])
+
+	return (
+		<div className="flex w-[360px] flex-col h-full border-l border-border">
+			<div className="flex items-center justify-between border-b border-border px-3 py-2 shrink-0">
+				<div>
+					<div className="text-sm font-medium text-fg">AI Assistant</div>
+					<div className="text-xs text-muted">Talking about: Model</div>
+				</div>
+				<button
+					type="button"
+					onClick={onClose}
+					className="text-muted hover:text-fg"
+					aria-label="Close AI assistant"
+				>
+					<X size={16} />
+				</button>
+			</div>
+			<div ref={containerRef} className="flex flex-1 flex-col min-h-0 overflow-hidden" />
+		</div>
+	)
+}
+
+// ── General text chat ─────────────────────────────────────────────────────────
+
+function TextChat({ contextLabel, onClose }: { contextLabel: string; onClose(): void }) {
+	const {
+		aiMessages,
+		aiBackend,
+		aiInitialPrompt,
+		editorAiContext,
+		pushAiMessage,
+		updateAiMessage,
+		clearAiMessages,
+	} = useUiStore()
 	const [input, setInput] = useState("")
 	const [loading, setLoading] = useState(false)
 	const messagesEndRef = useRef<HTMLDivElement>(null)
 	const textareaRef = useRef<HTMLTextAreaElement>(null)
 
-	// Pre-fill input when opened with an initial prompt (e.g. from "Generate from OpenAPI spec")
+	// Auto-submit initial prompt once if provided and no existing messages
+	// biome-ignore lint/correctness/useExhaustiveDependencies: send once on open
 	useEffect(() => {
-		if (aiOpen && aiInitialPrompt) {
-			setInput(aiInitialPrompt)
+		if (aiInitialPrompt && aiMessages.length === 0) {
+			void sendMessage(aiInitialPrompt)
+		} else {
 			setTimeout(() => textareaRef.current?.focus(), 50)
 		}
-	}, [aiOpen, aiInitialPrompt])
+	}, [])
 
-	const messageCount = messages.length
-	// biome-ignore lint/correctness/useExhaustiveDependencies: scroll triggered by message count change
+	const messageCount = aiMessages.length
+	// biome-ignore lint/correctness/useExhaustiveDependencies: scroll on message count change
 	useEffect(() => {
 		messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
 	}, [messageCount])
 
-	async function sendMessage() {
-		const text = input.trim()
-		if (!text || loading) return
+	async function sendMessage(text?: string) {
+		const msgText = (text ?? input).trim()
+		if (!msgText || loading) return
 
-		const userMsg: Message = {
-			id: crypto.randomUUID(),
-			role: "user",
-			content: text,
-		}
-		setMessages((prev) => [...prev, userMsg])
-		setInput("")
+		const userMsg: AiMessage = { id: crypto.randomUUID(), role: "user", content: msgText }
+		const historyPayload = useUiStore.getState().aiMessages
+		pushAiMessage(userMsg)
+		if (!text) setInput("")
 		setLoading(true)
 
 		const assistantId = crypto.randomUUID()
-		setMessages((prev) => [...prev, { id: assistantId, role: "assistant", content: "" }])
+		pushAiMessage({ id: assistantId, role: "assistant", content: "" })
+
+		const backendParam = aiBackend === "auto" ? null : aiBackend
 
 		try {
 			const response = await fetch(`${getProxyUrl()}/operate/chat`, {
 				method: "POST",
 				headers: { "content-type": "application/json" },
 				body: JSON.stringify({
-					messages: [...messages, userMsg].map((m) => ({ role: m.role, content: m.content })),
+					messages: [...historyPayload, userMsg].map((m) => ({
+						role: m.role,
+						content: m.content,
+					})),
+					backend: backendParam,
 				}),
 			})
 
-			if (!response.ok || !response.body) {
-				throw new Error(`HTTP ${response.status}`)
-			}
+			if (!response.ok || !response.body) throw new Error(`HTTP ${response.status}`)
 
 			const reader = response.body.getReader()
 			const decoder = new TextDecoder()
@@ -97,12 +234,9 @@ export function AIDrawer() {
 						if (parsed.type === "error") throw new Error(parsed.message)
 						if (parsed.type === "token") {
 							accumulated += parsed.text
-							setMessages((prev) =>
-								prev.map((m) => (m.id === assistantId ? { ...m, content: accumulated } : m)),
-							)
+							updateAiMessage(assistantId, { content: accumulated })
 						}
 					} catch (parseErr) {
-						// re-throw real errors, skip malformed SSE lines
 						if (parseErr instanceof Error && parseErr.message !== "Unexpected end of JSON input") {
 							throw parseErr
 						}
@@ -110,13 +244,9 @@ export function AIDrawer() {
 				}
 			}
 		} catch (err) {
-			setMessages((prev) =>
-				prev.map((m) =>
-					m.id === assistantId
-						? { ...m, content: `Error: ${err instanceof Error ? err.message : String(err)}` }
-						: m,
-				),
-			)
+			updateAiMessage(assistantId, {
+				content: `Error: ${err instanceof Error ? err.message : String(err)}`,
+			})
 		} finally {
 			setLoading(false)
 		}
@@ -129,88 +259,88 @@ export function AIDrawer() {
 		}
 	}
 
-	const contextLabel = getContextLabel(location)
-
 	return (
-		<div
-			className={`flex shrink-0 flex-col overflow-hidden bg-surface transition-[max-width] duration-300 ease-out ${
-				aiOpen ? "max-w-[280px] pointer-events-auto" : "max-w-0 pointer-events-none"
-			}`}
-			aria-hidden={!aiOpen}
-			role="complementary"
-		>
-			{/* Fixed-width inner so content never reflows during the animation */}
-			<div className="flex w-[280px] flex-col h-full border-l border-border">
-				{/* Header */}
-				<div className="flex items-center justify-between border-b border-border px-3 py-2">
-					<div>
-						<div className="text-sm font-medium text-fg">AI Assistant</div>
-						<div className="text-xs text-muted">Talking about: {contextLabel}</div>
-					</div>
+		<div className="flex w-[280px] flex-col h-full border-l border-border">
+			{/* Header */}
+			<div className="flex items-center justify-between border-b border-border px-3 py-2 shrink-0">
+				<div>
+					<div className="text-sm font-medium text-fg">AI Assistant</div>
+					<div className="text-xs text-muted">Talking about: {contextLabel}</div>
+				</div>
+				<div className="flex items-center gap-1.5">
+					<BackendSelector />
 					<button
 						type="button"
-						onClick={closeAI}
+						onClick={onClose}
 						className="text-muted hover:text-fg"
 						aria-label="Close AI assistant"
 					>
 						<X size={16} />
 					</button>
 				</div>
+			</div>
 
-				{/* Messages */}
-				<div
-					className="flex-1 overflow-y-auto p-3 space-y-3"
-					aria-live="polite"
-					aria-atomic="false"
-				>
-					{messages.length === 0 && (
-						<p className="text-center text-xs text-muted mt-8">
-							Ask anything about your processes, instances, or incidents.
-						</p>
-					)}
-					{messages.map((msg) => (
+			{/* Messages */}
+			<div className="flex-1 overflow-y-auto p-3 space-y-3" aria-live="polite" aria-atomic="false">
+				{aiMessages.length === 0 && (
+					<p className="text-center text-xs text-muted mt-8">
+						Ask anything about your processes, instances, or incidents.
+					</p>
+				)}
+				{aiMessages.map((msg) => (
+					<div
+						key={msg.id}
+						className={`flex flex-col ${msg.role === "user" ? "items-end" : "items-start"}`}
+					>
 						<div
-							key={msg.id}
-							className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+							className={`max-w-[90%] rounded-lg px-3 py-2 text-sm ${
+								msg.role === "user" ? "bg-accent text-accent-fg" : "bg-surface-2 text-fg"
+							}`}
 						>
-							<div
-								className={`max-w-[90%] rounded-lg px-3 py-2 text-sm ${
-									msg.role === "user" ? "bg-accent text-accent-fg" : "bg-surface-2 text-fg"
-								}`}
-							>
-								{msg.content ||
-									(loading && msg.role === "assistant" ? (
-										<span className="animate-pulse text-muted">...</span>
-									) : (
-										""
-									))}
-							</div>
+							{msg.content && msg.content}
+							{!msg.content && loading && msg.role === "assistant" && <ThinkingDots />}
 						</div>
-					))}
-					<div ref={messagesEndRef} />
-				</div>
-
-				{/* Input */}
-				<div className="border-t border-border p-2">
-					<div className="flex gap-2">
-						<textarea
-							ref={textareaRef}
-							value={input}
-							onInput={(e) => setInput((e.target as HTMLTextAreaElement).value)}
-							onKeyDown={handleKeyDown}
-							placeholder="Ask AI... (Enter to send)"
-							className="flex-1 resize-none rounded border border-border bg-surface-2 px-2 py-1.5 text-sm text-fg placeholder:text-muted focus-visible:outline-2 focus-visible:outline-accent"
-							rows={2}
-							disabled={loading}
-							aria-label="Message input"
-						/>
+						{msg.xml && editorAiContext && (
+							<div className="w-full mt-1">
+								<XmlPreview xml={msg.xml} />
+								<div className="flex items-center justify-between mt-1 px-1">
+									<span className="text-[11px] text-muted">Diagram ready</span>
+									<button
+										type="button"
+										onClick={() => msg.xml && editorAiContext.loadXml(msg.xml)}
+										className="text-[11px] font-medium text-accent hover:underline"
+									>
+										Apply to editor
+									</button>
+								</div>
+							</div>
+						)}
 					</div>
-					<div className="mt-1 flex justify-between items-center">
-						<span className="text-xs text-muted">Shift+Enter for newline</span>
-						{messages.length > 0 && (
+				))}
+				<div ref={messagesEndRef} />
+			</div>
+
+			{/* Input */}
+			<div className="border-t border-border p-2">
+				<textarea
+					ref={textareaRef}
+					value={input}
+					onInput={(e) => setInput((e.target as HTMLTextAreaElement).value)}
+					onKeyDown={handleKeyDown}
+					placeholder="Ask AI… (Enter to send)"
+					className="flex-1 w-full resize-none rounded border border-border bg-surface-2 px-2 py-1.5 text-sm text-fg placeholder:text-muted focus-visible:outline-2 focus-visible:outline-accent"
+					rows={2}
+					disabled={loading}
+					aria-label="Message input"
+				/>
+				<div className="mt-1 flex justify-between items-center">
+					<span className="text-xs text-muted">Shift+Enter for newline</span>
+					<div className="flex items-center gap-2">
+						{loading && <span className="text-xs text-accent animate-pulse">Thinking…</span>}
+						{aiMessages.length > 0 && !loading && (
 							<button
 								type="button"
-								onClick={() => setMessages([])}
+								onClick={clearAiMessages}
 								className="text-xs text-muted hover:text-fg"
 							>
 								Clear
@@ -219,6 +349,39 @@ export function AIDrawer() {
 					</div>
 				</div>
 			</div>
+		</div>
+	)
+}
+
+// ── AIDrawer ──────────────────────────────────────────────────────────────────
+
+export function AIDrawer() {
+	const { aiOpen, aiInitialMessages, aiMessages, editorAiContext, closeAI } = useUiStore()
+	const [location] = useLocation()
+
+	// Editor mode: only when editorAiContext is active and there's no existing conversation
+	// (palette chat history in aiMessages takes precedence — show TextChat so the history is visible)
+	const isEditorMode = !!editorAiContext && !aiInitialMessages && aiMessages.length === 0
+
+	const contextLabel = getContextLabel(location)
+
+	return (
+		<div
+			className={`flex shrink-0 flex-col overflow-hidden bg-surface transition-[max-width] duration-300 ease-out ${
+				aiOpen ? "pointer-events-auto" : "pointer-events-none"
+			} ${isEditorMode ? (aiOpen ? "max-w-[360px]" : "max-w-0") : aiOpen ? "max-w-[280px]" : "max-w-0"}`}
+			aria-hidden={!aiOpen}
+			role="complementary"
+		>
+			{isEditorMode ? (
+				<EditorAiPanel onClose={closeAI} />
+			) : (
+				<TextChat
+					key={aiInitialMessages ? "with-messages" : "persistent"}
+					contextLabel={contextLabel}
+					onClose={closeAI}
+				/>
+			)}
 		</div>
 	)
 }

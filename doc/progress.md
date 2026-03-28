@@ -1,5 +1,55 @@
 # Progress
 
+## 2026-03-28 — Studio: AI polish — z-index, shared history, XML preview, backend picker, thinking indicator
+
+**Command palette always on top** (`apps/studio/src/components/CommandPalette.tsx`):
+- Overlay raised to `z-[10000]`, content to `z-[10001]` — above the editor dock's `z-index: 9999`.
+- Backdrop uses `backdrop-blur-md bg-black/50` for a strong frosted-glass effect over all UI.
+
+**Shared persistent chat history** (`apps/studio/src/stores/ui.ts`, both chat components):
+- Moved message array to the Zustand store (`aiMessages`, `pushAiMessage`, `updateAiMessage`, `clearAiMessages`).
+- History is shared between the command palette inline chat and the AI Drawer text-chat — switching between them preserves the conversation.
+- `AiMessage.xml?: string` field carries BPMN XML alongside message content.
+
+**BPMN XML preview in chat** (`XmlPreview` component in both files):
+- When the AI returns a BPMN diagram (`type: "xml"` SSE event) in the editor context, it is stored on the message and rendered as an inline `BpmnCanvas` (160 px tall, respects current theme).
+- "Apply to editor" button below the preview calls `editorAiContext.loadXml(xml)` directly.
+
+**AI backend selector** (`BackendSelector` component):
+- Fetches `/status` to populate available backends; auto-selects the first available.
+- Dropdown shows `Auto (Claude)` / `Claude` / `Copilot` / `Gemini` etc.
+- Selection stored in `aiBackend` (Zustand) — shared between palette chat and sidebar.
+- Both the palette header and the sidebar header show the selector.
+- Proxy `/operate/chat` extended to accept `backend` param (mirrors `/chat`).
+
+**Better thinking indicator** (`ThinkingDots` component):
+- Three bouncing dots (`animate-bounce`) with staggered delays replace the old `animate-pulse "..."`.
+- "Thinking…" text shown next to input while loading.
+
+## 2026-03-28 — Studio: context-aware AI & command palette chat
+
+**AI Drawer context-awareness** (`apps/studio/src/layout/AIDrawer.tsx`, `stores/ui.ts`):
+- Added `EditorAiContext` and `AiMessage` types to the UI store; `setEditorAiContext` action for views to register their context.
+- In editor view (Models): mounts the existing `createAiPanel` from `@bpmnkit/plugins/ai-bridge` in docked mode — full BPMN context, streaming XML preview, Apply / companion-file workflow. Drawer is 360 px in this mode.
+- In all other views: text chat via `/operate/chat` SSE, 280 px drawer.
+- When initial messages are transferred from the command palette, text mode is used regardless of context.
+
+**Editor sidebar AI tab removed** (`packages/editor/src/dock.ts`, `apps/studio/src/pages/ModelDetail.tsx`):
+- Added `setAiTabVisible(visible)` to the `SideDock` interface and implementation (mirrors `setPlayTabVisible`).
+- `ModelDetail` calls `dock.setAiTabVisible(false)` and registers / deregisters the editor AI context on mount / unmount. `createCompanionFile` creates a new model via the models store.
+- Exported `PanelOptions` and `createAiPanel` from `@bpmnkit/plugins/ai-bridge` public API.
+
+**Command palette inline AI chat** (`apps/studio/src/components/CommandPalette.tsx`):
+- Selecting "Ask AI: …" transforms the palette modal into an inline chat (`InlineAiChat` component) — no drawer open, no context switch.
+- Context-aware endpoint: `/chat` with `compactify(defs)` when `editorAiContext` is set, `/operate/chat` otherwise.
+- XML responses show a "Diagram ready" + Apply button (applies directly without leaving the palette).
+- "Sidebar" button top-right transfers the conversation to the AI Drawer (`openAI(undefined, messages)`) and closes the palette.
+- Back (`‹`) returns to the command list; Esc also goes back.
+
+**Incident AI tab** (`apps/studio/src/pages/IncidentDetail.tsx`):
+- Added "AI" as a third tab in the incident detail sidebar.
+- Streams `/operate/incident-assist` SSE into a scrollable `<pre>` block; Re-analyze button resets and re-runs.
+
 ## 2026-03-27 — Studio: motion & view transitions
 
 Added animations throughout the Studio app — previously all `animate-in`/`fade-in-0`/`slide-in-from-*` Tailwind classes were dead code because `tailwindcss-animate` was not installed.

@@ -564,6 +564,8 @@ export function ModelDetail() {
 		dock.setHistoryTabEnabled(false)
 		// Play mode not integrated in Studio
 		dock.setPlayTabVisible(false)
+		// AI is handled by the Studio AI drawer — remove the dock's own AI tab
+		dock.setAiTabVisible(false)
 
 		// Render Studio-specific content into dock panes
 		render(
@@ -738,6 +740,24 @@ export function ModelDetail() {
 			}, 2000)
 		})
 
+		// Register editor AI context for the Studio AI drawer
+		const { saveModel: saveModelFn, upsertModel: upsertModelFn } = useModelsStore.getState()
+		useUiStore.getState().setEditorAiContext({
+			getDefinitions: () => editorRef.current?.getDefinitions() ?? null,
+			loadXml: (xml) => editorRef.current?.load(xml),
+			getTheme: () => (useThemeStore.getState().theme === "light" ? "light" : "dark"),
+			createCompanionFile: async (name, type, content) => {
+				const newModel = await saveModelFn({
+					id: crypto.randomUUID(),
+					name,
+					type,
+					content,
+					createdAt: Date.now(),
+				})
+				upsertModelFn(newModel)
+			},
+		})
+
 		return () => {
 			off()
 			offSelect()
@@ -749,6 +769,7 @@ export function ModelDetail() {
 			editor.destroy() // triggers paletteEditorPlugin.uninstall() → clears element commands
 			deregisterExtra()
 			useUiStore.getState().clearContextCommands()
+			useUiStore.getState().setEditorAiContext(null)
 			editorRef.current = null
 			presentationApiRef.current = null
 		}
