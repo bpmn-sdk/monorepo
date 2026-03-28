@@ -1,5 +1,19 @@
 # @bpmnkit/plugins
 
+## 0.0.19
+
+### Patch Changes
+
+- [#65](https://github.com/bpmnkit/monorepo/pull/65) [`58adc33`](https://github.com/bpmnkit/monorepo/commit/58adc33d1818367a68c27cc02aabec7e68aca002) Thanks [@urbanisierung](https://github.com/urbanisierung)! - Profile improvements
+
+- [#66](https://github.com/bpmnkit/monorepo/pull/66) [`270078c`](https://github.com/bpmnkit/monorepo/commit/270078c52fce2c2a567fa1b4b9d6de8001c6f18e) Thanks [@urbanisierung](https://github.com/urbanisierung)! - Improved AI capabilities.
+
+- Updated dependencies [[`270078c`](https://github.com/bpmnkit/monorepo/commit/270078c52fce2c2a567fa1b4b9d6de8001c6f18e)]:
+  - @bpmnkit/canvas@0.0.16
+  - @bpmnkit/editor@0.0.19
+  - @bpmnkit/core@0.0.16
+  - @bpmnkit/ascii@0.0.16
+
 ## 0.0.18
 
 ### Patch Changes

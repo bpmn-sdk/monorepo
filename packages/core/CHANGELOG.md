@@ -1,5 +1,11 @@
 # @bpmnkit/core
 
+## 0.0.16
+
+### Patch Changes
+
+- [#66](https://github.com/bpmnkit/monorepo/pull/66) [`270078c`](https://github.com/bpmnkit/monorepo/commit/270078c52fce2c2a567fa1b4b9d6de8001c6f18e) Thanks [@urbanisierung](https://github.com/urbanisierung)! - Improved AI capabilities.
+
 ## 0.0.15
 
 ### Patch Changes
