@@ -158,6 +158,8 @@ export interface SideDock {
 	setVisible(visible: boolean): void
 	/** Register a callback invoked when the AI tab is clicked (after switching to it). */
 	setAiTabClickHandler(fn: () => void): void
+	/** Show or hide the AI tab. */
+	setAiTabVisible(visible: boolean): void
 	/** Register a callback invoked when the History tab is clicked (after switching to it). */
 	setHistoryTabClickHandler(fn: () => void): void
 	/** Enable or disable the History tab (disable when no storage context is available). */
@@ -413,6 +415,14 @@ export function createSideDock(): SideDock {
 		}
 	}
 
+	function setAiTabVisible(visible: boolean): void {
+		aiTab.style.display = visible ? "" : "none"
+		// If AI tab is hidden while active, fall back to properties
+		if (!visible && aiTab.classList.contains("active")) {
+			switchTab("properties")
+		}
+	}
+
 	function setPlayTabVisible(visible: boolean): void {
 		playTab.style.display = visible ? "" : "none"
 		// If play tab is hidden while active, fall back to properties
@@ -513,6 +523,7 @@ export function createSideDock(): SideDock {
 		setDiagramInfo,
 		setVisible,
 		setAiTabClickHandler,
+		setAiTabVisible,
 		setHistoryTabClickHandler,
 		setHistoryTabEnabled,
 		setPlayTabVisible,

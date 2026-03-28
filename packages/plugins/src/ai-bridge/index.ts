@@ -1,6 +1,9 @@
 import type { BpmnDefinitions } from "@bpmnkit/core"
 import { DEFAULT_SERVER, createAiPanel } from "./panel.js"
-import type { NodeContext } from "./panel.js"
+import type { NodeContext, PanelOptions } from "./panel.js"
+
+export { createAiPanel, DEFAULT_SERVER }
+export type { PanelOptions }
 
 export type { NodeContext }
 

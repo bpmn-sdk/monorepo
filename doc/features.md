@@ -1,5 +1,17 @@
 # Features
 
+## AI-Assisted BPMN Improvement (2026-03-28) — `apps/proxy`, `packages/core`, `packages/plugins`, `apps/cli`
+
+Token-efficient pipeline for AI-powered BPMN analysis and improvement.
+
+- **`POST /improve` proxy endpoint**: 4-phase pipeline — auto-fix (zero AI tokens), residual analysis, AI explanation + `BpmnOperation[]` output (~5× fewer tokens than full XML regeneration), apply ops and emit final XML via SSE.
+- **`BpmnOperation` + `applyOperations()`** (`packages/core`): discriminated union (7 op types) + pure functional apply step; exported from `@bpmnkit/core`.
+- **Sub-process support in compact format** (`packages/core/bpmn/compact.ts`): `CompactElement.children` for nested processes; `compactify()` recurses, `expand()` reconstructs.
+- **Canvas highlight API** (`packages/canvas`): `highlight(ids, variant)` marks elements amber (`"changed"`) or green (`"new"`); `clearHighlights()` removes all marks.
+- **AI panel improve flow** (`packages/plugins/ai-bridge`): "✦ Improve" streams explanation, shows auto-fix count + op diff list, renders canvas preview with highlights, "Apply to diagram" button.
+- **CLI `bpmn improve <file> [--auto]`** (`apps/cli`): streams AI explanation + shows diff; `--auto` writes result back to file; `--server` for custom proxy URL.
+- **CLI `bpmn lint --fix`** (`apps/cli`): applies all auto-fixable static analysis findings and writes the BPMN file in place.
+
 ## BPMNkit Studio (2026-03-24) — `apps/studio` + `packages/user-tasks`
 
 A unified Preact web application replacing fragmented Camunda tooling (Modeler, Operate, Tasklist).
@@ -14,7 +26,9 @@ A unified Preact web application replacing fragmented Camunda tooling (Modeler, 
 - **Incidents**: filterable table, detail page with BpmnCanvas highlighting the failing element in red via `tokenPlugin.api.setError()`.
 - **User Tasks**: filterable table with overdue highlighting, detail page with form rendering via `@bpmnkit/plugins/form-viewer`, claim/unclaim/complete actions.
 - **Decisions**: browsable DMN decision table list and detail view.
-- **AI Drawer**: context-aware chat via proxy SSE streaming endpoint, persists conversation in-session.
+- **AI Drawer**: context-aware chat — in editor view mounts the full `createAiPanel` (BPMN context, XML preview, Apply button, companion file creation); in all other views uses text chat via `/operate/chat`. Accepts initial messages transferred from the command palette.
+- **Command Palette AI Chat**: typing a query + selecting "Ask AI" transforms the palette into an inline chat modal (no context switch). Chat is context-aware: uses `/chat` with BPMN context on model pages, `/operate/chat` elsewhere. Returns XML → "Diagram ready" + Apply button. "Sidebar" button moves the conversation to the AI Drawer.
+- **Incident AI**: IncidentDetail sidebar has a third "AI" tab that calls `/operate/incident-assist` for structured root-cause / remediation analysis (matching Operate's implementation).
 - **Command Palette**: ⌘K dialog with arrow-key navigation, fuzzy word-prefix matching, match highlighting, styled `<kbd>` shortcuts, footer hint bar.
 - **Zen / Presentation Mode**: ⌘K → "Start Presentation Mode" hides all Studio chrome (TopBar, Sidebar, AI Drawer, save bar, editor HUD toolbars) for a distraction-free BPMN view.
 - **`@bpmnkit/user-tasks`**: standalone vanilla TS widget (`createUserTaskWidget`) for embedding task completion forms in any host page.

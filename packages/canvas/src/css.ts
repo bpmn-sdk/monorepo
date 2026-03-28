@@ -54,6 +54,33 @@ export const CANVAS_CSS = `
   stroke-width: 2.5;
 }
 
+/* ── Highlight variants (AI improve preview) ────────────────────── */
+.bpmnkit-highlight--changed .bpmnkit-shape-body,
+.bpmnkit-highlight--changed .bpmnkit-event-body,
+.bpmnkit-highlight--changed .bpmnkit-gw-body,
+.bpmnkit-highlight--changed .bpmnkit-pool-body,
+.bpmnkit-highlight--changed .bpmnkit-lane-body {
+  stroke: var(--bpmnkit-warn, #d97706);
+  stroke-width: 2.5;
+}
+.bpmnkit-highlight--changed .bpmnkit-edge-path {
+  stroke: var(--bpmnkit-warn, #d97706);
+  stroke-width: 2.5;
+}
+.bpmnkit-highlight--new .bpmnkit-shape-body,
+.bpmnkit-highlight--new .bpmnkit-event-body,
+.bpmnkit-highlight--new .bpmnkit-gw-body,
+.bpmnkit-highlight--new .bpmnkit-pool-body,
+.bpmnkit-highlight--new .bpmnkit-lane-body {
+  fill: var(--bpmnkit-success-subtle, rgba(22, 163, 74, 0.12));
+  stroke: var(--bpmnkit-success, #16a34a);
+  stroke-width: 2.5;
+}
+.bpmnkit-highlight--new .bpmnkit-edge-path {
+  stroke: var(--bpmnkit-success, #16a34a);
+  stroke-width: 2.5;
+}
+
 .bpmnkit-shape-body,
 .bpmnkit-event-body,
 .bpmnkit-gw-body {

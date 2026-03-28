@@ -1,5 +1,6 @@
 {
-  "name": "reebe-wasm",
+  "name": "@bpmnkit/reebe-wasm",
+  "private": true,
   "type": "module",
   "description": "WebAssembly playground for the Reebe BPMN workflow engine",
   "version": "0.1.0",
@@ -10,7 +11,14 @@
     "reebe_wasm.d.ts"
   ],
   "main": "reebe_wasm.js",
+  "module": "reebe_wasm.js",
   "types": "reebe_wasm.d.ts",
+  "exports": {
+    ".": {
+      "import": "./reebe_wasm.js",
+      "types": "./reebe_wasm.d.ts"
+    }
+  },
   "sideEffects": [
     "./snippets/*"
   ]

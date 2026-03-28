@@ -438,6 +438,46 @@ export function injectAiBridgeStyles(): void {
   color: oklch(75% 0.16 280);
 }
 [data-bpmnkit-hud-theme="neon"] .ai-companion-create:hover:not(:disabled) { background: oklch(65% 0.28 280 / 0.2); }
+/* ── Improve diff ── */
+.ai-improve-diff {
+  margin-top: 10px;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 6px;
+  overflow: hidden;
+  font-size: 12px;
+}
+.ai-improve-autofix {
+  padding: 5px 10px;
+  background: rgba(22,163,74,0.12);
+  color: rgba(120,220,120,0.9);
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.ai-improve-ops {
+  margin: 0; padding: 4px 0;
+  list-style: none;
+}
+.ai-improve-op {
+  padding: 4px 10px 4px 26px;
+  position: relative;
+  color: rgba(255,255,255,0.75);
+  line-height: 1.4;
+}
+.ai-improve-op::before {
+  content: "•";
+  position: absolute; left: 10px;
+  color: rgba(255,255,255,0.3);
+}
+.ai-improve-op--insert::before { content: "+"; color: rgba(120,220,120,0.8); }
+.ai-improve-op--delete::before { content: "−"; color: rgba(220,80,80,0.8); }
+.ai-improve-op--delete_flow::before { content: "−"; color: rgba(220,80,80,0.8); }
+.ai-improve-op--rename::before,
+.ai-improve-op--update::before,
+.ai-improve-op--redirect_flow::before,
+.ai-improve-op--add_flow::before { content: "~"; color: rgba(220,160,60,0.8); }
+[data-bpmnkit-hud-theme="light"] .ai-improve-diff { border-color: rgba(0,0,0,0.1); }
+[data-bpmnkit-hud-theme="light"] .ai-improve-autofix { color: rgba(22,120,60,0.9); }
+[data-bpmnkit-hud-theme="light"] .ai-improve-op { color: rgba(0,0,0,0.7); }
+[data-bpmnkit-hud-theme="light"] .ai-improve-op::before { color: rgba(0,0,0,0.25); }
 `
 	document.head.appendChild(style)
 }

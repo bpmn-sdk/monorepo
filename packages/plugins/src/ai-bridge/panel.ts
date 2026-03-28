@@ -1,10 +1,10 @@
 import { BpmnCanvas } from "@bpmnkit/canvas"
 import { Bpmn, Dmn, Form, compactify, optimize } from "@bpmnkit/core"
-import type { BpmnDefinitions } from "@bpmnkit/core"
+import type { BpmnDefinitions, BpmnOperation, CompactDiagram } from "@bpmnkit/core"
 import { saveCheckpoint } from "../history/index.js"
 import { injectAiBridgeStyles } from "./css.js"
 
-const DEFAULT_SERVER = "http://localhost:3033"
+export const DEFAULT_SERVER = "http://localhost:3033"
 
 export interface NodeContext {
 	id: string
@@ -12,7 +12,7 @@ export interface NodeContext {
 	name?: string
 }
 
-interface PanelOptions {
+export interface PanelOptions {
 	serverUrl: string
 	getDefinitions(): BpmnDefinitions | null
 	loadXml(xml: string): void
@@ -84,6 +84,71 @@ async function* streamChat(
 						xml?: string
 					}
 					if (event.type === "token" && event.text) yield event.text
+					if (event.type === "xml" && event.xml) onXml?.(event.xml)
+					if (event.type === "done") return
+					if (event.type === "error") throw new Error(event.message ?? event.text ?? "AI error")
+				} catch (e) {
+					if (e instanceof SyntaxError) continue
+					throw e
+				}
+			}
+		}
+	} finally {
+		reader.releaseLock()
+	}
+}
+
+async function* streamImprove(
+	serverUrl: string,
+	compactDiagram: CompactDiagram,
+	backend: string,
+	signal: AbortSignal,
+	onOps?: (ops: BpmnOperation[], autoFixCount: number) => void,
+	onXml?: (xml: string) => void,
+): AsyncGenerator<string> {
+	let res: Response
+	try {
+		res = await fetch(`${serverUrl}/improve`, {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+				context: compactDiagram,
+				instruction: null,
+				backend: backend === "auto" ? null : backend,
+			}),
+			signal,
+		})
+	} catch (err) {
+		if (err instanceof Error && err.name === "AbortError") return
+		throw err
+	}
+	if (!res.ok || !res.body) throw new Error(`Server returned ${res.status}`)
+
+	const reader = res.body.getReader()
+	const decoder = new TextDecoder()
+	let buf = ""
+	try {
+		while (!signal.aborted) {
+			const { done, value } = await reader.read()
+			if (done || signal.aborted) break
+			buf += decoder.decode(value, { stream: true })
+			const parts = buf.split("\n\n")
+			buf = parts.pop() ?? ""
+			for (const part of parts) {
+				const line = part.startsWith("data: ") ? part.slice(6) : part
+				const trimmed = line.trim()
+				if (!trimmed) continue
+				try {
+					const event = JSON.parse(trimmed) as {
+						type: string
+						text?: string
+						message?: string
+						xml?: string
+						ops?: BpmnOperation[]
+						autoFixCount?: number
+					}
+					if (event.type === "token" && event.text) yield event.text
+					if (event.type === "ops") onOps?.(event.ops ?? [], event.autoFixCount ?? 0)
 					if (event.type === "xml" && event.xml) onXml?.(event.xml)
 					if (event.type === "done") return
 					if (event.type === "error") throw new Error(event.message ?? event.text ?? "AI error")
@@ -212,6 +277,39 @@ function renderMarkdown(text: string): DocumentFragment {
 	}
 
 	return frag
+}
+
+// ── Improve diff helpers ──────────────────────────────────────────────────────
+
+function describeOp(op: BpmnOperation): string {
+	switch (op.op) {
+		case "rename":
+			return `Rename to "${op.name}"`
+		case "update":
+			return "Update element properties"
+		case "delete":
+			return "Remove element"
+		case "insert":
+			return `Add ${op.element.type}${op.element.name ? ` "${op.element.name}"` : ""}`
+		case "add_flow":
+			return `Add flow: ${op.from} → ${op.to}`
+		case "delete_flow":
+			return "Remove flow"
+		case "redirect_flow":
+			return "Redirect flow"
+	}
+}
+
+function classifyOps(ops: BpmnOperation[]): { changedIds: string[]; newIds: string[] } {
+	const changedIds: string[] = []
+	const newIds: string[] = []
+	for (const op of ops) {
+		if (op.op === "rename" || op.op === "update") changedIds.push(op.id)
+		else if (op.op === "delete_flow" || op.op === "redirect_flow") changedIds.push(op.id)
+		else if (op.op === "insert") newIds.push(op.element.id)
+		else if (op.op === "add_flow" && op.id) newIds.push(op.id)
+	}
+	return { changedIds, newIds }
 }
 
 // ── Panel ─────────────────────────────────────────────────────────────────────
@@ -740,6 +838,127 @@ export function createAiPanel(options: PanelOptions): {
 		messagesEl.scrollTop = messagesEl.scrollHeight
 	}
 
+	// ── Finalize improve message (diff view + preview + apply) ──
+	function finalizeImproveMessage(
+		msgEl: HTMLElement,
+		fullText: string,
+		ops: BpmnOperation[],
+		autoFixCount: number,
+		resultXml: string | undefined,
+	): void {
+		msgEl.classList.remove("ai-msg-cursor")
+		while (msgEl.firstChild) msgEl.removeChild(msgEl.firstChild)
+
+		msgEl.append(renderMarkdown(fullText))
+
+		// Diff section: auto-fix summary + AI-suggested operations
+		if (autoFixCount > 0 || ops.length > 0) {
+			const diffEl = document.createElement("div")
+			diffEl.className = "ai-improve-diff"
+
+			if (autoFixCount > 0) {
+				const autoFixNote = document.createElement("div")
+				autoFixNote.className = "ai-improve-autofix"
+				autoFixNote.textContent = `✓ ${autoFixCount} issue${autoFixCount === 1 ? "" : "s"} auto-fixed`
+				diffEl.append(autoFixNote)
+			}
+
+			if (ops.length > 0) {
+				const opsList = document.createElement("ul")
+				opsList.className = "ai-improve-ops"
+				for (const op of ops) {
+					const li = document.createElement("li")
+					li.className = `ai-improve-op ai-improve-op--${op.op}`
+					li.textContent = describeOp(op)
+					opsList.append(li)
+				}
+				diffEl.append(opsList)
+			}
+
+			msgEl.append(diffEl)
+		}
+
+		// Canvas preview with highlights for changed/new elements
+		if (resultXml !== undefined) {
+			const previewEl = document.createElement("div")
+			previewEl.className = "ai-msg-preview"
+			const canvas = new BpmnCanvas({
+				container: previewEl,
+				xml: resultXml,
+				grid: false,
+				fit: "contain",
+				theme: options.getTheme?.() ?? "dark",
+			})
+			_previewCanvases.push(canvas)
+
+			if (ops.length > 0) {
+				const { changedIds, newIds } = classifyOps(ops)
+				requestAnimationFrame(() => {
+					if (changedIds.length > 0) canvas.highlight(changedIds, "changed")
+					if (newIds.length > 0) canvas.highlight(newIds, "new")
+				})
+			}
+
+			msgEl.append(previewEl)
+		}
+
+		// Action row: copy + apply
+		const actionRow = document.createElement("div")
+		actionRow.className = "ai-msg-actions"
+
+		const copyBtn = document.createElement("button")
+		copyBtn.className = "ai-msg-copy"
+		copyBtn.textContent = "Copy"
+		copyBtn.addEventListener("click", () => {
+			void navigator.clipboard
+				.writeText(fullText)
+				.then(() => {
+					copyBtn.textContent = "Copied!"
+					setTimeout(() => {
+						copyBtn.textContent = "Copy"
+					}, 2000)
+				})
+				.catch(() => {
+					copyBtn.textContent = "Failed"
+					setTimeout(() => {
+						copyBtn.textContent = "Copy"
+					}, 2000)
+				})
+		})
+		actionRow.append(copyBtn)
+
+		if (resultXml !== undefined) {
+			const applyBtn = document.createElement("button")
+			applyBtn.className = "ai-msg-apply"
+			applyBtn.textContent = "Apply to diagram"
+			applyBtn.addEventListener("click", async () => {
+				applyBtn.disabled = true
+				applyBtn.textContent = "Applying…"
+				try {
+					const currentDefs = options.getDefinitions()
+					if (currentDefs) {
+						const ctx = options.getCurrentContext?.()
+						if (ctx) {
+							await saveCheckpoint(ctx.projectId, ctx.fileId, Bpmn.export(currentDefs))
+						}
+					}
+					options.loadXml(resultXml)
+					applyBtn.textContent = "Applied ✓"
+					if (options.createCompanionFile) {
+						showCompanionOffer(msgEl, resultXml, options.createCompanionFile)
+					}
+				} catch (err) {
+					applyBtn.disabled = false
+					applyBtn.textContent = `Apply failed: ${String(err)}`
+				}
+			})
+			actionRow.append(applyBtn)
+		}
+
+		msgEl.append(actionRow)
+		messagesEl.scrollTop = messagesEl.scrollHeight
+	}
+
 	// ── Clear conversation ──
 	function clearConversation(): void {
 		history.length = 0
@@ -862,8 +1081,62 @@ export function createAiPanel(options: PanelOptions): {
 		textarea.focus()
 	}
 
+	// ── Improve with /improve endpoint ──
+	async function sendImprove(): Promise<void> {
+		if (sending) return
+		const defs = options.getDefinitions()
+		if (!defs) return
+
+		_abortCtrl = new AbortController()
+		const signal = _abortCtrl.signal
+		setUiBusy(true)
+
+		history.push({ role: "user", content: "Improve this diagram" })
+		addMessage("user", "Improve this diagram")
+
+		const aiMsgEl = addMessage("ai", "")
+		aiMsgEl.classList.add("ai-msg-cursor")
+
+		const compactDiagram = compactify(defs)
+		let capturedOps: BpmnOperation[] = []
+		let capturedAutoFixCount = 0
+		let capturedXml: string | undefined
+
+		let fullText = ""
+		try {
+			for await (const token of streamImprove(
+				options.serverUrl,
+				compactDiagram,
+				backendSelect.value,
+				signal,
+				(ops, autoFixCount) => {
+					capturedOps = ops
+					capturedAutoFixCount = autoFixCount
+				},
+				(xml) => {
+					capturedXml = xml
+				},
+			)) {
+				fullText += token
+				aiMsgEl.textContent = fullText
+				messagesEl.scrollTop = messagesEl.scrollHeight
+			}
+		} catch (err) {
+			if (!signal.aborted) {
+				fullText = `${fullText ? `${fullText}\n\n` : ""}Error: ${err instanceof Error ? err.message : String(err)}`
+			}
+		}
+
+		finalizeImproveMessage(aiMsgEl, fullText, capturedOps, capturedAutoFixCount, capturedXml)
+		history.push({ role: "ai", content: fullText })
+
+		_abortCtrl = null
+		setUiBusy(false)
+		textarea.focus()
+	}
+
 	// ── Event wiring ──
-	improveBtn.addEventListener("click", () => void sendAction("Improve this diagram", "improve"))
+	improveBtn.addEventListener("click", () => void sendImprove())
 	explainBtn.addEventListener("click", () => void sendAction("Explain this diagram", "explain"))
 	explainElementBtn.addEventListener(
 		"click",
@@ -899,5 +1172,3 @@ export function createAiPanel(options: PanelOptions): {
 
 	return { panel, open, close, setContext, submit }
 }
-
-export { DEFAULT_SERVER }

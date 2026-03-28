@@ -1,3 +1,4 @@
+import type { BpmnDefinitions } from "@bpmnkit/core"
 import { create } from "zustand"
 
 const SIDEBAR_KEY = "bpmnkit-studio-sidebar-expanded"
@@ -5,6 +6,23 @@ const SIDEBAR_KEY = "bpmnkit-studio-sidebar-expanded"
 export interface Breadcrumb {
 	label: string
 	href?: string
+}
+
+export interface AiMessage {
+	id: string
+	role: "user" | "assistant"
+	content: string
+	/** BPMN XML returned by AI in editor context — rendered as canvas preview */
+	xml?: string
+}
+
+export type AiBackend = "auto" | "claude" | "copilot" | "gemini"
+
+export interface EditorAiContext {
+	getDefinitions(): BpmnDefinitions | null
+	loadXml(xml: string): void
+	getTheme?(): "dark" | "light"
+	createCompanionFile?(name: string, type: "dmn" | "form", content: string): Promise<void>
 }
 
 export interface ContextCommand {
@@ -34,6 +52,14 @@ function loadSidebarExpanded(): boolean {
 interface UiState {
 	aiOpen: boolean
 	aiInitialPrompt: string | null
+	aiInitialMessages: AiMessage[] | null
+	editorAiContext: EditorAiContext | null
+	/** Shared persistent chat history (text-chat mode) */
+	aiMessages: AiMessage[]
+	/** Currently selected AI backend */
+	aiBackend: AiBackend
+	/** Backends reported available by the proxy /status endpoint */
+	aiAvailableBackends: string[]
 	commandPaletteOpen: boolean
 	sidebarExpanded: boolean
 	zenMode: boolean
@@ -41,8 +67,14 @@ interface UiState {
 	contextCommands: ContextCommand[]
 	paletteViewStack: PaletteView[]
 	toggleAI(): void
-	openAI(prompt?: string): void
+	openAI(prompt?: string, messages?: AiMessage[]): void
 	closeAI(): void
+	setEditorAiContext(ctx: EditorAiContext | null): void
+	pushAiMessage(msg: AiMessage): void
+	updateAiMessage(id: string, patch: Partial<Pick<AiMessage, "content" | "xml">>): void
+	clearAiMessages(): void
+	setAiBackend(b: AiBackend): void
+	setAiAvailableBackends(backends: string[]): void
 	toggleCommandPalette(): void
 	openCommandPalette(): void
 	closeCommandPalette(): void
@@ -61,6 +93,11 @@ interface UiState {
 export const useUiStore = create<UiState>()((set, get) => ({
 	aiOpen: false,
 	aiInitialPrompt: null,
+	aiInitialMessages: null,
+	editorAiContext: null,
+	aiMessages: [],
+	aiBackend: "auto",
+	aiAvailableBackends: [],
 	commandPaletteOpen: false,
 	sidebarExpanded: loadSidebarExpanded(),
 	zenMode: false,
@@ -69,8 +106,19 @@ export const useUiStore = create<UiState>()((set, get) => ({
 	paletteViewStack: [],
 
 	toggleAI: () => set((s) => ({ aiOpen: !s.aiOpen })),
-	openAI: (prompt) => set({ aiOpen: true, aiInitialPrompt: prompt ?? null }),
-	closeAI: () => set({ aiOpen: false, aiInitialPrompt: null }),
+	openAI: (prompt, messages) =>
+		set({ aiOpen: true, aiInitialPrompt: prompt ?? null, aiInitialMessages: messages ?? null }),
+	closeAI: () => set({ aiOpen: false, aiInitialPrompt: null, aiInitialMessages: null }),
+	setEditorAiContext: (ctx) => set({ editorAiContext: ctx }),
+
+	pushAiMessage: (msg) => set((s) => ({ aiMessages: [...s.aiMessages, msg] })),
+	updateAiMessage: (id, patch) =>
+		set((s) => ({
+			aiMessages: s.aiMessages.map((m) => (m.id === id ? { ...m, ...patch } : m)),
+		})),
+	clearAiMessages: () => set({ aiMessages: [] }),
+	setAiBackend: (b) => set({ aiBackend: b }),
+	setAiAvailableBackends: (backends) => set({ aiAvailableBackends: backends }),
 
 	toggleCommandPalette: () =>
 		set((s) => ({
