@@ -1,5 +1,11 @@
 # @bpmnkit/core
 
+## 0.0.17
+
+### Patch Changes
+
+- [#70](https://github.com/bpmnkit/monorepo/pull/70) [`3f3b8f7`](https://github.com/bpmnkit/monorepo/commit/3f3b8f777cfb192582452757d86dc53b3de8059d) Thanks [@urbanisierung](https://github.com/urbanisierung)! - Input Validation
+
 ## 0.0.16
 
 ### Patch Changes

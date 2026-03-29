@@ -1,5 +1,17 @@
 # @bpmnkit/plugins
 
+## 0.0.20
+
+### Patch Changes
+
+- [#70](https://github.com/bpmnkit/monorepo/pull/70) [`3f3b8f7`](https://github.com/bpmnkit/monorepo/commit/3f3b8f777cfb192582452757d86dc53b3de8059d) Thanks [@urbanisierung](https://github.com/urbanisierung)! - Input Validation
+
+- Updated dependencies [[`3f3b8f7`](https://github.com/bpmnkit/monorepo/commit/3f3b8f777cfb192582452757d86dc53b3de8059d)]:
+  - @bpmnkit/core@0.0.17
+  - @bpmnkit/ascii@0.0.17
+  - @bpmnkit/canvas@0.0.17
+  - @bpmnkit/editor@0.0.20
+
 ## 0.0.19
 
 ### Patch Changes

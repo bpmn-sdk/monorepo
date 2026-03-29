@@ -1,5 +1,18 @@
 # @bpmnkit/studio
 
+## 0.0.4
+
+### Patch Changes
+
+- Updated dependencies [[`3f3b8f7`](https://github.com/bpmnkit/monorepo/commit/3f3b8f777cfb192582452757d86dc53b3de8059d)]:
+  - @bpmnkit/plugins@0.0.20
+  - @bpmnkit/core@0.0.17
+  - @bpmnkit/operate@0.0.17
+  - @bpmnkit/user-tasks@0.0.4
+  - @bpmnkit/canvas@0.0.17
+  - @bpmnkit/editor@0.0.20
+  - @bpmnkit/engine@0.1.16
+
 ## 0.0.3
 
 ### Patch Changes
