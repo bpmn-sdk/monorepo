@@ -265,7 +265,11 @@ export {
 	removeValidationStructure,
 	validationDecisionId,
 } from "./bpmn/input-validation.js"
-export type { InputVariableDef, ValidationStructure, ValidationVariableType } from "./bpmn/input-validation.js"
+export type {
+	InputVariableDef,
+	ValidationStructure,
+	ValidationVariableType,
+} from "./bpmn/input-validation.js"
 export { exportSvg } from "./bpmn/svg.js"
 export type { SvgExportOptions } from "./bpmn/svg.js"
 export type {

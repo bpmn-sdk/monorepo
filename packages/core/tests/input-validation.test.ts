@@ -103,9 +103,7 @@ describe("buildValidationDmn", () => {
 		const xml = buildValidationDmn("start", VARIABLES)
 		const defs = Dmn.parse(xml)
 		const rules = defs.decisions[0]?.decisionTable?.rules ?? []
-		const typeRule = rules.find(
-			(r) => r.outputEntries[0]?.text === '"amount must be a number"',
-		)
+		const typeRule = rules.find((r) => r.outputEntries[0]?.text === '"amount must be a number"')
 		expect(typeRule).toBeDefined()
 		expect(typeRule?.inputEntries[1]?.text).toBe("not(instance of number)")
 	})
@@ -164,20 +162,18 @@ describe("insertValidationStructure / findValidationStructure / removeValidation
 	it("does not mutate the original definitions", () => {
 		const { original, updated } = parseAndInsert()
 		expect(updated).not.toBe(original)
-		const origProcess = original.processes[0]!
-		expect(origProcess.flowElements).toHaveLength(3) // start, task, end
+		const origProcess = original.processes[0]
+		expect(origProcess?.flowElements).toHaveLength(3) // start, task, end
 	})
 
 	it("inserts BRT, gateway, error end event into the process", () => {
 		const { updated } = parseAndInsert()
-		const proc = updated.processes[0]!
-		expect(proc.flowElements).toHaveLength(6) // start, task, end, brt, gw, errEnd
-		const brt = proc.flowElements.find((e) => e.type === "businessRuleTask")
-		const gw = proc.flowElements.find((e) => e.type === "exclusiveGateway")
-		const errEnd = proc.flowElements.find(
-			(e) =>
-				e.type === "endEvent" &&
-				e.eventDefinitions[0]?.type === "error",
+		const proc = updated.processes[0]
+		expect(proc?.flowElements).toHaveLength(6) // start, task, end, brt, gw, errEnd
+		const brt = proc?.flowElements.find((e) => e.type === "businessRuleTask")
+		const gw = proc?.flowElements.find((e) => e.type === "exclusiveGateway")
+		const errEnd = proc?.flowElements.find(
+			(e) => e.type === "endEvent" && e.eventDefinitions[0]?.type === "error",
 		)
 		expect(brt).toBeDefined()
 		expect(gw).toBeDefined()
@@ -199,12 +195,12 @@ describe("insertValidationStructure / findValidationStructure / removeValidation
 
 	it("redirects original outgoing flow from start to come from gateway with condition", () => {
 		const { updated } = parseAndInsert()
-		const proc = updated.processes[0]!
-		const flow1 = proc.sequenceFlows.find((f) => f.id === "flow1")
+		const proc = updated.processes[0]
+		const flow1 = proc?.sequenceFlows.find((f) => f.id === "flow1")
 		expect(flow1?.conditionExpression?.text).toBe("= count(validationErrors) = 0")
 		// flow1 now goes from gateway, not from start
-		const gw = proc.flowElements.find((e) => e.type === "exclusiveGateway")!
-		expect(flow1?.sourceRef).toBe(gw.id)
+		const gw = proc?.flowElements.find((e) => e.type === "exclusiveGateway")
+		expect(flow1?.sourceRef).toBe(gw?.id)
 	})
 
 	it("findValidationStructure detects inserted structure", () => {
@@ -228,10 +224,10 @@ describe("insertValidationStructure / findValidationStructure / removeValidation
 	it("removeValidationStructure reverts to single-flow diagram", () => {
 		const { updated } = parseAndInsert()
 		const reverted = removeValidationStructure(updated, "start")
-		const proc = reverted.processes[0]!
-		expect(proc.flowElements).toHaveLength(3) // back to start, task, end
+		const proc = reverted.processes[0]
+		expect(proc?.flowElements).toHaveLength(3) // back to start, task, end
 		// flow1 restored to come from start
-		const flow1 = proc.sequenceFlows.find((f) => f.id === "flow1")
+		const flow1 = proc?.sequenceFlows.find((f) => f.id === "flow1")
 		expect(flow1?.sourceRef).toBe("start")
 		expect(flow1?.conditionExpression).toBeUndefined()
 	})
@@ -266,10 +262,10 @@ describe("insertValidationStructure / findValidationStructure / removeValidation
 </bpmn:definitions>`
 		const defs = Bpmn.parse(xml)
 		const updated = insertValidationStructure(defs, "start", "start_inputValidation")
-		const proc = updated.processes[0]!
+		const proc = updated.processes[0]
 		// original: start + 3 inserted: brt, gateway, error end event = 4
-		expect(proc.flowElements).toHaveLength(4)
-		expect(proc.flowElements.find((e) => e.type === "businessRuleTask")).toBeDefined()
+		expect(proc?.flowElements).toHaveLength(4)
+		expect(proc?.flowElements.find((e) => e.type === "businessRuleTask")).toBeDefined()
 	})
 })
 

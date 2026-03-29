@@ -1339,7 +1339,6 @@ function eventDefToRegistration(
 	}
 }
 
-
 const END_EVENT_ADAPTER: PanelAdapter = {
 	read: GENERAL_ADAPTER.read,
 	write: GENERAL_ADAPTER.write,
@@ -1502,7 +1501,18 @@ interface WizardRow {
 function openValidationWizard(): Promise<InputVariableDef[] | null> {
 	injectValidationModalCss()
 	return new Promise((resolve) => {
-		const rows: WizardRow[] = [{ name: "", type: "string", required: true, min: "", max: "", minLength: "", maxLength: "", pattern: "" }]
+		const rows: WizardRow[] = [
+			{
+				name: "",
+				type: "string",
+				required: true,
+				min: "",
+				max: "",
+				minLength: "",
+				maxLength: "",
+				pattern: "",
+			},
+		]
 
 		const overlay = document.createElement("div")
 		overlay.className = "bpmnkit-val-overlay"
@@ -1517,7 +1527,8 @@ function openValidationWizard(): Promise<InputVariableDef[] | null> {
 
 		const hint = document.createElement("p")
 		hint.className = "hint"
-		hint.textContent = "Define the variables this process expects. A validation DMN table and wiring will be inserted after the start event."
+		hint.textContent =
+			"Define the variables this process expects. A validation DMN table and wiring will be inserted after the start event."
 		dialog.appendChild(hint)
 
 		const tableWrap = document.createElement("div")
@@ -1543,7 +1554,8 @@ function openValidationWizard(): Promise<InputVariableDef[] | null> {
 
 			const tbody = document.createElement("tbody")
 			for (let i = 0; i < rows.length; i++) {
-				const row = rows[i]!
+				const row = rows[i]
+				if (!row) continue
 				const tr = document.createElement("tr")
 
 				const isNum = row.type === "number"
@@ -1569,9 +1581,11 @@ function openValidationWizard(): Promise<InputVariableDef[] | null> {
 				`
 
 				const readRow = (idx: number) => {
-					const r = rows[idx]!
+					const r = rows[idx]
+					if (!r) return
 					r.name = (tr.querySelector<HTMLInputElement>(".v-name")?.value ?? "").trim()
-					r.type = (tr.querySelector<HTMLSelectElement>(".v-type")?.value ?? "string") as ValidationVariableType
+					r.type = (tr.querySelector<HTMLSelectElement>(".v-type")?.value ??
+						"string") as ValidationVariableType
 					r.required = tr.querySelector<HTMLInputElement>(".v-req")?.checked ?? false
 					r.min = tr.querySelector<HTMLInputElement>(".v-min")?.value ?? ""
 					r.max = tr.querySelector<HTMLInputElement>(".v-max")?.value ?? ""
@@ -1590,7 +1604,9 @@ function openValidationWizard(): Promise<InputVariableDef[] | null> {
 				tr.querySelector<HTMLInputElement>(".v-max")?.addEventListener("input", () => readRow(i))
 				tr.querySelector<HTMLInputElement>(".v-minlen")?.addEventListener("input", () => readRow(i))
 				tr.querySelector<HTMLInputElement>(".v-maxlen")?.addEventListener("input", () => readRow(i))
-				tr.querySelector<HTMLInputElement>(".v-pattern")?.addEventListener("input", () => readRow(i))
+				tr.querySelector<HTMLInputElement>(".v-pattern")?.addEventListener("input", () =>
+					readRow(i),
+				)
 				tr.querySelector<HTMLButtonElement>(".v-del")?.addEventListener("click", () => {
 					readRow(i)
 					rows.splice(i, 1)
@@ -1606,7 +1622,16 @@ function openValidationWizard(): Promise<InputVariableDef[] | null> {
 			addBtn.className = "bpmnkit-val-add"
 			addBtn.textContent = "+ Add variable"
 			addBtn.addEventListener("click", () => {
-				rows.push({ name: "", type: "string", required: true, min: "", max: "", minLength: "", maxLength: "", pattern: "" })
+				rows.push({
+					name: "",
+					type: "string",
+					required: true,
+					min: "",
+					max: "",
+					minLength: "",
+					maxLength: "",
+					pattern: "",
+				})
 				renderTable()
 				const inputs = tableWrap.querySelectorAll<HTMLInputElement>(".v-name")
 				inputs[inputs.length - 1]?.focus()
@@ -1633,16 +1658,22 @@ function openValidationWizard(): Promise<InputVariableDef[] | null> {
 		generateBtn.addEventListener("click", () => {
 			const defs = rows
 				.filter((r) => r.name)
-				.map((r): InputVariableDef => ({
-					name: r.name,
-					type: r.type,
-					required: r.required,
-					...(r.type === "number" && r.min !== "" ? { min: Number(r.min) } : {}),
-					...(r.type === "number" && r.max !== "" ? { max: Number(r.max) } : {}),
-					...(r.type === "string" && r.minLength !== "" ? { minLength: Number(r.minLength) } : {}),
-					...(r.type === "string" && r.maxLength !== "" ? { maxLength: Number(r.maxLength) } : {}),
-					...(r.type === "string" && r.pattern ? { pattern: r.pattern } : {}),
-				}))
+				.map(
+					(r): InputVariableDef => ({
+						name: r.name,
+						type: r.type,
+						required: r.required,
+						...(r.type === "number" && r.min !== "" ? { min: Number(r.min) } : {}),
+						...(r.type === "number" && r.max !== "" ? { max: Number(r.max) } : {}),
+						...(r.type === "string" && r.minLength !== ""
+							? { minLength: Number(r.minLength) }
+							: {}),
+						...(r.type === "string" && r.maxLength !== ""
+							? { maxLength: Number(r.maxLength) }
+							: {}),
+						...(r.type === "string" && r.pattern ? { pattern: r.pattern } : {}),
+					}),
+				)
 			overlay.remove()
 			resolve(defs.length > 0 ? defs : null)
 		})
@@ -1652,7 +1683,10 @@ function openValidationWizard(): Promise<InputVariableDef[] | null> {
 		dialog.appendChild(actions)
 
 		overlay.addEventListener("click", (e) => {
-			if (e.target === overlay) { overlay.remove(); resolve(null) }
+			if (e.target === overlay) {
+				overlay.remove()
+				resolve(null)
+			}
 		})
 
 		document.body.appendChild(overlay)
@@ -1660,7 +1694,11 @@ function openValidationWizard(): Promise<InputVariableDef[] | null> {
 }
 
 function escHtml(s: string): string {
-	return s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+	return s
+		.replace(/&/g, "&amp;")
+		.replace(/"/g, "&quot;")
+		.replace(/</g, "&lt;")
+		.replace(/>/g, "&gt;")
 }
 
 // ── Start event input validation group ───────────────────────────────────────

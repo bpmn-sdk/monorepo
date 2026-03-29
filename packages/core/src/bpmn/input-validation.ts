@@ -66,9 +66,7 @@ export function validationDecisionId(startEventId: string): string {
  */
 export function buildValidationDmn(startEventId: string, variables: InputVariableDef[]): string {
 	const decisionId = validationDecisionId(startEventId)
-	const builder = new DecisionTableBuilder(decisionId)
-		.name("Input Validation")
-		.hitPolicy("COLLECT")
+	const builder = new DecisionTableBuilder(decisionId).name("Input Validation").hitPolicy("COLLECT")
 
 	for (const v of variables) {
 		builder.input({
@@ -103,10 +101,16 @@ export function buildValidationDmn(startEventId: string, variables: InputVariabl
 
 		if (v.type === "string") {
 			if (v.minLength !== undefined) {
-				addRow(`string length(?) < ${v.minLength}`, `${v.name} must be at least ${v.minLength} characters`)
+				addRow(
+					`string length(?) < ${v.minLength}`,
+					`${v.name} must be at least ${v.minLength} characters`,
+				)
 			}
 			if (v.maxLength !== undefined) {
-				addRow(`string length(?) > ${v.maxLength}`, `${v.name} must be at most ${v.maxLength} characters`)
+				addRow(
+					`string length(?) > ${v.maxLength}`,
+					`${v.name} must be at most ${v.maxLength} characters`,
+				)
 			}
 			if (v.pattern) {
 				addRow(`not(matches(?, "${v.pattern}"))`, `${v.name} has invalid format`)
@@ -196,9 +200,8 @@ export function insertValidationStructure(
 	const processIdx = defs.processes.findIndex((p) =>
 		p.flowElements.some((e) => e.id === startEventId),
 	)
-	if (processIdx < 0) return defs
-
-	const process = defs.processes[processIdx]!
+	const process = defs.processes[processIdx]
+	if (processIdx < 0 || !process) return defs
 
 	// ── Generate IDs ─────────────────────────────────────────────────────────
 	const brtId = generateId("Activity")
@@ -211,9 +214,7 @@ export function insertValidationStructure(
 	const flowGwToError = generateId("Flow")
 
 	// ── Find existing outgoing flow from start event ──────────────────────────
-	const originalOutgoingFlowId = process.sequenceFlows.find(
-		(f) => f.sourceRef === startEventId,
-	)?.id
+	const originalOutgoingFlowId = process.sequenceFlows.find((f) => f.sourceRef === startEventId)?.id
 
 	// ── Build new flow elements ───────────────────────────────────────────────
 	const brt: BpmnBusinessRuleTask = {
@@ -477,9 +478,8 @@ export function removeValidationStructure(
 	const processIdx = defs.processes.findIndex((p) =>
 		p.flowElements.some((e) => e.id === startEventId),
 	)
-	if (processIdx < 0) return defs
-
-	const process = defs.processes[processIdx]!
+	const process = defs.processes[processIdx]
+	if (processIdx < 0 || !process) return defs
 
 	// Locate the BRT immediately after the start event
 	const startToBrtFlow = process.sequenceFlows.find((f) => f.sourceRef === startEventId)
@@ -520,9 +520,10 @@ export function removeValidationStructure(
 
 	// Find error ref to remove from defs.errors
 	const errEndEl = errEnd?.type === "endEvent" ? errEnd : undefined
-	const errorRefId = errEndEl?.eventDefinitions[0]?.type === "error"
-		? errEndEl.eventDefinitions[0].errorRef
-		: undefined
+	const errorRefId =
+		errEndEl?.eventDefinitions[0]?.type === "error"
+			? errEndEl.eventDefinitions[0].errorRef
+			: undefined
 
 	// Reconnect: restore the valid-path flow to come from the start event
 	const updatedFlows = process.sequenceFlows
