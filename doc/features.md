@@ -1,5 +1,15 @@
 # Features
 
+## Process Input Validation (2026-03-29) — `packages/core`, `packages/plugins`, `apps/studio`
+
+Validates process input variables at the start event using a companion Collect-hit-policy DMN table.
+
+- **`buildValidationDmn(startEventId, variables)`** (`@bpmnkit/core`): generates a DMN decision table from `InputVariableDef[]` — one input column per variable, one rule per violation (required, type, min/max, minLength/maxLength, regex pattern).
+- **`insertValidationStructure` / `removeValidationStructure`** (`@bpmnkit/core`): splice a Business Rule Task + XOR gateway + error end event after the start event; the happy-path flow requires `count(validationErrors) = 0`; `VALIDATION_FAILED` BPMN error thrown on violation. Fully reversible.
+- **Start Event config panel "Input Validation" group** (`@bpmnkit/plugins/config-panel-bpmn`): Add/Edit/Remove actions with a modal variable editor (name, type, required, numeric/string constraints).
+- **Process runner variable hints** (`@bpmnkit/plugins/process-runner`): reads input column names from the companion DMN and displays them as hint chips above the Play panel variable input.
+- **Studio companion deploy** (`apps/studio`): all deploy paths auto-detect `zeebe:calledDecision` references in the BPMN XML and bundle matching DMN models as multipart companions; creating a validation DMN auto-saves it as a new studio model; Edit navigates to it.
+
 ## AI-Assisted BPMN Improvement (2026-03-28) — `apps/proxy`, `packages/core`, `packages/plugins`, `apps/cli`
 
 Token-efficient pipeline for AI-powered BPMN analysis and improvement.

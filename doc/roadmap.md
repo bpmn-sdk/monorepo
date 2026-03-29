@@ -79,6 +79,15 @@ Medium effort. New optimize module and canvas overlay plugin.
 - [x] Variables tab, FEEL tab, and token highlight update to show state at T
 - [x] "Replay from here" button
 
+**Process Input Validation** (`packages/core`, `packages/plugins`, `apps/studio`)
+
+- [x] `buildValidationDmn(startEventId, variables)` — generate DMN Collect-hit-policy table from `InputVariableDef[]` (`@bpmnkit/core`)
+- [x] `insertValidationStructure` / `removeValidationStructure` — splice BRT + XOR gateway + error end event after start event, restore on remove (`@bpmnkit/core`)
+- [x] `findValidationStructure` / `getValidationInputNames` — detect existing structure and read variable names from DMN (`@bpmnkit/core`)
+- [x] Start Event config panel "Input Validation" group: Add/Edit/Remove actions via modal wizard (`@bpmnkit/plugins/config-panel-bpmn`)
+- [x] Process runner variable hints: reads input column names from companion DMN, shows chips in Play panel (`@bpmnkit/plugins/process-runner`)
+- [x] Studio wiring: `onCreateValidationDmn` saves DMN as a new model, `onEditValidationDmn` navigates to it, deploy auto-bundles referenced DMN companions (`apps/studio`)
+
 ---
 
 ### Phase 3 — Test Contracts

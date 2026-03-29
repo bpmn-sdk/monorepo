@@ -1,5 +1,44 @@
 # Progress
 
+## 2026-03-29 — Process input validation via DMN
+
+End-to-end input validation for BPMN start events using a companion Collect-hit-policy DMN table.
+
+**`packages/core/src/bpmn/input-validation.ts`** (new):
+- `InputVariableDef` type: `name`, `type` (string/number/boolean/context/list/any), `required`, `min`, `max`, `minLength`, `maxLength`, `pattern`
+- `buildValidationDmn(startEventId, variables)` — generates DMN XML with one input column per variable and one rule per violation (required check, type check, min/max, minLength/maxLength, pattern match)
+- `insertValidationStructure(defs, startEventId, decisionId)` — inserts BRT + XOR gateway + error end event after the start event; redirects original outgoing flow through gateway with `= count(validationErrors) = 0` condition; adds `VALIDATION_FAILED` error to root
+- `removeValidationStructure(defs, startEventId)` — reverses the insertion, restoring the original outgoing flow
+- `findValidationStructure(defs, startEventId)` — detects existing validation structure by locating a BRT with `resultVariable: "validationErrors"` after the start event
+- `getValidationInputNames(dmnXml)` — parses a validation DMN and returns the input column expression names
+
+**`packages/core/src/index.ts`**:
+- Exported all new input-validation types and functions
+
+**`packages/core/tests/input-validation.test.ts`** (new):
+- 23 tests covering all functions (DMN generation, BPMN structure insert/find/remove, edge cases)
+
+**`packages/plugins/src/config-panel-bpmn/index.ts`**:
+- Added `ConfigPanelBpmnOptions.applyChange`, `onCreateValidationDmn`, `onEditValidationDmn` callbacks
+- Start event panel gains an "Input Validation" group with conditional actions: "Add Validation" (triggers modal wizard → inserts structure + creates DMN), "Edit Validation DMN", "Remove Validation"
+- Modal wizard: pure-DOM table editor for adding/editing input variables (name, type, required, min/max/minLength/maxLength/pattern)
+
+**`packages/plugins/src/process-runner/index.ts`**:
+- Added `getValidationDmn?: (decisionId: string) => string | null` option
+- Before the variable input rows, if a validation structure is present and `getValidationDmn` returns content, renders a hint bar with chips for each expected variable name
+
+**`packages/plugins/src/process-runner/css.ts`**:
+- Added CSS for `.bpmnkit-runner-play-ivar-hints` hint bar and `.bpmnkit-runner-play-ivar-hint-chip` chips
+
+**`apps/studio/src/api/queries.ts`**:
+- `useDeployProcess` mutation now accepts `companions?: Array<{xml: string; fileName: string}>` and appends them to the multipart FormData payload
+
+**`apps/studio/src/pages/ModelDetail.tsx`**:
+- `getCompanionDmns(xml, models)` helper: extracts `zeebe:calledDecision` decision IDs from BPMN XML, finds matching DMN models in the store
+- `createConfigPanelBpmnPlugin` wired with `applyChange`, `onCreateValidationDmn` (saves new DMN model), `onEditValidationDmn` (navigates to DMN model)
+- `createProcessRunnerPlugin` wired with `getValidationDmn` (looks up DMN content from the store)
+- All three deploy paths (`StudioDeployPane.handleDeploy`, `handleDeploy`, `handleDeployAndRun`) auto-detect and bundle companion DMN files
+
 ## 2026-03-28 — Visual scenario editor in Tests panel
 
 **`packages/plugins/src/process-runner/index.ts`**:
