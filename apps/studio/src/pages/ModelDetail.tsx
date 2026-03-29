@@ -25,7 +25,7 @@ import {
 } from "lucide-react"
 import { render } from "preact"
 import { useCallback, useEffect, useRef, useState } from "preact/hooks"
-import { Link, useParams } from "wouter"
+import { Link, useLocation, useParams } from "wouter"
 import { useCreateProcessInstance, useDefinitions, useDeployProcess } from "../api/queries.js"
 import { queryClient } from "../api/queryClient.js"
 import { runScenarioWasm } from "../api/run-scenario-wasm.js"
@@ -41,6 +41,16 @@ import { WasmInstanceDetail } from "./InstanceDetail.js"
 
 // TopBar = h-12 (48px), save bar = h-10 (40px)
 const DOCK_TOP = 88
+
+function getCompanionDmns(xml: string, models: ModelFile[]) {
+	const matches = [...xml.matchAll(/<zeebe:calledDecision[^>]+decisionId="([^"]+)"/g)]
+	const decisionIds = [...new Set(matches.map((m) => m[1] as string))]
+	return decisionIds.flatMap((decisionId) => {
+		const dmn = models.find((m) => m.type === "dmn" && m.content.includes(decisionId))
+		if (!dmn) return []
+		return [{ xml: dmn.content, fileName: `${dmn.name}.dmn` }]
+	})
+}
 
 // ── Deploy pane component (rendered into dock's deploy pane) ─────────────────
 
@@ -71,7 +81,12 @@ function StudioDeployPane({ modelId, getXml }: { modelId: string; getXml: () => 
 		const xml = getXml()
 		if (!xml || !model) return
 		try {
-			await deploy.mutateAsync({ xml, fileName: `${model.name}.bpmn` })
+			const companions = getCompanionDmns(xml, models)
+			await deploy.mutateAsync({
+				xml,
+				fileName: `${model.name}.bpmn`,
+				...(companions.length && { companions }),
+			})
 			await refetch()
 			toast.success("Deployed successfully")
 		} catch (err) {
@@ -527,6 +542,9 @@ function StudioDocsPane({ elementType }: { elementType: string | null }) {
 
 export function ModelDetail() {
 	const { id } = useParams<{ id: string }>()
+	const [, navigate] = useLocation()
+	const navigateRef = useRef(navigate)
+	navigateRef.current = navigate
 	const { models, saveModel, upsertModel, loaded } = useModelsStore()
 	const model = models.find((m) => m.id === id)
 	const editorContainerRef = useRef<HTMLDivElement>(null)
@@ -684,6 +702,13 @@ export function ModelDetail() {
 			},
 			getProjectId: () => model.id,
 			getDefinitions: () => editorRef.current?.getDefinitions() ?? null,
+			getValidationDmn: (decisionId) => {
+				const { models: currentModels } = useModelsStore.getState()
+				return (
+					currentModels.find((m) => m.type === "dmn" && m.content.includes(decisionId))?.content ??
+					null
+				)
+			},
 		})
 		processRunner.toolbar.classList.add("bpmnkit-runner-toolbar--hud-bottom")
 		processRunner.toolbar.style.display = "none"
@@ -709,7 +734,25 @@ export function ModelDetail() {
 			},
 			onPanelHide: () => dock.hidePanel(),
 		})
-		const configPanelBpmn = createConfigPanelBpmnPlugin(configPanel)
+		const configPanelBpmn = createConfigPanelBpmnPlugin(configPanel, {
+			applyChange: (fn) => editorRef.current?.applyChange(fn),
+			onCreateValidationDmn: (dmnXml, fileName, decisionId) => {
+				const { saveModel: saveFn, upsertModel: upsertFn } = useModelsStore.getState()
+				void saveFn({
+					id: crypto.randomUUID(),
+					name: fileName.replace(/\.dmn$/i, ""),
+					type: "dmn",
+					content: dmnXml,
+					createdAt: Date.now(),
+				}).then(upsertFn)
+				toast.success(`Validation DMN "${fileName}" created`)
+			},
+			onEditValidationDmn: (decisionId) => {
+				const { models: currentModels } = useModelsStore.getState()
+				const dmn = currentModels.find((m) => m.type === "dmn" && m.content.includes(decisionId))
+				if (dmn) navigateRef.current(`/models/${dmn.id}`)
+			},
+		})
 
 		// Bridge: wire element:click → editor:select so the config panel activates on element click
 		const bridgePlugin: CanvasPlugin = {
@@ -847,7 +890,12 @@ export function ModelDetail() {
 		// Deploy
 		let bpmnProcessId: string | undefined
 		try {
-			const deployResult = await deploy.mutateAsync({ xml, fileName: `${model.name}.bpmn` })
+			const companions = getCompanionDmns(xml, useModelsStore.getState().models)
+			const deployResult = await deploy.mutateAsync({
+				xml,
+				fileName: `${model.name}.bpmn`,
+				...(companions.length && { companions }),
+			})
 			bpmnProcessId = deployResult.processes?.[0]?.bpmnProcessId
 		} catch (err) {
 			toast.error(err instanceof Error ? err.message : String(err))
@@ -881,7 +929,12 @@ export function ModelDetail() {
 		const xml = editor.exportXml()
 		if (!xml) return
 		try {
-			await deploy.mutateAsync({ xml, fileName: `${model.name}.bpmn` })
+			const companions = getCompanionDmns(xml, useModelsStore.getState().models)
+			await deploy.mutateAsync({
+				xml,
+				fileName: `${model.name}.bpmn`,
+				...(companions.length && { companions }),
+			})
 			toast.success("Deployed")
 		} catch (err) {
 			toast.error(err instanceof Error ? err.message : String(err))

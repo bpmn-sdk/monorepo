@@ -33,7 +33,15 @@ import type {
 	BpmnFlowElement,
 	BpmnTimerEventDefinition,
 } from "@bpmnkit/core"
-import { zeebeExtensionsToXmlElements } from "@bpmnkit/core"
+import {
+	buildValidationDmn,
+	findValidationStructure,
+	insertValidationStructure,
+	removeValidationStructure,
+	validationDecisionId,
+	zeebeExtensionsToXmlElements,
+} from "@bpmnkit/core"
+import type { InputVariableDef, ValidationVariableType } from "@bpmnkit/core"
 import { ELEMENT_TYPE_LABELS } from "@bpmnkit/editor"
 import type { CreateShapeType } from "@bpmnkit/editor"
 import type {
@@ -1331,17 +1339,6 @@ function eventDefToRegistration(
 	}
 }
 
-const START_EVENT_ADAPTER: PanelAdapter = {
-	read: GENERAL_ADAPTER.read,
-	write: GENERAL_ADAPTER.write,
-	resolve(defs, id) {
-		const el = findFlowElement(defs, id)
-		if (!el || el.type !== "startEvent") return null
-		const defType = el.eventDefinitions[0]?.type
-		if (!defType) return null
-		return eventDefToRegistration(defType)
-	},
-}
 
 const END_EVENT_ADAPTER: PanelAdapter = {
 	read: GENERAL_ADAPTER.read,
@@ -1391,6 +1388,405 @@ const BOUNDARY_EVENT_ADAPTER: PanelAdapter = {
 	},
 }
 
+// ── Input validation wizard modal ─────────────────────────────────────────────
+
+const VALIDATION_MODAL_CSS = `
+.bpmnkit-val-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px);
+  display: flex; align-items: center; justify-content: center; z-index: 99999;
+}
+.bpmnkit-val-dialog {
+  background: var(--bpmnkit-surface, #161626);
+  border: 1px solid var(--bpmnkit-border, #2a2a42);
+  border-radius: 10px; padding: 20px; width: 680px; max-width: 95vw; max-height: 85vh;
+  display: flex; flex-direction: column; gap: 14px;
+  font-family: var(--bpmnkit-font, system-ui, sans-serif);
+  font-size: 13px; color: var(--bpmnkit-fg, #cdd6f4);
+  box-shadow: 0 24px 64px rgba(0,0,0,0.7);
+}
+.bpmnkit-val-dialog h2 {
+  font-size: 14px; font-weight: 600; margin: 0;
+  color: var(--bpmnkit-fg, #cdd6f4);
+}
+.bpmnkit-val-dialog p.hint {
+  font-size: 12px; color: var(--bpmnkit-fg-muted, #8888a8); margin: 0;
+}
+.bpmnkit-val-table { overflow-y: auto; flex: 1; }
+.bpmnkit-val-table table {
+  width: 100%; border-collapse: collapse; font-size: 12px;
+}
+.bpmnkit-val-table th {
+  text-align: left; padding: 6px 8px; font-weight: 500;
+  color: var(--bpmnkit-fg-muted, #8888a8); font-size: 11px; text-transform: uppercase;
+  border-bottom: 1px solid var(--bpmnkit-border, #2a2a42);
+}
+.bpmnkit-val-table td { padding: 4px 4px; vertical-align: middle; }
+.bpmnkit-val-table input[type=text], .bpmnkit-val-table input[type=number], .bpmnkit-val-table select {
+  background: var(--bpmnkit-surface-2, #1e1e2e);
+  border: 1px solid var(--bpmnkit-border, #2a2a42);
+  border-radius: 4px; padding: 4px 7px; font-size: 12px;
+  color: var(--bpmnkit-fg, #cdd6f4); width: 100%; box-sizing: border-box;
+}
+.bpmnkit-val-table input[type=text]:focus, .bpmnkit-val-table input[type=number]:focus,
+.bpmnkit-val-table select:focus {
+  outline: none; border-color: var(--bpmnkit-accent, #6b9df7);
+}
+.bpmnkit-val-table input:disabled, .bpmnkit-val-table select:disabled {
+  opacity: 0.35; cursor: not-allowed;
+}
+.bpmnkit-val-chk { display: flex; align-items: center; justify-content: center; }
+.bpmnkit-val-chk input[type=checkbox] { width: 14px; height: 14px; cursor: pointer; }
+.bpmnkit-val-del {
+  background: none; border: none; cursor: pointer; padding: 2px 6px; border-radius: 4px;
+  color: var(--bpmnkit-fg-muted, #8888a8); font-size: 14px; line-height: 1;
+}
+.bpmnkit-val-del:hover { color: var(--bpmnkit-danger, #f87171); background: var(--bpmnkit-surface-2, #1e1e2e); }
+.bpmnkit-val-add {
+  background: none; border: 1px dashed var(--bpmnkit-border, #2a2a42); border-radius: 6px;
+  padding: 6px 12px; font-size: 12px; cursor: pointer; width: 100%;
+  color: var(--bpmnkit-fg-muted, #8888a8); margin-top: 4px;
+}
+.bpmnkit-val-add:hover { border-color: var(--bpmnkit-accent, #6b9df7); color: var(--bpmnkit-accent, #6b9df7); }
+.bpmnkit-val-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.bpmnkit-val-btn {
+  padding: 6px 16px; border-radius: 6px; font-size: 12px; font-weight: 500;
+  cursor: pointer; border: 1px solid var(--bpmnkit-border, #2a2a42);
+  background: var(--bpmnkit-surface-2, #1e1e2e); color: var(--bpmnkit-fg, #cdd6f4);
+}
+.bpmnkit-val-btn:hover { background: var(--bpmnkit-accent-subtle, rgba(107,157,247,0.15)); }
+.bpmnkit-val-btn--primary {
+  background: var(--bpmnkit-accent, #6b9df7); color: #fff; border-color: var(--bpmnkit-accent, #6b9df7);
+}
+.bpmnkit-val-btn--primary:hover { filter: brightness(1.1); }
+.bpmnkit-val-summary {
+  background: var(--bpmnkit-surface-2, #1e1e2e); border-radius: 6px; padding: 8px 10px;
+  font-size: 12px; display: flex; flex-direction: column; gap: 3px;
+}
+.bpmnkit-val-summary-row { display: flex; gap: 6px; align-items: baseline; }
+.bpmnkit-val-summary-name { color: var(--bpmnkit-accent-bright, #89b4fa); font-weight: 500; }
+.bpmnkit-val-summary-meta { color: var(--bpmnkit-fg-muted, #8888a8); }
+.bpmnkit-val-summary-badge {
+  font-size: 10px; padding: 1px 5px; border-radius: 3px; font-weight: 500;
+  background: var(--bpmnkit-accent-subtle, rgba(107,157,247,0.15));
+  color: var(--bpmnkit-accent-bright, #89b4fa);
+}
+.bpmnkit-val-summary-badge--req {
+  background: rgba(249,115,22,0.15); color: #fb923c;
+}
+`
+
+function injectValidationModalCss(): void {
+	const id = "bpmnkit-validation-modal-css"
+	if (document.getElementById(id)) return
+	const style = document.createElement("style")
+	style.id = id
+	style.textContent = VALIDATION_MODAL_CSS
+	document.head.appendChild(style)
+}
+
+interface WizardRow {
+	name: string
+	type: ValidationVariableType
+	required: boolean
+	min: string
+	max: string
+	minLength: string
+	maxLength: string
+	pattern: string
+}
+
+/**
+ * Opens the input validation wizard modal.
+ * Resolves with the variable definitions on confirm, or null on cancel.
+ */
+function openValidationWizard(): Promise<InputVariableDef[] | null> {
+	injectValidationModalCss()
+	return new Promise((resolve) => {
+		const rows: WizardRow[] = [{ name: "", type: "string", required: true, min: "", max: "", minLength: "", maxLength: "", pattern: "" }]
+
+		const overlay = document.createElement("div")
+		overlay.className = "bpmnkit-val-overlay"
+
+		const dialog = document.createElement("div")
+		dialog.className = "bpmnkit-val-dialog"
+		overlay.appendChild(dialog)
+
+		const title = document.createElement("h2")
+		title.textContent = "Add Input Validation"
+		dialog.appendChild(title)
+
+		const hint = document.createElement("p")
+		hint.className = "hint"
+		hint.textContent = "Define the variables this process expects. A validation DMN table and wiring will be inserted after the start event."
+		dialog.appendChild(hint)
+
+		const tableWrap = document.createElement("div")
+		tableWrap.className = "bpmnkit-val-table"
+		dialog.appendChild(tableWrap)
+
+		function renderTable(): void {
+			tableWrap.innerHTML = ""
+			const table = document.createElement("table")
+			const thead = document.createElement("thead")
+			thead.innerHTML = `<tr>
+				<th style="width:22%">Name</th>
+				<th style="width:14%">Type</th>
+				<th style="width:8%;text-align:center">Req.</th>
+				<th style="width:10%">Min</th>
+				<th style="width:10%">Max</th>
+				<th style="width:10%">MinLen</th>
+				<th style="width:10%">MaxLen</th>
+				<th style="width:10%">Pattern</th>
+				<th style="width:6%"></th>
+			</tr>`
+			table.appendChild(thead)
+
+			const tbody = document.createElement("tbody")
+			for (let i = 0; i < rows.length; i++) {
+				const row = rows[i]!
+				const tr = document.createElement("tr")
+
+				const isNum = row.type === "number"
+				const isStr = row.type === "string"
+
+				tr.innerHTML = `
+					<td><input type="text" class="v-name" value="${escHtml(row.name)}" placeholder="variableName"/></td>
+					<td><select class="v-type">
+						<option value="string"${row.type === "string" ? " selected" : ""}>string</option>
+						<option value="number"${row.type === "number" ? " selected" : ""}>number</option>
+						<option value="boolean"${row.type === "boolean" ? " selected" : ""}>boolean</option>
+						<option value="context"${row.type === "context" ? " selected" : ""}>context</option>
+						<option value="list"${row.type === "list" ? " selected" : ""}>list</option>
+						<option value="any"${row.type === "any" ? " selected" : ""}>any</option>
+					</select></td>
+					<td class="bpmnkit-val-chk"><input type="checkbox" class="v-req"${row.required ? " checked" : ""}/></td>
+					<td><input type="number" class="v-min" value="${escHtml(row.min)}" placeholder="—"${!isNum ? " disabled" : ""}/></td>
+					<td><input type="number" class="v-max" value="${escHtml(row.max)}" placeholder="—"${!isNum ? " disabled" : ""}/></td>
+					<td><input type="number" class="v-minlen" value="${escHtml(row.minLength)}" placeholder="—"${!isStr ? " disabled" : ""}/></td>
+					<td><input type="number" class="v-maxlen" value="${escHtml(row.maxLength)}" placeholder="—"${!isStr ? " disabled" : ""}/></td>
+					<td><input type="text" class="v-pattern" value="${escHtml(row.pattern)}" placeholder="regex"${!isStr ? " disabled" : ""}/></td>
+					<td><button class="bpmnkit-val-del v-del" title="Remove">✕</button></td>
+				`
+
+				const readRow = (idx: number) => {
+					const r = rows[idx]!
+					r.name = (tr.querySelector<HTMLInputElement>(".v-name")?.value ?? "").trim()
+					r.type = (tr.querySelector<HTMLSelectElement>(".v-type")?.value ?? "string") as ValidationVariableType
+					r.required = tr.querySelector<HTMLInputElement>(".v-req")?.checked ?? false
+					r.min = tr.querySelector<HTMLInputElement>(".v-min")?.value ?? ""
+					r.max = tr.querySelector<HTMLInputElement>(".v-max")?.value ?? ""
+					r.minLength = tr.querySelector<HTMLInputElement>(".v-minlen")?.value ?? ""
+					r.maxLength = tr.querySelector<HTMLInputElement>(".v-maxlen")?.value ?? ""
+					r.pattern = tr.querySelector<HTMLInputElement>(".v-pattern")?.value ?? ""
+				}
+
+				tr.querySelector<HTMLSelectElement>(".v-type")?.addEventListener("change", () => {
+					readRow(i)
+					renderTable()
+				})
+				tr.querySelector<HTMLInputElement>(".v-name")?.addEventListener("input", () => readRow(i))
+				tr.querySelector<HTMLInputElement>(".v-req")?.addEventListener("change", () => readRow(i))
+				tr.querySelector<HTMLInputElement>(".v-min")?.addEventListener("input", () => readRow(i))
+				tr.querySelector<HTMLInputElement>(".v-max")?.addEventListener("input", () => readRow(i))
+				tr.querySelector<HTMLInputElement>(".v-minlen")?.addEventListener("input", () => readRow(i))
+				tr.querySelector<HTMLInputElement>(".v-maxlen")?.addEventListener("input", () => readRow(i))
+				tr.querySelector<HTMLInputElement>(".v-pattern")?.addEventListener("input", () => readRow(i))
+				tr.querySelector<HTMLButtonElement>(".v-del")?.addEventListener("click", () => {
+					readRow(i)
+					rows.splice(i, 1)
+					renderTable()
+				})
+
+				tbody.appendChild(tr)
+			}
+			table.appendChild(tbody)
+			tableWrap.appendChild(table)
+
+			const addBtn = document.createElement("button")
+			addBtn.className = "bpmnkit-val-add"
+			addBtn.textContent = "+ Add variable"
+			addBtn.addEventListener("click", () => {
+				rows.push({ name: "", type: "string", required: true, min: "", max: "", minLength: "", maxLength: "", pattern: "" })
+				renderTable()
+				const inputs = tableWrap.querySelectorAll<HTMLInputElement>(".v-name")
+				inputs[inputs.length - 1]?.focus()
+			})
+			tableWrap.appendChild(addBtn)
+		}
+
+		renderTable()
+
+		const actions = document.createElement("div")
+		actions.className = "bpmnkit-val-actions"
+
+		const cancelBtn = document.createElement("button")
+		cancelBtn.className = "bpmnkit-val-btn"
+		cancelBtn.textContent = "Cancel"
+		cancelBtn.addEventListener("click", () => {
+			overlay.remove()
+			resolve(null)
+		})
+
+		const generateBtn = document.createElement("button")
+		generateBtn.className = "bpmnkit-val-btn bpmnkit-val-btn--primary"
+		generateBtn.textContent = "Generate Validation"
+		generateBtn.addEventListener("click", () => {
+			const defs = rows
+				.filter((r) => r.name)
+				.map((r): InputVariableDef => ({
+					name: r.name,
+					type: r.type,
+					required: r.required,
+					...(r.type === "number" && r.min !== "" ? { min: Number(r.min) } : {}),
+					...(r.type === "number" && r.max !== "" ? { max: Number(r.max) } : {}),
+					...(r.type === "string" && r.minLength !== "" ? { minLength: Number(r.minLength) } : {}),
+					...(r.type === "string" && r.maxLength !== "" ? { maxLength: Number(r.maxLength) } : {}),
+					...(r.type === "string" && r.pattern ? { pattern: r.pattern } : {}),
+				}))
+			overlay.remove()
+			resolve(defs.length > 0 ? defs : null)
+		})
+
+		actions.appendChild(cancelBtn)
+		actions.appendChild(generateBtn)
+		dialog.appendChild(actions)
+
+		overlay.addEventListener("click", (e) => {
+			if (e.target === overlay) { overlay.remove(); resolve(null) }
+		})
+
+		document.body.appendChild(overlay)
+	})
+}
+
+function escHtml(s: string): string {
+	return s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+}
+
+// ── Start event input validation group ───────────────────────────────────────
+
+interface ValidationGroupCallbacks {
+	applyChange?: (fn: (defs: BpmnDefinitions) => BpmnDefinitions) => void
+	onCreateValidationDmn?: (dmnXml: string, fileName: string, decisionId: string) => void
+	onEditValidationDmn?: (decisionId: string) => void
+}
+
+function makeStartEventSchema(callbacks: ValidationGroupCallbacks): PanelSchema {
+	return {
+		compact: [{ key: "name", label: "Name", type: "text", placeholder: "Event name" }],
+		groups: [
+			{
+				id: "general",
+				label: "General",
+				fields: [
+					{ key: "name", label: "Name", type: "text", placeholder: "Event name" },
+					{
+						key: "documentation",
+						label: "Documentation",
+						type: "textarea",
+						placeholder: "Add notes or documentation for this element…",
+					},
+				],
+			},
+			{
+				id: "input-validation",
+				label: "Input Validation",
+				fields: [
+					// Shown when no validation is configured
+					{
+						key: "_addValidation",
+						label: "Add Input Validation",
+						type: "action",
+						hint: "Generate a DMN validation table and error path after this start event.",
+						condition: (values) => values._hasValidation !== true,
+						onClick: (_values, setValue) => {
+							void openValidationWizard().then(async (vars) => {
+								if (!vars || vars.length === 0) return
+								const startEventId = _values._elementId as string | undefined
+								if (!startEventId) return
+								const decId = validationDecisionId(startEventId)
+								const dmnXml = buildValidationDmn(startEventId, vars)
+								const fileName = `${startEventId}_validation.dmn`
+								callbacks.onCreateValidationDmn?.(dmnXml, fileName, decId)
+								callbacks.applyChange?.((defs) =>
+									insertValidationStructure(defs, startEventId, decId),
+								)
+								setValue("_hasValidation", true)
+								setValue("_decisionId", decId)
+							})
+						},
+					},
+					// Shown when validation is already configured
+					{
+						key: "_decisionId",
+						label: "Decision ID",
+						type: "text",
+						condition: (values) => values._hasValidation === true,
+					},
+					{
+						key: "_editValidation",
+						label: "Edit Validation DMN",
+						type: "action",
+						hint: "Open the validation decision table in the DMN editor.",
+						condition: (values) => values._hasValidation === true,
+						onClick: (values) => {
+							const decId = values._decisionId as string | undefined
+							if (decId) callbacks.onEditValidationDmn?.(decId)
+						},
+					},
+					{
+						key: "_removeValidation",
+						label: "Remove Validation",
+						type: "action",
+						hint: "Delete the validation Business Rule Task, gateway, and error end event.",
+						condition: (values) => values._hasValidation === true,
+						onClick: (values, setValue) => {
+							const startEventId = values._elementId as string | undefined
+							if (!startEventId) return
+							callbacks.applyChange?.((defs) => removeValidationStructure(defs, startEventId))
+							setValue("_hasValidation", false)
+							setValue("_decisionId", "")
+						},
+					},
+				],
+			},
+		],
+	}
+}
+
+function makeStartEventAdapter(callbacks: ValidationGroupCallbacks): PanelAdapter {
+	return {
+		read(defs, id) {
+			const el = findFlowElement(defs, id)
+			const structure = findValidationStructure(defs, id)
+			return {
+				name: el?.name ?? "",
+				documentation: (el as { documentation?: string })?.documentation ?? "",
+				_elementId: id,
+				_hasValidation: structure !== null,
+				_decisionId: structure?.decisionId ?? "",
+			}
+		},
+		write(defs, id, values) {
+			return updateFlowElement(defs, id, (el) => ({
+				...el,
+				name: typeof values.name === "string" ? values.name : el.name,
+				documentation:
+					typeof values.documentation === "string"
+						? values.documentation || undefined
+						: (el as { documentation?: string }).documentation,
+			}))
+		},
+		resolve(defs, id) {
+			const el = findFlowElement(defs, id)
+			if (!el || el.type !== "startEvent") return null
+			const defType = el.eventDefinitions[0]?.type
+			if (!defType) return null
+			return eventDefToRegistration(defType)
+		},
+	}
+}
+
 // ── Options for the plugin factory ────────────────────────────────────────────
 
 export interface ConfigPanelBpmnOptions {
@@ -1399,6 +1795,23 @@ export interface ConfigPanelBpmnOptions {
 	 * Typically implemented by calling `tabsPlugin.api.openTab({ type: "feel", ... })`.
 	 */
 	openFeelPlayground?: (expression: string) => void
+	/**
+	 * Called when a new validation DMN should be created.
+	 * Receives the DMN XML content, a suggested file name, and the decision ID.
+	 * Typically implemented by saving a new DMN model in the studio's model storage.
+	 */
+	onCreateValidationDmn?: (dmnXml: string, fileName: string, decisionId: string) => void
+	/**
+	 * Called when the user clicks "Edit Validation DMN".
+	 * Receives the decision ID so the host can navigate to the DMN model.
+	 */
+	onEditValidationDmn?: (decisionId: string) => void
+	/**
+	 * Applies a change to the current BPMN definitions.
+	 * Required for input validation insert/remove to work.
+	 * Typically: `(fn) => editorRef.current?.applyChange(fn)`.
+	 */
+	applyChange?: (fn: (defs: BpmnDefinitions) => BpmnDefinitions) => void
 }
 
 // ── Factory ───────────────────────────────────────────────────────────────────
@@ -1428,6 +1841,14 @@ export function createConfigPanelBpmnPlugin(
 	const scriptTaskSchema = makeScriptTaskSchema(options.openFeelPlayground)
 	const sequenceFlowSchema = makeSequenceFlowSchema(options.openFeelPlayground)
 
+	const validationCallbacks: ValidationGroupCallbacks = {
+		applyChange: options.applyChange,
+		onCreateValidationDmn: options.onCreateValidationDmn,
+		onEditValidationDmn: options.onEditValidationDmn,
+	}
+	const startEventSchema = makeStartEventSchema(validationCallbacks)
+	const startEventAdapter = makeStartEventAdapter(validationCallbacks)
+
 	return {
 		name: "config-panel-bpmn",
 
@@ -1437,7 +1858,7 @@ export function createConfigPanelBpmnPlugin(
 				configPanel.registerSchema(type, GENERAL_SCHEMA, GENERAL_ADAPTER)
 			}
 			// Events: dispatcher adapters resolve to event-definition-specific schemas
-			configPanel.registerSchema("startEvent", GENERAL_SCHEMA, START_EVENT_ADAPTER)
+			configPanel.registerSchema("startEvent", startEventSchema, startEventAdapter)
 			configPanel.registerSchema("endEvent", GENERAL_SCHEMA, END_EVENT_ADAPTER)
 			configPanel.registerSchema("intermediateCatchEvent", GENERAL_SCHEMA, CATCH_EVENT_ADAPTER)
 			configPanel.registerSchema("intermediateThrowEvent", GENERAL_SCHEMA, THROW_EVENT_ADAPTER)

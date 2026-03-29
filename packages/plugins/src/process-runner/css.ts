@@ -473,6 +473,38 @@ const CSS = `
 }
 .bpmnkit-runner-play-ivar-add:hover { border-color: var(--bpmnkit-accent, #6b9df7); color: var(--bpmnkit-accent, #6b9df7); }
 
+/* ── Input variable hints (from validation DMN) ──────────────────────────── */
+.bpmnkit-runner-play-ivar-hints {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px;
+  background: rgba(107,157,247,0.06);
+  border-bottom: 1px solid rgba(107,157,247,0.12);
+  font-size: 11px;
+}
+.bpmnkit-runner-play-ivar-hints-label {
+  color: var(--bpmnkit-fg-muted, #8888a8);
+  flex-shrink: 0;
+}
+.bpmnkit-runner-play-ivar-hint-chip {
+  background: rgba(107,157,247,0.12);
+  color: var(--bpmnkit-accent-bright, #89b4fa);
+  border-radius: 3px;
+  padding: 1px 5px;
+  font-family: var(--bpmnkit-font-mono, monospace);
+}
+[data-bpmnkit-hud-theme="light"] .bpmnkit-runner-play-ivar-hints {
+  background: rgba(26,86,219,0.05);
+  border-bottom-color: rgba(26,86,219,0.1);
+}
+[data-bpmnkit-hud-theme="light"] .bpmnkit-runner-play-ivar-hints-label { color: rgba(0,0,0,0.4); }
+[data-bpmnkit-hud-theme="light"] .bpmnkit-runner-play-ivar-hint-chip {
+  background: rgba(26,86,219,0.08);
+  color: var(--bpmnkit-accent, #1a56db);
+}
+
 /* ── Light theme overrides ───────────────────────────────────────────────── */
 [data-bpmnkit-hud-theme="light"] .bpmnkit-runner-play-panel { color: rgba(0,0,0,0.75); }
 [data-bpmnkit-hud-theme="light"] .bpmnkit-runner-play-tabs { border-bottom-color: rgba(0,0,0,0.07); }

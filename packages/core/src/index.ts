@@ -257,6 +257,15 @@ export { ELEMENT_SIZES, GRID_CELL_HEIGHT } from "./layout/index.js"
 export { compactify, expand } from "./bpmn/compact.js"
 export { applyOperations } from "./bpmn/operations.js"
 export type { BpmnOperation } from "./bpmn/operations.js"
+export {
+	buildValidationDmn,
+	findValidationStructure,
+	getValidationInputNames,
+	insertValidationStructure,
+	removeValidationStructure,
+	validationDecisionId,
+} from "./bpmn/input-validation.js"
+export type { InputVariableDef, ValidationStructure, ValidationVariableType } from "./bpmn/input-validation.js"
 export { exportSvg } from "./bpmn/svg.js"
 export type { SvgExportOptions } from "./bpmn/svg.js"
 export type {

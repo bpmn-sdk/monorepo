@@ -1,4 +1,5 @@
 import type { CanvasApi, CanvasPlugin } from "@bpmnkit/canvas"
+import { findValidationStructure, getValidationInputNames } from "@bpmnkit/core"
 import { injectProcessRunnerStyles } from "./css.js"
 
 // ── Structural types — no hard deps on engine packages ─────────────────────
@@ -112,6 +113,12 @@ export interface ProcessRunnerOptions {
 	getDefinitions?: () => {
 		processes: Array<{ flowElements: Array<{ id: string; name?: string; type: string }> }>
 	} | null
+	/**
+	 * Returns the DMN XML for a given decision ID, or null if not found.
+	 * Used to display expected variable hints in the input variables pane.
+	 * Typically: `(id) => models.find(m => m.type === "dmn" && m.content.includes(id))?.content ?? null`
+	 */
+	getValidationDmn?: (decisionId: string) => string | null
 }
 
 // ── IndexedDB persistence for input variables ───────────────────────────────
@@ -675,6 +682,30 @@ export function createProcessRunnerPlugin(
 
 	function renderInputVars(): void {
 		clearEl(ivarsPaneEl)
+
+		// ── Validation hints ────────────────────────────────────────────────────
+		if (options.getValidationDmn && options.getDefinitions) {
+			const defs = options.getDefinitions()
+			const startEvent = defs?.processes[0]?.flowElements.find((e) => e.type === "startEvent")
+			if (startEvent && defs) {
+				// getDefinitions returns a minimal interface; cast to BpmnDefinitions-compatible shape
+				const structure = findValidationStructure(
+					defs as Parameters<typeof findValidationStructure>[0],
+					startEvent.id,
+				)
+				if (structure) {
+					const dmnXml = options.getValidationDmn(structure.decisionId)
+					const names = dmnXml ? getValidationInputNames(dmnXml) : []
+					if (names.length > 0) {
+						const hintsEl = document.createElement("div")
+						hintsEl.className = "bpmnkit-runner-play-ivar-hints"
+						hintsEl.innerHTML = `<span class="bpmnkit-runner-play-ivar-hints-label">Expected:</span> ${names.map((n) => `<span class="bpmnkit-runner-play-ivar-hint-chip">${n}</span>`).join("")}`
+						ivarsPaneEl.appendChild(hintsEl)
+					}
+				}
+			}
+		}
+
 		for (let i = 0; i < inputVars.length; i++) {
 			const entry = inputVars[i]
 			if (entry === undefined) continue

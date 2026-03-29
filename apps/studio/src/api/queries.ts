@@ -284,9 +284,21 @@ export function useCreateProcessInstance() {
 export function useDeployProcess() {
 	const qc = useQueryClient()
 	return useMutation({
-		mutationFn: ({ xml, fileName }: { xml: string; fileName: string }) => {
+		mutationFn: ({
+			xml,
+			fileName,
+			companions,
+		}: {
+			xml: string
+			fileName: string
+			/** Additional XML resources (e.g. companion DMN files) to deploy together. */
+			companions?: Array<{ xml: string; fileName: string }>
+		}) => {
 			const form = new FormData()
 			form.append("resources", new Blob([xml], { type: "application/xml" }), fileName)
+			for (const c of companions ?? []) {
+				form.append("resources", new Blob([c.xml], { type: "application/xml" }), c.fileName)
+			}
 			return proxyPostMultipart<{
 				deploymentKey?: string
 				processes?: Array<{
