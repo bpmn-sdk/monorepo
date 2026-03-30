@@ -52,6 +52,10 @@ pub trait StateBackend: Send + Sync {
     async fn upsert_variable(&self, variable: &Variable) -> Result<()>;
     async fn get_variables_by_scope(&self, scope_key: i64) -> Result<Vec<Variable>>;
 
+    // ---- Decision definitions (DMN) ----
+    async fn insert_decision_xml(&self, decision_id: &str, dmn_xml: &str) -> Result<()>;
+    async fn get_dmn_xml_by_decision_id(&self, decision_id: &str) -> Result<Option<String>>;
+
     // ---- Jobs ----
     async fn insert_job(&self, job: &Job) -> Result<()>;
     async fn get_job_by_key(&self, key: i64) -> Result<Job>;

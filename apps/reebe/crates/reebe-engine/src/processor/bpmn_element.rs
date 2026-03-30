@@ -592,9 +592,9 @@ impl BpmnElementProcessor {
                     }),
                 });
 
-                // Try to evaluate the DMN decision if one is configured
+                // Evaluate the DMN decision and write the result variable
+                let mut decision_vars: Option<serde_json::Value> = None;
                 if let Some(ref decision_id) = brt.zeebe_called_decision_id.clone() {
-                    // Load variables for the current process instance
                     let vars = state.backend.get_variables_by_scope(process_instance_key).await.unwrap_or_default();
                     let mut ctx_map = serde_json::Map::new();
                     for v in vars {
@@ -602,29 +602,55 @@ impl BpmnElementProcessor {
                     }
                     let input_ctx = serde_json::Value::Object(ctx_map);
 
-                    tracing::info!(
-                        decision_id = %decision_id,
-                        process_instance_key = %process_instance_key,
-                        "BusinessRuleTask: evaluating decision"
-                    );
-
-                    let _ = input_ctx; // evaluation is best-effort; fall through to complete
+                    match state.backend.get_dmn_xml_by_decision_id(decision_id).await {
+                        Ok(Some(dmn_xml)) => {
+                            match reebe_dmn::parse_dmn(&dmn_xml) {
+                                Ok(drg) => {
+                                    match reebe_dmn::evaluate_decision(&drg, decision_id, &input_ctx) {
+                                        Ok(result) => {
+                                            let result_var = brt.zeebe_result_variable.as_deref().unwrap_or("result");
+                                            let var_key = key_gen.next_key().await?;
+                                            state.backend.upsert_variable(&Variable {
+                                                key: var_key,
+                                                partition_id: state.partition_id,
+                                                name: result_var.to_string(),
+                                                value: result.clone(),
+                                                scope_key: process_instance_key,
+                                                process_instance_key,
+                                                tenant_id: tenant_id.clone(),
+                                                is_preview: false,
+                                            }).await?;
+                                            decision_vars = Some(serde_json::json!({ result_var: result }));
+                                        }
+                                        Err(e) => tracing::warn!(decision_id, "DMN evaluation failed: {e}"),
+                                    }
+                                }
+                                Err(e) => tracing::warn!(decision_id, "DMN parse failed: {e}"),
+                            }
+                        }
+                        Ok(None) => tracing::warn!(decision_id, "No DMN found for decision"),
+                        Err(e) => tracing::warn!(decision_id, "Backend error looking up DMN: {e}"),
+                    }
                 }
 
+                let mut complete_payload = serde_json::json!({
+                    "elementInstanceKey": ei_key.to_string(),
+                    "processInstanceKey": process_instance_key.to_string(),
+                    "processDefinitionKey": process_definition_key.to_string(),
+                    "elementId": element_id,
+                    "elementType": element_type,
+                    "bpmnProcessId": bpmn_process_id,
+                    "flowScopeKey": flow_scope_key.to_string(),
+                    "tenantId": tenant_id,
+                });
+                if let Some(vars) = decision_vars {
+                    complete_payload["variables"] = vars;
+                }
                 writers.commands.push(CommandToWrite {
                     value_type: "PROCESS_INSTANCE".to_string(),
                     intent: "COMPLETE_ELEMENT".to_string(),
                     key: ei_key,
-                    payload: serde_json::json!({
-                        "elementInstanceKey": ei_key.to_string(),
-                        "processInstanceKey": process_instance_key.to_string(),
-                        "processDefinitionKey": process_definition_key.to_string(),
-                        "elementId": element_id,
-                        "elementType": element_type,
-                        "bpmnProcessId": bpmn_process_id,
-                        "flowScopeKey": flow_scope_key.to_string(),
-                        "tenantId": tenant_id,
-                    }),
+                    payload: complete_payload,
                 });
             }
             reebe_bpmn::FlowElement::IntermediateCatchEvent(ice) => {

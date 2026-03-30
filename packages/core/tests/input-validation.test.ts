@@ -148,6 +148,28 @@ describe("buildValidationDmn", () => {
 		const typeRow = rules.find((r) => r.outputEntries[0]?.text === '"email must be a string"')
 		expect(typeRow).toBeDefined()
 	})
+
+	it("generates type check rules for context and list types", () => {
+		const vars: InputVariableDef[] = [
+			{ name: "payload", type: "context", required: false },
+			{ name: "items", type: "list", required: false },
+		]
+		const xml = buildValidationDmn("start", vars)
+		const defs = Dmn.parse(xml)
+		const rules = defs.decisions[0]?.decisionTable?.rules ?? []
+		expect(
+			rules.find((r) => r.outputEntries[0]?.text === '"payload must be a context"'),
+		).toBeDefined()
+		expect(rules.find((r) => r.outputEntries[0]?.text === '"items must be a list"')).toBeDefined()
+	})
+
+	it("generates no rules for any type with required false", () => {
+		const vars: InputVariableDef[] = [{ name: "data", type: "any", required: false }]
+		const xml = buildValidationDmn("start", vars)
+		const defs = Dmn.parse(xml)
+		const rules = defs.decisions[0]?.decisionTable?.rules ?? []
+		expect(rules).toHaveLength(0)
+	})
 })
 
 describe("insertValidationStructure / findValidationStructure / removeValidationStructure", () => {

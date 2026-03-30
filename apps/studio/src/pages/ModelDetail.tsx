@@ -7,6 +7,7 @@ import { createCommandPaletteEditorPlugin } from "@bpmnkit/plugins/command-palet
 import { createConfigPanelPlugin } from "@bpmnkit/plugins/config-panel"
 import { createConfigPanelBpmnPlugin } from "@bpmnkit/plugins/config-panel-bpmn"
 import { createConnectorCatalogPlugin } from "@bpmnkit/plugins/connector-catalog"
+import { DmnEditor } from "@bpmnkit/plugins/dmn-editor"
 import { type PresentationApi, createPresentationPlugin } from "@bpmnkit/plugins/presentation"
 import { createProcessRunnerPlugin } from "@bpmnkit/plugins/process-runner"
 import { createTokenHighlightPlugin } from "@bpmnkit/plugins/token-highlight"
@@ -549,6 +550,7 @@ export function ModelDetail() {
 	const model = models.find((m) => m.id === id)
 	const editorContainerRef = useRef<HTMLDivElement>(null)
 	const editorRef = useRef<BpmnEditor | null>(null)
+	const dmnEditorRef = useRef<DmnEditor | null>(null)
 	const dockRef = useRef<SideDock | null>(null)
 	const presentationApiRef = useRef<PresentationApi | null>(null)
 	const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -574,6 +576,29 @@ export function ModelDetail() {
 		if (!loaded) return
 		const container = editorContainerRef.current
 		if (!container || !model) return
+
+		// ── DMN editor (short-circuit — no dock/plugins needed) ──────────────
+		if (model.type === "dmn") {
+			const rawTheme = useThemeStore.getState().theme
+			const editor = new DmnEditor({ container, theme: rawTheme === "light" ? "light" : "dark" })
+			dmnEditorRef.current = editor
+			if (model.content) {
+				void editor.loadXML(model.content)
+			}
+			const off = editor.onChange(() => {
+				setSaveStatus("unsaved")
+				if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
+				saveTimerRef.current = setTimeout(() => {
+					void doSave()
+				}, 2000)
+			})
+			return () => {
+				off()
+				if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
+				editor.destroy()
+				dmnEditorRef.current = null
+			}
+		}
 
 		// ── Dock ──────────────────────────────────────────────────────────────
 		const dock = createSideDock()
@@ -864,6 +889,7 @@ export function ModelDetail() {
 	// Sync editor theme
 	useEffect(() => {
 		editorRef.current?.setTheme(theme)
+		dmnEditorRef.current?.setTheme(theme === "light" ? "light" : "dark")
 	}, [theme])
 
 	// Hide/show dock when entering/exiting run mode
@@ -964,9 +990,13 @@ export function ModelDetail() {
 	}, [id, model])
 
 	async function doSave() {
-		const editor = editorRef.current
-		if (!editor || !model) return
-		const xml = editor.exportXml()
+		if (!model) return
+		let xml: string | null = null
+		if (dmnEditorRef.current) {
+			xml = await dmnEditorRef.current.getXML()
+		} else if (editorRef.current) {
+			xml = editorRef.current.exportXml()
+		}
 		if (!xml) return
 		setSaveStatus("saving")
 		try {
