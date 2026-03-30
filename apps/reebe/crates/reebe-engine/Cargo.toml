@@ -40,7 +40,7 @@ memory = ["reebe-db/memory"]
 [dev-dependencies]
 tokio = { workspace = true }
 base64 = { workspace = true }
-reebe-db = { workspace = true, features = ["postgres"] }
+reebe-db = { workspace = true, features = ["postgres", "memory"] }
 criterion = { version = "0.5", features = ["async_tokio"] }
 
 [[bench]]

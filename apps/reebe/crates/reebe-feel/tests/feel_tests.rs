@@ -383,3 +383,14 @@ fn test_count_builtin() {
     let result = evaluate("count([1, 2, 3, 4])", &ctx).unwrap();
     assert_eq!(result, FeelValue::Integer(4));
 }
+
+#[test]
+fn test_count_empty_list_equality() {
+    // count([]) should be 0, and count(x) = 0 should be true when x = []
+    let ctx = ctx_from_json(serde_json::json!({ "validationErrors": [] }));
+    let result = evaluate("count(validationErrors) = 0", &ctx).unwrap();
+    assert_eq!(result, FeelValue::Bool(true), "count([]) = 0 must be true");
+
+    let result2 = evaluate("count([]) = 0", &ctx).unwrap();
+    assert_eq!(result2, FeelValue::Bool(true), "count([]) = 0 literal must be true");
+}

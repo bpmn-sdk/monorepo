@@ -359,6 +359,24 @@ impl ParserState {
             "compensateEventDefinition" => {
                 self.pending_event_def = Some(EventDefinition::Compensation);
             }
+            // A sequenceFlow with child elements (e.g. conditionExpression) arrives as
+            // a Start event rather than Empty. Handle it identically to the Empty case so
+            // that the flow is registered immediately; conditionExpression is applied
+            // later by apply_last_flow_condition in handle_end.
+            "sequenceFlow" => {
+                let id = get_required_attr(e, "sequenceFlow", "id")?;
+                let source = get_required_attr(e, "sequenceFlow", "sourceRef")?;
+                let target = get_required_attr(e, "sequenceFlow", "targetRef")?;
+                let flow = SequenceFlow {
+                    id,
+                    name: get_attr(e, "name"),
+                    source_ref: source,
+                    target_ref: target,
+                    condition_expression: None,
+                    is_default: false,
+                };
+                self.add_sequence_flow(flow);
+            }
             _ => {}
         }
         Ok(())
@@ -732,7 +750,23 @@ impl ParserState {
                 }
             }
             "process" => {
-                if let Some(ParseContext::Process(process)) = self.stack.pop() {
+                if let Some(ParseContext::Process(mut process)) = self.stack.pop() {
+                    // Resolve default flows: find every gateway that has a default_flow
+                    // and mark the corresponding sequence flow's is_default flag.
+                    let default_flow_ids: Vec<String> = process
+                        .elements
+                        .values()
+                        .filter_map(|el| match el {
+                            FlowElement::ExclusiveGateway(gw)
+                            | FlowElement::InclusiveGateway(gw) => gw.default_flow.clone(),
+                            _ => None,
+                        })
+                        .collect();
+                    for flow in process.sequence_flows.iter_mut() {
+                        if default_flow_ids.contains(&flow.id) {
+                            flow.is_default = true;
+                        }
+                    }
                     return Ok(Some(process));
                 }
             }
