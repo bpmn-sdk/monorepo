@@ -97,7 +97,12 @@ export function buildValidationDmn(startEventId: string, variables: InputVariabl
 			addRow("not(instance of number)", `${v.name} must be a number`)
 		} else if (v.type === "boolean") {
 			addRow("not(instance of boolean)", `${v.name} must be a boolean`)
+		} else if (v.type === "context") {
+			addRow("not(instance of context)", `${v.name} must be a context`)
+		} else if (v.type === "list") {
+			addRow("not(instance of list)", `${v.name} must be a list`)
 		}
+		// "any" accepts all types — no type-check rule generated
 
 		if (v.type === "string") {
 			if (v.minLength !== undefined) {

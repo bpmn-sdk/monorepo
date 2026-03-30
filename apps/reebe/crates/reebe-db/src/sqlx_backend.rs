@@ -294,4 +294,37 @@ impl StateBackend for SqlxBackend {
     async fn delete_user(&self, username: &str) -> Result<()> {
         UserRepository::new(&self.pool).delete(username).await
     }
+
+    async fn insert_decision_xml(&self, decision_id: &str, dmn_xml: &str) -> Result<()> {
+        use sqlx::Row;
+        let existing: Option<i64> = sqlx::query(
+            "SELECT key FROM decision_definitions WHERE decision_id = $1 ORDER BY version DESC LIMIT 1",
+        )
+        .bind(decision_id)
+        .fetch_optional(&*self.pool)
+        .await?
+        .map(|r| r.get("key"));
+
+        if existing.is_none() {
+            sqlx::query(
+                "INSERT INTO decision_definitions (decision_id, dmn_xml, version) VALUES ($1, $2, 1) ON CONFLICT DO NOTHING",
+            )
+            .bind(decision_id)
+            .bind(dmn_xml)
+            .execute(&*self.pool)
+            .await?;
+        }
+        Ok(())
+    }
+
+    async fn get_dmn_xml_by_decision_id(&self, decision_id: &str) -> Result<Option<String>> {
+        use sqlx::Row;
+        let row = sqlx::query(
+            "SELECT dmn_xml FROM decision_definitions WHERE decision_id = $1 ORDER BY version DESC LIMIT 1",
+        )
+        .bind(decision_id)
+        .fetch_optional(&*self.pool)
+        .await?;
+        Ok(row.map(|r| r.get("dmn_xml")))
+    }
 }

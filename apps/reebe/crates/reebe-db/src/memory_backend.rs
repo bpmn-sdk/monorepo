@@ -45,6 +45,7 @@ pub struct InMemoryStore {
     gateway_tokens: std::collections::HashMap<(i64, String), i32>,
     deployments: BTreeMap<i64, Deployment>,
     process_definitions: BTreeMap<i64, ProcessDefinition>,
+    decision_xml_by_id: std::collections::HashMap<String, String>,
     user_tasks: BTreeMap<i64, UserTask>,
     tenants: BTreeMap<i64, Tenant>,
     users: BTreeMap<String, User>,
@@ -67,6 +68,7 @@ impl InMemoryStore {
             gateway_tokens: std::collections::HashMap::new(),
             deployments: BTreeMap::new(),
             process_definitions: BTreeMap::new(),
+            decision_xml_by_id: std::collections::HashMap::new(),
             user_tasks: BTreeMap::new(),
             tenants: BTreeMap::new(),
             users: BTreeMap::new(),
@@ -651,5 +653,14 @@ impl StateBackend for InMemoryBackend {
     async fn delete_user(&self, username: &str) -> Result<()> {
         self.store.lock().unwrap().users.remove(username);
         Ok(())
+    }
+
+    async fn insert_decision_xml(&self, decision_id: &str, dmn_xml: &str) -> Result<()> {
+        self.store.lock().unwrap().decision_xml_by_id.insert(decision_id.to_string(), dmn_xml.to_string());
+        Ok(())
+    }
+
+    async fn get_dmn_xml_by_decision_id(&self, decision_id: &str) -> Result<Option<String>> {
+        Ok(self.store.lock().unwrap().decision_xml_by_id.get(decision_id).cloned())
     }
 }

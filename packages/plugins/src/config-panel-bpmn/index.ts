@@ -536,7 +536,7 @@ const USER_TASK_ADAPTER: PanelAdapter = {
 
 // ── Business rule task schema (decisionId + resultVariable) ──────────────────
 
-function makeBusinessRuleTaskSchema(): PanelSchema {
+function makeBusinessRuleTaskSchema(onOpenDmn?: (decisionId: string) => void): PanelSchema {
 	return {
 		compact: [{ key: "name", label: "Name", type: "text", placeholder: "Task name" }],
 		groups: [
@@ -551,6 +551,18 @@ function makeBusinessRuleTaskSchema(): PanelSchema {
 						type: "text",
 						placeholder: "e.g. Decision_1m0rvzp",
 						hint: "ID of the DMN decision to evaluate.",
+					},
+					{
+						key: "_openDmn",
+						label: "Open DMN",
+						type: "action",
+						hint: "Open the referenced DMN decision in the editor.",
+						condition: (values) =>
+							typeof values.decisionId === "string" && values.decisionId !== "",
+						onClick: (values) => {
+							const decId = values.decisionId as string | undefined
+							if (decId) onOpenDmn?.(decId)
+						},
 					},
 					{
 						key: "resultVariable",
@@ -1874,7 +1886,7 @@ export function createConfigPanelBpmnPlugin(
 	registerTemplate(template: ElementTemplate): void
 } {
 	const userTaskSchema = makeUserTaskSchema()
-	const businessRuleTaskSchema = makeBusinessRuleTaskSchema()
+	const businessRuleTaskSchema = makeBusinessRuleTaskSchema(options.onEditValidationDmn)
 	const callActivitySchema = makeCallActivitySchema()
 	const scriptTaskSchema = makeScriptTaskSchema(options.openFeelPlayground)
 	const sequenceFlowSchema = makeSequenceFlowSchema(options.openFeelPlayground)

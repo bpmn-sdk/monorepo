@@ -420,20 +420,33 @@ export async function wasmRoute(
 
 	// ── Deploy ────────────────────────────────────────────────────────────────
 	if (method === "POST" && path === "/api/deployments") {
-		const xml = await extractXmlFromForm(form)
-		log(
-			`   deploy: xml length=${xml.length}, first 80 chars: ${xml.slice(0, 80).replace(/\n/g, " ")}`,
-		)
-		let result: DeployResponse
-		try {
-			result = eng.deploy(xml) as DeployResponse
-		} catch (err) {
-			logError("   deploy failed:", err)
-			throw new Error(String(err))
+		const resources = await extractAllXmlsFromForm(form)
+		log(`   deploy: ${resources.length} resource(s)`)
+
+		// Deploy all resources (BPMN + companion DMNs); keep only the BPMN result.
+		let bpmnResult: DeployResponse = { deploymentKey: "0", deployments: [] }
+		let bpmnXml = ""
+		for (const xml of resources) {
+			log(
+				`   deploying resource: length=${xml.length}, first 80: ${xml.slice(0, 80).replace(/\n/g, " ")}`,
+			)
+			let depResult: DeployResponse
+			try {
+				depResult = eng.deploy(xml) as DeployResponse
+			} catch (err) {
+				logError("   deploy failed:", err)
+				throw new Error(String(err))
+			}
+			log("   deploy result:", JSON.stringify(depResult))
+			// Only capture results from BPMN deploys (they carry process definitions).
+			if ((depResult.deployments?.length ?? 0) > 0) {
+				bpmnResult = depResult
+				bpmnXml = xml
+			}
 		}
-		log("   deploy result:", JSON.stringify(result))
+
 		const now = new Date().toISOString()
-		for (const dep of result.deployments ?? []) {
+		for (const dep of bpmnResult.deployments ?? []) {
 			log(
 				`   storing localDef key=${dep.processDefinitionKey} bpmnProcessId=${dep.bpmnProcessId} v${dep.version}`,
 			)
@@ -441,14 +454,14 @@ export async function wasmRoute(
 				key: dep.processDefinitionKey,
 				bpmnProcessId: dep.bpmnProcessId,
 				version: dep.version,
-				xml,
+				xml: bpmnXml,
 				deployedAt: now,
 			})
 		}
 		log(`   localDefs now has ${localDefs.size} entries`)
 		const response = {
-			deploymentKey: result.deploymentKey,
-			processes: (result.deployments ?? []).map((d) => ({
+			deploymentKey: bpmnResult.deploymentKey,
+			processes: (bpmnResult.deployments ?? []).map((d) => ({
 				processDefinitionKey: d.processDefinitionKey,
 				bpmnProcessId: d.bpmnProcessId,
 				version: d.version,
@@ -653,12 +666,13 @@ export async function wasmRoute(
 
 // ── Internal helpers ──────────────────────────────────────────────────────────
 
-async function extractXmlFromForm(form: FormData | undefined): Promise<string> {
+async function extractAllXmlsFromForm(form: FormData | undefined): Promise<string[]> {
 	if (!form) throw new Error("Deploy requires FormData")
-	const file = form.get("resources")
-	if (typeof file === "string") return file
-	if (file != null) return (file as Blob).text()
-	throw new Error("Could not extract BPMN XML from FormData")
+	const entries = form.getAll("resources")
+	if (entries.length === 0) throw new Error("Deploy requires at least one resource")
+	return Promise.all(
+		entries.map((e) => (typeof e === "string" ? Promise.resolve(e) : (e as Blob).text())),
+	)
 }
 
 function buildDefinitions(): ProcessDefinition[] {

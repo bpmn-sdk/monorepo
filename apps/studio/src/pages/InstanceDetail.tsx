@@ -3,6 +3,7 @@ import { InstancesStore, createInstanceDetailView } from "@bpmnkit/operate"
 import { createTokenHighlightPlugin } from "@bpmnkit/plugins/token-highlight"
 import { Play, RotateCw, XCircle } from "lucide-react"
 import { useEffect, useRef, useState } from "preact/hooks"
+import type { JSX } from "preact/jsx-runtime"
 import { Link, useLocation, useParams } from "wouter"
 import { getActiveProfile, getProxyUrl } from "../api/client.js"
 import {
@@ -22,6 +23,129 @@ import { toast } from "../stores/toast.js"
 import { useUiStore } from "../stores/ui.js"
 
 type OperateView = ReturnType<typeof createInstanceDetailView>
+
+// ── Variable rendering helpers ────────────────────────────────────────────────
+
+interface VariableItem {
+	name: string
+	value: unknown
+}
+
+function formatValue(raw: unknown): string {
+	if (raw === null || raw === undefined) return "null"
+	const str = String(raw)
+	try {
+		const parsed: unknown = JSON.parse(str)
+		if (typeof parsed === "object" && parsed !== null) {
+			return JSON.stringify(parsed, null, 2)
+		}
+	} catch {
+		/* not JSON */
+	}
+	return str
+}
+
+function escapeRegex(s: string): string {
+	return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+}
+
+function highlightText(text: string, query: string): JSX.Element {
+	if (!query.trim()) return <>{text}</>
+	const parts = text.split(new RegExp(`(${escapeRegex(query)})`, "gi"))
+	return (
+		<>
+			{parts.map((part, i) =>
+				i % 2 === 1 ? (
+					// biome-ignore lint/suspicious/noArrayIndexKey: static highlight parts
+					<mark key={i} className="bg-accent/30 text-fg rounded-sm not-italic">
+						{part}
+					</mark>
+				) : (
+					part
+				),
+			)}
+		</>
+	)
+}
+
+function VariableModal({
+	variable,
+	onClose,
+}: {
+	variable: VariableItem
+	onClose: () => void
+}) {
+	const [search, setSearch] = useState("")
+	const inputRef = useRef<HTMLInputElement>(null)
+	const formatted = formatValue(variable.value)
+	const lines = formatted.split("\n")
+
+	const visibleLines = search.trim()
+		? lines.filter((l) => l.toLowerCase().includes(search.toLowerCase()))
+		: lines
+
+	useEffect(() => {
+		inputRef.current?.focus()
+		function onKey(e: KeyboardEvent) {
+			if (e.key === "Escape") onClose()
+		}
+		window.addEventListener("keydown", onKey)
+		return () => window.removeEventListener("keydown", onKey)
+	}, [onClose])
+
+	return (
+		// biome-ignore lint/a11y/useKeyWithClickEvents: ESC is handled via window keydown listener
+		<div
+			className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+			onClick={(e) => e.target === e.currentTarget && onClose()}
+		>
+			<div className="flex flex-col w-full max-w-2xl max-h-[80vh] rounded-lg border border-border bg-surface shadow-2xl overflow-hidden mx-4">
+				<div className="flex items-center gap-3 px-4 py-3 border-b border-border shrink-0">
+					<span className="font-mono text-sm text-fg font-medium flex-1 truncate">
+						{variable.name}
+					</span>
+					{search.trim() && (
+						<span className="text-xs text-muted shrink-0">
+							{visibleLines.length} / {lines.length} lines
+						</span>
+					)}
+					<button
+						type="button"
+						onClick={onClose}
+						className="text-muted hover:text-fg transition-colors shrink-0 text-lg leading-none"
+						aria-label="Close"
+					>
+						✕
+					</button>
+				</div>
+				<div className="px-4 py-2 border-b border-border/60 shrink-0">
+					<input
+						ref={inputRef}
+						type="text"
+						value={search}
+						onInput={(e) => setSearch((e.target as HTMLInputElement).value)}
+						placeholder="Search in value…"
+						className="w-full rounded border border-border bg-surface-2 px-2.5 py-1.5 text-xs text-fg placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-accent"
+					/>
+				</div>
+				<div className="flex-1 overflow-auto p-4">
+					<pre className="font-mono text-xs text-fg leading-relaxed whitespace-pre-wrap break-all">
+						{visibleLines.length === 0 ? (
+							<span className="text-muted italic">No lines match the search.</span>
+						) : search.trim() ? (
+							visibleLines.map((line, i) => (
+								// biome-ignore lint/suspicious/noArrayIndexKey: filtered lines
+								<div key={i}>{highlightText(line, search)}</div>
+							))
+						) : (
+							highlightText(formatted, search)
+						)}
+					</pre>
+				</div>
+			</div>
+		</div>
+	)
+}
 
 // ── Wasm-native instance detail ───────────────────────────────────────────────
 
@@ -51,6 +175,8 @@ export function WasmInstanceDetail({
 	const [startVars, setStartVars] = useState(initialVariables ?? "{}")
 	const [startError, setStartError] = useState<string | null>(null)
 	const [startedKey, setStartedKey] = useState<string | null>(null)
+	const [varSearch, setVarSearch] = useState("")
+	const [modalVar, setModalVar] = useState<VariableItem | null>(null)
 
 	function handleVarsChange(v: string) {
 		setStartVars(v)
@@ -143,8 +269,17 @@ export function WasmInstanceDetail({
 		)
 	}
 
+	const filteredVars = varSearch
+		? variables.filter(
+				(v) =>
+					v.name.toLowerCase().includes(varSearch.toLowerCase()) ||
+					String(v.value).toLowerCase().includes(varSearch.toLowerCase()),
+			)
+		: variables
+
 	return (
 		<div className="h-full flex">
+			{modalVar && <VariableModal variable={modalVar} onClose={() => setModalVar(null)} />}
 			{/* Left: BPMN canvas with token overlay */}
 			<div className="flex-1 relative border-r border-border bg-surface-2">
 				<div ref={canvasContainerRef} className="absolute inset-0" />
@@ -313,29 +448,51 @@ export function WasmInstanceDetail({
 				)}
 
 				{/* Variables */}
-				{variables.length > 0 && (
-					<div className="flex flex-col gap-2">
-						<p className="text-xs font-semibold text-muted uppercase tracking-wider">Variables</p>
-						<div className="border border-border rounded-lg overflow-hidden">
-							<table className="w-full text-xs">
-								<thead>
-									<tr className="bg-surface-2 border-b border-border">
-										<th className="px-3 py-2 text-left font-medium text-muted">Name</th>
-										<th className="px-3 py-2 text-left font-medium text-muted">Value</th>
-									</tr>
-								</thead>
-								<tbody>
-									{variables.map((v) => (
-										<tr key={v.name} className="border-b border-border last:border-0">
-											<td className="px-3 py-2 font-mono text-fg">{v.name}</td>
-											<td className="px-3 py-2 font-mono text-muted">{JSON.stringify(v.value)}</td>
-										</tr>
-									))}
-								</tbody>
-							</table>
+				<div className="flex flex-col gap-2">
+					<p className="text-xs font-semibold text-muted uppercase tracking-wider flex items-center gap-1.5">
+						Variables
+						{variables.length > 0 && (
+							<span className="rounded-full bg-surface-2 px-1.5 py-0.5 text-[10px] text-muted">
+								{variables.length}
+							</span>
+						)}
+					</p>
+					<div className="border border-border rounded-lg overflow-hidden">
+						<div className="p-2 border-b border-border/60">
+							<input
+								type="text"
+								value={varSearch}
+								onInput={(e) => setVarSearch((e.target as HTMLInputElement).value)}
+								placeholder="Filter by name or value…"
+								className="w-full rounded border border-border bg-surface-2 px-2.5 py-1 text-xs text-fg placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-accent"
+							/>
 						</div>
+						{filteredVars.length === 0 ? (
+							<p className="px-3 py-4 text-xs text-muted text-center">
+								{variables.length === 0
+									? "No variables found for this instance."
+									: "No variables match the filter."}
+							</p>
+						) : (
+							filteredVars.map((v) => {
+								const preview = formatValue(v.value).replace(/\s+/g, " ").trim()
+								return (
+									<button
+										key={v.name}
+										type="button"
+										onClick={() => setModalVar(v)}
+										className="w-full text-left px-3 py-2 border-b border-border/30 last:border-0 hover:bg-surface-2 transition-colors cursor-pointer group"
+									>
+										<div className="font-mono text-xs text-fg truncate">{v.name}</div>
+										<div className="font-mono text-xs text-muted truncate mt-0.5 group-hover:text-fg/70 transition-colors">
+											{preview || <span className="italic">null</span>}
+										</div>
+									</button>
+								)
+							})
+						)}
 					</div>
-				)}
+				</div>
 
 				{!hideNavLink && (
 					<Link href="/instances" className="text-xs text-accent hover:underline self-start">

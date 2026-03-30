@@ -255,6 +255,409 @@ mod tests {
         assert!(!is_feel_expression(""));
     }
 
+    // ---- BRT + DMN companion flow ----
+
+    #[cfg(feature = "memory")]
+    #[tokio::test]
+    async fn test_brt_dmn_companion_stores_result_variable() {
+        use std::sync::Arc;
+        use base64::Engine as Base64Engine;
+        use reebe_db::{InMemoryBackend, StateBackend};
+        use crate::{EngineState, VirtualClock, JobNotifier};
+        use crate::processor::{
+            RecordProcessor, Writers,
+            DeploymentProcessor, ProcessInstanceCreationProcessor,
+            BpmnElementProcessor, JobProcessor,
+        };
+        use reebe_db::records::DbRecord;
+
+        const BPMN: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                  xmlns:zeebe="http://camunda.org/schema/zeebe/1.0"
+                  targetNamespace="http://bpmn.io/schema/bpmn">
+  <bpmn:process id="validation-proc" isExecutable="true">
+    <bpmn:startEvent id="start">
+      <bpmn:outgoing>f1</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:businessRuleTask id="brt1" name="Validate Input">
+      <bpmn:extensionElements>
+        <zeebe:calledDecision decisionId="start_inputValidation" resultVariable="validationErrors"/>
+      </bpmn:extensionElements>
+      <bpmn:incoming>f1</bpmn:incoming>
+      <bpmn:outgoing>f2</bpmn:outgoing>
+    </bpmn:businessRuleTask>
+    <bpmn:endEvent id="end">
+      <bpmn:incoming>f2</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="f1" sourceRef="start" targetRef="brt1"/>
+    <bpmn:sequenceFlow id="f2" sourceRef="brt1" targetRef="end"/>
+  </bpmn:process>
+</bpmn:definitions>"#;
+
+        const DMN: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/"
+             namespace="http://camunda.org/schema/1.0/dmn"
+             name="DRD"
+             id="Definitions_validation">
+  <decision id="start_inputValidation" name="Input Validation">
+    <decisionTable id="dt1" hitPolicy="COLLECT">
+      <input id="i1" label="name">
+        <inputExpression id="ie1">
+          <text>name</text>
+        </inputExpression>
+      </input>
+      <output id="o1" name="error" typeRef="string"/>
+      <rule id="r1">
+        <inputEntry id="ie1r1"><text>null</text></inputEntry>
+        <outputEntry id="oe1r1"><text>"name is required"</text></outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+</definitions>"#;
+
+        let backend = Arc::new(InMemoryBackend::new());
+        let clock = Arc::new(VirtualClock::new(chrono::Utc::now()));
+        let state = Arc::new(EngineState {
+            backend: backend.clone() as Arc<dyn reebe_db::StateBackend>,
+            partition_id: 0,
+            process_def_cache: crate::process_def_cache::ProcessDefCache::new(),
+            clock: clock.clone(),
+        });
+        let job_notifier = Arc::new(JobNotifier::new());
+
+        let processors: Vec<Arc<dyn RecordProcessor>> = vec![
+            Arc::new(DeploymentProcessor),
+            Arc::new(ProcessInstanceCreationProcessor),
+            Arc::new(BpmnElementProcessor),
+            Arc::new(JobProcessor { job_notifier }),
+        ];
+
+        // Helper: submit a command and drain follow-up commands
+        let submit_and_drain = {
+            let backend = backend.clone();
+            let state = state.clone();
+            let processors = processors.clone();
+            move |value_type: &str, intent: &str, payload: serde_json::Value| {
+                let backend = backend.clone();
+                let state = state.clone();
+                let processors = processors.clone();
+                let value_type = value_type.to_string();
+                let intent = intent.to_string();
+                async move {
+                    let (position, key) = backend.next_position_and_key(0).await.unwrap();
+                    let record = DbRecord {
+                        partition_id: 0,
+                        position,
+                        record_type: "COMMAND".to_string(),
+                        value_type: value_type.clone(),
+                        intent: intent.clone(),
+                        record_key: key,
+                        timestamp_ms: chrono::Utc::now().timestamp_millis(),
+                        payload,
+                        source_position: None,
+                        tenant_id: "<default>".to_string(),
+                    };
+                    backend.insert_record(&record).await.unwrap();
+
+                    let mut last_pos = position - 1;
+                    let mut response: Option<serde_json::Value> = None;
+
+                    loop {
+                        let cmds = backend.fetch_commands_from(0, last_pos + 1, 100).await.unwrap();
+                        if cmds.is_empty() { break; }
+                        for rec in &cmds {
+                            last_pos = rec.position;
+                            for proc in &processors {
+                                if proc.accepts(&rec.value_type, &rec.intent) {
+                                    let mut writers = Writers::new();
+                                    proc.process(rec, &state, &mut writers).await.unwrap();
+                                    if rec.position == position {
+                                        response = writers.response.clone();
+                                    }
+                                    let total = writers.events.len() + writers.commands.len();
+                                    if total > 0 {
+                                        let first = backend.next_position_batch(0, total).await.unwrap();
+                                        let mut recs = Vec::new();
+                                        for (i, ev) in writers.events.iter().enumerate() {
+                                            recs.push(DbRecord {
+                                                partition_id: 0,
+                                                position: first + i as i64,
+                                                record_type: "EVENT".to_string(),
+                                                value_type: ev.value_type.clone(),
+                                                intent: ev.intent.clone(),
+                                                record_key: ev.key,
+                                                timestamp_ms: chrono::Utc::now().timestamp_millis(),
+                                                payload: ev.payload.clone(),
+                                                source_position: Some(rec.position),
+                                                tenant_id: rec.tenant_id.clone(),
+                                            });
+                                        }
+                                        for (i, cmd) in writers.commands.iter().enumerate() {
+                                            recs.push(DbRecord {
+                                                partition_id: 0,
+                                                position: first + writers.events.len() as i64 + i as i64,
+                                                record_type: "COMMAND".to_string(),
+                                                value_type: cmd.value_type.clone(),
+                                                intent: cmd.intent.clone(),
+                                                record_key: cmd.key,
+                                                timestamp_ms: chrono::Utc::now().timestamp_millis(),
+                                                payload: cmd.payload.clone(),
+                                                source_position: Some(rec.position),
+                                                tenant_id: rec.tenant_id.clone(),
+                                            });
+                                        }
+                                        backend.insert_records_batch(&recs).await.unwrap();
+                                    }
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    response
+                }
+            }
+        };
+
+        // Deploy DMN companion
+        let dmn_encoded = base64::engine::general_purpose::STANDARD.encode(DMN.as_bytes());
+        submit_and_drain("DEPLOYMENT", "CREATE", serde_json::json!({
+            "resources": [{ "name": "validation.dmn", "content": dmn_encoded }]
+        })).await;
+
+        // Deploy BPMN
+        let bpmn_encoded = base64::engine::general_purpose::STANDARD.encode(BPMN.as_bytes());
+        let deploy_resp = submit_and_drain("DEPLOYMENT", "CREATE", serde_json::json!({
+            "resources": [{ "name": "process.bpmn", "content": bpmn_encoded }]
+        })).await.expect("deploy should return response");
+
+        assert!(
+            deploy_resp["deployments"].as_array().map(|a| !a.is_empty()).unwrap_or(false),
+            "BPMN deploy should return non-empty deployments: {deploy_resp}"
+        );
+
+        // Create process instance with a missing 'name' variable (triggers required rule)
+        submit_and_drain("PROCESS_INSTANCE_CREATION", "CREATE", serde_json::json!({
+            "bpmnProcessId": "validation-proc",
+            "version": -1,
+            "variables": {},
+        })).await;
+
+        // Check variables
+        let vars = backend.list_variables();
+        let validation_errors = vars.iter().find(|v| v.name == "validationErrors");
+        assert!(
+            validation_errors.is_some(),
+            "validationErrors variable should be stored; got: {:?}",
+            vars.iter().map(|v| &v.name).collect::<Vec<_>>()
+        );
+
+        let val = &validation_errors.unwrap().value;
+        let arr = val.as_array().expect("validationErrors should be an array");
+        assert!(!arr.is_empty(), "validationErrors should have at least one error for missing name");
+    }
+
+    /// When all inputs are valid, the COLLECT decision returns [] and the XOR
+    /// gateway condition `count(validationErrors) = 0` should take the valid path.
+    #[tokio::test]
+    #[cfg(feature = "memory")]
+    async fn test_brt_dmn_valid_inputs_gateway_takes_valid_path() {
+        use std::sync::Arc;
+        use base64::Engine as Base64Engine;
+        use reebe_db::{InMemoryBackend, StateBackend};
+        use crate::{EngineState, VirtualClock, JobNotifier};
+        use crate::processor::{
+            RecordProcessor, Writers,
+            DeploymentProcessor, ProcessInstanceCreationProcessor,
+            BpmnElementProcessor, JobProcessor,
+        };
+        use reebe_db::records::DbRecord;
+
+        // BRT → XOR gateway (condition: count(validationErrors) = 0) → end
+        //                                                               ↘ error-end (default)
+        const BPMN: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                  xmlns:zeebe="http://camunda.org/schema/zeebe/1.0"
+                  targetNamespace="http://bpmn.io/schema/bpmn">
+  <bpmn:process id="valid-proc" isExecutable="true">
+    <bpmn:startEvent id="start">
+      <bpmn:outgoing>f1</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:businessRuleTask id="brt1" name="Validate Input">
+      <bpmn:extensionElements>
+        <zeebe:calledDecision decisionId="start_inputValidation" resultVariable="validationErrors"/>
+      </bpmn:extensionElements>
+      <bpmn:incoming>f1</bpmn:incoming>
+      <bpmn:outgoing>f2</bpmn:outgoing>
+    </bpmn:businessRuleTask>
+    <bpmn:exclusiveGateway id="gw1" name="Valid?" default="f4">
+      <bpmn:incoming>f2</bpmn:incoming>
+      <bpmn:outgoing>f3</bpmn:outgoing>
+      <bpmn:outgoing>f4</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:endEvent id="end-ok">
+      <bpmn:incoming>f3</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:endEvent id="end-err">
+      <bpmn:incoming>f4</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="f1" sourceRef="start" targetRef="brt1"/>
+    <bpmn:sequenceFlow id="f2" sourceRef="brt1" targetRef="gw1"/>
+    <bpmn:sequenceFlow id="f3" sourceRef="gw1" targetRef="end-ok">
+      <bpmn:conditionExpression>= count(validationErrors) = 0</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="f4" sourceRef="gw1" targetRef="end-err"/>
+  </bpmn:process>
+</bpmn:definitions>"#;
+
+        const DMN: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/"
+             namespace="http://camunda.org/schema/1.0/dmn"
+             name="DRD"
+             id="Definitions_validation">
+  <decision id="start_inputValidation" name="Input Validation">
+    <decisionTable id="dt1" hitPolicy="COLLECT">
+      <input id="i1" label="name">
+        <inputExpression id="ie1">
+          <text>name</text>
+        </inputExpression>
+      </input>
+      <output id="o1" name="error" typeRef="string"/>
+      <rule id="r1">
+        <inputEntry id="ie1r1"><text>null</text></inputEntry>
+        <outputEntry id="oe1r1"><text>"name is required"</text></outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+</definitions>"#;
+
+        let backend = Arc::new(InMemoryBackend::new());
+        let clock = Arc::new(VirtualClock::new(chrono::Utc::now()));
+        let state = Arc::new(EngineState {
+            backend: backend.clone() as Arc<dyn reebe_db::StateBackend>,
+            partition_id: 0,
+            process_def_cache: crate::process_def_cache::ProcessDefCache::new(),
+            clock: clock.clone(),
+        });
+        let job_notifier = Arc::new(JobNotifier::new());
+
+        let processors: Vec<Arc<dyn RecordProcessor>> = vec![
+            Arc::new(DeploymentProcessor),
+            Arc::new(ProcessInstanceCreationProcessor),
+            Arc::new(BpmnElementProcessor),
+            Arc::new(JobProcessor { job_notifier }),
+        ];
+
+        let submit_and_drain = {
+            let backend = backend.clone();
+            let state = state.clone();
+            let processors = processors.clone();
+            move |value_type: &str, intent: &str, payload: serde_json::Value| {
+                let backend = backend.clone();
+                let state = state.clone();
+                let processors = processors.clone();
+                let value_type = value_type.to_string();
+                let intent = intent.to_string();
+                async move {
+                    let (position, key) = backend.next_position_and_key(0).await.unwrap();
+                    let record = DbRecord {
+                        partition_id: 0, position,
+                        record_type: "COMMAND".to_string(),
+                        value_type: value_type.clone(),
+                        intent: intent.clone(),
+                        record_key: key,
+                        timestamp_ms: chrono::Utc::now().timestamp_millis(),
+                        payload,
+                        source_position: None,
+                        tenant_id: "<default>".to_string(),
+                    };
+                    backend.insert_record(&record).await.unwrap();
+                    let mut last_pos = position - 1;
+                    loop {
+                        let cmds = backend.fetch_commands_from(0, last_pos + 1, 100).await.unwrap();
+                        if cmds.is_empty() { break; }
+                        for rec in &cmds {
+                            last_pos = rec.position;
+                            for proc in &processors {
+                                if proc.accepts(&rec.value_type, &rec.intent) {
+                                    let mut writers = Writers::new();
+                                    proc.process(rec, &state, &mut writers).await.unwrap();
+                                    let total = writers.events.len() + writers.commands.len();
+                                    if total > 0 {
+                                        let first = backend.next_position_batch(0, total).await.unwrap();
+                                        let mut recs = Vec::new();
+                                        for (i, ev) in writers.events.iter().enumerate() {
+                                            recs.push(DbRecord {
+                                                partition_id: 0, position: first + i as i64,
+                                                record_type: "EVENT".to_string(),
+                                                value_type: ev.value_type.clone(),
+                                                intent: ev.intent.clone(),
+                                                record_key: ev.key,
+                                                timestamp_ms: chrono::Utc::now().timestamp_millis(),
+                                                payload: ev.payload.clone(),
+                                                source_position: Some(rec.position),
+                                                tenant_id: rec.tenant_id.clone(),
+                                            });
+                                        }
+                                        for (i, cmd) in writers.commands.iter().enumerate() {
+                                            recs.push(DbRecord {
+                                                partition_id: 0,
+                                                position: first + writers.events.len() as i64 + i as i64,
+                                                record_type: "COMMAND".to_string(),
+                                                value_type: cmd.value_type.clone(),
+                                                intent: cmd.intent.clone(),
+                                                record_key: cmd.key,
+                                                timestamp_ms: chrono::Utc::now().timestamp_millis(),
+                                                payload: cmd.payload.clone(),
+                                                source_position: Some(rec.position),
+                                                tenant_id: rec.tenant_id.clone(),
+                                            });
+                                        }
+                                        backend.insert_records_batch(&recs).await.unwrap();
+                                    }
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        };
+
+        // Deploy DMN then BPMN
+        let dmn_encoded = base64::engine::general_purpose::STANDARD.encode(DMN.as_bytes());
+        submit_and_drain("DEPLOYMENT", "CREATE", serde_json::json!({
+            "resources": [{ "name": "validation.dmn", "content": dmn_encoded }]
+        })).await;
+
+        let bpmn_encoded = base64::engine::general_purpose::STANDARD.encode(BPMN.as_bytes());
+        submit_and_drain("DEPLOYMENT", "CREATE", serde_json::json!({
+            "resources": [{ "name": "process.bpmn", "content": bpmn_encoded }]
+        })).await;
+
+        // Create instance WITH a valid 'name' variable — no validation errors expected
+        submit_and_drain("PROCESS_INSTANCE_CREATION", "CREATE", serde_json::json!({
+            "bpmnProcessId": "valid-proc",
+            "version": -1,
+            "variables": { "name": "John" },
+        })).await;
+
+        // validationErrors should be an empty array (no rules fired)
+        let vars = backend.list_variables();
+        let ve = vars.iter().find(|v| v.name == "validationErrors");
+        assert!(ve.is_some(), "validationErrors variable must be set; got: {:?}",
+            vars.iter().map(|v| &v.name).collect::<Vec<_>>());
+        let arr = ve.unwrap().value.as_array().expect("validationErrors must be array");
+        assert!(arr.is_empty(), "validationErrors should be empty when inputs are valid; got: {arr:?}");
+
+        let element_instances = backend.list_element_instances();
+
+        // The process should have reached 'end-ok' (COMPLETED), not 'end-err'
+        let end_ok = element_instances.iter().find(|ei| ei.element_id == "end-ok");
+        let end_err = element_instances.iter().find(|ei| ei.element_id == "end-err");
+        assert!(end_ok.is_some(), "end-ok element instance should exist (valid path taken)");
+        assert!(end_err.is_none(), "end-err must NOT be reached when inputs are valid");
+    }
+
     // ---- BPMN + FEEL integration ----
 
     #[test]

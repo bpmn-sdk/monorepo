@@ -58,6 +58,19 @@ impl RecordProcessor for DeploymentProcessor {
             let xml = String::from_utf8(xml_bytes)
                 .map_err(|e| EngineError::BpmnParse(format!("UTF-8 decode error: {e}")))?;
 
+            // If the resource is a DMN file (has at least one decision), store each
+            // decision and skip BPMN parsing. BPMN also parses without error (same root
+            // element name) but yields zero decisions, so we must guard on non-empty.
+            if let Ok(drg) = reebe_dmn::parse_dmn(&xml) {
+                if !drg.decisions.is_empty() {
+                    for decision in &drg.decisions {
+                        state.backend.insert_decision_xml(&decision.id, &xml).await
+                            .unwrap_or_else(|e| tracing::warn!("Failed to store DMN decision {}: {e}", decision.id));
+                    }
+                    continue;
+                }
+            }
+
             // Parse BPMN
             let deployment_obj = reebe_bpmn::BpmnDeployment::from_xml(&xml, &resource_name)
                 .map_err(|e| EngineError::BpmnParse(e.to_string()))?;
