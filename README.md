@@ -7,6 +7,8 @@
   [![typescript](https://img.shields.io/badge/TypeScript-strict-6244d7?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
   [![pnpm](https://img.shields.io/badge/pnpm-workspace-f69220?style=flat-square&logo=pnpm&logoColor=white)](https://pnpm.io/)
   [![turborepo](https://img.shields.io/badge/Turborepo-monorepo-ef4444?style=flat-square&logo=turborepo&logoColor=white)](https://turbo.build/)
+  [![ai-assisted](https://img.shields.io/badge/AI--assisted-claude-8b5cf6?style=flat-square)](https://github.com/bpmnkit/monorepo)
+  [![experimental](https://img.shields.io/badge/status-experimental-f59e0b?style=flat-square)](https://github.com/bpmnkit/monorepo)
 
   [Website](https://bpmnkit.com) · [Documentation](https://docs.bpmnkit.com) · [npm](https://www.npmjs.com/org/bpmnkit) · [GitHub](https://github.com/bpmnkit/monorepo)
 </div>
@@ -213,34 +215,10 @@ bpmnkit/monorepo
 
 ### Prerequisites
 
-| Tool | Version | Required for |
-|------|---------|-------------|
-| [Node.js](https://nodejs.org/) | 18+ (latest LTS recommended) | All packages |
-| [pnpm](https://pnpm.io/) | 10+ | All packages |
-| [Rust](https://www.rust-lang.org/tools/install) | stable | `@bpmnkit/reebe-wasm` only |
-| [wasm-pack](https://rustwasm.github.io/wasm-pack/) | latest | `@bpmnkit/reebe-wasm` only |
-
-Rust and wasm-pack are only needed if you want to build the in-browser BPMN engine (`apps/reebe-wasm`). All other packages work with Node.js alone.
-
-**Installing Rust and wasm-pack:**
-
-```sh
-# Install Rust (if not already installed)
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-
-# Add the WebAssembly target
-rustup target add wasm32-unknown-unknown
-
-# Install wasm-pack
-cargo install wasm-pack
-```
-
-On Fedora/RHEL with system Rust (no rustup), install the wasm target via dnf:
-
-```sh
-sudo dnf install rust-std-static-wasm32-unknown-unknown
-cargo install wasm-pack
-```
+| Tool | Version |
+|------|---------|
+| [Node.js](https://nodejs.org/) | 18+ (latest LTS recommended) |
+| [pnpm](https://pnpm.io/) | 10+ |
 
 ### Setup
 
@@ -248,12 +226,6 @@ cargo install wasm-pack
 git clone https://github.com/bpmnkit/monorepo.git
 cd monorepo
 pnpm install
-```
-
-**Build the in-browser BPMN engine** (optional — required for the `reebe-wasm` profile in Studio):
-
-```sh
-wasm-pack build apps/reebe/crates/reebe-wasm --target web --out-dir "$(pwd)/apps/reebe-wasm"
 ```
 
 ### Commands

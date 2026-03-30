@@ -23,6 +23,8 @@ function header({ name, description, extra = "", dir = "packages" }) {
   [![npm](https://img.shields.io/npm/v/${name}?style=flat-square&color=6244d7)](https://www.npmjs.com/package/${name})
   [![license](https://img.shields.io/npm/l/${name}?style=flat-square)](${GITHUB}/blob/main/LICENSE)
   [![typescript](https://img.shields.io/badge/TypeScript-strict-6244d7?style=flat-square&logo=typescript&logoColor=white)](${GITHUB})
+  [![ai-assisted](https://img.shields.io/badge/AI--assisted-claude-8b5cf6?style=flat-square)](${GITHUB})
+  [![experimental](https://img.shields.io/badge/status-experimental-f59e0b?style=flat-square)](${GITHUB})
 
   [Website](https://bpmnkit.com) · [Documentation](${DOCS}) · [GitHub](${GITHUB}) · [Changelog](${GITHUB}/blob/main/${changelogPath})
 </div>
@@ -2006,6 +2008,8 @@ const rootReadme = `<div align="center">
   [![typescript](https://img.shields.io/badge/TypeScript-strict-6244d7?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
   [![pnpm](https://img.shields.io/badge/pnpm-workspace-f69220?style=flat-square&logo=pnpm&logoColor=white)](https://pnpm.io/)
   [![turborepo](https://img.shields.io/badge/Turborepo-monorepo-ef4444?style=flat-square&logo=turborepo&logoColor=white)](https://turbo.build/)
+  [![ai-assisted](https://img.shields.io/badge/AI--assisted-claude-8b5cf6?style=flat-square)](${GITHUB})
+  [![experimental](https://img.shields.io/badge/status-experimental-f59e0b?style=flat-square)](${GITHUB})
 
   [Website](https://bpmnkit.com) · [Documentation](${DOCS}) · [npm](https://www.npmjs.com/org/bpmnkit) · [GitHub](${GITHUB})
 </div>
