@@ -31,6 +31,40 @@ impl From<quick_xml::events::attributes::AttrError> for BpmnParseError {
     }
 }
 
+/// Pre-scan XML for `<bpmn:message>` and `<bpmn:signal>` declarations so that
+/// forward references (event definitions appearing before the declaration) are resolved.
+fn prescan_refs(xml: &str) -> (HashMap<String, String>, HashMap<String, String>) {
+    let mut messages: HashMap<String, String> = HashMap::new();
+    let mut signals: HashMap<String, String> = HashMap::new();
+    let mut reader = Reader::from_str(xml);
+    reader.config_mut().trim_text(true);
+    let mut buf = Vec::new();
+    loop {
+        match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e)) => {
+                let name = local_name_owned(e.name().as_ref());
+                match name.as_str() {
+                    "message" => {
+                        if let (Some(id), Some(n)) = (get_attr(e, "id"), get_attr(e, "name")) {
+                            messages.insert(id, n);
+                        }
+                    }
+                    "signal" => {
+                        if let (Some(id), Some(n)) = (get_attr(e, "id"), get_attr(e, "name")) {
+                            signals.insert(id, n);
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            Ok(Event::Eof) | Err(_) => break,
+            _ => {}
+        }
+        buf.clear();
+    }
+    (messages, signals)
+}
+
 /// Parse a BPMN 2.0 XML string and return all process definitions.
 pub fn parse_bpmn(xml: &str) -> Result<Vec<BpmnProcess>, BpmnParseError> {
     let mut reader = Reader::from_str(xml);
@@ -38,8 +72,13 @@ pub fn parse_bpmn(xml: &str) -> Result<Vec<BpmnProcess>, BpmnParseError> {
 
     let mut processes: Vec<BpmnProcess> = Vec::new();
 
+    // Pre-scan to resolve forward references for messages and signals
+    let (pre_messages, pre_signals) = prescan_refs(xml);
+
     // We use a stateful parser with a stack
     let mut parser_state = ParserState::new();
+    parser_state.messages = pre_messages;
+    parser_state.signals = pre_signals;
     let mut buf = Vec::new();
 
     loop {
@@ -158,6 +197,8 @@ struct ParserState {
     stack: Vec<ParseContext>,
     // Messages referenced in the process
     messages: HashMap<String, String>, // id -> name
+    // Signals referenced in the process
+    signals: HashMap<String, String>, // id -> name
     // Current text content (for CDATA elements)
     current_text: String,
     // Pending event definition being built
@@ -169,6 +210,7 @@ impl ParserState {
         Self {
             stack: vec![ParseContext::Root],
             messages: HashMap::new(),
+            signals: HashMap::new(),
             current_text: String::new(),
             pending_event_def: None,
         }
@@ -183,6 +225,56 @@ impl ParserState {
         None
     }
 
+    /// Add a regular (non-start, non-end) flow element to the nearest enclosing
+    /// SubProcess or Process scope.
+    fn add_element_to_scope(&mut self, id: String, element: FlowElement) {
+        for ctx in self.stack.iter_mut().rev() {
+            match ctx {
+                ParseContext::SubProcess(sp) => { sp.elements.insert(id, element); return; }
+                ParseContext::Process(p) => { p.elements.insert(id, element); return; }
+                _ => {}
+            }
+        }
+    }
+
+    /// Add a start event to the nearest enclosing SubProcess or Process scope,
+    /// registering it in start_events.
+    fn add_start_event_to_scope(&mut self, id: String, element: FlowElement) {
+        for ctx in self.stack.iter_mut().rev() {
+            match ctx {
+                ParseContext::SubProcess(sp) => {
+                    sp.start_events.push(id.clone());
+                    sp.elements.insert(id, element);
+                    return;
+                }
+                ParseContext::Process(p) => {
+                    p.start_events.push(id.clone());
+                    p.elements.insert(id, element);
+                    return;
+                }
+                _ => {}
+            }
+        }
+    }
+
+    /// Add an end event to the nearest enclosing SubProcess or Process scope.
+    fn add_end_event_to_scope(&mut self, id: String, element: FlowElement) {
+        for ctx in self.stack.iter_mut().rev() {
+            match ctx {
+                ParseContext::SubProcess(sp) => {
+                    sp.elements.insert(id, element);
+                    return;
+                }
+                ParseContext::Process(p) => {
+                    p.end_events.push(id.clone());
+                    p.elements.insert(id, element);
+                    return;
+                }
+                _ => {}
+            }
+        }
+    }
+
     fn handle_start(
         &mut self,
         name: &str,
@@ -193,6 +285,11 @@ impl ParserState {
             "message" => {
                 if let (Some(id), Some(msg_name)) = (get_attr(e, "id"), get_attr(e, "name")) {
                     self.messages.insert(id, msg_name);
+                }
+            }
+            "signal" => {
+                if let (Some(id), Some(sig_name)) = (get_attr(e, "id"), get_attr(e, "name")) {
+                    self.signals.insert(id, sig_name);
                 }
             }
             "process" => {
@@ -342,8 +439,14 @@ impl ParserState {
             }
             "signalEventDefinition" => {
                 let signal_ref = get_attr(e, "signalRef");
+                let signal_name = signal_ref
+                    .as_ref()
+                    .and_then(|r| self.signals.get(r))
+                    .cloned()
+                    .or(signal_ref)
+                    .unwrap_or_default();
                 self.pending_event_def = Some(EventDefinition::Signal(SignalEventDefinition {
-                    signal_name: signal_ref.unwrap_or_default(),
+                    signal_name,
                 }));
             }
             "errorEventDefinition" => {
@@ -401,6 +504,11 @@ impl ParserState {
                     self.messages.insert(id, msg_name);
                 }
             }
+            "signal" => {
+                if let (Some(id), Some(sig_name)) = (get_attr(e, "id"), get_attr(e, "name")) {
+                    self.signals.insert(id, sig_name);
+                }
+            }
             "incoming" | "outgoing" => {}
             "sequenceFlow" => {
                 let id = get_required_attr(e, "sequenceFlow", "id")?;
@@ -450,6 +558,11 @@ impl ParserState {
                 let decision_id = get_attr(e, "decisionId");
                 let result_variable = get_attr(e, "resultVariable");
                 self.apply_called_decision(decision_id, result_variable);
+            }
+            "script" => {
+                let expression = get_attr(e, "expression").unwrap_or_default();
+                let result_variable = get_attr(e, "resultVariable");
+                self.apply_script(expression, result_variable);
             }
             "subscription" => {
                 let correlation_key = get_attr(e, "correlationKey").unwrap_or_default();
@@ -532,8 +645,14 @@ impl ParserState {
             }
             "signalEventDefinition" => {
                 let signal_ref = get_attr(e, "signalRef");
+                let signal_name = signal_ref
+                    .as_ref()
+                    .and_then(|r| self.signals.get(r))
+                    .cloned()
+                    .or(signal_ref)
+                    .unwrap_or_default();
                 self.pending_event_def = Some(EventDefinition::Signal(SignalEventDefinition {
-                    signal_name: signal_ref.unwrap_or_default(),
+                    signal_name,
                 }));
                 self.finalize_event_definition();
             }
@@ -618,142 +737,103 @@ impl ParserState {
             "startEvent" => {
                 if let Some(ParseContext::StartEvent(ev)) = self.stack.pop() {
                     let id = ev.id.clone();
-                    let is_start = matches!(ev.event_definition, None) || !matches!(ev.event_definition, Some(EventDefinition::Terminate));
-                    if let Some(process) = self.current_process() {
-                        if is_start {
-                            process.start_events.push(id.clone());
-                        }
-                        process.elements.insert(id, FlowElement::StartEvent(ev));
-                    }
+                    self.add_start_event_to_scope(id, FlowElement::StartEvent(ev));
                 }
             }
             "endEvent" => {
                 if let Some(ParseContext::EndEvent(ev)) = self.stack.pop() {
                     let id = ev.id.clone();
-                    if let Some(process) = self.current_process() {
-                        process.end_events.push(id.clone());
-                        process.elements.insert(id, FlowElement::EndEvent(ev));
-                    }
+                    self.add_end_event_to_scope(id, FlowElement::EndEvent(ev));
                 }
             }
             "serviceTask" => {
                 if let Some(ParseContext::ServiceTask(task)) = self.stack.pop() {
                     let id = task.id.clone();
-                    if let Some(process) = self.current_process() {
-                        process.elements.insert(id, FlowElement::ServiceTask(task));
-                    }
+                    self.add_element_to_scope(id, FlowElement::ServiceTask(task));
                 }
             }
             "userTask" => {
                 if let Some(ParseContext::UserTask(task)) = self.stack.pop() {
                     let id = task.id.clone();
-                    if let Some(process) = self.current_process() {
-                        process.elements.insert(id, FlowElement::UserTask(task));
-                    }
+                    self.add_element_to_scope(id, FlowElement::UserTask(task));
                 }
             }
             "receiveTask" => {
                 if let Some(ParseContext::ReceiveTask(task)) = self.stack.pop() {
                     let id = task.id.clone();
-                    if let Some(process) = self.current_process() {
-                        process.elements.insert(id, FlowElement::ReceiveTask(task));
-                    }
+                    self.add_element_to_scope(id, FlowElement::ReceiveTask(task));
                 }
             }
             "scriptTask" => {
                 if let Some(ParseContext::ScriptTask(task)) = self.stack.pop() {
                     let id = task.id.clone();
-                    if let Some(process) = self.current_process() {
-                        process.elements.insert(id, FlowElement::ScriptTask(task));
-                    }
+                    self.add_element_to_scope(id, FlowElement::ScriptTask(task));
                 }
             }
             "sendTask" => {
                 if let Some(ParseContext::SendTask(task)) = self.stack.pop() {
                     let id = task.id.clone();
-                    if let Some(process) = self.current_process() {
-                        process.elements.insert(id, FlowElement::SendTask(task));
-                    }
+                    self.add_element_to_scope(id, FlowElement::SendTask(task));
                 }
             }
             "businessRuleTask" => {
                 if let Some(ParseContext::BusinessRuleTask(task)) = self.stack.pop() {
                     let id = task.id.clone();
-                    if let Some(process) = self.current_process() {
-                        process.elements.insert(id, FlowElement::BusinessRuleTask(task));
-                    }
+                    self.add_element_to_scope(id, FlowElement::BusinessRuleTask(task));
                 }
             }
             "callActivity" => {
                 if let Some(ParseContext::CallActivity(ca)) = self.stack.pop() {
                     let id = ca.id.clone();
-                    if let Some(process) = self.current_process() {
-                        process.elements.insert(id, FlowElement::CallActivity(ca));
-                    }
+                    self.add_element_to_scope(id, FlowElement::CallActivity(ca));
                 }
             }
             "subProcess" => {
                 if let Some(ParseContext::SubProcess(sp)) = self.stack.pop() {
                     let id = sp.id.clone();
-                    if let Some(process) = self.current_process() {
-                        process.elements.insert(id, FlowElement::SubProcess(sp));
-                    }
+                    self.add_element_to_scope(id, FlowElement::SubProcess(sp));
                 }
             }
             "exclusiveGateway" => {
                 if let Some(ParseContext::ExclusiveGateway(gw)) = self.stack.pop() {
                     let id = gw.id.clone();
-                    if let Some(process) = self.current_process() {
-                        process.elements.insert(id, FlowElement::ExclusiveGateway(gw));
-                    }
+                    self.add_element_to_scope(id, FlowElement::ExclusiveGateway(gw));
                 }
             }
             "parallelGateway" => {
                 if let Some(ParseContext::ParallelGateway(gw)) = self.stack.pop() {
                     let id = gw.id.clone();
-                    if let Some(process) = self.current_process() {
-                        process.elements.insert(id, FlowElement::ParallelGateway(gw));
-                    }
+                    self.add_element_to_scope(id, FlowElement::ParallelGateway(gw));
                 }
             }
             "inclusiveGateway" => {
                 if let Some(ParseContext::InclusiveGateway(gw)) = self.stack.pop() {
                     let id = gw.id.clone();
-                    if let Some(process) = self.current_process() {
-                        process.elements.insert(id, FlowElement::InclusiveGateway(gw));
-                    }
+                    self.add_element_to_scope(id, FlowElement::InclusiveGateway(gw));
                 }
             }
             "eventBasedGateway" => {
                 if let Some(ParseContext::EventBasedGateway(gw)) = self.stack.pop() {
                     let id = gw.id.clone();
-                    if let Some(process) = self.current_process() {
-                        process.elements.insert(id, FlowElement::EventBasedGateway(gw));
-                    }
+                    self.add_element_to_scope(id, FlowElement::EventBasedGateway(gw));
                 }
             }
             "intermediateCatchEvent" => {
                 if let Some(ParseContext::IntermediateCatchEvent(ev)) = self.stack.pop() {
                     let id = ev.id.clone();
-                    if let Some(process) = self.current_process() {
-                        process.elements.insert(id, FlowElement::IntermediateCatchEvent(ev));
-                    }
+                    self.add_element_to_scope(id, FlowElement::IntermediateCatchEvent(ev));
                 }
             }
             "intermediateThrowEvent" => {
                 if let Some(ParseContext::IntermediateThrowEvent(ev)) = self.stack.pop() {
                     let id = ev.id.clone();
-                    if let Some(process) = self.current_process() {
-                        process.elements.insert(id, FlowElement::IntermediateThrowEvent(ev));
-                    }
+                    self.add_element_to_scope(id, FlowElement::IntermediateThrowEvent(ev));
                 }
             }
             "boundaryEvent" => {
                 if let Some(ParseContext::BoundaryEvent(ev)) = self.stack.pop() {
                     let id = ev.id.clone();
-                    if let Some(process) = self.current_process() {
-                        process.elements.insert(id, FlowElement::BoundaryEvent(ev));
-                    }
+                    self.add_element_to_scope(id, FlowElement::BoundaryEvent(ev));
                 }
             }
             "process" => {
@@ -953,6 +1033,16 @@ impl ParserState {
             if let ParseContext::BusinessRuleTask(t) = ctx {
                 t.zeebe_called_decision_id = decision_id;
                 t.zeebe_result_variable = result_variable;
+                return;
+            }
+        }
+    }
+
+    fn apply_script(&mut self, expression: String, result_variable: Option<String>) {
+        for ctx in self.stack.iter_mut().rev() {
+            if let ParseContext::ScriptTask(t) = ctx {
+                t.script = Some(expression);
+                t.result_variable = result_variable;
                 return;
             }
         }

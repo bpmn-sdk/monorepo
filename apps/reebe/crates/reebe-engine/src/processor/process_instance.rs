@@ -51,6 +51,16 @@ impl RecordProcessor for ProcessInstanceCreationProcessor {
         // Generate instance key
         let instance_key = key_gen.next_key().await?;
 
+        // Accept optional parent linkage (set by call activity spawning)
+        let parent_process_instance_key: Option<i64> = payload["parentProcessInstanceKey"]
+            .as_str()
+            .and_then(|s| s.parse().ok())
+            .or_else(|| payload["parentProcessInstanceKey"].as_i64());
+        let parent_element_instance_key: Option<i64> = payload["parentElementInstanceKey"]
+            .as_str()
+            .and_then(|s| s.parse().ok())
+            .or_else(|| payload["parentElementInstanceKey"].as_i64());
+
         // Insert process instance
         let pi = ProcessInstance {
             key: instance_key,
@@ -61,8 +71,8 @@ impl RecordProcessor for ProcessInstanceCreationProcessor {
             state: "ACTIVE".to_string(),
             start_date: state.clock.now(),
             end_date: None,
-            parent_process_instance_key: None,
-            parent_element_instance_key: None,
+            parent_process_instance_key,
+            parent_element_instance_key,
             root_process_instance_key: instance_key,
             tenant_id: tenant_id.clone(),
         };

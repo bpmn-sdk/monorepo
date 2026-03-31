@@ -134,6 +134,10 @@ impl JobProcessor {
         let job = state.backend.get_job_by_key(job_key).await?;
         state.backend.complete_job(job_key, variables.clone()).await?;
 
+        // Look up the element instance to recover the correct flowScopeKey (e.g. subprocess scope)
+        let ei = state.backend.get_element_instance_by_key(job.element_instance_key).await?;
+        let flow_scope_key = ei.flow_scope_key.unwrap_or(job.process_instance_key);
+
         writers.events.push(EventToWrite {
             value_type: "JOB".to_string(),
             intent: "COMPLETED".to_string(),
@@ -159,7 +163,7 @@ impl JobProcessor {
                 "elementId": job.element_id,
                 "elementType": "SERVICE_TASK",
                 "bpmnProcessId": job.bpmn_process_id,
-                "flowScopeKey": job.process_instance_key.to_string(),
+                "flowScopeKey": flow_scope_key.to_string(),
                 "variables": variables.unwrap_or_default(),
                 "tenantId": tenant_id,
             }),
