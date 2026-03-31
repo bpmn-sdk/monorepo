@@ -229,13 +229,6 @@ fn validate_intermediate_catch_event(
                     message: "Message catch event must reference a message with a name".to_string(),
                 });
             }
-            if msg.correlation_key.is_none() {
-                errors.push(ValidationError::ElementError {
-                    process_id: process_id.to_string(),
-                    element_id: element_id.to_string(),
-                    message: "Message catch event must have a zeebe:subscription correlationKey".to_string(),
-                });
-            }
         }
         _ => {}
     }

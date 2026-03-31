@@ -520,7 +520,14 @@ export class ProcessInstance {
 		const cd = ext.calledDecision
 		if (cd === undefined) return
 		const decision = this.decisions.get(cd.decisionId)
-		if (decision === undefined) return
+		if (decision === undefined) {
+			this.emit({
+				type: "element:failed",
+				elementId: _el.id,
+				error: `DMN decision '${cd.decisionId}' not found. Deploy the DMN before running the process.`,
+			})
+			return
+		}
 		const result = evaluateDecision(decision, this.variables.getAll(scopeId))
 		this.variables.set(scopeId, cd.resultVariable, result)
 		this.emit({ type: "variable:set", name: cd.resultVariable, value: result, scopeId })

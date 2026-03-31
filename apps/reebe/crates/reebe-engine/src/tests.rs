@@ -698,4 +698,180 @@ mod tests {
         let result = parse_and_evaluate(condition, &ctx).unwrap();
         assert_eq!(result, FeelValue::Bool(false));
     }
+
+    /// When the default flow (f4, no condition, marked with `default="f4"`) appears
+    /// before the conditioned flow (f3) in the sequenceFlow document order, the
+    /// gateway must still take the conditioned path when its condition is true.
+    /// The default flow must only be taken when no conditioned flow matches.
+    #[tokio::test]
+    #[cfg(feature = "memory")]
+    async fn test_xor_gateway_conditioned_flow_wins_over_unconditioned_default() {
+        use std::sync::Arc;
+        use base64::Engine as Base64Engine;
+        use reebe_db::{InMemoryBackend, StateBackend};
+        use crate::{EngineState, VirtualClock, JobNotifier};
+        use crate::processor::{
+            RecordProcessor, Writers,
+            DeploymentProcessor, ProcessInstanceCreationProcessor,
+            BpmnElementProcessor, JobProcessor,
+        };
+        use reebe_db::records::DbRecord;
+
+        // f4 (no condition, intended as default) comes BEFORE f3 (conditioned) in the XML.
+        // Without the fix the engine would pick f4 (wrong path) because None => true.
+        const BPMN: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                  targetNamespace="http://bpmn.io/schema/bpmn">
+  <bpmn:process id="gw-order-proc" isExecutable="true">
+    <bpmn:startEvent id="start">
+      <bpmn:outgoing>f1</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:exclusiveGateway id="gw1" name="Check" default="f4">
+      <bpmn:incoming>f1</bpmn:incoming>
+      <bpmn:outgoing>f3</bpmn:outgoing>
+      <bpmn:outgoing>f4</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:endEvent id="end-ok">
+      <bpmn:incoming>f3</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:endEvent id="end-err">
+      <bpmn:incoming>f4</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="f1" sourceRef="start" targetRef="gw1"/>
+    <!-- f4 (no condition) intentionally listed FIRST to expose the ordering bug -->
+    <bpmn:sequenceFlow id="f4" sourceRef="gw1" targetRef="end-err"/>
+    <bpmn:sequenceFlow id="f3" sourceRef="gw1" targetRef="end-ok">
+      <bpmn:conditionExpression>= ok = true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+  </bpmn:process>
+</bpmn:definitions>"#;
+
+        let backend = Arc::new(InMemoryBackend::new());
+        let clock = Arc::new(VirtualClock::new(chrono::Utc::now()));
+        let state = Arc::new(EngineState {
+            backend: backend.clone() as Arc<dyn reebe_db::StateBackend>,
+            partition_id: 0,
+            process_def_cache: crate::process_def_cache::ProcessDefCache::new(),
+            clock: clock.clone(),
+        });
+        let job_notifier = Arc::new(JobNotifier::new());
+        let processors: Vec<Arc<dyn RecordProcessor>> = vec![
+            Arc::new(DeploymentProcessor),
+            Arc::new(ProcessInstanceCreationProcessor),
+            Arc::new(BpmnElementProcessor),
+            Arc::new(JobProcessor { job_notifier }),
+        ];
+
+        let submit_and_drain = {
+            let backend = backend.clone();
+            let state = state.clone();
+            let processors = processors.clone();
+            move |value_type: &str, intent: &str, payload: serde_json::Value| {
+                let backend = backend.clone();
+                let state = state.clone();
+                let processors = processors.clone();
+                let value_type = value_type.to_string();
+                let intent = intent.to_string();
+                async move {
+                    let (position, key) = backend.next_position_and_key(0).await.unwrap();
+                    let record = DbRecord {
+                        partition_id: 0, position,
+                        record_type: "COMMAND".to_string(),
+                        value_type: value_type.clone(),
+                        intent: intent.clone(),
+                        record_key: key,
+                        timestamp_ms: chrono::Utc::now().timestamp_millis(),
+                        payload,
+                        source_position: None,
+                        tenant_id: "<default>".to_string(),
+                    };
+                    backend.insert_record(&record).await.unwrap();
+                    let mut last_pos = position - 1;
+                    loop {
+                        let cmds = backend.fetch_commands_from(0, last_pos + 1, 100).await.unwrap();
+                        if cmds.is_empty() { break; }
+                        for rec in &cmds {
+                            last_pos = rec.position;
+                            for proc in &processors {
+                                if proc.accepts(&rec.value_type, &rec.intent) {
+                                    let mut writers = Writers::new();
+                                    proc.process(rec, &state, &mut writers).await.unwrap();
+                                    let total = writers.events.len() + writers.commands.len();
+                                    if total > 0 {
+                                        let first = backend.next_position_batch(0, total).await.unwrap();
+                                        let mut recs = Vec::new();
+                                        for (i, ev) in writers.events.iter().enumerate() {
+                                            recs.push(DbRecord {
+                                                partition_id: 0, position: first + i as i64,
+                                                record_type: "EVENT".to_string(),
+                                                value_type: ev.value_type.clone(),
+                                                intent: ev.intent.clone(),
+                                                record_key: ev.key,
+                                                timestamp_ms: chrono::Utc::now().timestamp_millis(),
+                                                payload: ev.payload.clone(),
+                                                source_position: Some(rec.position),
+                                                tenant_id: rec.tenant_id.clone(),
+                                            });
+                                        }
+                                        for (i, cmd) in writers.commands.iter().enumerate() {
+                                            recs.push(DbRecord {
+                                                partition_id: 0,
+                                                position: first + writers.events.len() as i64 + i as i64,
+                                                record_type: "COMMAND".to_string(),
+                                                value_type: cmd.value_type.clone(),
+                                                intent: cmd.intent.clone(),
+                                                record_key: cmd.key,
+                                                timestamp_ms: chrono::Utc::now().timestamp_millis(),
+                                                payload: cmd.payload.clone(),
+                                                source_position: Some(rec.position),
+                                                tenant_id: rec.tenant_id.clone(),
+                                            });
+                                        }
+                                        backend.insert_records_batch(&recs).await.unwrap();
+                                    }
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        };
+
+        let bpmn_encoded = base64::engine::general_purpose::STANDARD.encode(BPMN.as_bytes());
+        submit_and_drain("DEPLOYMENT", "CREATE", serde_json::json!({
+            "resources": [{ "name": "process.bpmn", "content": bpmn_encoded }]
+        })).await;
+
+        // ok=true → conditioned flow f3 should win even though f4 (unconditioned) comes first
+        submit_and_drain("PROCESS_INSTANCE_CREATION", "CREATE", serde_json::json!({
+            "bpmnProcessId": "gw-order-proc",
+            "version": -1,
+            "variables": { "ok": true },
+        })).await;
+
+        let element_instances = backend.list_element_instances();
+        let end_ok = element_instances.iter().find(|ei| ei.element_id == "end-ok");
+        let end_err = element_instances.iter().find(|ei| ei.element_id == "end-err");
+        assert!(end_ok.is_some(), "end-ok must be reached when ok=true");
+        assert!(end_err.is_none(), "end-err must NOT be reached when ok=true");
+    }
+
+    #[test]
+    fn test_eval_flow_condition_without_equals_prefix() {
+        // Condition expressions without a leading `=` must still be evaluated as FEEL.
+        use reebe_feel::{evaluate, FeelContext, FeelValue};
+
+        let mut ctx = FeelContext::new();
+        ctx.set("validationErrors", FeelValue::List(vec![]));
+
+        // Without `=` prefix — should evaluate to true
+        let result = evaluate("count(validationErrors) = 0", &ctx).unwrap();
+        assert_eq!(result, FeelValue::Bool(true));
+
+        // With errors — should evaluate to false
+        ctx.set("validationErrors", FeelValue::List(vec![FeelValue::String("name is required".to_string())]));
+        let result = evaluate("count(validationErrors) = 0", &ctx).unwrap();
+        assert_eq!(result, FeelValue::Bool(false));
+    }
 }

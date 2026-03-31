@@ -32,8 +32,44 @@ impl BpmnProcess {
         self.elements.get(id)
     }
 
+    /// Like `get_element`, but also searches recursively inside embedded subprocesses.
+    pub fn get_element_recursive(&self, id: &str) -> Option<&FlowElement> {
+        if let Some(e) = self.elements.get(id) {
+            return Some(e);
+        }
+        for e in self.elements.values() {
+            if let FlowElement::SubProcess(sp) = e {
+                if let Some(found) = sp.find_element(id) {
+                    return Some(found);
+                }
+            }
+        }
+        None
+    }
+
     pub fn outgoing_flows(&self, element_id: &str) -> Vec<&SequenceFlow> {
         self.sequence_flows.iter().filter(|f| f.source_ref == element_id).collect()
+    }
+
+    /// Like `outgoing_flows`, but also searches inside embedded subprocesses.
+    pub fn outgoing_flows_recursive(&self, element_id: &str) -> Vec<&SequenceFlow> {
+        let top: Vec<&SequenceFlow> = self.sequence_flows.iter()
+            .filter(|f| f.source_ref == element_id)
+            .collect();
+        if !top.is_empty() {
+            return top;
+        }
+        for e in self.elements.values() {
+            if let FlowElement::SubProcess(sp) = e {
+                let inner: Vec<&SequenceFlow> = sp.sequence_flows.iter()
+                    .filter(|f| f.source_ref == element_id)
+                    .collect();
+                if !inner.is_empty() {
+                    return inner;
+                }
+            }
+        }
+        vec![]
     }
 
     pub fn incoming_flows(&self, element_id: &str) -> Vec<&SequenceFlow> {
@@ -462,6 +498,21 @@ impl SubProcess {
             output_mappings: Vec::new(),
             multi_instance: None,
         }
+    }
+
+    /// Find an element by ID, recursively searching nested subprocesses.
+    pub fn find_element(&self, id: &str) -> Option<&FlowElement> {
+        if let Some(e) = self.elements.get(id) {
+            return Some(e);
+        }
+        for e in self.elements.values() {
+            if let FlowElement::SubProcess(nested) = e {
+                if let Some(found) = nested.find_element(id) {
+                    return Some(found);
+                }
+            }
+        }
+        None
     }
 }
 

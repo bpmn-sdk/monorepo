@@ -136,7 +136,11 @@ impl UserTaskProcessor {
             }),
         });
 
-        // Complete the element instance
+        // Complete the element instance — pass submitted variables so that
+        // output mappings defined on the user task can reference them.
+        let completion_vars = payload.get("variables").cloned().unwrap_or(serde_json::json!({}));
+        let ei = state.backend.get_element_instance_by_key(task.element_instance_key).await?;
+        let flow_scope_key = ei.flow_scope_key.unwrap_or(task.process_instance_key);
         writers.commands.push(CommandToWrite {
             value_type: "PROCESS_INSTANCE".to_string(),
             intent: "COMPLETE_ELEMENT".to_string(),
@@ -148,7 +152,8 @@ impl UserTaskProcessor {
                 "elementId": task.element_id,
                 "elementType": "USER_TASK",
                 "bpmnProcessId": task.bpmn_process_id,
-                "flowScopeKey": task.process_instance_key.to_string(),
+                "flowScopeKey": flow_scope_key.to_string(),
+                "variables": completion_vars,
                 "tenantId": tenant_id,
             }),
         });

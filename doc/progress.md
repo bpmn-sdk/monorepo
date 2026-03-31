@@ -1,5 +1,68 @@
 # Progress
 
+## 2026-03-31 — All scenario tests now run on the WASM engine
+
+**`packages/engine/src/wasm-runner.ts`** (new):
+- Shared WASM-backed scenario runner used by both CLI and Studio
+- Detects environment: Node.js uses `initSync` + `readFileSync` (avoids `fetch(file://)` limitation); browser uses the default fetch-based init
+- Handles recursive DMN/BPMN dependency deployment, job driving, assertions, and missing-decision error reporting
+
+**`packages/engine/package.json`**:
+- Added `@bpmnkit/reebe-wasm` dependency and `./wasm-runner` export
+
+**`apps/cli/src/commands/test.ts`**:
+- Switched from the TypeScript engine (`@bpmnkit/engine`) to `runScenarioWasm` from the shared WASM runner
+- Builds a `decisionId → DMN XML` map from `*.dmn` files in the BPMN directory and passes it as `getDecisionDmn`
+
+**`apps/studio/src/api/run-scenario-wasm.ts`**:
+- Reduced to a re-export shim pointing at `@bpmnkit/engine/wasm-runner`
+
+## 2026-03-31 — Fix: `validationErrors` undefined when DMN not deployed for scenario tests
+
+**`apps/cli/src/commands/test.ts`**:
+- Auto-discovers `*.dmn` files in the same directory as the BPMN file and deploys them to the engine before running scenarios — fixes "variables.validationErrors: expected [], got undefined" when the BRT uses `zeebe:calledDecision`
+
+**`packages/engine/src/instance.ts`**:
+- `handleBusinessRuleTask` now emits `element:failed` with an actionable error message when the referenced DMN decision is not deployed, instead of silently returning without setting the result variable
+
+**`apps/studio/src/api/run-scenario-wasm.ts`**:
+- `deployDependencies` now returns `string[]` of missing decision IDs (when `getDecisionDmn` returns null or deploy throws)
+- Recursive call for sub-processes propagates missing decisions upward
+- Missing decisions are added to the scenario result `errors` array with a helpful message pointing the user to the Models view
+
+## 2026-03-31 — DMN-backed BRTs excluded from scenario mock configuration
+
+**`packages/plugins/src/process-runner/index.ts`**:
+- Extended `getDefinitions` return type to include `decisionId?: string` per flow element
+- Business Rule Tasks with `decisionId` (i.e., backed by a `zeebe:calledDecision` DMN) are now excluded from the "Task Outputs" section in the scenario editor — they run internally using process variables and don't require mock configuration
+
+**`apps/studio/src/pages/ModelDetail.tsx`**:
+- Updated `getDefinitions` wrapper in the process runner plugin to extract `decisionId` from each element's `extensionElements` (looks for `zeebe:calledDecision` attribute), so the runner can distinguish DMN-backed BRTs from external-job BRTs
+
+## 2026-03-31 — Gateway routing fixes + CDATA parsing + recursive resource deployment
+
+**`apps/reebe/crates/reebe-bpmn/src/parser.rs`**:
+- Added `Event::CData` handling to the XML parse loop — bpmn-js wraps condition expressions in CDATA sections (`<![CDATA[...]]>`); without this, `condition_expression` was silently `None` and the gateway always fell back to its default flow
+- Added `test_parse_condition_expression_cdata` to verify CDATA round-trips correctly
+
+**`apps/reebe/justfile`**:
+- Fixed `build-wasm` recipe to use `$(pwd)/../reebe-wasm` (absolute path) so the WASM package always outputs to `apps/reebe-wasm/` regardless of where `just` is invoked from
+
+**`apps/reebe/crates/reebe-engine/src/processor/bpmn_element.rs`**:
+- Fixed `eval_flow_condition` to use `reebe_feel::evaluate` directly (instead of `parse_and_evaluate`), stripping optional `=` prefix — conditions like `count(validationErrors) = 0` now evaluate correctly
+- Fixed XOR gateway routing: unconditioned/default flows are deferred to `default_entry` and only used when no conditioned flow matches; conditioned flows are always evaluated first regardless of document order
+
+**`apps/reebe/crates/reebe-engine/src/tests.rs`**:
+- Added `test_xor_gateway_conditioned_flow_wins_over_unconditioned_default` — verifies conditioned flow wins even when default flow is listed first in document order
+- Added `test_eval_flow_condition_without_equals_prefix` — confirms FEEL evaluation works without leading `=`
+
+**`apps/studio/src/api/run-scenario-wasm.ts`**:
+- Added `getProcessBpmn` parameter for resolving call activity / sub-process references
+- Extracted `deployDependencies` helper that recursively deploys all referenced DMN decisions and called-element BPMNs before deploying the main BPMN — prevents engine lookup failures on referenced resources
+
+**`apps/studio/src/pages/ModelDetail.tsx`**:
+- Wired `getProcessBpmn` callback to `runScenarioWasm` — looks up BPMN models by process ID from the models store
+
 ## 2026-03-29 — Process input validation via DMN
 
 End-to-end input validation for BPMN start events using a companion Collect-hit-policy DMN table.

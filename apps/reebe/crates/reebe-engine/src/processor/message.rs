@@ -150,12 +150,9 @@ impl MessageProcessor {
             }),
         });
 
-        // Complete the waiting element instance
-        let process_instance_key: i64 = payload["processInstanceKey"]
-            .as_str()
-            .and_then(|s| s.parse().ok())
-            .or_else(|| payload["processInstanceKey"].as_i64())
-            .unwrap_or(0);
+        // Look up the element instance to get full context for COMPLETE_ELEMENT
+        let ei = state.backend.get_element_instance_by_key(element_instance_key).await?;
+        let flow_scope_key = ei.flow_scope_key.unwrap_or(ei.process_instance_key);
 
         writers.commands.push(CommandToWrite {
             value_type: "PROCESS_INSTANCE".to_string(),
@@ -163,7 +160,12 @@ impl MessageProcessor {
             key: element_instance_key,
             payload: serde_json::json!({
                 "elementInstanceKey": element_instance_key.to_string(),
-                "processInstanceKey": process_instance_key.to_string(),
+                "processInstanceKey": ei.process_instance_key.to_string(),
+                "processDefinitionKey": ei.process_definition_key.to_string(),
+                "elementId": ei.element_id,
+                "elementType": ei.element_type,
+                "bpmnProcessId": ei.bpmn_process_id,
+                "flowScopeKey": flow_scope_key.to_string(),
                 "tenantId": tenant_id,
             }),
         });

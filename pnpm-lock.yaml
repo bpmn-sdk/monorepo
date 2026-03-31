@@ -319,6 +319,9 @@ importers:
       '@bpmnkit/feel':
         specifier: workspace:*
         version: link:../feel
+      '@bpmnkit/reebe-wasm':
+        specifier: workspace:*
+        version: link:../../apps/reebe-wasm
 
   packages/feel: {}
 

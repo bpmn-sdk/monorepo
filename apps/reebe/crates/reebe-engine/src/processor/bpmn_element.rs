@@ -182,7 +182,7 @@ impl BpmnElementProcessor {
             .ok_or_else(|| EngineError::NotFound(format!("Process {bpmn_process_id}")))?;
 
         let element = process
-            .get_element(&element_id)
+            .get_element_recursive(&element_id)
             .ok_or_else(|| EngineError::NotFound(format!("Element {element_id}")))?;
 
         // Parallel join gateway: count tokens before creating an element instance.
@@ -411,7 +411,7 @@ impl BpmnElementProcessor {
                 if is_compensation {
                     // Find the outgoing elements of this compensation handler boundary event
                     // and activate them (the compensation task)
-                    let outgoing = process.outgoing_flows(&element_id);
+                    let outgoing = process.outgoing_flows_recursive(&element_id);
                     for flow in outgoing {
                         writers.commands.push(CommandToWrite {
                             value_type: "PROCESS_INSTANCE".to_string(),
@@ -770,6 +770,295 @@ impl BpmnElementProcessor {
                     }
                 }
             }
+            reebe_bpmn::FlowElement::ScriptTask(st) => {
+                // Evaluate the FEEL script expression immediately and store the result.
+                state.backend.update_element_instance_state(ei_key, "ACTIVATED").await?;
+                writers.events.push(EventToWrite {
+                    value_type: "PROCESS_INSTANCE".to_string(),
+                    intent: "ELEMENT_ACTIVATED".to_string(),
+                    key: ei_key,
+                    payload: serde_json::json!({
+                        "elementInstanceKey": ei_key.to_string(),
+                        "processInstanceKey": process_instance_key.to_string(),
+                        "elementId": element_id,
+                        "elementType": element_type,
+                        "bpmnProcessId": bpmn_process_id,
+                        "tenantId": tenant_id,
+                    }),
+                });
+
+                if let (Some(script), Some(result_var)) = (&st.script, &st.result_variable) {
+                    let vars = state.backend.get_variables_by_scope(process_instance_key).await.unwrap_or_default();
+                    let mut ctx_map = serde_json::Map::new();
+                    for v in vars { ctx_map.insert(v.name, v.value); }
+                    let ctx = reebe_feel::FeelContext::from_json(serde_json::Value::Object(ctx_map));
+                    let expr = script.trim().strip_prefix('=').unwrap_or(script.trim());
+                    if let Ok(val) = reebe_feel::evaluate(expr, &ctx) {
+                        let var_key = key_gen.next_key().await?;
+                        state.backend.upsert_variable(&reebe_db::state::variables::Variable {
+                            key: var_key,
+                            partition_id: state.partition_id,
+                            name: result_var.clone(),
+                            value: serde_json::Value::from(val),
+                            scope_key: process_instance_key,
+                            process_instance_key,
+                            tenant_id: tenant_id.clone(),
+                            is_preview: false,
+                        }).await?;
+                    }
+                }
+
+                writers.commands.push(CommandToWrite {
+                    value_type: "PROCESS_INSTANCE".to_string(),
+                    intent: "COMPLETE_ELEMENT".to_string(),
+                    key: ei_key,
+                    payload: serde_json::json!({
+                        "elementInstanceKey": ei_key.to_string(),
+                        "processInstanceKey": process_instance_key.to_string(),
+                        "processDefinitionKey": process_definition_key.to_string(),
+                        "elementId": element_id,
+                        "elementType": element_type,
+                        "bpmnProcessId": bpmn_process_id,
+                        "flowScopeKey": flow_scope_key.to_string(),
+                        "tenantId": tenant_id,
+                    }),
+                });
+            }
+            reebe_bpmn::FlowElement::SendTask(st) => {
+                // Behaves like a ServiceTask: creates a job that must be completed externally.
+                state.backend.update_element_instance_state(ei_key, "ACTIVATED").await?;
+                writers.events.push(EventToWrite {
+                    value_type: "PROCESS_INSTANCE".to_string(),
+                    intent: "ELEMENT_ACTIVATED".to_string(),
+                    key: ei_key,
+                    payload: serde_json::json!({
+                        "elementInstanceKey": ei_key.to_string(),
+                        "processInstanceKey": process_instance_key.to_string(),
+                        "elementId": element_id,
+                        "elementType": element_type,
+                        "bpmnProcessId": bpmn_process_id,
+                        "tenantId": tenant_id,
+                    }),
+                });
+
+                let job_type = st.task_definition.as_ref()
+                    .map(|td| td.job_type.clone())
+                    .unwrap_or_else(|| element_id.clone());
+
+                writers.commands.push(CommandToWrite {
+                    value_type: "JOB".to_string(),
+                    intent: "CREATE".to_string(),
+                    key: 0,
+                    payload: serde_json::json!({
+                        "jobType": job_type,
+                        "processInstanceKey": process_instance_key.to_string(),
+                        "elementInstanceKey": ei_key.to_string(),
+                        "processDefinitionKey": process_definition_key.to_string(),
+                        "bpmnProcessId": bpmn_process_id,
+                        "elementId": element_id,
+                        "retries": 3,
+                        "customHeaders": {},
+                        "tenantId": tenant_id,
+                    }),
+                });
+            }
+            reebe_bpmn::FlowElement::ReceiveTask(rt) => {
+                // Waits for a message to be published (like IntermediateCatchEvent + message).
+                state.backend.update_element_instance_state(ei_key, "ACTIVATED").await?;
+                writers.events.push(EventToWrite {
+                    value_type: "PROCESS_INSTANCE".to_string(),
+                    intent: "ELEMENT_ACTIVATED".to_string(),
+                    key: ei_key,
+                    payload: serde_json::json!({
+                        "elementInstanceKey": ei_key.to_string(),
+                        "processInstanceKey": process_instance_key.to_string(),
+                        "elementId": element_id,
+                        "elementType": element_type,
+                        "bpmnProcessId": bpmn_process_id,
+                        "tenantId": tenant_id,
+                    }),
+                });
+
+                let message_name = rt.message_ref.clone().unwrap_or_default();
+                let sub_key = key_gen.next_key().await?;
+                let sub = reebe_db::state::messages::MessageSubscription {
+                    key: sub_key,
+                    message_name: message_name.clone(),
+                    correlation_key: String::new(),
+                    process_instance_key,
+                    element_instance_key: ei_key,
+                    state: "OPENED".to_string(),
+                    tenant_id: tenant_id.clone(),
+                };
+                state.backend.insert_message_subscription(&sub).await?;
+
+                // Check for an already-published matching message
+                let existing = state.backend
+                    .get_messages_by_correlation(&message_name, "", &tenant_id)
+                    .await
+                    .unwrap_or_default();
+                if existing.into_iter().next().is_some() {
+                    writers.commands.push(CommandToWrite {
+                        value_type: "PROCESS_INSTANCE".to_string(),
+                        intent: "COMPLETE_ELEMENT".to_string(),
+                        key: ei_key,
+                        payload: serde_json::json!({
+                            "elementInstanceKey": ei_key.to_string(),
+                            "processInstanceKey": process_instance_key.to_string(),
+                            "processDefinitionKey": process_definition_key.to_string(),
+                            "elementId": element_id,
+                            "elementType": element_type,
+                            "bpmnProcessId": bpmn_process_id,
+                            "flowScopeKey": flow_scope_key.to_string(),
+                            "tenantId": tenant_id,
+                        }),
+                    });
+                }
+                // Otherwise wait for MESSAGE.PUBLISH to correlate
+            }
+            reebe_bpmn::FlowElement::IntermediateThrowEvent(ite) => {
+                state.backend.update_element_instance_state(ei_key, "ACTIVATED").await?;
+                writers.events.push(EventToWrite {
+                    value_type: "PROCESS_INSTANCE".to_string(),
+                    intent: "ELEMENT_ACTIVATED".to_string(),
+                    key: ei_key,
+                    payload: serde_json::json!({
+                        "elementInstanceKey": ei_key.to_string(),
+                        "processInstanceKey": process_instance_key.to_string(),
+                        "elementId": element_id,
+                        "elementType": element_type,
+                        "bpmnProcessId": bpmn_process_id,
+                        "tenantId": tenant_id,
+                    }),
+                });
+
+                // Signal throw: broadcast to all waiting catch events
+                if let Some(reebe_bpmn::EventDefinition::Signal(sig)) = &ite.event_definition {
+                    writers.commands.push(CommandToWrite {
+                        value_type: "SIGNAL".to_string(),
+                        intent: "BROADCAST".to_string(),
+                        key: 0,
+                        payload: serde_json::json!({
+                            "signalName": sig.signal_name,
+                            "variables": {},
+                            "tenantId": tenant_id,
+                        }),
+                    });
+                }
+
+                // Complete the throw event and continue
+                writers.commands.push(CommandToWrite {
+                    value_type: "PROCESS_INSTANCE".to_string(),
+                    intent: "COMPLETE_ELEMENT".to_string(),
+                    key: ei_key,
+                    payload: serde_json::json!({
+                        "elementInstanceKey": ei_key.to_string(),
+                        "processInstanceKey": process_instance_key.to_string(),
+                        "processDefinitionKey": process_definition_key.to_string(),
+                        "elementId": element_id,
+                        "elementType": element_type,
+                        "bpmnProcessId": bpmn_process_id,
+                        "flowScopeKey": flow_scope_key.to_string(),
+                        "tenantId": tenant_id,
+                    }),
+                });
+            }
+            reebe_bpmn::FlowElement::SubProcess(sp) => {
+                // Activate the subprocess element and launch its start events.
+                state.backend.update_element_instance_state(ei_key, "ACTIVATED").await?;
+                writers.events.push(EventToWrite {
+                    value_type: "PROCESS_INSTANCE".to_string(),
+                    intent: "ELEMENT_ACTIVATED".to_string(),
+                    key: ei_key,
+                    payload: serde_json::json!({
+                        "elementInstanceKey": ei_key.to_string(),
+                        "processInstanceKey": process_instance_key.to_string(),
+                        "elementId": element_id,
+                        "elementType": element_type,
+                        "bpmnProcessId": bpmn_process_id,
+                        "tenantId": tenant_id,
+                    }),
+                });
+
+                // Fire ACTIVATE_ELEMENT for each start event inside the subprocess.
+                // Use ei_key as the flowScopeKey so end-event handling can detect the scope.
+                for start_id in &sp.start_events {
+                    writers.commands.push(CommandToWrite {
+                        value_type: "PROCESS_INSTANCE".to_string(),
+                        intent: "ACTIVATE_ELEMENT".to_string(),
+                        key: process_instance_key,
+                        payload: serde_json::json!({
+                            "processInstanceKey": process_instance_key.to_string(),
+                            "processDefinitionKey": process_definition_key.to_string(),
+                            "bpmnProcessId": bpmn_process_id,
+                            "elementId": start_id,
+                            "flowScopeKey": ei_key.to_string(),
+                            "tenantId": tenant_id,
+                        }),
+                    });
+                }
+                // COMPLETE_ELEMENT is fired when the subprocess end event fires (see complete_element).
+            }
+            reebe_bpmn::FlowElement::CallActivity(ca) => {
+                // Spawn a child process instance and wait for it to complete.
+                state.backend.update_element_instance_state(ei_key, "ACTIVATED").await?;
+                writers.events.push(EventToWrite {
+                    value_type: "PROCESS_INSTANCE".to_string(),
+                    intent: "ELEMENT_ACTIVATED".to_string(),
+                    key: ei_key,
+                    payload: serde_json::json!({
+                        "elementInstanceKey": ei_key.to_string(),
+                        "processInstanceKey": process_instance_key.to_string(),
+                        "elementId": element_id,
+                        "elementType": element_type,
+                        "bpmnProcessId": bpmn_process_id,
+                        "tenantId": tenant_id,
+                    }),
+                });
+
+                let child_process_id = ca
+                    .called_element
+                    .as_ref()
+                    .map(|ce| ce.process_id.clone())
+                    .unwrap_or_default();
+
+                // Collect input variables to pass to child scope.
+                let child_vars: serde_json::Value = if !ca.input_mappings.is_empty() {
+                    let vars = state.backend.get_variables_by_scope(process_instance_key).await.unwrap_or_default();
+                    let mut ctx_map = serde_json::Map::new();
+                    for v in vars { ctx_map.insert(v.name, v.value); }
+                    let ctx = reebe_feel::FeelContext::from_json(serde_json::Value::Object(ctx_map));
+                    let mut out = serde_json::Map::new();
+                    for m in &ca.input_mappings {
+                        if let Ok(val) = reebe_feel::parse_and_evaluate(&m.source, &ctx) {
+                            out.insert(m.target.clone(), serde_json::Value::from(val));
+                        }
+                    }
+                    serde_json::Value::Object(out)
+                } else {
+                    // Propagate all parent variables by default
+                    let vars = state.backend.get_variables_by_scope(process_instance_key).await.unwrap_or_default();
+                    let mut map = serde_json::Map::new();
+                    for v in vars { map.insert(v.name, v.value); }
+                    serde_json::Value::Object(map)
+                };
+
+                // Spawn child via PROCESS_INSTANCE_CREATION; include parent linkage so that
+                // when the child's end event fires, it can resume this call activity.
+                writers.commands.push(CommandToWrite {
+                    value_type: "PROCESS_INSTANCE_CREATION".to_string(),
+                    intent: "CREATE".to_string(),
+                    key: 0,
+                    payload: serde_json::json!({
+                        "bpmnProcessId": child_process_id,
+                        "version": -1,
+                        "variables": child_vars,
+                        "parentProcessInstanceKey": process_instance_key.to_string(),
+                        "parentElementInstanceKey": ei_key.to_string(),
+                    }),
+                });
+                // COMPLETE_ELEMENT will be sent when the child process completes.
+            }
             _ => {
                 // Default: activate immediately and complete
                 state.backend.update_element_instance_state(ei_key, "ACTIVATED").await?;
@@ -869,7 +1158,7 @@ impl BpmnElementProcessor {
                         .iter()
                         .find(|p| p.id == bpmn_process_id || p.id == pd.bpmn_process_id)
                     {
-                        if let Some(element) = process.get_element(&element_id) {
+                        if let Some(element) = process.get_element_recursive(&element_id) {
                             let output_mappings = get_output_mappings(element);
                             if !output_mappings.is_empty() {
                                 let vars = state.backend.get_variables_by_scope(process_instance_key).await.unwrap_or_default();
@@ -935,9 +1224,52 @@ impl BpmnElementProcessor {
             }),
         });
 
-        // If this is an EndEvent, check if the process is complete
+        // If this is an EndEvent, check if the process (or subprocess) is complete
         if element_type == "END_EVENT" {
-            // Check remaining active elements (excludes the PROCESS container element itself)
+            // Detect whether this end event is inside an embedded subprocess by checking
+            // if the flow scope element is a SUB_PROCESS rather than the root PROCESS.
+            let scope_ei = state.backend.get_element_instance_by_key(flow_scope_key).await.ok();
+            let is_subprocess_end = scope_ei.as_ref()
+                .map(|ei| ei.element_type == "SUB_PROCESS")
+                .unwrap_or(false);
+
+            if is_subprocess_end {
+                // The subprocess is done — complete its element and let the outer flow continue.
+                let sp_ei = scope_ei.unwrap();
+                state.backend.update_element_instance_state(sp_ei.key, "COMPLETED").await?;
+                writers.events.push(EventToWrite {
+                    value_type: "PROCESS_INSTANCE".to_string(),
+                    intent: "ELEMENT_COMPLETED".to_string(),
+                    key: sp_ei.key,
+                    payload: serde_json::json!({
+                        "elementInstanceKey": sp_ei.key.to_string(),
+                        "processInstanceKey": process_instance_key.to_string(),
+                        "elementId": sp_ei.element_id,
+                        "elementType": "SUB_PROCESS",
+                        "bpmnProcessId": bpmn_process_id,
+                        "tenantId": tenant_id,
+                    }),
+                });
+                // Fire COMPLETE_ELEMENT for the subprocess so the outer flow is activated.
+                writers.commands.push(CommandToWrite {
+                    value_type: "PROCESS_INSTANCE".to_string(),
+                    intent: "COMPLETE_ELEMENT".to_string(),
+                    key: sp_ei.key,
+                    payload: serde_json::json!({
+                        "elementInstanceKey": sp_ei.key.to_string(),
+                        "processInstanceKey": process_instance_key.to_string(),
+                        "processDefinitionKey": process_definition_key.to_string(),
+                        "elementId": sp_ei.element_id,
+                        "elementType": "SUB_PROCESS",
+                        "bpmnProcessId": bpmn_process_id,
+                        "flowScopeKey": sp_ei.flow_scope_key.unwrap_or(process_instance_key).to_string(),
+                        "tenantId": tenant_id,
+                    }),
+                });
+                return Ok(());
+            }
+
+            // Root process end event — check remaining active elements
             let active_count = state.backend.get_active_element_instance_count(process_instance_key).await?;
             if active_count <= 0 {
                 // Mark the PROCESS-level element instance as COMPLETED
@@ -960,6 +1292,43 @@ impl BpmnElementProcessor {
                         "tenantId": tenant_id,
                     }),
                 });
+
+                // If this is a child process (called via call activity), resume the parent.
+                let pi = state.backend.get_process_instance_by_key(process_instance_key).await?;
+                if let (Some(parent_pi_key), Some(call_ei_key)) =
+                    (pi.parent_process_instance_key, pi.parent_element_instance_key)
+                {
+                    // Retrieve the call activity element instance to get parent process def key
+                    // and element ID — needed for output mapping evaluation.
+                    let call_ei = state.backend.get_element_instance_by_key(call_ei_key).await?;
+
+                    // Propagate child output variables to parent scope via output mappings.
+                    // If the call activity has output mappings they will be evaluated by
+                    // complete_element; we pass the child's variables in the payload.
+                    let child_vars = {
+                        let vs = state.backend.get_variables_by_scope(process_instance_key).await.unwrap_or_default();
+                        let mut m = serde_json::Map::new();
+                        for v in vs { m.insert(v.name, v.value); }
+                        serde_json::Value::Object(m)
+                    };
+
+                    writers.commands.push(CommandToWrite {
+                        value_type: "PROCESS_INSTANCE".to_string(),
+                        intent: "COMPLETE_ELEMENT".to_string(),
+                        key: call_ei_key,
+                        payload: serde_json::json!({
+                            "elementInstanceKey": call_ei_key.to_string(),
+                            "processInstanceKey": parent_pi_key.to_string(),
+                            "processDefinitionKey": call_ei.process_definition_key.to_string(),
+                            "elementId": call_ei.element_id,
+                            "elementType": "CALL_ACTIVITY",
+                            "bpmnProcessId": call_ei.bpmn_process_id,
+                            "flowScopeKey": parent_pi_key.to_string(),
+                            "variables": child_vars,
+                            "tenantId": tenant_id,
+                        }),
+                    });
+                }
             }
             return Ok(());
         }
@@ -973,7 +1342,7 @@ impl BpmnElementProcessor {
             .find(|p| p.id == bpmn_process_id || p.id == pd.bpmn_process_id)
             .ok_or_else(|| EngineError::NotFound(format!("Process {bpmn_process_id}")))?;
 
-        let outgoing = process.outgoing_flows(&element_id);
+        let outgoing = process.outgoing_flows_recursive(&element_id);
 
         // Load variables once for condition evaluation
         let feel_ctx = {
@@ -986,14 +1355,21 @@ impl BpmnElementProcessor {
         };
 
         if element_type == "EXCLUSIVE_GATEWAY" {
-            // Take the first non-default flow where the condition is true;
-            // fall back to the default flow if none matches.
+            // Evaluate conditioned flows first; unconditioned and default flows are fallbacks.
+            // This ensures that a flow with a condition always wins over a flow with no
+            // condition, regardless of document order.
             let mut chosen: Option<(String, String)> = None; // (flow_id, target_id)
             let mut default_entry: Option<(String, String)> = None;
 
             for flow in &outgoing {
-                if flow.is_default {
-                    default_entry = Some((flow.id.clone(), flow.target_ref.clone()));
+                let has_condition = flow.condition_expression.as_ref()
+                    .map(|c| !c.trim().is_empty())
+                    .unwrap_or(false);
+                // Unconditioned flows and explicit defaults are both fallbacks.
+                if flow.is_default || !has_condition {
+                    if default_entry.is_none() {
+                        default_entry = Some((flow.id.clone(), flow.target_ref.clone()));
+                    }
                     continue;
                 }
                 if chosen.is_some() {
@@ -1167,10 +1543,15 @@ fn eval_flow_condition(condition: &Option<String>, ctx: &reebe_feel::FeelContext
     match condition {
         None => true,
         Some(cond) if cond.trim().is_empty() => true,
-        Some(cond) => match reebe_feel::parse_and_evaluate(cond, ctx) {
-            Ok(val) => matches!(val, reebe_feel::FeelValue::Bool(true)),
-            Err(_) => false,
-        },
+        Some(cond) => {
+            // Strip optional leading `=` (BPMN FEEL convention) before evaluating.
+            // Some editors omit it; always evaluate as FEEL regardless.
+            let expr = cond.trim().strip_prefix('=').unwrap_or(cond.trim()).trim();
+            match reebe_feel::evaluate(expr, ctx) {
+                Ok(val) => matches!(val, reebe_feel::FeelValue::Bool(true)),
+                Err(_) => false,
+            }
+        }
     }
 }
 

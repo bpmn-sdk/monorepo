@@ -23,6 +23,8 @@ pub mod stream;
 pub mod scheduler;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod tests;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod engine_integration_tests;
 
 pub use clock::{Clock, RealClock, VirtualClock};
 pub use engine::{EngineConfig, EngineState};

@@ -111,7 +111,9 @@ export interface ProcessRunnerOptions {
 	 * auto-populates task mocks from the diagram.
 	 */
 	getDefinitions?: () => {
-		processes: Array<{ flowElements: Array<{ id: string; name?: string; type: string }> }>
+		processes: Array<{
+			flowElements: Array<{ id: string; name?: string; type: string; decisionId?: string }>
+		}>
 	} | null
 	/**
 	 * Returns the DMN XML for a given decision ID, or null if not found.
@@ -1155,7 +1157,12 @@ export function createProcessRunnerPlugin(
 		const defs = options.getDefinitions?.() ?? null
 		const mockableTasks =
 			defs?.processes.flatMap((p) =>
-				p.flowElements.filter((e) => MOCKABLE_TASK_TYPES.has(e.type)),
+				p.flowElements.filter((e) => {
+					if (!MOCKABLE_TASK_TYPES.has(e.type)) return false
+					// BRTs with calledDecision run internally via DMN — no external job, no mock needed
+					if (e.type === "businessRuleTask" && e.decisionId) return false
+					return true
+				}),
 			) ?? []
 
 		if (mockableTasks.length > 0) {

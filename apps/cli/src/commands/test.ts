@@ -1,7 +1,7 @@
-import { readFile } from "node:fs/promises"
-import { Bpmn } from "@bpmnkit/core"
-import { Engine, runScenario } from "@bpmnkit/engine"
-import type { ProcessScenario } from "@bpmnkit/engine"
+import { readFile, readdir } from "node:fs/promises"
+import { dirname, extname, join } from "node:path"
+import { runScenarioWasm } from "@bpmnkit/engine/wasm-runner"
+import type { ScenarioLike } from "@bpmnkit/engine/wasm-runner"
 import type { Command, CommandGroup } from "../types.js"
 
 const testCmd: Command = {
@@ -37,9 +37,9 @@ const testCmd: Command = {
 			throw new Error(`Cannot read scenarios file: ${scenariosPath}`)
 		})
 
-		let scenarios: ProcessScenario[]
+		let scenarios: ScenarioLike[]
 		try {
-			scenarios = JSON.parse(scenariosRaw) as ProcessScenario[]
+			scenarios = JSON.parse(scenariosRaw) as ScenarioLike[]
 		} catch {
 			throw new Error(`Invalid JSON in scenarios file: ${scenariosPath}`)
 		}
@@ -49,14 +49,27 @@ const testCmd: Command = {
 			return
 		}
 
-		const defs = Bpmn.parse(bpmnXml)
-		const engine = new Engine()
+		// Build a decision-ID → DMN XML map from all *.dmn files in the BPMN's directory.
+		const bpmnDir = dirname(bpmnPath)
+		const dirFiles = await readdir(bpmnDir).catch(() => [] as string[])
+		const decisionMap = new Map<string, string>()
+		for (const file of dirFiles) {
+			if (extname(file).toLowerCase() !== ".dmn") continue
+			const dmnXml = await readFile(join(bpmnDir, file), "utf8").catch(() => null)
+			if (dmnXml === null) continue
+			for (const [, id] of dmnXml.matchAll(/<decision[^>]+\bid="([^"]+)"/g)) {
+				if (id) decisionMap.set(id, dmnXml)
+			}
+		}
+
+		const getDecisionDmn =
+			decisionMap.size > 0 ? (id: string) => decisionMap.get(id) ?? null : undefined
 
 		let passed = 0
 		let failed = 0
 
 		for (const scenario of scenarios) {
-			const result = await runScenario(engine, defs, scenario)
+			const result = await runScenarioWasm(bpmnXml, scenario, getDecisionDmn)
 			if (result.passed) {
 				passed++
 				ctx.output.ok(`PASS  ${scenario.name}  (${result.durationMs}ms)`)

@@ -723,10 +723,41 @@ export function ModelDetail() {
 			runScenario: (scenario) => {
 				const xml = editorRef.current?.exportXml()
 				if (!xml) return Promise.reject(new Error("No diagram loaded"))
-				return runScenarioWasm(xml, scenario)
+				return runScenarioWasm(
+					xml,
+					scenario,
+					(decisionId) => {
+						const { models: currentModels } = useModelsStore.getState()
+						return (
+							currentModels.find((m) => m.type === "dmn" && m.content.includes(decisionId))
+								?.content ?? null
+						)
+					},
+					(processId) => {
+						const { models: currentModels } = useModelsStore.getState()
+						return (
+							currentModels.find(
+								(m) => m.type === "bpmn" && m.content.includes(`id="${processId}"`),
+							)?.content ?? null
+						)
+					},
+				)
 			},
 			getProjectId: () => model.id,
-			getDefinitions: () => editorRef.current?.getDefinitions() ?? null,
+			getDefinitions: () => {
+				const defs = editorRef.current?.getDefinitions()
+				if (!defs) return null
+				return {
+					processes: defs.processes.map((p) => ({
+						...p,
+						flowElements: p.flowElements.map((el) => ({
+							...el,
+							decisionId: el.extensionElements.find((e) => e.name === "zeebe:calledDecision")
+								?.attributes.decisionId,
+						})),
+					})),
+				}
+			},
 			getValidationDmn: (decisionId) => {
 				const { models: currentModels } = useModelsStore.getState()
 				return (
@@ -828,6 +859,24 @@ export function ModelDetail() {
 			onToggleSidebar: () => {
 				if (dock.collapsed) dock.expand()
 				else dock.collapse()
+			},
+			openDecision: (decisionId) => {
+				const { models: currentModels } = useModelsStore.getState()
+				const dmn = currentModels.find((m) => m.type === "dmn" && m.content.includes(decisionId))
+				if (dmn) navigateRef.current(`/models/${dmn.id}`)
+			},
+			getAvailableDecisions: () => {
+				const { models: currentModels } = useModelsStore.getState()
+				const result: Array<{ id: string; name?: string }> = []
+				for (const m of currentModels) {
+					if (m.type !== "dmn") continue
+					for (const match of m.content.matchAll(
+						/<decision[^>]+id="([^"]+)"(?:[^>]+name="([^"]+)")?/g,
+					)) {
+						result.push({ id: match[1] ?? "", name: match[2] ?? m.name })
+					}
+				}
+				return result
 			},
 		})
 		editorRef.current = editor

@@ -158,6 +158,11 @@ impl InMemoryBackend {
     pub fn list_process_definitions(&self) -> Vec<ProcessDefinition> {
         self.store.lock().unwrap().process_definitions.values().cloned().collect()
     }
+
+    /// List all user tasks (for snapshot API).
+    pub fn list_user_tasks(&self) -> Vec<UserTask> {
+        self.store.lock().unwrap().user_tasks.values().cloned().collect()
+    }
 }
 
 impl Default for InMemoryBackend {
