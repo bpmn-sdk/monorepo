@@ -8,6 +8,10 @@
 		".": {
 			"types": "./dist/index.d.ts",
 			"import": "./dist/index.js"
+		},
+		"./wasm-runner": {
+			"types": "./dist/wasm-runner.d.ts",
+			"import": "./dist/wasm-runner.js"
 		}
 	},
 	"files": ["LICENSE", "README.md", "dist/**/*.js", "dist/**/*.d.ts"],
@@ -19,7 +23,8 @@
 	},
 	"dependencies": {
 		"@bpmnkit/core": "workspace:*",
-		"@bpmnkit/feel": "workspace:*"
+		"@bpmnkit/feel": "workspace:*",
+		"@bpmnkit/reebe-wasm": "workspace:*"
 	},
 	"description": "Lightweight BPMN 2.0 process execution engine for browsers and Node.js — zero dependencies",
 	"keywords": ["bpmn", "engine", "simulation", "workflow", "typescript", "dmn", "camunda"],

@@ -1,5 +1,44 @@
 # Progress
 
+## 2026-03-31 — All scenario tests now run on the WASM engine
+
+**`packages/engine/src/wasm-runner.ts`** (new):
+- Shared WASM-backed scenario runner used by both CLI and Studio
+- Detects environment: Node.js uses `initSync` + `readFileSync` (avoids `fetch(file://)` limitation); browser uses the default fetch-based init
+- Handles recursive DMN/BPMN dependency deployment, job driving, assertions, and missing-decision error reporting
+
+**`packages/engine/package.json`**:
+- Added `@bpmnkit/reebe-wasm` dependency and `./wasm-runner` export
+
+**`apps/cli/src/commands/test.ts`**:
+- Switched from the TypeScript engine (`@bpmnkit/engine`) to `runScenarioWasm` from the shared WASM runner
+- Builds a `decisionId → DMN XML` map from `*.dmn` files in the BPMN directory and passes it as `getDecisionDmn`
+
+**`apps/studio/src/api/run-scenario-wasm.ts`**:
+- Reduced to a re-export shim pointing at `@bpmnkit/engine/wasm-runner`
+
+## 2026-03-31 — Fix: `validationErrors` undefined when DMN not deployed for scenario tests
+
+**`apps/cli/src/commands/test.ts`**:
+- Auto-discovers `*.dmn` files in the same directory as the BPMN file and deploys them to the engine before running scenarios — fixes "variables.validationErrors: expected [], got undefined" when the BRT uses `zeebe:calledDecision`
+
+**`packages/engine/src/instance.ts`**:
+- `handleBusinessRuleTask` now emits `element:failed` with an actionable error message when the referenced DMN decision is not deployed, instead of silently returning without setting the result variable
+
+**`apps/studio/src/api/run-scenario-wasm.ts`**:
+- `deployDependencies` now returns `string[]` of missing decision IDs (when `getDecisionDmn` returns null or deploy throws)
+- Recursive call for sub-processes propagates missing decisions upward
+- Missing decisions are added to the scenario result `errors` array with a helpful message pointing the user to the Models view
+
+## 2026-03-31 — DMN-backed BRTs excluded from scenario mock configuration
+
+**`packages/plugins/src/process-runner/index.ts`**:
+- Extended `getDefinitions` return type to include `decisionId?: string` per flow element
+- Business Rule Tasks with `decisionId` (i.e., backed by a `zeebe:calledDecision` DMN) are now excluded from the "Task Outputs" section in the scenario editor — they run internally using process variables and don't require mock configuration
+
+**`apps/studio/src/pages/ModelDetail.tsx`**:
+- Updated `getDefinitions` wrapper in the process runner plugin to extract `decisionId` from each element's `extensionElements` (looks for `zeebe:calledDecision` attribute), so the runner can distinguish DMN-backed BRTs from external-job BRTs
+
 ## 2026-03-31 — Gateway routing fixes + CDATA parsing + recursive resource deployment
 
 **`apps/reebe/crates/reebe-bpmn/src/parser.rs`**:

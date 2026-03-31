@@ -744,7 +744,20 @@ export function ModelDetail() {
 				)
 			},
 			getProjectId: () => model.id,
-			getDefinitions: () => editorRef.current?.getDefinitions() ?? null,
+			getDefinitions: () => {
+				const defs = editorRef.current?.getDefinitions()
+				if (!defs) return null
+				return {
+					processes: defs.processes.map((p) => ({
+						...p,
+						flowElements: p.flowElements.map((el) => ({
+							...el,
+							decisionId: el.extensionElements.find((e) => e.name === "zeebe:calledDecision")
+								?.attributes.decisionId,
+						})),
+					})),
+				}
+			},
 			getValidationDmn: (decisionId) => {
 				const { models: currentModels } = useModelsStore.getState()
 				return (
