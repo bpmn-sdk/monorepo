@@ -68,6 +68,13 @@ pub fn parse_bpmn(xml: &str) -> Result<Vec<BpmnProcess>, BpmnParseError> {
                     .unwrap_or_default();
                 parser_state.handle_text(&text);
             }
+            Ok(Event::CData(ref e)) => {
+                // bpmn-js and other editors may wrap condition expressions and
+                // other text content in CDATA sections. Treat them identically
+                // to plain text nodes.
+                let text = String::from_utf8_lossy(e.as_ref()).into_owned();
+                parser_state.handle_text(&text);
+            }
             Ok(Event::Eof) => break,
             Err(e) => return Err(BpmnParseError::XmlError(e.to_string())),
             _ => {}
@@ -1122,6 +1129,37 @@ mod tests {
         assert_eq!(processes.len(), 1);
         let gw = processes[0].elements.get("GW1").unwrap();
         assert!(matches!(gw, FlowElement::ExclusiveGateway(_)));
+    }
+
+    #[test]
+    fn test_parse_condition_expression_cdata() {
+        // bpmn-js sometimes wraps condition expressions in CDATA sections.
+        // The parser must read CDATA text the same as plain text.
+        let xml = "<?xml version=\"1.0\"?>\n\
+<bpmn:definitions xmlns:bpmn=\"http://www.omg.org/spec/BPMN/20100524/MODEL\">\n\
+  <bpmn:process id=\"cdata-proc\" isExecutable=\"true\">\n\
+    <bpmn:startEvent id=\"Start\"><bpmn:outgoing>F1</bpmn:outgoing></bpmn:startEvent>\n\
+    <bpmn:exclusiveGateway id=\"GW1\" default=\"F3\">\n\
+      <bpmn:incoming>F1</bpmn:incoming>\n\
+      <bpmn:outgoing>F2</bpmn:outgoing>\n\
+      <bpmn:outgoing>F3</bpmn:outgoing>\n\
+    </bpmn:exclusiveGateway>\n\
+    <bpmn:endEvent id=\"End1\"><bpmn:incoming>F2</bpmn:incoming></bpmn:endEvent>\n\
+    <bpmn:endEvent id=\"End2\"><bpmn:incoming>F3</bpmn:incoming></bpmn:endEvent>\n\
+    <bpmn:sequenceFlow id=\"F1\" sourceRef=\"Start\" targetRef=\"GW1\"/>\n\
+    <bpmn:sequenceFlow id=\"F2\" sourceRef=\"GW1\" targetRef=\"End1\">\n\
+      <bpmn:conditionExpression><![CDATA[= count(validationErrors) = 0]]></bpmn:conditionExpression>\n\
+    </bpmn:sequenceFlow>\n\
+    <bpmn:sequenceFlow id=\"F3\" sourceRef=\"GW1\" targetRef=\"End2\"/>\n\
+  </bpmn:process>\n\
+</bpmn:definitions>";
+        let processes = parse_bpmn(xml).unwrap();
+        let flow_f2 = processes[0].sequence_flows.iter().find(|f| f.id == "F2").unwrap();
+        assert_eq!(
+            flow_f2.condition_expression.as_deref(),
+            Some("= count(validationErrors) = 0"),
+            "CDATA condition expression must be read correctly"
+        );
     }
 
     #[test]

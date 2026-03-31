@@ -28,6 +28,7 @@ interface VariableItem {
 
 function formatValue(raw: unknown): string {
 	if (raw === null || raw === undefined) return "null"
+	if (typeof raw === "object") return JSON.stringify(raw, null, 2)
 	const str = String(raw)
 	try {
 		const parsed: unknown = JSON.parse(str)

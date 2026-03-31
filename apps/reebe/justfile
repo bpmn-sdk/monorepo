@@ -64,7 +64,7 @@ bench *args:
 
 # Build the WASM playground package
 build-wasm:
-    wasm-pack build crates/reebe-wasm --target web --scope bpmnkit --out-dir ../reebe-wasm
+    wasm-pack build crates/reebe-wasm --target web --scope bpmnkit --out-dir "$(pwd)/../reebe-wasm"
 
 # Check the WASM crate for compile errors (no wasm-pack needed)
 check-wasm:

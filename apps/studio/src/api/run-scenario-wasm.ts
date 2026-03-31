@@ -2,8 +2,9 @@
  * Scenario runner for the in-browser WasmEngine.
  *
  * Creates a fresh WasmEngine per scenario for clean isolation, deploys the
- * current BPMN XML, drives jobs to completion using mock outputs from the
- * scenario definition, then asserts expectations.
+ * current BPMN XML (and all referenced DMN/BPMN resources recursively), drives
+ * jobs to completion using mock outputs from the scenario definition, then
+ * asserts expectations.
  */
 
 import type { ScenarioLike, ScenarioResultLike } from "@bpmnkit/plugins/process-runner"
@@ -56,6 +57,55 @@ interface DeployResponse {
 	deployments: Array<{ bpmnProcessId: string }>
 }
 
+interface WasmEngineInstance {
+	deploy(xml: string): unknown
+	create_process_instance(processId: string, variables: string): void
+	activate_job(key: number, worker: string, timeout: number): void
+	complete_job(key: number, variables: string): void
+	fail_job(key: number, retries: number, message: string): void
+	snapshot(): unknown
+	free(): void
+}
+
+// ── Recursive dependency deployment ──────────────────────────────────────────
+
+/**
+ * Deploys all referenced DMN decisions and called-element BPMNs found in `xml`
+ * into `engine`, recursively following calledElement references. Tracks already-
+ * deployed IDs in `deployed` to prevent cycles and duplicate deployments.
+ */
+function deployDependencies(
+	xml: string,
+	engine: WasmEngineInstance,
+	getDecisionDmn: ((id: string) => string | null) | undefined,
+	getProcessBpmn: ((id: string) => string | null) | undefined,
+	deployed: Set<string>,
+): void {
+	// DMN decisions referenced via decisionId="..."
+	if (getDecisionDmn) {
+		for (const [, id] of xml.matchAll(/decisionId="([^"]+)"/g)) {
+			if (!id || deployed.has(`dmn:${id}`)) continue
+			deployed.add(`dmn:${id}`)
+			const dmnXml = getDecisionDmn(id)
+			if (dmnXml) engine.deploy(dmnXml)
+		}
+	}
+
+	// Sub-processes / call activities referenced via calledElement="..."
+	if (getProcessBpmn) {
+		for (const [, id] of xml.matchAll(/calledElement="([^"]+)"/g)) {
+			if (!id || deployed.has(`bpmn:${id}`)) continue
+			deployed.add(`bpmn:${id}`)
+			const bpmnXml = getProcessBpmn(id)
+			if (bpmnXml) {
+				// Recursively deploy that sub-process's own dependencies first
+				deployDependencies(bpmnXml, engine, getDecisionDmn, getProcessBpmn, deployed)
+				engine.deploy(bpmnXml)
+			}
+		}
+	}
+}
+
 // ── Runner ─────────────────────────────────────────────────────────────────────
 
 const MAX_ROUNDS = 200
@@ -64,16 +114,22 @@ const TIMEOUT_MS = 10_000
 export async function runScenarioWasm(
 	xml: string,
 	scenario: ScenarioLike,
+	getDecisionDmn?: (decisionId: string) => string | null,
+	getProcessBpmn?: (processId: string) => string | null,
 ): Promise<ScenarioResultLike> {
 	const startMs = Date.now()
 
 	// Import and create a fresh engine for clean isolation
 	const mod = await import("@bpmnkit/reebe-wasm")
 	await mod.default()
-	const engine = new mod.WasmEngine()
+	const engine = new mod.WasmEngine() as WasmEngineInstance
 
 	try {
-		// Deploy
+		// Deploy all referenced dependencies recursively before deploying the main BPMN.
+		const deployed = new Set<string>()
+		deployDependencies(xml, engine, getDecisionDmn, getProcessBpmn, deployed)
+
+		// Deploy main BPMN
 		const deployResult = engine.deploy(xml) as DeployResponse
 		const processId = scenario.processId ?? deployResult.deployments[0]?.bpmnProcessId
 		if (!processId) {

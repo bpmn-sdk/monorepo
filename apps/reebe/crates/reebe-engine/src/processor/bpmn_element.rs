@@ -986,14 +986,21 @@ impl BpmnElementProcessor {
         };
 
         if element_type == "EXCLUSIVE_GATEWAY" {
-            // Take the first non-default flow where the condition is true;
-            // fall back to the default flow if none matches.
+            // Evaluate conditioned flows first; unconditioned and default flows are fallbacks.
+            // This ensures that a flow with a condition always wins over a flow with no
+            // condition, regardless of document order.
             let mut chosen: Option<(String, String)> = None; // (flow_id, target_id)
             let mut default_entry: Option<(String, String)> = None;
 
             for flow in &outgoing {
-                if flow.is_default {
-                    default_entry = Some((flow.id.clone(), flow.target_ref.clone()));
+                let has_condition = flow.condition_expression.as_ref()
+                    .map(|c| !c.trim().is_empty())
+                    .unwrap_or(false);
+                // Unconditioned flows and explicit defaults are both fallbacks.
+                if flow.is_default || !has_condition {
+                    if default_entry.is_none() {
+                        default_entry = Some((flow.id.clone(), flow.target_ref.clone()));
+                    }
                     continue;
                 }
                 if chosen.is_some() {
@@ -1167,10 +1174,15 @@ fn eval_flow_condition(condition: &Option<String>, ctx: &reebe_feel::FeelContext
     match condition {
         None => true,
         Some(cond) if cond.trim().is_empty() => true,
-        Some(cond) => match reebe_feel::parse_and_evaluate(cond, ctx) {
-            Ok(val) => matches!(val, reebe_feel::FeelValue::Bool(true)),
-            Err(_) => false,
-        },
+        Some(cond) => {
+            // Strip optional leading `=` (BPMN FEEL convention) before evaluating.
+            // Some editors omit it; always evaluate as FEEL regardless.
+            let expr = cond.trim().strip_prefix('=').unwrap_or(cond.trim()).trim();
+            match reebe_feel::evaluate(expr, ctx) {
+                Ok(val) => matches!(val, reebe_feel::FeelValue::Bool(true)),
+                Err(_) => false,
+            }
+        }
     }
 }
 

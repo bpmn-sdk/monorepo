@@ -1,5 +1,29 @@
 # Progress
 
+## 2026-03-31 — Gateway routing fixes + CDATA parsing + recursive resource deployment
+
+**`apps/reebe/crates/reebe-bpmn/src/parser.rs`**:
+- Added `Event::CData` handling to the XML parse loop — bpmn-js wraps condition expressions in CDATA sections (`<![CDATA[...]]>`); without this, `condition_expression` was silently `None` and the gateway always fell back to its default flow
+- Added `test_parse_condition_expression_cdata` to verify CDATA round-trips correctly
+
+**`apps/reebe/justfile`**:
+- Fixed `build-wasm` recipe to use `$(pwd)/../reebe-wasm` (absolute path) so the WASM package always outputs to `apps/reebe-wasm/` regardless of where `just` is invoked from
+
+**`apps/reebe/crates/reebe-engine/src/processor/bpmn_element.rs`**:
+- Fixed `eval_flow_condition` to use `reebe_feel::evaluate` directly (instead of `parse_and_evaluate`), stripping optional `=` prefix — conditions like `count(validationErrors) = 0` now evaluate correctly
+- Fixed XOR gateway routing: unconditioned/default flows are deferred to `default_entry` and only used when no conditioned flow matches; conditioned flows are always evaluated first regardless of document order
+
+**`apps/reebe/crates/reebe-engine/src/tests.rs`**:
+- Added `test_xor_gateway_conditioned_flow_wins_over_unconditioned_default` — verifies conditioned flow wins even when default flow is listed first in document order
+- Added `test_eval_flow_condition_without_equals_prefix` — confirms FEEL evaluation works without leading `=`
+
+**`apps/studio/src/api/run-scenario-wasm.ts`**:
+- Added `getProcessBpmn` parameter for resolving call activity / sub-process references
+- Extracted `deployDependencies` helper that recursively deploys all referenced DMN decisions and called-element BPMNs before deploying the main BPMN — prevents engine lookup failures on referenced resources
+
+**`apps/studio/src/pages/ModelDetail.tsx`**:
+- Wired `getProcessBpmn` callback to `runScenarioWasm` — looks up BPMN models by process ID from the models store
+
 ## 2026-03-29 — Process input validation via DMN
 
 End-to-end input validation for BPMN start events using a companion Collect-hit-policy DMN table.
