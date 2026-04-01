@@ -248,9 +248,6 @@ function ensureBrtResultVariableOutputs(xml: string): string {
 			patched = body.replace(/(<\/(?:[a-zA-Z]+:)?ioMapping>)/, `${outputEntry}$1`)
 		}
 
-		console.debug(
-			`[wasm-runner] patched BRT resultVariable "${resultVar}" (hadIoMapping=${hasIoMapping})`,
-		)
 		return open + patched + close
 	})
 }
@@ -480,13 +477,6 @@ export async function runScenarioWasm(
 			getProcessBpmn,
 			deployed,
 		)
-		console.debug(
-			"[wasm-runner] deployed set:",
-			[...deployed],
-			"missingDecisions:",
-			missingDecisions,
-		)
-
 		// Deploy main BPMN (with BRT result variable output mappings patched in)
 		const deployResult = engine.deploy(ensureBrtResultVariableOutputs(xml)) as DeployResponse
 		const processId = scenario.processId ?? deployResult.deployments[0]?.bpmnProcessId
@@ -537,29 +527,10 @@ export async function runScenarioWasm(
 		const visitedElements = snap.elementInstances
 			.filter((e) => e.process_instance_key === pi.key)
 			.map((e) => e.element_id)
-		console.debug("[wasm-runner] visitedElements:", visitedElements)
-		console.debug(
-			"[wasm-runner] snap.elementInstances (all):",
-			JSON.stringify(snap.elementInstances),
-		)
-
 		// Collect variables: merge snapshot state (deduplicated, final values) with
 		// VARIABLE.CREATED events from the event log (catches DMN-produced variables
 		// that may not survive snapshot filtering due to scope key differences).
 		const piKeyStr = String(pi.key)
-		console.debug(
-			"[wasm-runner] process instance key:",
-			pi.key,
-			"(type:",
-			typeof pi.key,
-			") state:",
-			pi.state,
-		)
-		console.debug("[wasm-runner] snap.variables (all - raw JSON):", JSON.stringify(snap.variables))
-		console.debug("[wasm-runner] snap.incidents:", JSON.stringify(snap.incidents))
-		console.debug("[wasm-runner] eventLog total entries:", snap.eventLog.length)
-		console.debug("[wasm-runner] eventLog ALL entries:", JSON.stringify(snap.eventLog))
-		console.debug("[wasm-runner] snap.jobs (all):", JSON.stringify(snap.jobs))
 		const finalVariables: Record<string, unknown> = {}
 		for (const rec of snap.eventLog) {
 			if (
@@ -590,8 +561,6 @@ export async function runScenarioWasm(
 		for (const [k, v] of Object.entries(brtResultVars)) {
 			if (!(k in finalVariables)) finalVariables[k] = v
 		}
-
-		console.debug("[wasm-runner] finalVariables:", finalVariables)
 
 		// Reconstruct FEEL evaluations from SEQUENCE_FLOW_TAKEN events.
 		// The WASM engine evaluates conditions but doesn't emit dedicated FEEL records;

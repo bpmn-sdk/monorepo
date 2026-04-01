@@ -1,5 +1,16 @@
 # Progress
 
+## 2026-04-01 — Fix: BRT `resultVariable` now appears in Last Run Trace → Variables
+
+**Root cause**: The WASM browser engine stores `zeebe:calledDecision resultVariable` in the BRT's local element scope and cleans it up when the element completes, never propagating it to the process instance scope that the snapshot reads. Injecting `zeebe:ioMapping` output entries (prior workaround attempt) had no effect — the engine ignores output mappings for BRTs in the browser.
+
+**Fix (`packages/engine/src/wasm-runner.ts`)**:
+- Added `parseDmnDecisionTable(dmnXml, decisionId)`: parses a DMN decision table from XML — extracts hit policy, input expressions, output column names, and rules with their unary test / output entry expressions
+- Added `evalDmnDecisionTable(table, vars)`: evaluates all rules using the existing `@bpmnkit/feel` engine (already a dependency), applies hit policy (COLLECT returns list, UNIQUE/FIRST/ANY return first match)
+- Added `evaluateBrtResultVariables(bpmnXml, visitedElementIds, vars, getDecisionDmn)`: for each visited BRT with a `zeebe:calledDecision resultVariable`, evaluates the DMN directly and returns `{resultVar: value}` pairs
+- This result is merged into `finalVariables` after the WASM snapshot collection (snapshot value wins if present, FEEL evaluation fills the gap otherwise)
+- `feelModule` is lazily cached after first `import("@bpmnkit/feel")` to avoid repeated dynamic imports
+
 ## 2026-04-01 — Tests tab: fix DMN auto-deployment UX and scenario correctness
 
 **`packages/plugins/src/process-runner/index.ts`**:
