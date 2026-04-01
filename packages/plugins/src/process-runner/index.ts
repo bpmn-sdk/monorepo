@@ -1156,6 +1156,16 @@ export function createProcessRunnerPlugin(
 
 		// ── Task Mocks ──────────────────────────────────────────────────────────
 		const defs = options.getDefinitions?.() ?? null
+		// Decisions referenced by BRTs — used both for filtering mocks and for missing-DMN warnings
+		const referencedDecisions =
+			defs?.processes.flatMap((p) =>
+				p.flowElements.flatMap((e) =>
+					e.type === "businessRuleTask" && e.decisionId ? [e.decisionId] : [],
+				),
+			) ?? []
+		const missingDmns = options.getValidationDmn
+			? referencedDecisions.filter((id) => options.getValidationDmn?.(id) === null)
+			: []
 		const mockableTasks =
 			defs?.processes.flatMap((p) =>
 				p.flowElements.filter((e) => {
@@ -1245,6 +1255,14 @@ export function createProcessRunnerPlugin(
 
 				testsPaneEl.appendChild(taskEl)
 			}
+		}
+
+		// ── Missing DMN warning ──────────────────────────────────────────────────
+		if (missingDmns.length > 0) {
+			const warnEl = document.createElement("div")
+			warnEl.className = "bpmnkit-runner-tests-missing-dmn"
+			warnEl.textContent = `⚠ Decision model${missingDmns.length > 1 ? "s" : ""} not found: ${missingDmns.join(", ")}. Import the DMN in the Models view.`
+			testsPaneEl.appendChild(warnEl)
 		}
 
 		// ── Expected Variables ──────────────────────────────────────────────────

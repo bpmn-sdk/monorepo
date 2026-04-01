@@ -202,6 +202,258 @@ function extractFlowConditions(bpmnXml: string): Map<string, string> {
 	return result
 }
 
+/**
+ * Ensure BRT result variables are propagated to the parent process scope.
+ *
+ * When a BPMN `businessRuleTask` has both `zeebe:calledDecision resultVariable="X"`
+ * and a `zeebe:ioMapping` element, the WASM engine only propagates explicitly mapped
+ * output variables.  Without an output entry for X, the result stays in the element
+ * scope (scope_key = element instance key) and is cleaned up when the BRT completes —
+ * never reaching the process instance scope where the runner's snapshot reads variables.
+ *
+ * This function rewrites the XML so that each such BRT has an explicit
+ * `<zeebe:output source="=X" target="X"/>` entry, mirroring real Zeebe behaviour
+ * where resultVariable is always stored at the parent scope.
+ */
+function ensureBrtResultVariableOutputs(xml: string): string {
+	const brtPattern =
+		/(<(?:[a-zA-Z]+:)?businessRuleTask\b[^>]*>)([\s\S]*?)(<\/(?:[a-zA-Z]+:)?businessRuleTask>)/g
+	return xml.replace(brtPattern, (_match, open: string, body: string, close: string) => {
+		const rvMatch = /resultVariable="([^"]+)"/.exec(body)
+		if (!rvMatch?.[1]) return open + body + close // no calledDecision resultVariable
+		const resultVar = rvMatch[1]
+
+		// Already has an output entry for this variable? Nothing to do
+		if (new RegExp(`<(?:[a-zA-Z]+:)?output\\b[^>]*target="${resultVar}"`).test(body))
+			return open + body + close
+
+		const outputEntry = `<zeebe:output source="=${resultVar}" target="${resultVar}"/>`
+		const hasIoMapping = /<(?:[a-zA-Z]+:)?ioMapping\b/.test(body)
+
+		let patched: string
+		if (!hasIoMapping) {
+			// No ioMapping at all — inject one before the closing extensionElements tag
+			patched = body.replace(
+				/(<\/(?:[a-zA-Z]+:)?extensionElements>)/,
+				`<zeebe:ioMapping>${outputEntry}</zeebe:ioMapping>$1`,
+			)
+		} else if (/<(?:[a-zA-Z]+:)?ioMapping\s*\/>/.test(body)) {
+			// Self-closing <zeebe:ioMapping/> — expand and inject
+			patched = body.replace(
+				/<(?:[a-zA-Z]+:)?ioMapping\s*\/>/,
+				`<zeebe:ioMapping>${outputEntry}</zeebe:ioMapping>`,
+			)
+		} else {
+			// Open/close <zeebe:ioMapping>…</zeebe:ioMapping> — inject before closing tag
+			patched = body.replace(/(<\/(?:[a-zA-Z]+:)?ioMapping>)/, `${outputEntry}$1`)
+		}
+
+		console.debug(
+			`[wasm-runner] patched BRT resultVariable "${resultVar}" (hadIoMapping=${hasIoMapping})`,
+		)
+		return open + patched + close
+	})
+}
+
+// ── BRT result variable post-hoc evaluation ──────────────────────────────────
+
+interface BrtInfo {
+	elementId: string
+	decisionId: string
+	resultVar: string
+}
+
+function extractBrtInfos(bpmnXml: string): BrtInfo[] {
+	const infos: BrtInfo[] = []
+	const pattern =
+		/<(?:[a-zA-Z]+:)?businessRuleTask\b([^>]*)>([\s\S]*?)<\/(?:[a-zA-Z]+:)?businessRuleTask>/g
+	for (const m of bpmnXml.matchAll(pattern)) {
+		const attrs = m[1] ?? ""
+		const body = m[2] ?? ""
+		const idMatch = /\bid="([^"]+)"/.exec(attrs)
+		const decisionIdMatch = /decisionId="([^"]+)"/.exec(body)
+		const resultVarMatch = /resultVariable="([^"]+)"/.exec(body)
+		if (idMatch?.[1] && decisionIdMatch?.[1] && resultVarMatch?.[1]) {
+			infos.push({
+				elementId: idMatch[1],
+				decisionId: decisionIdMatch[1],
+				resultVar: resultVarMatch[1],
+			})
+		}
+	}
+	return infos
+}
+
+interface DmnDecisionTable {
+	hitPolicy: string
+	inputs: string[] // FEEL expressions for input columns
+	outputs: string[] // variable names for output columns
+	rules: Array<{
+		inputEntries: string[] // unary test expressions (empty = match any)
+		outputEntries: string[] // FEEL value expressions
+	}>
+}
+
+function parseDmnDecisionTable(dmnXml: string, decisionId: string): DmnDecisionTable | null {
+	const decisionMatch = new RegExp(
+		`<(?:[a-zA-Z]+:)?decision\\b[^>]*\\bid="${decisionId}"[^>]*>[\\s\\S]*?<\\/(?:[a-zA-Z]+:)?decision>`,
+	).exec(dmnXml)
+	if (!decisionMatch) return null
+	const decisionBody = decisionMatch[0]
+
+	const tableMatch =
+		/<(?:[a-zA-Z]+:)?decisionTable\b([^>]*)>([\s\S]*?)<\/(?:[a-zA-Z]+:)?decisionTable>/.exec(
+			decisionBody,
+		)
+	if (!tableMatch) return null
+	const hitPolicy = /hitPolicy="([^"]*)"/.exec(tableMatch[1] ?? "")?.[1] ?? "UNIQUE"
+	const tableBody = tableMatch[2] ?? ""
+
+	const extractText = (xml: string) =>
+		/<(?:[a-zA-Z]+:)?text\b[^>]*>([\s\S]*?)<\/(?:[a-zA-Z]+:)?text>/.exec(xml)?.[1]?.trim() ?? ""
+
+	const inputs: string[] = []
+	for (const m of tableBody.matchAll(
+		/<(?:[a-zA-Z]+:)?input\b[^>]*>([\s\S]*?)<\/(?:[a-zA-Z]+:)?input>/g,
+	)) {
+		const exprBody =
+			/<(?:[a-zA-Z]+:)?inputExpression\b[^>]*>([\s\S]*?)<\/(?:[a-zA-Z]+:)?inputExpression>/.exec(
+				m[1] ?? "",
+			)?.[1] ?? ""
+		inputs.push(extractText(exprBody))
+	}
+
+	const outputs: string[] = []
+	for (const m of tableBody.matchAll(
+		/<(?:[a-zA-Z]+:)?output\b([^/>]*?)(?:\/>|>[\s\S]*?<\/(?:[a-zA-Z]+:)?output>)/g,
+	)) {
+		outputs.push(/\bname="([^"]*)"/.exec(m[1] ?? "")?.[1] ?? "")
+	}
+
+	const rules: DmnDecisionTable["rules"] = []
+	for (const ruleMatch of tableBody.matchAll(
+		/<(?:[a-zA-Z]+:)?rule\b[^>]*>([\s\S]*?)<\/(?:[a-zA-Z]+:)?rule>/g,
+	)) {
+		const ruleBody = ruleMatch[1] ?? ""
+		const inputEntries: string[] = []
+		for (const ie of ruleBody.matchAll(
+			/<(?:[a-zA-Z]+:)?inputEntry\b[^>]*>([\s\S]*?)<\/(?:[a-zA-Z]+:)?inputEntry>/g,
+		))
+			inputEntries.push(extractText(ie[1] ?? ""))
+		const outputEntries: string[] = []
+		for (const oe of ruleBody.matchAll(
+			/<(?:[a-zA-Z]+:)?outputEntry\b[^>]*>([\s\S]*?)<\/(?:[a-zA-Z]+:)?outputEntry>/g,
+		))
+			outputEntries.push(extractText(oe[1] ?? ""))
+		rules.push({ inputEntries, outputEntries })
+	}
+
+	return { hitPolicy, inputs, outputs, rules }
+}
+
+function evalDmnDecisionTable(table: DmnDecisionTable, vars: Record<string, unknown>): unknown {
+	const feel = feelModule
+	if (!feel) return null
+	const ctx = { vars: vars as Record<string, import("@bpmnkit/feel").FeelValue> }
+
+	const collectResults: unknown[] = []
+	for (const rule of table.rules) {
+		let matches = true
+		for (let i = 0; i < table.inputs.length; i++) {
+			const inputExpr = table.inputs[i] ?? ""
+			const testExpr = rule.inputEntries[i] ?? ""
+			if (!testExpr) continue // empty = any
+
+			const inputParsed = feel.parseExpression(inputExpr)
+			if (!inputParsed.ast) {
+				matches = false
+				break
+			}
+			const inputVal = feel.evaluate(inputParsed.ast, ctx)
+
+			const testParsed = feel.parseUnaryTests(testExpr)
+			if (!testParsed.ast) {
+				matches = false
+				break
+			}
+			if (!feel.evaluateUnaryTests(testParsed.ast, inputVal, ctx)) {
+				matches = false
+				break
+			}
+		}
+		if (!matches) continue
+
+		if (table.outputs.length === 1) {
+			const expr = rule.outputEntries[0] ?? ""
+			if (expr) {
+				const parsed = feel.parseExpression(expr)
+				if (parsed.ast) collectResults.push(feel.evaluate(parsed.ast, ctx))
+			}
+		} else {
+			const row: Record<string, unknown> = {}
+			for (let i = 0; i < table.outputs.length; i++) {
+				const name = table.outputs[i]
+				const expr = rule.outputEntries[i] ?? ""
+				if (name && expr) {
+					const parsed = feel.parseExpression(expr)
+					if (parsed.ast) row[name] = feel.evaluate(parsed.ast, ctx)
+				}
+			}
+			collectResults.push(row)
+		}
+	}
+
+	// Apply hit policy
+	if (table.hitPolicy === "FIRST") return collectResults[0] ?? null
+	if (table.hitPolicy === "UNIQUE" || table.hitPolicy === "ANY") return collectResults[0] ?? null
+	return collectResults // COLLECT, RULE ORDER, etc.
+}
+
+// Lazily cached feel module reference (avoids repeated dynamic imports)
+let feelModule: typeof import("@bpmnkit/feel") | null = null
+
+async function ensureFeelModule(): Promise<void> {
+	if (feelModule) return
+	feelModule = await import("@bpmnkit/feel")
+}
+
+/**
+ * For visited BRTs that have a resultVariable, evaluate the DMN decision table
+ * directly using the FEEL engine and return {resultVar: value} pairs.
+ *
+ * The WASM browser engine cleans up BRT local-scope variables on element
+ * completion and does not propagate the resultVariable to the process scope
+ * snapshot.  Evaluating the DMN with the FEEL engine directly sidesteps this
+ * limitation.
+ */
+async function evaluateBrtResultVariables(
+	bpmnXml: string,
+	visitedElementIds: string[],
+	vars: Record<string, unknown>,
+	getDecisionDmn: ((id: string) => string | null) | undefined,
+): Promise<Record<string, unknown>> {
+	if (!getDecisionDmn) return {}
+
+	const allBrts = extractBrtInfos(bpmnXml)
+	const visitedBrts = allBrts.filter((b) => visitedElementIds.includes(b.elementId))
+	if (visitedBrts.length === 0) return {}
+
+	await ensureFeelModule()
+	const result: Record<string, unknown> = {}
+
+	for (const { decisionId, resultVar } of visitedBrts) {
+		const dmnXml = getDecisionDmn(decisionId)
+		if (!dmnXml) continue
+
+		const table = parseDmnDecisionTable(dmnXml, decisionId)
+		if (!table) continue
+
+		result[resultVar] = evalDmnDecisionTable(table, vars)
+	}
+
+	return result
+}
+
 // ── Runner ────────────────────────────────────────────────────────────────────
 
 const MAX_ROUNDS = 200
@@ -228,9 +480,15 @@ export async function runScenarioWasm(
 			getProcessBpmn,
 			deployed,
 		)
+		console.debug(
+			"[wasm-runner] deployed set:",
+			[...deployed],
+			"missingDecisions:",
+			missingDecisions,
+		)
 
-		// Deploy main BPMN
-		const deployResult = engine.deploy(xml) as DeployResponse
+		// Deploy main BPMN (with BRT result variable output mappings patched in)
+		const deployResult = engine.deploy(ensureBrtResultVariableOutputs(xml)) as DeployResponse
 		const processId = scenario.processId ?? deployResult.deployments[0]?.bpmnProcessId
 		if (!processId) {
 			return fail(scenario, startMs, "No process found in deployed BPMN.")
@@ -279,11 +537,29 @@ export async function runScenarioWasm(
 		const visitedElements = snap.elementInstances
 			.filter((e) => e.process_instance_key === pi.key)
 			.map((e) => e.element_id)
+		console.debug("[wasm-runner] visitedElements:", visitedElements)
+		console.debug(
+			"[wasm-runner] snap.elementInstances (all):",
+			JSON.stringify(snap.elementInstances),
+		)
 
 		// Collect variables: merge snapshot state (deduplicated, final values) with
 		// VARIABLE.CREATED events from the event log (catches DMN-produced variables
 		// that may not survive snapshot filtering due to scope key differences).
 		const piKeyStr = String(pi.key)
+		console.debug(
+			"[wasm-runner] process instance key:",
+			pi.key,
+			"(type:",
+			typeof pi.key,
+			") state:",
+			pi.state,
+		)
+		console.debug("[wasm-runner] snap.variables (all - raw JSON):", JSON.stringify(snap.variables))
+		console.debug("[wasm-runner] snap.incidents:", JSON.stringify(snap.incidents))
+		console.debug("[wasm-runner] eventLog total entries:", snap.eventLog.length)
+		console.debug("[wasm-runner] eventLog ALL entries:", JSON.stringify(snap.eventLog))
+		console.debug("[wasm-runner] snap.jobs (all):", JSON.stringify(snap.jobs))
 		const finalVariables: Record<string, unknown> = {}
 		for (const rec of snap.eventLog) {
 			if (
@@ -300,6 +576,22 @@ export async function runScenarioWasm(
 		for (const v of snap.variables.filter((v) => v.process_instance_key === pi.key)) {
 			finalVariables[v.name] = v.value
 		}
+
+		// BRT resultVariable post-hoc evaluation: the WASM browser engine cleans up
+		// BRT local-scope variables on element completion so they never reach the
+		// process-scope snapshot.  Evaluate each visited BRT's DMN directly with
+		// the FEEL engine and inject the result (snapshot value wins if present).
+		const brtResultVars = await evaluateBrtResultVariables(
+			xml,
+			visitedElements,
+			finalVariables,
+			getDecisionDmn,
+		)
+		for (const [k, v] of Object.entries(brtResultVars)) {
+			if (!(k in finalVariables)) finalVariables[k] = v
+		}
+
+		console.debug("[wasm-runner] finalVariables:", finalVariables)
 
 		// Reconstruct FEEL evaluations from SEQUENCE_FLOW_TAKEN events.
 		// The WASM engine evaluates conditions but doesn't emit dedicated FEEL records;

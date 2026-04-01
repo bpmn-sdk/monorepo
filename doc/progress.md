@@ -1,5 +1,20 @@
 # Progress
 
+## 2026-04-01 — Tests tab: fix DMN auto-deployment UX and scenario correctness
+
+**`packages/plugins/src/process-runner/index.ts`**:
+- Added missing-DMN detection: scans `getDefinitions()` for BRTs with `decisionId`, checks each via `getValidationDmn()`, and renders an amber warning banner ("⚠ Decision model not found: X. Import the DMN in the Models view.") in the scenario editor when any are missing
+- BRTs with `zeebe:calledDecision` are already excluded from Task Outputs (no mock needed — they run the DMN internally); added `referencedDecisions` variable to share the BRT decision-ID list between the exclusion filter and the warning banner
+
+**`packages/plugins/src/process-runner/css.ts`**:
+- Added `.bpmnkit-runner-tests-missing-dmn` style (amber border/background, matching chaos-summary styling)
+
+**`packages/engine/src/wasm-runner.ts`** (prior fix, same session):
+- `passed` now correctly reflects both `errors` and `failures` (`errors.length === 0 && failures.length === 0`)
+
+**`apps/studio/src/pages/ModelDetail.tsx`** (prior fix, same session):
+- Added `getJobType` callback so service task mocks are keyed by `zeebe:taskDefinition.type` (job type) rather than element ID
+
 ## 2026-04-01 — Scenario runner integration tests in apps/studio
 
 **`apps/studio/tests/scenario-runner.test.ts`** (new):

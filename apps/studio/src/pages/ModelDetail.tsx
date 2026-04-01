@@ -801,15 +801,26 @@ export function ModelDetail() {
 			runScenario: (scenario) => {
 				const xml = editorRef.current?.exportXml()
 				if (!xml) return Promise.reject(new Error("No diagram loaded"))
+				// Log BRT extension elements from the exported XML
+				const brtMatch = xml.match(
+					/<(?:\w+:)?businessRuleTask[\s\S]*?<\/(?:\w+:)?businessRuleTask>/g,
+				)
+				console.debug("[studio] BRT elements in exported XML:", brtMatch)
 				return runScenarioWasm(
 					xml,
 					scenario,
 					(decisionId) => {
 						const { models: currentModels } = useModelsStore.getState()
-						return (
-							currentModels.find((m) => m.type === "dmn" && m.content.includes(decisionId))
-								?.content ?? null
+						const found = currentModels.find(
+							(m) => m.type === "dmn" && m.content.includes(decisionId),
 						)
+						console.debug(
+							`[studio] getDecisionDmn("${decisionId}"):`,
+							found ? `found model "${found.name}" (${found.id})` : "NOT FOUND",
+							"| total dmn models:",
+							currentModels.filter((m) => m.type === "dmn").map((m) => m.name),
+						)
+						return found?.content ?? null
 					},
 					(processId) => {
 						const { models: currentModels } = useModelsStore.getState()

@@ -798,6 +798,17 @@ const CSS = `
 [data-bpmnkit-hud-theme="light"] .bpmnkit-runner-tests-trace-elem-idx { color: rgba(0,0,0,0.25); }
 [data-bpmnkit-hud-theme="light"] .bpmnkit-runner-tests-trace-elem-id { color: rgba(0,0,0,0.6); }
 
+/* ── Missing DMN warning ──────────────────────────────────────────────────── */
+.bpmnkit-runner-tests-missing-dmn {
+  font-size: 11px;
+  padding: 6px 10px;
+  margin-bottom: 8px;
+  border-radius: 5px;
+  background: rgba(245,158,11,0.12);
+  border: 1px solid var(--bpmnkit-warn, #f59e0b);
+  color: var(--bpmnkit-warn, #f59e0b);
+}
+
 /* ── Chaos run summary banner ─────────────────────────────────────────────── */
 .bpmnkit-runner-chaos-summary {
   font-size: 11px;
