@@ -1,6 +1,6 @@
 import { create } from "zustand"
 import { queryClient } from "../api/queryClient.js"
-import { initWasmEngine } from "../api/wasm-adapter.js"
+import { initWasmEngine, setSimulationMode as setWasmSimulationMode } from "../api/wasm-adapter.js"
 
 const PROFILE_KEY = "bpmnkit-studio-profile"
 const PROXY_KEY = "bpmnkit-studio-proxy"
@@ -23,9 +23,11 @@ interface ClusterState {
 	activeProfile: string | null
 	proxyUrl: string
 	status: Status
+	simulationMode: boolean
 	loadProfiles(): Promise<void>
 	setActiveProfile(name: string | null): void
 	setProxyUrl(url: string): void
+	setSimulationMode(v: boolean): void
 }
 
 function loadProxyUrl(): string {
@@ -49,6 +51,7 @@ export const useClusterStore = create<ClusterState>()((set, get) => ({
 	activeProfile: loadActiveProfile(),
 	proxyUrl: loadProxyUrl(),
 	status: "loading",
+	simulationMode: false,
 
 	async loadProfiles() {
 		const { proxyUrl, activeProfile: current } = get()
@@ -135,5 +138,10 @@ export const useClusterStore = create<ClusterState>()((set, get) => ({
 		} catch {
 			// storage unavailable
 		}
+	},
+
+	setSimulationMode(v) {
+		set({ simulationMode: v })
+		setWasmSimulationMode(v)
 	},
 }))

@@ -130,6 +130,20 @@ const localDefs = new Map<
 
 const HTTP_JOB_TYPE = "io.camunda:http-json:1"
 const PROXY_HTTP_URL = "http://localhost:3033/http-request"
+
+// ── Simulation mode ───────────────────────────────────────────────────────────
+// When false (default), service tasks that cannot be handled create an incident.
+// When true, they are auto-completed with empty/simulated data.
+let simulationMode = false
+
+export function getSimulationMode(): boolean {
+	return simulationMode
+}
+
+export function setSimulationMode(enabled: boolean): void {
+	simulationMode = enabled
+}
+
 /** Jobs currently being handled to avoid double-activation. */
 const inFlight = new Set<number>()
 
@@ -153,7 +167,7 @@ async function handleJob(eng: WasmEngine, job: WasmJob, allVars: WasmVariable[])
 	}
 	if (job.job_type === HTTP_JOB_TYPE) {
 		await handleHttpJob(eng, job, allVars)
-	} else {
+	} else if (simulationMode) {
 		try {
 			eng.complete_job(job.key, "{}")
 			jobResults.set(job.key, {
@@ -166,6 +180,24 @@ async function handleJob(eng: WasmEngine, job: WasmJob, allVars: WasmVariable[])
 		} catch {
 			// ignore — job may have been completed elsewhere
 		}
+	} else {
+		try {
+			eng.fail_job(
+				job.key,
+				0,
+				`Service task "${job.job_type}" has no handler. Enable Simulation Mode to auto-complete.`,
+			)
+		} catch {
+			/* ignore */
+		}
+		jobResults.set(job.key, {
+			jobKey: job.key,
+			elementId: job.element_id,
+			jobType: job.job_type,
+			kind: "rest-error",
+			error: `No handler for job type "${job.job_type}"`,
+			processInstanceKey: job.process_instance_key,
+		})
 	}
 }
 
@@ -215,22 +247,41 @@ async function handleHttpJob(
 	}
 
 	if (!url) {
-		// No URL configured — complete with a default simulated response
-		try {
-			eng.complete_job(
-				job.key,
-				JSON.stringify({ response: { status: 200, body: {}, headers: {} } }),
-			)
-		} catch {
-			/* ignore */
+		if (simulationMode) {
+			try {
+				eng.complete_job(
+					job.key,
+					JSON.stringify({ response: { status: 200, body: {}, headers: {} } }),
+				)
+			} catch {
+				/* ignore */
+			}
+			jobResults.set(job.key, {
+				jobKey: job.key,
+				elementId: job.element_id,
+				jobType: job.job_type,
+				kind: "simulated",
+				processInstanceKey: job.process_instance_key,
+			})
+		} else {
+			try {
+				eng.fail_job(
+					job.key,
+					0,
+					"REST connector has no URL configured. Enable Simulation Mode to auto-complete.",
+				)
+			} catch {
+				/* ignore */
+			}
+			jobResults.set(job.key, {
+				jobKey: job.key,
+				elementId: job.element_id,
+				jobType: job.job_type,
+				kind: "rest-error",
+				error: "No URL configured",
+				processInstanceKey: job.process_instance_key,
+			})
 		}
-		jobResults.set(job.key, {
-			jobKey: job.key,
-			elementId: job.element_id,
-			jobType: job.job_type,
-			kind: "simulated",
-			processInstanceKey: job.process_instance_key,
-		})
 		return
 	}
 
@@ -291,8 +342,8 @@ async function handleHttpJob(
 		} catch (e) {
 			logError(`HTTP job ${job.key}: complete_job failed:`, e)
 		}
-	} else {
-		// Tier 3: both failed — complete with empty simulated response
+	} else if (simulationMode) {
+		// Tier 3 (simulation on): complete with empty simulated response
 		try {
 			eng.complete_job(job.key, JSON.stringify({ response: { status: 0, body: {}, headers: {} } }))
 		} catch {
@@ -304,6 +355,25 @@ async function handleHttpJob(
 			jobType: job.job_type,
 			kind: "rest-error",
 			error: fetchError ?? "Proxy unavailable",
+			processInstanceKey: job.process_instance_key,
+		})
+	} else {
+		// Tier 3 (simulation off): fail the job to create an incident
+		try {
+			eng.fail_job(
+				job.key,
+				0,
+				fetchError ?? "HTTP request failed. Enable Simulation Mode to auto-complete.",
+			)
+		} catch {
+			/* ignore */
+		}
+		jobResults.set(job.key, {
+			jobKey: job.key,
+			elementId: job.element_id,
+			jobType: job.job_type,
+			kind: "rest-error",
+			error: fetchError ?? "HTTP request failed",
 			processInstanceKey: job.process_instance_key,
 		})
 	}
