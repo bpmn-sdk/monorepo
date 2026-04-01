@@ -17,8 +17,11 @@ import {
 	BookOpen,
 	CheckCircle,
 	ExternalLink,
+	FileCode,
+	Image,
 	Link2,
 	MonitorPlay,
+	MoreHorizontal,
 	Play,
 	Rocket,
 	RotateCw,
@@ -31,6 +34,12 @@ import { useCreateProcessInstance, useDefinitions, useDeployProcess } from "../a
 import { queryClient } from "../api/queryClient.js"
 import { runScenarioWasm } from "../api/run-scenario-wasm.js"
 import { Button } from "../components/ui/button.js"
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuTrigger,
+} from "../components/ui/dropdown-menu.js"
 import { Input } from "../components/ui/input.js"
 import type { ModelFile } from "../storage/types.js"
 import { useClusterStore } from "../stores/cluster.js"
@@ -539,6 +548,75 @@ function StudioDocsPane({ elementType }: { elementType: string | null }) {
 	)
 }
 
+// ── XML view dialog ───────────────────────────────────────────────────────────
+
+function showXmlDialog(xml: string): void {
+	const overlay = document.createElement("div")
+	overlay.style.cssText =
+		"position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;"
+	overlay.addEventListener("click", (e) => {
+		if (e.target === overlay) overlay.remove()
+	})
+
+	const panel = document.createElement("div")
+	panel.style.cssText =
+		"background:var(--bpmnkit-surface,#fff);border:1px solid var(--bpmnkit-border,#d0d0e8);border-radius:8px;width:min(800px,90vw);max-height:80vh;display:flex;flex-direction:column;overflow:hidden;"
+
+	const header = document.createElement("div")
+	header.style.cssText =
+		"display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--bpmnkit-border,#d0d0e8);"
+
+	const title = document.createElement("span")
+	title.style.cssText = "font-size:14px;font-weight:600;color:var(--bpmnkit-fg,#1a1a2e);"
+	title.textContent = "XML Source"
+
+	const actions = document.createElement("div")
+	actions.style.cssText = "display:flex;gap:8px;"
+
+	const copyBtn = document.createElement("button")
+	copyBtn.style.cssText =
+		"font-size:12px;padding:4px 10px;border-radius:4px;border:1px solid var(--bpmnkit-border,#d0d0e8);background:transparent;color:var(--bpmnkit-fg,#1a1a2e);cursor:pointer;"
+	copyBtn.textContent = "Copy"
+	copyBtn.addEventListener("click", () => {
+		void navigator.clipboard.writeText(xml).then(() => {
+			copyBtn.textContent = "Copied!"
+			setTimeout(() => {
+				copyBtn.textContent = "Copy"
+			}, 1500)
+		})
+	})
+
+	const closeBtn = document.createElement("button")
+	closeBtn.style.cssText =
+		"font-size:12px;padding:4px 10px;border-radius:4px;border:1px solid var(--bpmnkit-border,#d0d0e8);background:transparent;color:var(--bpmnkit-fg,#1a1a2e);cursor:pointer;"
+	closeBtn.textContent = "Close"
+	closeBtn.addEventListener("click", () => overlay.remove())
+
+	actions.append(copyBtn, closeBtn)
+	header.append(title, actions)
+
+	const body = document.createElement("div")
+	body.style.cssText = "overflow:auto;flex:1;"
+
+	const pre = document.createElement("pre")
+	pre.style.cssText =
+		"margin:0;padding:16px;font-size:12px;font-family:var(--bpmnkit-font-mono,monospace);color:var(--bpmnkit-fg,#1a1a2e);white-space:pre;"
+	pre.textContent = xml
+
+	body.append(pre)
+	panel.append(header, body)
+	overlay.append(panel)
+	document.body.append(overlay)
+
+	const onKey = (e: KeyboardEvent): void => {
+		if (e.key === "Escape") {
+			overlay.remove()
+			document.removeEventListener("keydown", onKey)
+		}
+	}
+	document.addEventListener("keydown", onKey)
+}
+
 // ── ModelDetail ───────────────────────────────────────────────────────────────
 
 export function ModelDetail() {
@@ -758,6 +836,20 @@ export function ModelDetail() {
 					})),
 				}
 			},
+			getJobType: (elementId) => {
+				const defs = editorRef.current?.getDefinitions()
+				if (!defs) return null
+				for (const process of defs.processes) {
+					const el = process.flowElements.find((f) => f.id === elementId)
+					if (el) {
+						return (
+							el.extensionElements.find((e) => e.name === "zeebe:taskDefinition")?.attributes
+								.type ?? null
+						)
+					}
+				}
+				return null
+			},
 			getValidationDmn: (decisionId) => {
 				const { models: currentModels } = useModelsStore.getState()
 				return (
@@ -854,8 +946,20 @@ export function ModelDetail() {
 				processRunner,
 			],
 		})
+		// XML view button — placed in bottom-left HUD panel
+		const xmlBtn = document.createElement("button")
+		xmlBtn.type = "button"
+		xmlBtn.title = "View XML source"
+		xmlBtn.innerHTML =
+			'<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M5 4L2 8l3 4"/><path d="M11 4l3 4-3 4"/><path d="M9 3l-2 10"/></svg>'
+		xmlBtn.addEventListener("click", () => {
+			const xml = editorRef.current?.exportXml()
+			if (!xml) return
+			showXmlDialog(xml)
+		})
+
 		initEditorHud(editor, {
-			playButton: processRunner.playButton,
+			rawModeButton: xmlBtn,
 			onToggleSidebar: () => {
 				if (dock.collapsed) dock.expand()
 				else dock.collapse()
@@ -1016,6 +1120,49 @@ export function ModelDetail() {
 		}
 	}, [model, deploy])
 
+	async function handleExportSource() {
+		if (!model) return
+		let content: string | null = null
+		let ext: string
+		let mimeType: string
+		if (model.type === "dmn") {
+			content = (await dmnEditorRef.current?.getXML()) ?? model.content
+			ext = ".dmn"
+			mimeType = "application/xml"
+		} else if (model.type === "form") {
+			content = model.content
+			ext = ".form"
+			mimeType = "application/json"
+		} else {
+			content = editorRef.current?.exportXml() ?? null
+			ext = ".bpmn"
+			mimeType = "application/xml"
+		}
+		if (!content) return
+		const blob = new Blob([content], { type: mimeType })
+		const url = URL.createObjectURL(blob)
+		const a = document.createElement("a")
+		a.href = url
+		a.download = `${model.name}${ext}`
+		a.click()
+		URL.revokeObjectURL(url)
+	}
+
+	function handleExportSvg() {
+		const container = editorRef.current?.container
+		const svg = container?.querySelector("svg")
+		if (!svg) return
+		const serializer = new XMLSerializer()
+		const svgStr = serializer.serializeToString(svg)
+		const blob = new Blob([svgStr], { type: "image/svg+xml" })
+		const url = URL.createObjectURL(blob)
+		const a = document.createElement("a")
+		a.href = url
+		a.download = `${model?.name ?? "diagram"}.svg`
+		a.click()
+		URL.revokeObjectURL(url)
+	}
+
 	function handleRunVariablesChange(v: string) {
 		setRunVariables(v)
 		if (runVarsSaveTimerRef.current) clearTimeout(runVarsSaveTimerRef.current)
@@ -1131,6 +1278,29 @@ export function ModelDetail() {
 									</Button>
 								</>
 							)}
+							<DropdownMenu>
+								<DropdownMenuTrigger asChild>
+									<Button size="sm" variant="ghost" aria-label="Export options">
+										<MoreHorizontal size={14} />
+									</Button>
+								</DropdownMenuTrigger>
+								<DropdownMenuContent align="end" className="z-[10000]">
+									<DropdownMenuItem onClick={() => void handleExportSource()}>
+										<FileCode size={13} />
+										{model.type === "dmn"
+											? "Export as DMN XML"
+											: model.type === "form"
+												? "Export as JSON"
+												: "Export as BPMN XML"}
+									</DropdownMenuItem>
+									{model.type === "bpmn" && (
+										<DropdownMenuItem onClick={handleExportSvg}>
+											<Image size={13} />
+											Export as SVG
+										</DropdownMenuItem>
+									)}
+								</DropdownMenuContent>
+							</DropdownMenu>
 						</div>
 					)}
 				</div>

@@ -55,6 +55,7 @@ export interface ScenarioResultLike {
 	passed: boolean
 	visitedElements: string[]
 	finalVariables: Record<string, unknown>
+	feelEvals: Array<{ elementId: string; property: string; expression: string; result: unknown }>
 	errors: Array<{ elementId?: string; message: string }>
 	failures: Array<{ field: string; expected: unknown; actual: unknown }>
 	durationMs: number
@@ -1257,7 +1258,7 @@ export function createProcessRunnerPlugin(
 		)
 
 		// ── Failure details ─────────────────────────────────────────────────────
-		if (result !== undefined && !result.passed) {
+		if (result !== undefined && (result.failures.length > 0 || result.errors.length > 0)) {
 			testsPaneEl.appendChild(makeSectionTitle("Last Run Failures"))
 			const diffEl = document.createElement("div")
 			diffEl.className = "bpmnkit-runner-tests-diff"
@@ -1274,6 +1275,144 @@ export function createProcessRunnerPlugin(
 				diffEl.appendChild(row)
 			}
 			testsPaneEl.appendChild(diffEl)
+		}
+
+		// ── Last Run Trace ───────────────────────────────────────────────────────
+		if (result !== undefined) {
+			const traceResult = result
+			testsPaneEl.appendChild(makeSectionTitle("Last Run Trace"))
+
+			const traceTabsEl = document.createElement("div")
+			traceTabsEl.className = "bpmnkit-runner-play-tabs bpmnkit-runner-tests-trace-tabs"
+
+			const tracePaneEl = document.createElement("div")
+			tracePaneEl.className = "bpmnkit-runner-tests-trace-pane"
+
+			type TraceTab = "vars" | "feel" | "elements"
+			let activeTraceTab: TraceTab = "vars"
+
+			const tVarBtn = makeTabBtn("Variables", true)
+			const tFeelBtn = makeTabBtn("FEEL", false)
+			const tElemBtn = makeTabBtn("Elements", false)
+
+			function renderTraceTab(): void {
+				clearEl(tracePaneEl)
+				tVarBtn.className =
+					activeTraceTab === "vars"
+						? "bpmnkit-runner-play-tab bpmnkit-runner-play-tab--active"
+						: "bpmnkit-runner-play-tab"
+				tFeelBtn.className =
+					activeTraceTab === "feel"
+						? "bpmnkit-runner-play-tab bpmnkit-runner-play-tab--active"
+						: "bpmnkit-runner-play-tab"
+				tElemBtn.className =
+					activeTraceTab === "elements"
+						? "bpmnkit-runner-play-tab bpmnkit-runner-play-tab--active"
+						: "bpmnkit-runner-play-tab"
+
+				if (activeTraceTab === "vars") {
+					const entries = Object.entries(traceResult.finalVariables)
+					if (entries.length === 0) {
+						tracePaneEl.appendChild(emptyEl("No variables."))
+					} else {
+						for (const [name, value] of entries) {
+							const row = document.createElement("div")
+							row.className = "bpmnkit-runner-play-var-row"
+							const nameEl = document.createElement("span")
+							nameEl.className = "bpmnkit-runner-play-var-name"
+							nameEl.textContent = name
+							const valueEl = document.createElement("span")
+							valueEl.className = "bpmnkit-runner-play-var-value"
+							valueEl.textContent = JSON.stringify(value)
+							row.append(nameEl, valueEl)
+							tracePaneEl.appendChild(row)
+						}
+					}
+				} else if (activeTraceTab === "feel") {
+					const evals = traceResult.feelEvals
+					if (evals.length === 0) {
+						tracePaneEl.appendChild(emptyEl("No FEEL evaluations recorded."))
+					} else {
+						const groups = new Map<
+							string,
+							Array<{ property: string; expression: string; result: unknown }>
+						>()
+						for (const ev of evals) {
+							let arr = groups.get(ev.elementId)
+							if (arr === undefined) {
+								arr = []
+								groups.set(ev.elementId, arr)
+							}
+							arr.push({ property: ev.property, expression: ev.expression, result: ev.result })
+						}
+						for (const [elementId, evArr] of groups) {
+							const groupEl = document.createElement("div")
+							groupEl.className = "bpmnkit-runner-play-feel-group"
+							const headerEl = document.createElement("div")
+							headerEl.className = "bpmnkit-runner-play-feel-header"
+							headerEl.textContent = elementId
+							groupEl.appendChild(headerEl)
+							for (const ev of evArr) {
+								const rowEl = document.createElement("div")
+								rowEl.className = "bpmnkit-runner-play-feel-row"
+								const propEl = document.createElement("div")
+								propEl.className = "bpmnkit-runner-play-feel-prop"
+								propEl.textContent = ev.property
+								const exprEl = document.createElement("code")
+								exprEl.className = "bpmnkit-runner-play-feel-expr"
+								exprEl.textContent = ev.expression
+								const resultRowEl = document.createElement("div")
+								resultRowEl.className = "bpmnkit-runner-play-feel-result-row"
+								const arrowEl = document.createElement("span")
+								arrowEl.className = "bpmnkit-runner-play-feel-arrow"
+								arrowEl.textContent = "\u2192"
+								const resultEl = document.createElement("span")
+								resultEl.className = "bpmnkit-runner-play-feel-result"
+								resultEl.textContent = JSON.stringify(ev.result)
+								resultRowEl.append(arrowEl, resultEl)
+								rowEl.append(propEl, exprEl, resultRowEl)
+								groupEl.appendChild(rowEl)
+							}
+							tracePaneEl.appendChild(groupEl)
+						}
+					}
+				} else {
+					const elems = traceResult.visitedElements
+					if (elems.length === 0) {
+						tracePaneEl.appendChild(emptyEl("No elements visited."))
+					} else {
+						for (let i = 0; i < elems.length; i++) {
+							const row = document.createElement("div")
+							row.className = "bpmnkit-runner-tests-trace-elem-row"
+							const idxEl = document.createElement("span")
+							idxEl.className = "bpmnkit-runner-tests-trace-elem-idx"
+							idxEl.textContent = String(i + 1)
+							const idEl = document.createElement("span")
+							idEl.className = "bpmnkit-runner-tests-trace-elem-id"
+							idEl.textContent = elems[i] ?? ""
+							row.append(idxEl, idEl)
+							tracePaneEl.appendChild(row)
+						}
+					}
+				}
+			}
+
+			tVarBtn.addEventListener("click", () => {
+				activeTraceTab = "vars"
+				renderTraceTab()
+			})
+			tFeelBtn.addEventListener("click", () => {
+				activeTraceTab = "feel"
+				renderTraceTab()
+			})
+			tElemBtn.addEventListener("click", () => {
+				activeTraceTab = "elements"
+				renderTraceTab()
+			})
+
+			traceTabsEl.append(tVarBtn, tFeelBtn, tElemBtn)
+			renderTraceTab()
+			testsPaneEl.append(traceTabsEl, tracePaneEl)
 		}
 	}
 

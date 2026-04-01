@@ -42,6 +42,8 @@ export interface ScenarioResult {
 	visitedElements: string[]
 	/** Final variable state. */
 	finalVariables: Record<string, unknown>
+	/** FEEL expressions evaluated during the run, in order. */
+	feelEvals: Array<{ elementId: string; property: string; expression: string; result: unknown }>
 	/** Errors collected during the run. */
 	errors: Array<{ elementId?: string; message: string }>
 	/** Assertion failures, each describing what was expected vs. actual. */
@@ -81,6 +83,7 @@ export function runScenario(
 				passed: false,
 				visitedElements: [],
 				finalVariables: {},
+				feelEvals: [],
 				errors: [{ message: "No process found in definitions." }],
 				failures: [{ field: "processId", expected: "a deployed process", actual: undefined }],
 				durationMs: Date.now() - startMs,
@@ -103,6 +106,12 @@ export function runScenario(
 
 		const visitedElements: string[] = []
 		const variableState = new Map<string, unknown>()
+		const feelEvals: Array<{
+			elementId: string
+			property: string
+			expression: string
+			result: unknown
+		}> = []
 		const errors: Array<{ elementId?: string; message: string }> = []
 
 		let settled = false
@@ -159,6 +168,7 @@ export function runScenario(
 				passed: failures.length === 0,
 				visitedElements,
 				finalVariables,
+				feelEvals,
 				errors,
 				failures,
 				durationMs: Date.now() - startMs,
@@ -184,6 +194,7 @@ export function runScenario(
 				passed: false,
 				visitedElements: [],
 				finalVariables: {},
+				feelEvals: [],
 				errors: [{ message: msg }],
 				failures: [{ field: "start", expected: "process to start", actual: msg }],
 				durationMs: Date.now() - startMs,
@@ -196,6 +207,13 @@ export function runScenario(
 				visitedElements.push(evt.elementId)
 			} else if (evt.type === "variable:set") {
 				variableState.set(evt.name, evt.value)
+			} else if (evt.type === "feel:evaluated") {
+				feelEvals.push({
+					elementId: evt.elementId,
+					property: evt.property,
+					expression: evt.expression,
+					result: evt.result,
+				})
 			} else if (evt.type === "element:failed") {
 				errors.push({ elementId: evt.elementId, message: evt.error })
 			} else if (evt.type === "process:failed") {

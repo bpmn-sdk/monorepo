@@ -1,5 +1,52 @@
 # Progress
 
+## 2026-04-01 — Scenario runner integration tests in apps/studio
+
+**`apps/studio/tests/scenario-runner.test.ts`** (new):
+- 18 end-to-end tests importing from `@bpmnkit/engine/wasm-runner` — the same dist path the studio uses
+- **Suite 1 (synthetic fixtures)**: 7 tests covering DMN result variable in `finalVariables`, correct gateway routing, FEEL eval capture with right `elementId`, variable assertion pass/fail
+- **Suite 2 (real files — `test.bpmn` + `dmn.dmn`)**: 11 tests covering working DMN rules (null/range checks), FEEL condition capture on happy path, gateway default-flow has no FEEL eval, service task mocking, and documented WASM FEEL engine limitations (`not(instance of X)` predicates not evaluated)
+
+**`apps/studio/vitest.config.ts`** (new): minimal vitest config for the studio package
+
+**`apps/studio/package.json`**: added `"test": "vitest run"` script so `pnpm turbo test` includes studio
+
+## 2026-04-01 — Fix test runner: FEEL evaluations and DMN output variables
+
+**`packages/engine/src/wasm-runner.ts`**:
+- Added `EventLogRecord` interface and `eventLog: EventLogRecord[]` to `WasmSnapshot` — the snapshot already returned the full event log from Rust; we now consume it in TypeScript
+- Added `extractFlowConditions(bpmnXml)` helper: extracts `conditionExpression` text keyed by sequence flow ID via regex (handles namespace prefixes and CDATA)
+- **FEEL evaluations**: scan `SEQUENCE_FLOW_TAKEN` events from the event log, pair each taken flow with its condition expression from the BPMN XML, and emit synthetic `feelEvals` entries (`result: true`). The WASM engine evaluates FEEL conditions but doesn't record them; this reconstructs the evaluations from the chosen paths.
+- **DMN variables**: collect all `VARIABLE.CREATED` events from the event log (filtered by `processInstanceKey`) in addition to snapshot variables. This ensures DMN-produced variables that may have scope key differences are captured. Snapshot variables still take precedence (final upserted state).
+
+## 2026-04-01 — Tests tab: Last Run Trace section with Variables, FEEL, Elements tabs
+
+**`packages/engine/src/scenario.ts`**:
+- Added `feelEvals` field to `ScenarioResult` interface
+- Captures `feel:evaluated` events during `runScenario` and includes them in the result
+
+**`packages/engine/src/wasm-runner.ts`**:
+- Added `feelEvals` to `ScenarioResultLike` interface; WASM runner returns `[]` (WASM engine doesn't expose FEEL evaluations in its snapshot)
+
+**`packages/plugins/src/process-runner/index.ts`**:
+- Added `feelEvals` to local `ScenarioResultLike` mirror interface
+- Added "Last Run Trace" section in `renderScenarioEditor()` — shown below all existing sections (Start Variables, Task Outputs, Expected Variables, Last Run Failures) whenever a result exists
+- Three tabs: **Variables** (final variable state), **FEEL** (grouped by element, with property/expression/result), **Elements** (ordered execution path with 1-based index)
+
+**`packages/plugins/src/process-runner/css.ts`**:
+- Added styles for trace tab wrapper (`.bpmnkit-runner-tests-trace-tabs`), scrollable content pane (`.bpmnkit-runner-tests-trace-pane`), and element row (`.bpmnkit-runner-tests-trace-elem-row`, `-idx`, `-id`) with light-theme overrides
+
+## 2026-04-01 — Studio editor: remove Play button, add XML view, add export menu
+
+**`apps/studio/src/pages/ModelDetail.tsx`**:
+- Removed the Play button from the top-center HUD toolbar (no longer passed as `playButton` to `initEditorHud`)
+- Added XML source view button to the bottom-left HUD panel (via `rawModeButton`): clicking opens a modal showing the raw BPMN XML with Copy and Close actions
+- Added a `showXmlDialog` helper that renders a styled modal with syntax-friendly monospace pre block
+- Added a three-dots (`⋯`) export menu button to the right of "Deploy & Run" in the save bar
+  - "Export as BPMN XML": downloads `<name>.bpmn` file
+  - "Export as SVG": serializes the editor's SVG element and downloads `<name>.svg`
+- Export menu is always visible (not gated on `isWasm`) so users can export regardless of connection mode
+
 ## 2026-03-31 — All scenario tests now run on the WASM engine
 
 **`packages/engine/src/wasm-runner.ts`** (new):

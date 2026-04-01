@@ -48,12 +48,20 @@ interface WasmIncident {
 	error_message: string | null
 }
 
+interface EventLogRecord {
+	record_type: string
+	value_type: string
+	intent: string
+	payload: Record<string, unknown>
+}
+
 interface WasmSnapshot {
 	processInstances: WasmProcessInstance[]
 	elementInstances: WasmElementInstance[]
 	jobs: WasmJob[]
 	variables: WasmVariable[]
 	incidents: WasmIncident[]
+	eventLog: EventLogRecord[]
 }
 
 interface DeployResponse {
@@ -90,6 +98,7 @@ export interface ScenarioResultLike {
 	passed: boolean
 	visitedElements: string[]
 	finalVariables: Record<string, unknown>
+	feelEvals: Array<{ elementId: string; property: string; expression: string; result: unknown }>
 	errors: Array<{ elementId?: string; message: string }>
 	failures: Array<{ field: string; expected: unknown; actual: unknown }>
 	durationMs: number
@@ -162,6 +171,35 @@ function deployDependencies(
 	}
 
 	return missingDecisions
+}
+
+// ── BPMN helpers ─────────────────────────────────────────────────────────────
+
+/**
+ * Extract condition expressions keyed by sequence flow ID from BPMN XML.
+ * Used to reconstruct FEEL evaluations from SEQUENCE_FLOW_TAKEN event log records.
+ */
+function extractFlowConditions(bpmnXml: string): Map<string, string> {
+	const result = new Map<string, string>()
+	// Strategy: find each conditionExpression element, then look backward to the
+	// nearest enclosing <sequenceFlow id="..."> opening tag.  Using a greedy
+	// prefix ([\s\S]*) forces the match to the LAST occurrence before the
+	// conditionExpression, which is always the immediately enclosing flow.
+	// This avoids the self-closing `/>` confusion that plagues forward-matching regexes.
+	const condPattern =
+		/<(?:[a-zA-Z]+:)?conditionExpression[^>]*>([\s\S]*?)<\/(?:[a-zA-Z]+:)?conditionExpression>/g
+	for (const condMatch of bpmnXml.matchAll(condPattern)) {
+		const rawExpr = condMatch[1]?.trim() ?? ""
+		const condition =
+			rawExpr.startsWith("<![CDATA[") && rawExpr.endsWith("]]>") ? rawExpr.slice(9, -3) : rawExpr
+		// Slice everything before this conditionExpression and find the last sequenceFlow id
+		const before = bpmnXml.slice(0, condMatch.index)
+		const flowMatch = before.match(/[\s\S]*<(?:[a-zA-Z]+:)?sequenceFlow\b[^>]*\bid="([^"]+)"/)
+		if (flowMatch?.[1]) {
+			result.set(flowMatch[1], condition)
+		}
+	}
+	return result
 }
 
 // ── Runner ────────────────────────────────────────────────────────────────────
@@ -242,9 +280,52 @@ export async function runScenarioWasm(
 			.filter((e) => e.process_instance_key === pi.key)
 			.map((e) => e.element_id)
 
+		// Collect variables: merge snapshot state (deduplicated, final values) with
+		// VARIABLE.CREATED events from the event log (catches DMN-produced variables
+		// that may not survive snapshot filtering due to scope key differences).
+		const piKeyStr = String(pi.key)
 		const finalVariables: Record<string, unknown> = {}
+		for (const rec of snap.eventLog) {
+			if (
+				rec.record_type === "EVENT" &&
+				rec.value_type === "VARIABLE" &&
+				rec.intent === "CREATED" &&
+				String(rec.payload.processInstanceKey) === piKeyStr
+			) {
+				const name = rec.payload.name as string | undefined
+				if (name !== undefined) finalVariables[name] = rec.payload.value
+			}
+		}
+		// Snapshot variables override (they represent the final upserted state)
 		for (const v of snap.variables.filter((v) => v.process_instance_key === pi.key)) {
 			finalVariables[v.name] = v.value
+		}
+
+		// Reconstruct FEEL evaluations from SEQUENCE_FLOW_TAKEN events.
+		// The WASM engine evaluates conditions but doesn't emit dedicated FEEL records;
+		// we pair each taken flow with its conditionExpression from the BPMN XML.
+		const flowConditions = extractFlowConditions(xml)
+		const feelEvals: ScenarioResultLike["feelEvals"] = []
+		for (const rec of snap.eventLog) {
+			if (
+				rec.record_type === "EVENT" &&
+				rec.value_type === "PROCESS_INSTANCE" &&
+				rec.intent === "SEQUENCE_FLOW_TAKEN" &&
+				String(rec.payload.processInstanceKey) === piKeyStr
+			) {
+				const flowId = rec.payload.elementId as string | undefined
+				const sourceId = rec.payload.sourceElementId as string | undefined
+				if (!flowId) continue
+				const expression = flowConditions.get(flowId)
+				if (expression !== undefined) {
+					feelEvals.push({
+						elementId: sourceId ?? flowId,
+						property: "condition",
+						expression,
+						result: true,
+					})
+				}
+			}
 		}
 
 		const errors: ScenarioResultLike["errors"] = snap.incidents
@@ -290,9 +371,10 @@ export async function runScenarioWasm(
 		return {
 			scenarioId: scenario.id,
 			scenarioName: scenario.name,
-			passed: failures.length === 0,
+			passed: errors.length === 0 && failures.length === 0,
 			visitedElements,
 			finalVariables,
+			feelEvals,
 			errors,
 			failures,
 			durationMs: Date.now() - startMs,
@@ -309,6 +391,7 @@ function fail(scenario: ScenarioLike, startMs: number, message: string): Scenari
 		passed: false,
 		visitedElements: [],
 		finalVariables: {},
+		feelEvals: [],
 		errors: [{ message }],
 		failures: [{ field: "start", expected: "process to deploy and start", actual: message }],
 		durationMs: Date.now() - startMs,

@@ -8,7 +8,8 @@
 		"build": "vite build",
 		"preview": "vite preview",
 		"typecheck": "tsc --noEmit",
-		"check": "biome check ."
+		"check": "biome check .",
+		"test": "vitest run"
 	},
 	"dependencies": {
 		"@bpmnkit/api": "workspace:*",
