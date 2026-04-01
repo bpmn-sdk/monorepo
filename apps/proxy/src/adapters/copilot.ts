@@ -31,7 +31,7 @@ export async function stream(
 	const args = ["-p", prompt, "--yolo"]
 
 	if (mcpConfigFile) {
-		args.push("--additional-mcp-config", mcpConfigFile)
+		args.push("--additional-mcp-config", `@${mcpConfigFile}`)
 		args.push("--allow-all-tools")
 	}
 

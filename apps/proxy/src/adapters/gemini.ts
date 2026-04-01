@@ -29,7 +29,7 @@ export async function stream(
 	const lastUser = [...messages].reverse().find((m) => m.role === "user")
 	const prompt = `${systemPrompt}\n\nUser: ${lastUser?.content ?? "help"}`
 
-	const args = ["--prompt", prompt, "--yolo"]
+	const args = ["--prompt", prompt]
 
 	console.log("[gemini] spawning (no MCP support — using system prompt fallback)")
 

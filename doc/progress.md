@@ -1,5 +1,13 @@
 # Progress
 
+## 2026-04-01 — Fix: Gemini and Copilot AI proxy errors
+
+**`apps/proxy/src/adapters/gemini.ts`**:
+- Removed `--yolo` flag from the Gemini CLI invocation. Gemini's `--yolo` is blocked by the `secureModeEnabled` admin/security policy (Gemini CLI exits with code 52 when this policy is active). Without `--yolo` the CLI runs correctly; for plain text generation (the proxy's use case) Gemini never needs tool auto-approval.
+
+**`apps/proxy/src/adapters/copilot.ts`**:
+- Fixed `--additional-mcp-config` to pass the file path with an `@` prefix (`@${mcpConfigFile}`). Without the prefix, Copilot attempts to parse the raw file path as an inline JSON string, prints "Invalid JSON in --additional-mcp-config" to stderr (exit code 0), and silently ignores the MCP configuration — so no MCP tools are registered and no diagram XML is produced.
+
 ## 2026-04-01 — Fix: BRT `resultVariable` now appears in Last Run Trace → Variables
 
 **Root cause**: The WASM browser engine stores `zeebe:calledDecision resultVariable` in the BRT's local element scope and cleans it up when the element completes, never propagating it to the process instance scope that the snapshot reads. Injecting `zeebe:ioMapping` output entries (prior workaround attempt) had no effect — the engine ignores output mappings for BRTs in the browser.
