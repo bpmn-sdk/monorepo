@@ -1,11 +1,14 @@
-import { MessageSquare } from "lucide-react"
+import { FolderOpen, MessageSquare } from "lucide-react"
 import { Link } from "wouter"
 import { BpmnkitLogo } from "../components/Logo.js"
 import { ModeToggle } from "../components/ModeToggle.js"
+import { useProjectsStore } from "../stores/projects.js"
 import { useUiStore } from "../stores/ui.js"
 
 export function TopBar() {
 	const { aiOpen, toggleAI, toggleSidebar, breadcrumbs } = useUiStore()
+	const { activeProjectId, projects } = useProjectsStore()
+	const activeProject = activeProjectId ? projects.find((p) => p.id === activeProjectId) : null
 
 	return (
 		<header className="flex h-12 shrink-0 items-center gap-3 border-b border-border bg-surface px-3">
@@ -52,6 +55,17 @@ export function TopBar() {
 						)
 					})}
 				</nav>
+			)}
+
+			{activeProject && (
+				<Link
+					href="/settings"
+					className="flex items-center gap-1.5 ml-4 px-2 py-1 rounded text-xs text-muted hover:text-fg hover:bg-surface-2 transition-colors"
+					title={`Project: ${activeProject.path}`}
+				>
+					<FolderOpen size={13} />
+					<span className="max-w-48 truncate">{activeProject.name}</span>
+				</Link>
 			)}
 
 			<div className="ml-auto flex items-center gap-2">

@@ -122,6 +122,24 @@ export interface ProcessRunnerOptions {
 	 * Typically: `(id) => models.find(m => m.type === "dmn" && m.content.includes(id))?.content ?? null`
 	 */
 	getValidationDmn?: (decisionId: string) => string | null
+	/**
+	 * When provided, called instead of the internal IndexedDB to persist scenarios.
+	 * Use this to save scenarios to the file system (FS mode).
+	 */
+	onSaveScenarios?: (scenarios: ScenarioLike[]) => Promise<void>
+	/**
+	 * When provided, called instead of the internal IndexedDB to load scenarios.
+	 * Use this to load scenarios from the file system (FS mode).
+	 */
+	onLoadScenarios?: () => Promise<ScenarioLike[]>
+	/**
+	 * When provided, called instead of the internal IndexedDB to persist input variables.
+	 */
+	onSaveInputVars?: (vars: Array<{ name: string; value: string }>) => Promise<void>
+	/**
+	 * When provided, called instead of the internal IndexedDB to load input variables.
+	 */
+	onLoadInputVars?: () => Promise<Array<{ name: string; value: string }>>
 }
 
 // ── IndexedDB persistence for input variables ───────────────────────────────
@@ -277,6 +295,24 @@ export function createProcessRunnerPlugin(
 	let currentProcessId: string | undefined
 	/** The project ID used to scope input variable persistence. */
 	let currentProjectId: string | null = null
+
+	// Wrappers that prefer the caller-provided callbacks over internal IndexedDB.
+	async function persistScenarios(scenarios: ScenarioLike[]): Promise<void> {
+		if (options.onSaveScenarios) return options.onSaveScenarios(scenarios)
+		return saveScenarios(currentProjectId, scenarios)
+	}
+	async function fetchScenarios(): Promise<ScenarioLike[]> {
+		if (options.onLoadScenarios) return options.onLoadScenarios()
+		return loadScenarios(currentProjectId)
+	}
+	async function persistInputVars(vars: Array<{ name: string; value: string }>): Promise<void> {
+		if (options.onSaveInputVars) return options.onSaveInputVars(vars)
+		return saveInputVars(currentProjectId, vars)
+	}
+	async function fetchInputVars(): Promise<Array<{ name: string; value: string }>> {
+		if (options.onLoadInputVars) return options.onLoadInputVars()
+		return loadInputVars(currentProjectId)
+	}
 
 	/** Pending step resolvers — each represents a paused beforeComplete call. */
 	const stepQueue: Array<() => void> = []
@@ -724,7 +760,7 @@ export function createProcessRunnerPlugin(
 				const v = inputVars[i]
 				if (v !== undefined) {
 					v.name = nameInput.value
-					void saveInputVars(currentProjectId, inputVars)
+					void persistInputVars(inputVars)
 				}
 			})
 
@@ -740,7 +776,7 @@ export function createProcessRunnerPlugin(
 				const v = inputVars[i]
 				if (v !== undefined) {
 					v.value = valueInput.value
-					void saveInputVars(currentProjectId, inputVars)
+					void persistInputVars(inputVars)
 				}
 			})
 
@@ -750,7 +786,7 @@ export function createProcessRunnerPlugin(
 			delBtn.addEventListener("click", () => {
 				inputVars.splice(i, 1)
 				renderInputVars()
-				void saveInputVars(currentProjectId, inputVars)
+				void persistInputVars(inputVars)
 			})
 
 			row.appendChild(nameInput)
@@ -766,7 +802,7 @@ export function createProcessRunnerPlugin(
 		addBtn.addEventListener("click", () => {
 			inputVars.push({ name: "", value: "" })
 			renderInputVars()
-			void saveInputVars(currentProjectId, inputVars)
+			void persistInputVars(inputVars)
 			// Focus the name field of the new row
 			const rows = ivarsPaneEl.querySelectorAll<HTMLInputElement>(".bpmnkit-runner-play-ivar-name")
 			rows[rows.length - 1]?.focus()
@@ -937,7 +973,7 @@ export function createProcessRunnerPlugin(
 				mocks: {},
 				expect: {},
 			})
-			void saveScenarios(currentProjectId, scenarios)
+			void persistScenarios(scenarios)
 			editingScenarioId = id
 			focusedElementId = null
 			renderTests()
@@ -955,7 +991,7 @@ export function createProcessRunnerPlugin(
 				void (options.generateScenarios as NonNullable<typeof options.generateScenarios>)()
 					.then((newScenarios) => {
 						scenarios.push(...newScenarios)
-						void saveScenarios(currentProjectId, scenarios)
+						void persistScenarios(scenarios)
 					})
 					.catch(() => undefined)
 					.finally(() => renderTests())
@@ -984,7 +1020,7 @@ export function createProcessRunnerPlugin(
 				}
 				if (newScenarios.length > 0) {
 					scenarios.push(...newScenarios)
-					void saveScenarios(currentProjectId, scenarios)
+					void persistScenarios(scenarios)
 					renderTests()
 				}
 			})
@@ -1049,7 +1085,7 @@ export function createProcessRunnerPlugin(
 			delBtn.addEventListener("click", () => {
 				scenarios.splice(i, 1)
 				scenarioResults.delete(scenario.id)
-				void saveScenarios(currentProjectId, scenarios)
+				void persistScenarios(scenarios)
 				renderTests()
 			})
 
@@ -1113,7 +1149,7 @@ export function createProcessRunnerPlugin(
 		nameInput.placeholder = "Scenario name"
 		nameInput.addEventListener("input", () => {
 			scenario.name = nameInput.value
-			void saveScenarios(currentProjectId, scenarios)
+			void persistScenarios(scenarios)
 		})
 		headerEl.appendChild(nameInput)
 
@@ -1150,7 +1186,7 @@ export function createProcessRunnerPlugin(
 		testsPaneEl.appendChild(
 			makeVarList(scenario.inputs ?? {}, "+ Add variable", (updated) => {
 				scenario.inputs = updated
-				void saveScenarios(currentProjectId, scenarios)
+				void persistScenarios(scenarios)
 			}),
 		)
 
@@ -1223,7 +1259,7 @@ export function createProcessRunnerPlugin(
 						makeVarList(mock.outputs ?? {}, "+ Add output", (updated) => {
 							if (scenario.mocks === undefined) scenario.mocks = {}
 							scenario.mocks[jobType] = { ...mock, outputs: updated }
-							void saveScenarios(currentProjectId, scenarios)
+							void persistScenarios(scenarios)
 						}),
 					)
 
@@ -1243,7 +1279,7 @@ export function createProcessRunnerPlugin(
 						if (scenario.mocks === undefined) scenario.mocks = {}
 						const err = errorInput.value.trim() || undefined
 						scenario.mocks[jobType] = { ...mock, error: err }
-						void saveScenarios(currentProjectId, scenarios)
+						void persistScenarios(scenarios)
 					})
 
 					errorRow.appendChild(errorLabel)
@@ -1271,7 +1307,7 @@ export function createProcessRunnerPlugin(
 			makeVarList(scenario.expect?.variables ?? {}, "+ Add assertion", (updated) => {
 				if (scenario.expect === undefined) scenario.expect = {}
 				scenario.expect.variables = updated
-				void saveScenarios(currentProjectId, scenarios)
+				void persistScenarios(scenarios)
 			}),
 		)
 
@@ -1752,12 +1788,12 @@ export function createProcessRunnerPlugin(
 
 			// Load persisted input variables and scenarios for the initial project
 			currentProjectId = options.getProjectId?.() ?? null
-			void loadInputVars(currentProjectId).then((loaded) => {
+			void fetchInputVars().then((loaded) => {
 				inputVars.length = 0
 				for (const v of loaded) inputVars.push(v)
 				renderInputVars()
 			})
-			void loadScenarios(currentProjectId).then((loaded) => {
+			void fetchScenarios().then((loaded) => {
 				scenarios.length = 0
 				for (const s of loaded) scenarios.push(s)
 				renderTests()
@@ -1768,7 +1804,7 @@ export function createProcessRunnerPlugin(
 					if (sidecar !== null && sidecar.length > 0) {
 						scenarios.length = 0
 						for (const s of sidecar) scenarios.push(s)
-						void saveScenarios(currentProjectId, scenarios)
+						void persistScenarios(scenarios)
 						renderTests()
 					}
 				})
@@ -1786,12 +1822,12 @@ export function createProcessRunnerPlugin(
 					const pid = options.getProjectId?.() ?? null
 					if (pid !== currentProjectId) {
 						currentProjectId = pid
-						void loadInputVars(pid).then((loaded) => {
+						void fetchInputVars().then((loaded) => {
 							inputVars.length = 0
 							for (const v of loaded) inputVars.push(v)
 							renderInputVars()
 						})
-						void loadScenarios(pid).then((loaded) => {
+						void fetchScenarios().then((loaded) => {
 							scenarios.length = 0
 							for (const s of loaded) scenarios.push(s)
 							scenarioResults.clear()
@@ -1804,7 +1840,7 @@ export function createProcessRunnerPlugin(
 									scenarios.length = 0
 									for (const s of sidecar) scenarios.push(s)
 									scenarioResults.clear()
-									void saveScenarios(currentProjectId, scenarios)
+									void persistScenarios(scenarios)
 									renderTests()
 								}
 							})

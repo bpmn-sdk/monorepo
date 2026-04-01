@@ -1,5 +1,20 @@
 # Features
 
+## File System Persistence & Project Management (2026-04-01) — `apps/proxy`, `apps/studio`, `packages/plugins`
+
+Studio models can now be stored as real files on disk instead of (or alongside) browser IndexedDB.
+
+- **Two storage modes**: _Local (IndexedDB)_ — the always-available default; _Project_ — a folder on the machine running the proxy, selectable in Settings.
+- **Proxy FS API** (`/fs/*`): 10 new endpoints for tree listing, file read/write/delete/move, folder creation, and sidecar metadata; only `.bpmn`, `.dmn`, `.form`, `.md` files are served.
+- **Sidecar metadata** (`.bpmnkit/<file>.meta.json`): stores stable UUID, deployment links, test scenarios, and run-variable defaults alongside the source file so everything is checkable into git.
+- **Project registry**: configured projects stored in browser IndexedDB; the active project is remembered across reloads via `localStorage`.
+- **Folder tree UI**: when a project is selected, the Models page shows a collapsible folder tree sidebar and shows only the files in the selected folder.
+- **Move to... dialog**: move files between folders within the same project.
+- **Markdown files** (`.md`): standalone notes in the project; opened with a plain textarea editor that auto-saves.
+- **Test scenario persistence**: process-runner now supports `onSaveScenarios`/`onLoadScenarios` callbacks; in FS mode, scenarios are written into the sidecar file next to the BPMN.
+
+Full specification: [`doc/projects-files.md`](projects-files.md)
+
 ## Process Input Validation (2026-03-29) — `packages/core`, `packages/plugins`, `apps/studio`
 
 Validates process input variables at the start event using a companion Collect-hit-policy DMN table.

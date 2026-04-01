@@ -1,5 +1,67 @@
 # Progress
 
+## 2026-04-01 — Feat: File system persistence + project management
+
+Full design: [`doc/projects-files.md`](projects-files.md)
+
+**`apps/proxy/src/index.ts`**:
+- Added 10 `/fs/*` REST endpoints: `GET /fs/tree`, `GET /fs/list`, `GET /fs/read`, `POST /fs/write`, `DELETE /fs/file`, `POST /fs/move`, `POST /fs/mkdir`, `GET /fs/meta`, `POST /fs/meta`
+- File system helpers: `buildTree()`, `collectFiles()`, `readMeta()`, `writeMeta()`, `fsValidate()`
+- Sidecar metadata at `<dir>/.bpmnkit/<filename>.meta.json` (stores UUID, deployment links, scenarios, inputVars)
+- Only serves `.bpmn`, `.dmn`, `.form`, `.md` files; `.bpmnkit/` directories skipped in listings
+
+**`apps/studio/src/storage/types.ts`**:
+- `ModelFile.type` extended with `"md"` for Markdown files
+- `ModelFile.path?: string` for relative path in FS mode
+- New interfaces: `FsEntry`, `FileMeta`, `Project`, `FsCapableAdapter`, `isFsAdapter()`
+
+**`apps/studio/src/storage/indexeddb.ts`**:
+- Bumped DB version to 2, added `projects` object store for the project registry
+- Added `listProjects()`, `saveProject()`, `deleteProject()` on `IndexedDbAdapter`
+- Exported `sharedIndexedDb` singleton for cross-adapter preference/project storage
+
+**`apps/studio/src/storage/proxy-fs.ts`** (new):
+- `ProxyFsAdapter` implements `FsCapableAdapter`; talks to proxy `/fs/*` endpoints
+- Maintains a UUID→relative-path cache for O(1) model lookups
+- Delegates preferences to `sharedIndexedDb`
+
+**`apps/studio/src/storage/index.ts`**:
+- Delegating `storage` object that forwards to the currently active adapter
+- `setActiveAdapter()`, `getCurrentAdapter()`, `getFsAdapter()`, `isFsMode()`
+
+**`apps/studio/src/stores/projects.ts`** (new):
+- `useProjectsStore`: projects list, active project, add/remove/switch
+- `setActiveProject()` swaps the storage adapter and reloads models
+- Active project ID persisted in `localStorage`
+
+**`apps/studio/src/stores/models.ts`**:
+- Added `loadModel(id)` for on-demand content refresh
+- Added `moveModel(fromRelPath, toRelPath)` delegating to `getFsAdapter()`
+
+**`packages/plugins/src/process-runner/index.ts`**:
+- Added `onSaveScenarios`, `onLoadScenarios`, `onSaveInputVars`, `onLoadInputVars` to `ProcessRunnerOptions`
+- Internal IndexedDB used as fallback when callbacks are not provided
+
+**`apps/studio/src/pages/ModelDetail.tsx`**:
+- Passes FS-mode scenario/inputVar callbacks to process-runner (sidecars via proxy)
+- Added Markdown editor (textarea with 1.5 s auto-save debounce)
+
+**`apps/studio/src/pages/Models.tsx`**:
+- FS mode: two-pane layout with collapsible folder tree sidebar + folder-scoped file grid
+- "New Folder" button and dialog
+- "Move to..." dialog for moving files between folders
+- Markdown type filter option when in FS mode
+
+**`apps/studio/src/pages/Settings.tsx`**:
+- New "Projects" section: list, add (with proxy validation), switch, remove
+- "Local (IndexedDB)" always shown as the default option
+
+**`apps/studio/src/layout/TopBar.tsx`**:
+- Shows active project name as a badge when in FS mode; links to Settings
+
+**`apps/studio/src/main.tsx`**:
+- Initialises project store at startup, restores persisted active project before loading models
+
 ## 2026-04-01 — Fix: Gemini and Copilot AI proxy errors
 
 **`apps/proxy/src/adapters/gemini.ts`**:

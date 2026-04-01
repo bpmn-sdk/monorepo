@@ -41,6 +41,7 @@ import {
 	DropdownMenuTrigger,
 } from "../components/ui/dropdown-menu.js"
 import { Input } from "../components/ui/input.js"
+import { getFsAdapter } from "../storage/index.js"
 import type { ModelFile } from "../storage/types.js"
 import { useClusterStore } from "../stores/cluster.js"
 import { useModelsStore } from "../stores/models.js"
@@ -637,6 +638,7 @@ export function ModelDetail() {
 	const [runMode, setRunMode] = useState(false)
 	const [activeInstanceKey, setActiveInstanceKey] = useState<string | null>(null)
 	const [runVariables, setRunVariables] = useState(model?.runVariables ?? "{}")
+	const [mdContent, setMdContent] = useState(model?.type === "md" ? (model.content ?? "") : "")
 	const { theme } = useThemeStore()
 	const { setBreadcrumbs, zenMode } = useUiStore()
 	const activeProfile = useClusterStore((s) => s.activeProfile)
@@ -654,6 +656,12 @@ export function ModelDetail() {
 		if (!loaded) return
 		const container = editorContainerRef.current
 		if (!container || !model) return
+
+		// ── Markdown editor (short-circuit — plain textarea) ─────────────────
+		if (model.type === "md") {
+			// Rendered inline via JSX below; nothing imperative to set up here.
+			return
+		}
 
 		// ── DMN editor (short-circuit — no dock/plugins needed) ──────────────
 		if (model.type === "dmn") {
@@ -785,11 +793,45 @@ export function ModelDetail() {
 		// ── Process runner ────────────────────────────────────────────────────
 		const engine = new Engine()
 		const tokenHighlight = createTokenHighlightPlugin()
+		// FS-mode scenario callbacks — persist to sidecar file instead of IndexedDB
+		const fsAdapter = getFsAdapter()
+		const modelPath = model.path
+		const fsScenarioCbs =
+			fsAdapter && modelPath
+				? {
+						onSaveScenarios: async (scenarios: unknown[]) => {
+							const meta = (await fsAdapter.loadMeta(modelPath)) ?? {
+								id: model.id,
+								createdAt: model.createdAt,
+							}
+							await fsAdapter.saveMeta(modelPath, { ...meta, scenarios })
+						},
+						onLoadScenarios: async () => {
+							const meta = await fsAdapter.loadMeta(modelPath)
+							return (
+								(meta?.scenarios as import("@bpmnkit/plugins/process-runner").ScenarioLike[]) ?? []
+							)
+						},
+						onSaveInputVars: async (vars: Array<{ name: string; value: string }>) => {
+							const meta = (await fsAdapter.loadMeta(modelPath)) ?? {
+								id: model.id,
+								createdAt: model.createdAt,
+							}
+							await fsAdapter.saveMeta(modelPath, { ...meta, inputVars: vars })
+						},
+						onLoadInputVars: async () => {
+							const meta = await fsAdapter.loadMeta(modelPath)
+							return meta?.inputVars ?? []
+						},
+					}
+				: {}
+
 		const processRunner = createProcessRunnerPlugin({
 			engine,
 			tokenHighlight,
 			playContainer: dock.playPane,
 			testsContainer: dock.testsPane,
+			...fsScenarioCbs,
 			onShowPlayTab() {
 				dock.setPlayTabVisible(true)
 				if (dock.collapsed) dock.expand()
@@ -1306,10 +1348,31 @@ export function ModelDetail() {
 				</div>
 			)}
 
-			{/* Editor — hidden in run mode but kept mounted */}
+			{/* Markdown editor */}
+			{model.type === "md" && (
+				<textarea
+					className="flex-1 min-h-0 resize-none p-4 font-mono text-sm text-fg bg-bg border-0 outline-none"
+					value={mdContent}
+					onInput={(e) => {
+						const v = (e.target as HTMLTextAreaElement).value
+						setMdContent(v)
+						setSaveStatus("unsaved")
+						if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
+						saveTimerRef.current = setTimeout(() => {
+							if (!model) return
+							void saveModel({ ...model, content: v })
+								.then(upsertModel)
+								.then(() => setSaveStatus("saved"))
+						}, 1500)
+					}}
+					aria-label="Markdown editor"
+				/>
+			)}
+
+			{/* BPMN/DMN/Form editor — hidden in run mode but kept mounted */}
 			<div
 				ref={editorContainerRef}
-				className={`flex-1 overflow-hidden relative min-h-0 ${runMode ? "hidden" : ""}`}
+				className={`flex-1 overflow-hidden relative min-h-0 ${model.type === "md" || runMode ? "hidden" : ""}`}
 			/>
 
 			{/* Run mode — live instance view */}

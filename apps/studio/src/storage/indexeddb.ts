@@ -1,7 +1,7 @@
-import type { ModelFile, StorageAdapter } from "./types.js"
+import type { FileMeta, ModelFile, Project, StorageAdapter } from "./types.js"
 
 const DB_NAME = "bpmnkit-studio"
-const DB_VERSION = 1
+const DB_VERSION = 2
 
 function openDb(): Promise<IDBDatabase> {
 	return new Promise((resolve, reject) => {
@@ -14,6 +14,10 @@ function openDb(): Promise<IDBDatabase> {
 			}
 			if (!db.objectStoreNames.contains("preferences")) {
 				db.createObjectStore("preferences", { keyPath: "key" })
+			}
+			// v2: project registry
+			if (!db.objectStoreNames.contains("projects")) {
+				db.createObjectStore("projects", { keyPath: "id" })
 			}
 		}
 
@@ -88,4 +92,27 @@ export class IndexedDbAdapter implements StorageAdapter {
 		const db = await this._db
 		await tx(db, "preferences", "readwrite", (s) => s.put({ key, value }))
 	}
+
+	// ── Project registry ─────────────────────────────────────────────────────
+
+	async listProjects(): Promise<Project[]> {
+		const db = await this._db
+		return tx<Project[]>(db, "projects", "readonly", (s) => s.getAll())
+	}
+
+	async saveProject(project: Project): Promise<void> {
+		const db = await this._db
+		await tx(db, "projects", "readwrite", (s) => s.put(project))
+	}
+
+	async deleteProject(id: string): Promise<void> {
+		const db = await this._db
+		await tx(db, "projects", "readwrite", (s) => s.delete(id))
+	}
 }
+
+// Shared instance used for project registry and preferences when in FS mode.
+export const sharedIndexedDb = new IndexedDbAdapter()
+
+// Stub that satisfies FileMeta usage in proxy-fs — kept here to avoid circular imports.
+export type { FileMeta }
