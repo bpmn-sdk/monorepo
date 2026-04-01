@@ -410,13 +410,11 @@ describe("scenario runner — webhook-call process + input validation DMN", () =
 		expect(result.visitedElements).toContain("Event_eReDBgY3")
 	})
 
-	// ── FEEL engine limitations (documented behavior) ─────────────────────────
-	// The WASM FEEL engine does not evaluate `not(instance of X)` or null equality
-	// when multiple inputs are absent simultaneously. In those cases the DMN
-	// returns no result (validationErrors is undefined), but the gateway still
-	// routes to the error end because count(undefined) = 0 evaluates to false.
+	// ── Cases where WASM DMN returns no result (post-hoc FEEL evaluation runs) ──
+	// When WASM's DMN produces no variable (null result, no VARIABLE event emitted),
+	// the runner falls back to the FEEL engine for post-hoc BRT evaluation.
 
-	it("both fields missing: DMN returns no result, gateway still takes error end", async () => {
+	it("both fields missing: FEEL fires all matching rules, gateway takes error end", async () => {
 		const result = await runScenarioWasm(
 			REAL_BPMN,
 			{ id: "r4", name: "Both fields missing", inputs: {} },
@@ -424,15 +422,17 @@ describe("scenario runner — webhook-call process + input validation DMN", () =
 		)
 
 		expect(result.errors).toHaveLength(0)
-		// DMN does not produce a validationErrors list when both inputs are absent
-		expect(result.finalVariables.validationErrors).toBeUndefined()
-		// Process still routes to error end (count(undefined) = 0 is false → default path)
+		expect(result.finalVariables.validationErrors).toEqual([
+			"asd is required",
+			"asd must be a string",
+			"sss is required",
+			"sss must be a number",
+		])
 		expect(result.visitedElements).toContain("Event_eReDBgY3")
 		expect(result.visitedElements).not.toContain("serviceTask_zu501th")
 	})
 
-	it("sss missing, asd valid: DMN returns no result, gateway still takes error end", async () => {
-		// Rule 'sss = null' does not fire when sss is absent from context
+	it("sss missing, asd valid: FEEL fires sss-null and sss-type rules, gateway takes error end", async () => {
 		const result = await runScenarioWasm(
 			REAL_BPMN,
 			{ id: "r5", name: "sss missing", inputs: { asd: "hello" } },
@@ -440,13 +440,15 @@ describe("scenario runner — webhook-call process + input validation DMN", () =
 		)
 
 		expect(result.errors).toHaveLength(0)
-		expect(result.finalVariables.validationErrors).toBeUndefined()
+		expect(result.finalVariables.validationErrors).toEqual([
+			"sss is required",
+			"sss must be a number",
+		])
 		expect(result.visitedElements).toContain("Event_eReDBgY3")
 	})
 
-	it("asd wrong type (number): not(instance of string) rule does not fire in WASM FEEL", async () => {
-		// The WASM FEEL engine does not evaluate not(instance of X) predicates;
-		// validationErrors is [] (COLLECT with no matches) and the happy path is taken.
+	it("asd wrong type (number): WASM returns [], gateway takes happy path", async () => {
+		// WASM DMN captures validationErrors=[] so post-hoc FEEL is skipped
 		const result = await runScenarioWasm(
 			REAL_BPMN,
 			{
@@ -464,8 +466,7 @@ describe("scenario runner — webhook-call process + input validation DMN", () =
 		expect(result.visitedElements).toContain("serviceTask_zu501th")
 	})
 
-	it("sss wrong type (string): not(instance of number) rule does not fire in WASM FEEL", async () => {
-		// Same WASM FEEL limitation: not(instance of X) predicates are not evaluated.
+	it("sss wrong type (string): FEEL fires not(instance of number), gateway takes error end", async () => {
 		const result = await runScenarioWasm(
 			REAL_BPMN,
 			{ id: "r7", name: "sss wrong type (string)", inputs: { asd: "hello", sss: "oops" } },
@@ -473,7 +474,7 @@ describe("scenario runner — webhook-call process + input validation DMN", () =
 		)
 
 		expect(result.errors).toHaveLength(0)
-		expect(result.finalVariables.validationErrors).toBeUndefined()
+		expect(result.finalVariables.validationErrors).toEqual(["sss must be a number"])
 		expect(result.visitedElements).toContain("Event_eReDBgY3")
 	})
 

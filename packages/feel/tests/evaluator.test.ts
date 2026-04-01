@@ -325,4 +325,33 @@ describe("evaluateUnaryTests", () => {
 		expect(evalUT('not("visa")', "master")).toBe(true)
 		expect(evalUT('not("visa")', "visa")).toBe(false)
 	})
+
+	it("null literal matches null input only", () => {
+		expect(evalUT("null", null)).toBe(true)
+		expect(evalUT("null", 0)).toBe(false)
+		expect(evalUT("null", "")).toBe(false)
+	})
+
+	it("null comparison does not match non-null inputs", () => {
+		// null < 5 evaluates to null (null arithmetic); must not match any input
+		expect(evalUT("< 5", null)).toBe(false)
+	})
+
+	it("instance of in unary-test context", () => {
+		expect(evalUT("instance of string", "hello")).toBe(true)
+		expect(evalUT("instance of string", 42)).toBe(false)
+		expect(evalUT("instance of string", null)).toBe(false)
+		expect(evalUT("instance of number", 42)).toBe(true)
+		expect(evalUT("instance of number", "oops")).toBe(false)
+		expect(evalUT("instance of number", null)).toBe(false)
+	})
+
+	it("not(instance of X) in unary-test context", () => {
+		expect(evalUT("not(instance of string)", "hello")).toBe(false)
+		expect(evalUT("not(instance of string)", 42)).toBe(true)
+		expect(evalUT("not(instance of string)", null)).toBe(true)
+		expect(evalUT("not(instance of number)", "oops")).toBe(true)
+		expect(evalUT("not(instance of number)", 42)).toBe(false)
+		expect(evalUT("not(instance of number)", null)).toBe(true)
+	})
 })

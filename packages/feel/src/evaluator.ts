@@ -608,9 +608,11 @@ export function evaluateUnaryTest(node: FeelNode, input: FeelValue, ctx: EvalCon
 	if (isFeelRange(result)) return testIncludes(result, input) === true
 	// List result → any element matches
 	if (isFeelList(result)) return result.some((r) => testIncludes(r, input) === true)
-	// A plain expression in unary test mode is an equality test
-	if (result !== null && result !== undefined) return deepEqual(result, input)
-	return false
+	// A plain expression in unary test mode is an equality test.
+	// When the result is null: only match if the node itself is the null literal
+	// (null arithmetic in comparisons also yields null but must not match anything).
+	if (result !== null) return deepEqual(result, input)
+	return node.kind === "null" ? input === null : false
 }
 
 /** Evaluate a full unary-test node (the root returned by parseUnaryTests). */
