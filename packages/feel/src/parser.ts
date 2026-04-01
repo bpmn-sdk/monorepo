@@ -810,6 +810,23 @@ class Parser {
 			return this.parseListOrRange() ?? this.parseParenOrRange()
 		}
 
+		// "instance of X" in unary-test context — implicit input "?" is the subject
+		if (tok.kind === "keyword" && tok.value === "instance") {
+			const start = tok.start
+			this.advance()
+			if (!this.expect("keyword", "of")) return null
+			const typeName = this.parseTypeName()
+			if (!typeName) return null
+			const implicitInput: FeelNode = { kind: "name", name: "?", start, end: start }
+			return {
+				kind: "instance-of",
+				value: implicitInput,
+				typeName,
+				start,
+				end: this.pos > 0 ? (this.tokens[this.pos - 1]?.end ?? start) : start,
+			}
+		}
+
 		// Expression equality test
 		return this.parseExpression(0)
 	}

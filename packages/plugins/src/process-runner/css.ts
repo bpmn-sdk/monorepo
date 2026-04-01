@@ -768,6 +768,47 @@ const CSS = `
 [data-bpmnkit-hud-theme="light"] .bpmnkit-runner-tests-edit { color: rgba(0,0,0,0.3); }
 [data-bpmnkit-hud-theme="light"] .bpmnkit-runner-tests-edit:hover { color: var(--bpmnkit-accent, #1a56db); }
 
+/* ── Last Run Trace ──────────────────────────────────────────────────────── */
+.bpmnkit-runner-tests-trace-tabs {
+  margin-top: 4px;
+}
+.bpmnkit-runner-tests-trace-pane {
+  padding: 8px 0;
+  max-height: 220px;
+  overflow-y: auto;
+}
+.bpmnkit-runner-tests-trace-elem-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 2px 0;
+}
+.bpmnkit-runner-tests-trace-elem-idx {
+  font-size: 10px;
+  color: rgba(255,255,255,0.25);
+  min-width: 18px;
+  text-align: right;
+  flex-shrink: 0;
+}
+.bpmnkit-runner-tests-trace-elem-id {
+  font-size: 11px;
+  font-family: var(--bpmnkit-font-mono, monospace);
+  color: rgba(255,255,255,0.65);
+}
+[data-bpmnkit-hud-theme="light"] .bpmnkit-runner-tests-trace-elem-idx { color: rgba(0,0,0,0.25); }
+[data-bpmnkit-hud-theme="light"] .bpmnkit-runner-tests-trace-elem-id { color: rgba(0,0,0,0.6); }
+
+/* ── Missing DMN warning ──────────────────────────────────────────────────── */
+.bpmnkit-runner-tests-missing-dmn {
+  font-size: 11px;
+  padding: 6px 10px;
+  margin-bottom: 8px;
+  border-radius: 5px;
+  background: rgba(245,158,11,0.12);
+  border: 1px solid var(--bpmnkit-warn, #f59e0b);
+  color: var(--bpmnkit-warn, #f59e0b);
+}
+
 /* ── Chaos run summary banner ─────────────────────────────────────────────── */
 .bpmnkit-runner-chaos-summary {
   font-size: 11px;

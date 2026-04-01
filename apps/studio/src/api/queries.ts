@@ -255,11 +255,17 @@ export function useDashboardStats() {
 // ── Profiles ───────────────────────────────────────────────────────────────────
 
 export function useProfiles() {
-	const proxyEnabled = useProxyEnabled()
+	const proxyUrl = useClusterStore((s) => s.proxyUrl)
 	return useQuery({
 		queryKey: keys.profiles(),
-		queryFn: () => proxyFetch<Profile[]>("/profiles"),
-		enabled: proxyEnabled,
+		// Fetch directly from the proxy — must not go through proxyFetch because
+		// that intercepts calls when the wasm profile is active and never hits the
+		// real proxy server.
+		queryFn: async () => {
+			const res = await fetch(`${proxyUrl}/profiles`, { headers: { accept: "application/json" } })
+			if (!res.ok) throw new Error(`HTTP ${res.status}`)
+			return res.json() as Promise<Profile[]>
+		},
 		staleTime: 60_000,
 	})
 }

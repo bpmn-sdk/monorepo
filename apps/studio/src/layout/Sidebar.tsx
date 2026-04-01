@@ -26,6 +26,7 @@ import {
 import { navigateWithTransition } from "../lib/transition.js"
 import { useClusterStore } from "../stores/cluster.js"
 import { useModeStore } from "../stores/mode.js"
+import { useProjectsStore } from "../stores/projects.js"
 import { useUiStore } from "../stores/ui.js"
 
 interface NavItem {
@@ -85,7 +86,9 @@ function getOrderedItems(mode: "developer" | "operator"): NavItem[] {
 export function Sidebar() {
 	const [location, navigate] = useLocation()
 	const { mode } = useModeStore()
-	const { profiles, activeProfile, status, setActiveProfile, loadProfiles } = useClusterStore()
+	const { profiles, activeProfile, status, setActiveProfile, loadProfiles, proxyUrl } =
+		useClusterStore()
+	const { projects, activeProjectId, setActiveProject } = useProjectsStore()
 	const [reconnecting, setReconnecting] = useState(false)
 
 	async function handleReconnect() {
@@ -169,6 +172,59 @@ export function Sidebar() {
 						<DropdownMenuItem asChild>
 							<Link href="/settings" className="cursor-pointer text-muted">
 								Add profile →
+							</Link>
+						</DropdownMenuItem>
+					</DropdownMenuContent>
+				</DropdownMenu>
+
+				{/* Project picker */}
+				<DropdownMenu>
+					<DropdownMenuTrigger
+						className={`flex w-full items-center gap-2.5 rounded-md h-9 px-2.5 text-nav-fg hover:text-nav-fg-active hover:bg-white/5 transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-accent ${
+							sidebarExpanded ? "justify-start" : "justify-center"
+						}`}
+						aria-label="Select project"
+					>
+						<FolderOpen size={18} className="shrink-0" />
+						<span
+							className={`text-sm font-medium whitespace-nowrap overflow-hidden transition-[max-width,opacity] duration-150 flex-1 text-left ${
+								sidebarExpanded ? "max-w-xs opacity-100" : "max-w-0 opacity-0"
+							}`}
+						>
+							{activeProjectId
+								? (projects.find((p) => p.id === activeProjectId)?.name ?? "Unknown project")
+								: "Local (IndexedDB)"}
+						</span>
+						<span
+							className={`text-muted text-xs transition-[max-width,opacity] duration-150 ${
+								sidebarExpanded ? "max-w-xs opacity-100" : "max-w-0 opacity-0"
+							}`}
+						>
+							▾
+						</span>
+					</DropdownMenuTrigger>
+					<DropdownMenuContent align="start" className="min-w-48">
+						<DropdownMenuLabel>Projects</DropdownMenuLabel>
+						<DropdownMenuItem onSelect={() => setActiveProject(null, proxyUrl)} className="gap-2">
+							{activeProjectId === null && <span className="text-accent">●</span>}
+							<span className={activeProjectId === null ? "font-medium" : ""}>
+								Local (IndexedDB)
+							</span>
+						</DropdownMenuItem>
+						{projects.map((p) => (
+							<DropdownMenuItem
+								key={p.id}
+								onSelect={() => setActiveProject(p.id, proxyUrl)}
+								className="gap-2"
+							>
+								{p.id === activeProjectId && <span className="text-accent">●</span>}
+								<span className={p.id === activeProjectId ? "font-medium" : ""}>{p.name}</span>
+							</DropdownMenuItem>
+						))}
+						<DropdownMenuSeparator />
+						<DropdownMenuItem asChild>
+							<Link href="/settings" className="cursor-pointer text-muted">
+								Manage projects →
 							</Link>
 						</DropdownMenuItem>
 					</DropdownMenuContent>

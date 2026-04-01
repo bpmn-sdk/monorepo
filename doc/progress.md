@@ -1,5 +1,148 @@
 # Progress
 
+## 2026-04-01 — Feat: File system persistence + project management
+
+Full design: [`doc/projects-files.md`](projects-files.md)
+
+**`apps/proxy/src/index.ts`**:
+- Added 10 `/fs/*` REST endpoints: `GET /fs/tree`, `GET /fs/list`, `GET /fs/read`, `POST /fs/write`, `DELETE /fs/file`, `POST /fs/move`, `POST /fs/mkdir`, `GET /fs/meta`, `POST /fs/meta`
+- File system helpers: `buildTree()`, `collectFiles()`, `readMeta()`, `writeMeta()`, `fsValidate()`
+- Sidecar metadata at `<dir>/.bpmnkit/<filename>.meta.json` (stores UUID, deployment links, scenarios, inputVars)
+- Only serves `.bpmn`, `.dmn`, `.form`, `.md` files; `.bpmnkit/` directories skipped in listings
+
+**`apps/studio/src/storage/types.ts`**:
+- `ModelFile.type` extended with `"md"` for Markdown files
+- `ModelFile.path?: string` for relative path in FS mode
+- New interfaces: `FsEntry`, `FileMeta`, `Project`, `FsCapableAdapter`, `isFsAdapter()`
+
+**`apps/studio/src/storage/indexeddb.ts`**:
+- Bumped DB version to 2, added `projects` object store for the project registry
+- Added `listProjects()`, `saveProject()`, `deleteProject()` on `IndexedDbAdapter`
+- Exported `sharedIndexedDb` singleton for cross-adapter preference/project storage
+
+**`apps/studio/src/storage/proxy-fs.ts`** (new):
+- `ProxyFsAdapter` implements `FsCapableAdapter`; talks to proxy `/fs/*` endpoints
+- Maintains a UUID→relative-path cache for O(1) model lookups
+- Delegates preferences to `sharedIndexedDb`
+
+**`apps/studio/src/storage/index.ts`**:
+- Delegating `storage` object that forwards to the currently active adapter
+- `setActiveAdapter()`, `getCurrentAdapter()`, `getFsAdapter()`, `isFsMode()`
+
+**`apps/studio/src/stores/projects.ts`** (new):
+- `useProjectsStore`: projects list, active project, add/remove/switch
+- `setActiveProject()` swaps the storage adapter and reloads models
+- Active project ID persisted in `localStorage`
+
+**`apps/studio/src/stores/models.ts`**:
+- Added `loadModel(id)` for on-demand content refresh
+- Added `moveModel(fromRelPath, toRelPath)` delegating to `getFsAdapter()`
+
+**`packages/plugins/src/process-runner/index.ts`**:
+- Added `onSaveScenarios`, `onLoadScenarios`, `onSaveInputVars`, `onLoadInputVars` to `ProcessRunnerOptions`
+- Internal IndexedDB used as fallback when callbacks are not provided
+
+**`apps/studio/src/pages/ModelDetail.tsx`**:
+- Passes FS-mode scenario/inputVar callbacks to process-runner (sidecars via proxy)
+- Added Markdown editor (textarea with 1.5 s auto-save debounce)
+
+**`apps/studio/src/pages/Models.tsx`**:
+- FS mode: two-pane layout with collapsible folder tree sidebar + folder-scoped file grid
+- "New Folder" button and dialog
+- "Move to..." dialog for moving files between folders
+- Markdown type filter option when in FS mode
+
+**`apps/studio/src/pages/Settings.tsx`**:
+- New "Projects" section: list, add (with proxy validation), switch, remove
+- "Local (IndexedDB)" always shown as the default option
+
+**`apps/studio/src/layout/TopBar.tsx`**:
+- Shows active project name as a badge when in FS mode; links to Settings
+
+**`apps/studio/src/main.tsx`**:
+- Initialises project store at startup, restores persisted active project before loading models
+
+## 2026-04-01 — Fix: Gemini and Copilot AI proxy errors
+
+**`apps/proxy/src/adapters/gemini.ts`**:
+- Removed `--yolo` flag from the Gemini CLI invocation. Gemini's `--yolo` is blocked by the `secureModeEnabled` admin/security policy (Gemini CLI exits with code 52 when this policy is active). Without `--yolo` the CLI runs correctly; for plain text generation (the proxy's use case) Gemini never needs tool auto-approval.
+
+**`apps/proxy/src/adapters/copilot.ts`**:
+- Fixed `--additional-mcp-config` to pass the file path with an `@` prefix (`@${mcpConfigFile}`). Without the prefix, Copilot attempts to parse the raw file path as an inline JSON string, prints "Invalid JSON in --additional-mcp-config" to stderr (exit code 0), and silently ignores the MCP configuration — so no MCP tools are registered and no diagram XML is produced.
+
+## 2026-04-01 — Fix: BRT `resultVariable` now appears in Last Run Trace → Variables
+
+**Root cause**: The WASM browser engine stores `zeebe:calledDecision resultVariable` in the BRT's local element scope and cleans it up when the element completes, never propagating it to the process instance scope that the snapshot reads. Injecting `zeebe:ioMapping` output entries (prior workaround attempt) had no effect — the engine ignores output mappings for BRTs in the browser.
+
+**Fix (`packages/engine/src/wasm-runner.ts`)**:
+- Added `parseDmnDecisionTable(dmnXml, decisionId)`: parses a DMN decision table from XML — extracts hit policy, input expressions, output column names, and rules with their unary test / output entry expressions
+- Added `evalDmnDecisionTable(table, vars)`: evaluates all rules using the existing `@bpmnkit/feel` engine (already a dependency), applies hit policy (COLLECT returns list, UNIQUE/FIRST/ANY return first match)
+- Added `evaluateBrtResultVariables(bpmnXml, visitedElementIds, vars, getDecisionDmn)`: for each visited BRT with a `zeebe:calledDecision resultVariable`, evaluates the DMN directly and returns `{resultVar: value}` pairs
+- This result is merged into `finalVariables` after the WASM snapshot collection (snapshot value wins if present, FEEL evaluation fills the gap otherwise)
+- `feelModule` is lazily cached after first `import("@bpmnkit/feel")` to avoid repeated dynamic imports
+
+## 2026-04-01 — Tests tab: fix DMN auto-deployment UX and scenario correctness
+
+**`packages/plugins/src/process-runner/index.ts`**:
+- Added missing-DMN detection: scans `getDefinitions()` for BRTs with `decisionId`, checks each via `getValidationDmn()`, and renders an amber warning banner ("⚠ Decision model not found: X. Import the DMN in the Models view.") in the scenario editor when any are missing
+- BRTs with `zeebe:calledDecision` are already excluded from Task Outputs (no mock needed — they run the DMN internally); added `referencedDecisions` variable to share the BRT decision-ID list between the exclusion filter and the warning banner
+
+**`packages/plugins/src/process-runner/css.ts`**:
+- Added `.bpmnkit-runner-tests-missing-dmn` style (amber border/background, matching chaos-summary styling)
+
+**`packages/engine/src/wasm-runner.ts`** (prior fix, same session):
+- `passed` now correctly reflects both `errors` and `failures` (`errors.length === 0 && failures.length === 0`)
+
+**`apps/studio/src/pages/ModelDetail.tsx`** (prior fix, same session):
+- Added `getJobType` callback so service task mocks are keyed by `zeebe:taskDefinition.type` (job type) rather than element ID
+
+## 2026-04-01 — Scenario runner integration tests in apps/studio
+
+**`apps/studio/tests/scenario-runner.test.ts`** (new):
+- 18 end-to-end tests importing from `@bpmnkit/engine/wasm-runner` — the same dist path the studio uses
+- **Suite 1 (synthetic fixtures)**: 7 tests covering DMN result variable in `finalVariables`, correct gateway routing, FEEL eval capture with right `elementId`, variable assertion pass/fail
+- **Suite 2 (real files — `test.bpmn` + `dmn.dmn`)**: 11 tests covering working DMN rules (null/range checks), FEEL condition capture on happy path, gateway default-flow has no FEEL eval, service task mocking, and documented WASM FEEL engine limitations (`not(instance of X)` predicates not evaluated)
+
+**`apps/studio/vitest.config.ts`** (new): minimal vitest config for the studio package
+
+**`apps/studio/package.json`**: added `"test": "vitest run"` script so `pnpm turbo test` includes studio
+
+## 2026-04-01 — Fix test runner: FEEL evaluations and DMN output variables
+
+**`packages/engine/src/wasm-runner.ts`**:
+- Added `EventLogRecord` interface and `eventLog: EventLogRecord[]` to `WasmSnapshot` — the snapshot already returned the full event log from Rust; we now consume it in TypeScript
+- Added `extractFlowConditions(bpmnXml)` helper: extracts `conditionExpression` text keyed by sequence flow ID via regex (handles namespace prefixes and CDATA)
+- **FEEL evaluations**: scan `SEQUENCE_FLOW_TAKEN` events from the event log, pair each taken flow with its condition expression from the BPMN XML, and emit synthetic `feelEvals` entries (`result: true`). The WASM engine evaluates FEEL conditions but doesn't record them; this reconstructs the evaluations from the chosen paths.
+- **DMN variables**: collect all `VARIABLE.CREATED` events from the event log (filtered by `processInstanceKey`) in addition to snapshot variables. This ensures DMN-produced variables that may have scope key differences are captured. Snapshot variables still take precedence (final upserted state).
+
+## 2026-04-01 — Tests tab: Last Run Trace section with Variables, FEEL, Elements tabs
+
+**`packages/engine/src/scenario.ts`**:
+- Added `feelEvals` field to `ScenarioResult` interface
+- Captures `feel:evaluated` events during `runScenario` and includes them in the result
+
+**`packages/engine/src/wasm-runner.ts`**:
+- Added `feelEvals` to `ScenarioResultLike` interface; WASM runner returns `[]` (WASM engine doesn't expose FEEL evaluations in its snapshot)
+
+**`packages/plugins/src/process-runner/index.ts`**:
+- Added `feelEvals` to local `ScenarioResultLike` mirror interface
+- Added "Last Run Trace" section in `renderScenarioEditor()` — shown below all existing sections (Start Variables, Task Outputs, Expected Variables, Last Run Failures) whenever a result exists
+- Three tabs: **Variables** (final variable state), **FEEL** (grouped by element, with property/expression/result), **Elements** (ordered execution path with 1-based index)
+
+**`packages/plugins/src/process-runner/css.ts`**:
+- Added styles for trace tab wrapper (`.bpmnkit-runner-tests-trace-tabs`), scrollable content pane (`.bpmnkit-runner-tests-trace-pane`), and element row (`.bpmnkit-runner-tests-trace-elem-row`, `-idx`, `-id`) with light-theme overrides
+
+## 2026-04-01 — Studio editor: remove Play button, add XML view, add export menu
+
+**`apps/studio/src/pages/ModelDetail.tsx`**:
+- Removed the Play button from the top-center HUD toolbar (no longer passed as `playButton` to `initEditorHud`)
+- Added XML source view button to the bottom-left HUD panel (via `rawModeButton`): clicking opens a modal showing the raw BPMN XML with Copy and Close actions
+- Added a `showXmlDialog` helper that renders a styled modal with syntax-friendly monospace pre block
+- Added a three-dots (`⋯`) export menu button to the right of "Deploy & Run" in the save bar
+  - "Export as BPMN XML": downloads `<name>.bpmn` file
+  - "Export as SVG": serializes the editor's SVG element and downloads `<name>.svg`
+- Export menu is always visible (not gated on `isWasm`) so users can export regardless of connection mode
+
 ## 2026-03-31 — All scenario tests now run on the WASM engine
 
 **`packages/engine/src/wasm-runner.ts`** (new):
