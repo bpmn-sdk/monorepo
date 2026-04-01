@@ -1,6 +1,6 @@
 {
 	"name": "@bpmnkit/reebe",
-	"version": "0.1.0",
+	"version": "0.1.1",
 	"private": true,
 	"scripts": {
 		"build": "cargo build --release -p reebe-server",
