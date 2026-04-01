@@ -1,5 +1,15 @@
 # @bpmnkit/editor
 
+## 0.0.21
+
+### Patch Changes
+
+- [#74](https://github.com/bpmnkit/monorepo/pull/74) [`e356b98`](https://github.com/bpmnkit/monorepo/commit/e356b98a6b281f825e757cb6e480e50369789d08) Thanks [@urbanisierung](https://github.com/urbanisierung)! - Test suites, simulation mode, improved reebe-wasm
+
+- Updated dependencies [[`e356b98`](https://github.com/bpmnkit/monorepo/commit/e356b98a6b281f825e757cb6e480e50369789d08)]:
+  - @bpmnkit/canvas@0.0.18
+  - @bpmnkit/core@0.0.18
+
 ## 0.0.20
 
 ### Patch Changes
