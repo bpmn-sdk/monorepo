@@ -20,7 +20,7 @@ import { StatusPill } from "../components/StatusPill.js"
 import { Button } from "../components/ui/button.js"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../components/ui/dialog.js"
 import { Input } from "../components/ui/input.js"
-import { getFsAdapter, isFsMode } from "../storage/index.js"
+import { getFsAdapter, isFsMode, storage } from "../storage/index.js"
 import type { FsEntry, ModelFile } from "../storage/types.js"
 import { useModelsStore } from "../stores/models.js"
 import { useProjectsStore } from "../stores/projects.js"
@@ -313,6 +313,22 @@ export function Models() {
 	const [, navigate] = useLocation()
 	const { setBreadcrumbs } = useUiStore()
 	const { activeProjectId, projects } = useProjectsStore()
+
+	// Project-switch animation: fade out → swap content key → fade in
+	const [contentKey, setContentKey] = useState(activeProjectId ?? "local")
+	const [fading, setFading] = useState(false)
+	const prevProjectId = useRef(activeProjectId)
+
+	useEffect(() => {
+		if (activeProjectId === prevProjectId.current) return
+		prevProjectId.current = activeProjectId
+		setFading(true)
+		const t = setTimeout(() => {
+			setContentKey(activeProjectId ?? "local")
+			setFading(false)
+		}, 180)
+		return () => clearTimeout(t)
+	}, [activeProjectId])
 	const [search, setSearch] = useState("")
 	const [typeFilter, setTypeFilter] = useState<ModelType | "all">("all")
 	const [viewMode, setViewMode] = useState<ViewMode>("grid")
@@ -323,12 +339,13 @@ export function Models() {
 	const [moveTarget, setMoveTarget] = useState<ModelFile | null>(null)
 	const fileInputRef = useRef<HTMLInputElement>(null)
 
-	// FS-mode state
+	// Folder state (used in both FS and IndexedDB mode)
 	const [fsTree, setFsTree] = useState<FsEntry[]>([])
 	const [selectedFolder, setSelectedFolder] = useState("")
 	const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set())
 	const [newFolderName, setNewFolderName] = useState("")
 	const [creatingFolder, setCreatingFolder] = useState(false)
+	const [virtualFolders, setVirtualFolders] = useState<string[]>([])
 
 	const fsMode = isFsMode()
 	const activeProject = projects.find((p) => p.id === activeProjectId)
@@ -337,31 +354,36 @@ export function Models() {
 		setBreadcrumbs([{ label: "Models" }])
 	}, [setBreadcrumbs])
 
-	// Load FS tree when in FS mode
-	// biome-ignore lint/correctness/useExhaustiveDependencies: models triggers a tree refresh after saves/moves
+	// Load folder tree (FS or virtual) when mode or models change
 	useEffect(() => {
-		if (!fsMode) {
-			setFsTree([])
-			setSelectedFolder("")
-			return
+		if (fsMode) {
+			const fs = getFsAdapter()
+			if (!fs) return
+			void fs
+				.listTree()
+				.then(setFsTree)
+				.catch(() => setFsTree([]))
+		} else {
+			// Virtual folders: merge persisted list with folders already on models
+			void storage.getPreference<string[]>("virtual-folders", []).then((saved) => {
+				const fromModels = models.map((m) => m.folder).filter((f): f is string => !!f)
+				const merged = [...new Set([...saved, ...fromModels])]
+				setVirtualFolders(merged)
+				setFsTree(buildVirtualTree(merged))
+			})
 		}
-		const fs = getFsAdapter()
-		if (!fs) return
-		void fs
-			.listTree()
-			.then(setFsTree)
-			.catch(() => setFsTree([]))
 	}, [fsMode, models])
 
-	// Files to display: in FS mode filter by selected folder; otherwise show all
-	const folderModels = fsMode
-		? models.filter((m) => {
-				if (!m.path) return false
-				const parts = m.path.split("/")
-				const fileFolder = parts.slice(0, -1).join("/")
-				return fileFolder === selectedFolder
-			})
-		: models
+	// Filter models by the selected folder in both FS and IndexedDB modes
+	const folderModels = models.filter((m) => {
+		if (fsMode) {
+			if (!m.path) return selectedFolder === ""
+			const parts = m.path.split("/")
+			const fileFolder = parts.slice(0, -1).join("/")
+			return fileFolder === selectedFolder
+		}
+		return (m.folder ?? "") === selectedFolder
+	})
 
 	const filtered = folderModels.filter((m) => {
 		if (typeFilter !== "all" && m.type !== typeFilter) return false
@@ -392,6 +414,7 @@ export function Models() {
 				name: newName.trim(),
 				type: newType,
 				content,
+				folder: selectedFolder || undefined,
 				createdAt: Date.now(),
 			}
 		}
@@ -404,17 +427,25 @@ export function Models() {
 
 	async function handleCreateFolder() {
 		if (!newFolderName.trim()) return
-		const fs = getFsAdapter()
-		if (!fs) return
 		const relPath = selectedFolder
 			? `${selectedFolder}/${newFolderName.trim()}`
 			: newFolderName.trim()
-		await fs.createFolder(relPath)
+
+		if (fsMode) {
+			const fs = getFsAdapter()
+			if (!fs) return
+			await fs.createFolder(relPath)
+			const tree = await fs.listTree()
+			setFsTree(tree)
+		} else {
+			const updated = [...new Set([...virtualFolders, relPath])]
+			setVirtualFolders(updated)
+			await storage.setPreference("virtual-folders", updated)
+			setFsTree(buildVirtualTree(updated))
+		}
+
 		setCreatingFolder(false)
 		setNewFolderName("")
-		// Refresh tree
-		const tree = await fs.listTree()
-		setFsTree(tree)
 		setExpandedFolders((prev) => {
 			const next = new Set(prev)
 			if (selectedFolder) next.add(selectedFolder)
@@ -440,7 +471,14 @@ export function Models() {
 						path: selectedFolder ? `${selectedFolder}/${file.name}` : file.name,
 						createdAt: Date.now(),
 					}
-				: { id: crypto.randomUUID(), name, type, content, createdAt: Date.now() }
+				: {
+						id: crypto.randomUUID(),
+						name,
+						type,
+						content,
+						folder: selectedFolder || undefined,
+						createdAt: Date.now(),
+					}
 			await saveModel(modelData)
 			toast.success(`Imported ${name}`)
 		}
@@ -480,18 +518,46 @@ export function Models() {
 		? ["all", "bpmn", "dmn", "form", "md"]
 		: ["all", "bpmn", "dmn", "form"]
 
+	// Build a nested FsEntry tree from flat folder paths (for IndexedDB virtual folders)
+	function buildVirtualTree(folders: string[]): FsEntry[] {
+		const root: FsEntry[] = []
+		for (const folderPath of [...folders].sort()) {
+			const parts = folderPath.split("/")
+			let current = root
+			let currentPath = ""
+			for (const part of parts) {
+				currentPath = currentPath ? `${currentPath}/${part}` : part
+				let node = current.find((e) => e.relativePath === currentPath)
+				if (!node) {
+					node = { name: part, relativePath: currentPath, type: "dir", children: [] }
+					current.push(node)
+				}
+				current = node.children ?? []
+			}
+		}
+		return root
+	}
+
 	return (
 		<div
 			className="flex h-full overflow-hidden"
 			onDragOver={(e) => e.preventDefault()}
 			onDrop={handleDrop}
 		>
-			{/* FS mode: folder tree sidebar */}
-			{fsMode && (
+			{/* Animated wrapper — keyed to contentKey so entry animation replays on project switch */}
+			<div
+				key={contentKey}
+				className={`flex flex-1 min-w-0 h-full ${
+					fading
+						? "opacity-0 translate-y-1 transition-[opacity,transform] duration-[180ms] ease-out"
+						: "animate-in fade-in slide-in-from-bottom-1 duration-200"
+				}`}
+			>
+				{/* Folder tree sidebar — always visible */}
 				<aside className="w-52 shrink-0 border-r border-border bg-surface overflow-y-auto p-2">
 					<div className="flex items-center justify-between mb-2 px-1">
 						<span className="text-xs font-medium text-muted uppercase tracking-wider">
-							{activeProject?.name ?? "Project"}
+							{fsMode ? (activeProject?.name ?? "Project") : "Local"}
 						</span>
 						<button
 							type="button"
@@ -522,178 +588,177 @@ export function Models() {
 						onToggle={toggleFolder}
 					/>
 				</aside>
-			)}
 
-			{/* Main content */}
-			<div className="flex-1 overflow-y-auto p-6">
-				<div className="max-w-6xl mx-auto animate-in fade-in slide-in-from-bottom-2 duration-300">
-					{/* Header */}
-					<div className="flex items-center justify-end mb-6">
-						<div className="flex items-center gap-2">
-							<Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
-								<Upload size={14} />
-								Import
-							</Button>
-							{fsMode && (
+				{/* Main content */}
+				<div className="flex-1 overflow-y-auto p-6">
+					<div className="max-w-6xl mx-auto">
+						{/* Header */}
+						<div className="flex items-center justify-end mb-6">
+							<div className="flex items-center gap-2">
+								<Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
+									<Upload size={14} />
+									Import
+								</Button>
 								<Button variant="outline" size="sm" onClick={() => setCreatingFolder(true)}>
 									<FolderPlus size={14} />
 									New Folder
 								</Button>
-							)}
-							<Button size="sm" onClick={() => setCreating(true)}>
-								<Plus size={14} />
-								New Model
-							</Button>
-							<input
-								ref={fileInputRef}
-								type="file"
-								accept=".bpmn,.dmn,.form,.json,.md"
-								multiple
-								className="hidden"
-								onChange={(e) => void handleImport((e.target as HTMLInputElement).files)}
-								aria-label="Import model files"
-							/>
-						</div>
-					</div>
-
-					{/* Filters */}
-					<div className="flex items-center gap-3 mb-4">
-						<Input
-							placeholder="Search models..."
-							value={search}
-							onInput={(e) => setSearch((e.target as HTMLInputElement).value)}
-							className="max-w-64"
-							aria-label="Search models"
-						/>
-						<div className="flex rounded border border-border bg-surface-2 text-xs overflow-hidden">
-							{typeFilterOptions.map((t) => (
-								<button
-									key={t}
-									type="button"
-									onClick={() => setTypeFilter(t)}
-									className={`px-3 py-1.5 capitalize transition-colors ${
-										typeFilter === t ? "bg-surface text-fg" : "text-muted hover:text-fg"
-									}`}
-									aria-pressed={typeFilter === t}
-								>
-									{t === "all" ? "All" : TYPE_LABELS[t as ModelType]}
-								</button>
-							))}
-						</div>
-						<div className="ml-auto flex gap-1">
-							<button
-								type="button"
-								onClick={() => setViewMode("grid")}
-								className={`p-1.5 rounded ${viewMode === "grid" ? "text-fg" : "text-muted hover:text-fg"}`}
-								aria-label="Grid view"
-								aria-pressed={viewMode === "grid"}
-							>
-								<Grid size={16} />
-							</button>
-							<button
-								type="button"
-								onClick={() => setViewMode("list")}
-								className={`p-1.5 rounded ${viewMode === "list" ? "text-fg" : "text-muted hover:text-fg"}`}
-								aria-label="List view"
-								aria-pressed={viewMode === "list"}
-							>
-								<List size={16} />
-							</button>
-						</div>
-					</div>
-
-					{/* Content */}
-					{filtered.length === 0 ? (
-						<div className="flex flex-col items-center justify-center gap-4 py-20 text-center">
-							<FileText size={40} className="text-muted" />
-							<div>
-								<p className="text-base font-medium text-fg">No models yet</p>
-								<p className="text-sm text-muted mt-1">
-									{fsMode
-										? "Create a model in this folder or import an existing file."
-										: "Create your first model or import an existing file."}
-								</p>
-							</div>
-							<Button onClick={() => setCreating(true)}>
-								<Plus size={14} />
-								Create model
-							</Button>
-						</div>
-					) : viewMode === "grid" ? (
-						<div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
-							{filtered.map((model) => (
-								<ProcessCard
-									key={model.id}
-									model={model}
-									onDelete={() => setConfirmDelete(model)}
-									onMove={() => setMoveTarget(model)}
+								<Button size="sm" onClick={() => setCreating(true)}>
+									<Plus size={14} />
+									New Model
+								</Button>
+								<input
+									ref={fileInputRef}
+									type="file"
+									accept=".bpmn,.dmn,.form,.json,.md"
+									multiple
+									className="hidden"
+									onChange={(e) => void handleImport((e.target as HTMLInputElement).files)}
+									aria-label="Import model files"
 								/>
-							))}
+							</div>
 						</div>
-					) : (
-						<table className="w-full text-sm">
-							<thead>
-								<tr className="border-b border-border text-left text-xs text-muted">
-									<th className="pb-2 font-medium">Name</th>
-									<th className="pb-2 font-medium">Type</th>
-									<th className="pb-2 font-medium">{fsMode ? "Path" : "Process ID"}</th>
-									<th className="pb-2 font-medium">Modified</th>
-									<th className="pb-2 font-medium sr-only">Actions</th>
-								</tr>
-							</thead>
-							<tbody>
-								{filtered.map((model) => (
-									<tr
-										key={model.id}
-										className="border-b border-border/50 hover:bg-surface-2 cursor-pointer"
-										onClick={() => navigate(`/models/${model.id}`)}
-										onKeyDown={(e) => e.key === "Enter" && navigate(`/models/${model.id}`)}
+
+						{/* Filters */}
+						<div className="flex items-center gap-3 mb-4">
+							<Input
+								placeholder="Search models..."
+								value={search}
+								onInput={(e) => setSearch((e.target as HTMLInputElement).value)}
+								className="max-w-64"
+								aria-label="Search models"
+							/>
+							<div className="flex rounded border border-border bg-surface-2 text-xs overflow-hidden">
+								{typeFilterOptions.map((t) => (
+									<button
+										key={t}
+										type="button"
+										onClick={() => setTypeFilter(t)}
+										className={`px-3 py-1.5 capitalize transition-colors ${
+											typeFilter === t ? "bg-surface text-fg" : "text-muted hover:text-fg"
+										}`}
+										aria-pressed={typeFilter === t}
 									>
-										<td className="py-2.5 pr-4 font-medium text-fg">{model.name}</td>
-										<td className="py-2.5 pr-4">
-											<StatusPill state={TYPE_LABELS[model.type as ModelType]} />
-										</td>
-										<td className="py-2.5 pr-4 text-muted font-mono text-xs">
-											{fsMode ? (model.path ?? "—") : (model.processDefinitionId ?? "—")}
-										</td>
-										<td className="py-2.5 pr-4 text-muted">
-											{new Date(model.updatedAt).toLocaleDateString()}
-										</td>
-										<td className="py-2.5">
-											<div className="flex gap-1">
-												{isFsMode() && (
+										{t === "all" ? "All" : TYPE_LABELS[t as ModelType]}
+									</button>
+								))}
+							</div>
+							<div className="ml-auto flex gap-1">
+								<button
+									type="button"
+									onClick={() => setViewMode("grid")}
+									className={`p-1.5 rounded ${viewMode === "grid" ? "text-fg" : "text-muted hover:text-fg"}`}
+									aria-label="Grid view"
+									aria-pressed={viewMode === "grid"}
+								>
+									<Grid size={16} />
+								</button>
+								<button
+									type="button"
+									onClick={() => setViewMode("list")}
+									className={`p-1.5 rounded ${viewMode === "list" ? "text-fg" : "text-muted hover:text-fg"}`}
+									aria-label="List view"
+									aria-pressed={viewMode === "list"}
+								>
+									<List size={16} />
+								</button>
+							</div>
+						</div>
+
+						{/* Content */}
+						{filtered.length === 0 ? (
+							<div className="flex flex-col items-center justify-center gap-4 py-20 text-center">
+								<FileText size={40} className="text-muted" />
+								<div>
+									<p className="text-base font-medium text-fg">No models yet</p>
+									<p className="text-sm text-muted mt-1">
+										{fsMode
+											? "Create a model in this folder or import an existing file."
+											: "Create your first model or import an existing file."}
+									</p>
+								</div>
+								<Button onClick={() => setCreating(true)}>
+									<Plus size={14} />
+									Create model
+								</Button>
+							</div>
+						) : viewMode === "grid" ? (
+							<div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
+								{filtered.map((model) => (
+									<ProcessCard
+										key={model.id}
+										model={model}
+										onDelete={() => setConfirmDelete(model)}
+										onMove={() => setMoveTarget(model)}
+									/>
+								))}
+							</div>
+						) : (
+							<table className="w-full text-sm">
+								<thead>
+									<tr className="border-b border-border text-left text-xs text-muted">
+										<th className="pb-2 font-medium">Name</th>
+										<th className="pb-2 font-medium">Type</th>
+										<th className="pb-2 font-medium">{fsMode ? "Path" : "Process ID"}</th>
+										<th className="pb-2 font-medium">Modified</th>
+										<th className="pb-2 font-medium sr-only">Actions</th>
+									</tr>
+								</thead>
+								<tbody>
+									{filtered.map((model) => (
+										<tr
+											key={model.id}
+											className="border-b border-border/50 hover:bg-surface-2 cursor-pointer"
+											onClick={() => navigate(`/models/${model.id}`)}
+											onKeyDown={(e) => e.key === "Enter" && navigate(`/models/${model.id}`)}
+										>
+											<td className="py-2.5 pr-4 font-medium text-fg">{model.name}</td>
+											<td className="py-2.5 pr-4">
+												<StatusPill state={TYPE_LABELS[model.type as ModelType]} />
+											</td>
+											<td className="py-2.5 pr-4 text-muted font-mono text-xs">
+												{fsMode ? (model.path ?? "—") : (model.processDefinitionId ?? "—")}
+											</td>
+											<td className="py-2.5 pr-4 text-muted">
+												{new Date(model.updatedAt).toLocaleDateString()}
+											</td>
+											<td className="py-2.5">
+												<div className="flex gap-1">
+													{isFsMode() && (
+														<Button
+															variant="ghost"
+															size="icon"
+															onClick={(e) => {
+																e.stopPropagation()
+																setMoveTarget(model)
+															}}
+															aria-label={`Move ${model.name}`}
+														>
+															<Move size={14} />
+														</Button>
+													)}
 													<Button
 														variant="ghost"
 														size="icon"
 														onClick={(e) => {
 															e.stopPropagation()
-															setMoveTarget(model)
+															setConfirmDelete(model)
 														}}
-														aria-label={`Move ${model.name}`}
+														aria-label={`Delete ${model.name}`}
 													>
-														<Move size={14} />
+														<Trash2 size={14} />
 													</Button>
-												)}
-												<Button
-													variant="ghost"
-													size="icon"
-													onClick={(e) => {
-														e.stopPropagation()
-														setConfirmDelete(model)
-													}}
-													aria-label={`Delete ${model.name}`}
-												>
-													<Trash2 size={14} />
-												</Button>
-											</div>
-										</td>
-									</tr>
-								))}
-							</tbody>
-						</table>
-					)}
+												</div>
+											</td>
+										</tr>
+									))}
+								</tbody>
+							</table>
+						)}
+					</div>
 				</div>
 			</div>
+			{/* end animated wrapper */}
 
 			{/* Create model dialog */}
 			<Dialog open={creating} onOpenChange={(open: boolean) => !open && setCreating(false)}>
@@ -714,7 +779,7 @@ export function Models() {
 								onKeyDown={(e) => e.key === "Enter" && void handleCreate()}
 							/>
 						</div>
-						{fsMode && selectedFolder && (
+						{selectedFolder && (
 							<p className="text-xs text-muted">
 								Folder: <span className="font-mono text-fg">{selectedFolder}/</span>
 							</p>

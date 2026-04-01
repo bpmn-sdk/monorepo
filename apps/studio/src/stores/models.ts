@@ -5,6 +5,7 @@ import type { ModelFile } from "../storage/index.js"
 interface ModelsState {
 	models: ModelFile[]
 	loaded: boolean
+	loading: boolean
 	loadModels(): Promise<void>
 	loadModel(id: string): Promise<ModelFile | null>
 	saveModel(m: Omit<ModelFile, "updatedAt">): Promise<ModelFile>
@@ -16,10 +17,12 @@ interface ModelsState {
 export const useModelsStore = create<ModelsState>()((set, get) => ({
 	models: [],
 	loaded: false,
+	loading: false,
 
 	async loadModels() {
+		set({ loading: true })
 		const models = await storage.listModels()
-		set({ models, loaded: true })
+		set({ models, loaded: true, loading: false })
 	},
 
 	async loadModel(id) {

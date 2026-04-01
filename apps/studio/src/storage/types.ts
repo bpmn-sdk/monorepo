@@ -5,6 +5,8 @@ export interface ModelFile {
 	content: string
 	/** Relative path from project root — only set in FS mode. */
 	path?: string
+	/** Virtual folder path for IndexedDB mode (e.g. "processes" or "processes/orders"). */
+	folder?: string
 	processDefinitionId?: string
 	/** Persisted JSON string of variables used when starting new instances. */
 	runVariables?: string
