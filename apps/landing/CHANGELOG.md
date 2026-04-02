@@ -1,5 +1,20 @@
 # @bpmnkit/landing
 
+## 0.0.23
+
+### Patch Changes
+
+- [`802e1dd`](https://github.com/bpmnkit/monorepo/commit/802e1dde53dfda07371e6a83dcf0e05e2650d0a2) Thanks [@urbanisierung](https://github.com/urbanisierung)! - Minor fixes.
+
+- Updated dependencies [[`802e1dd`](https://github.com/bpmnkit/monorepo/commit/802e1dde53dfda07371e6a83dcf0e05e2650d0a2)]:
+  - @bpmnkit/canvas@0.0.20
+  - @bpmnkit/connector-gen@0.0.11
+  - @bpmnkit/core@0.0.20
+  - @bpmnkit/editor@0.0.23
+  - @bpmnkit/engine@0.1.19
+  - @bpmnkit/operate@0.0.20
+  - @bpmnkit/plugins@0.0.23
+
 ## 0.0.22
 
 ### Patch Changes

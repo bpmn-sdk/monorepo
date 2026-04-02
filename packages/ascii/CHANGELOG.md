@@ -1,5 +1,14 @@
 # @bpmnkit/ascii
 
+## 0.0.20
+
+### Patch Changes
+
+- [`802e1dd`](https://github.com/bpmnkit/monorepo/commit/802e1dde53dfda07371e6a83dcf0e05e2650d0a2) Thanks [@urbanisierung](https://github.com/urbanisierung)! - Minor fixes.
+
+- Updated dependencies [[`802e1dd`](https://github.com/bpmnkit/monorepo/commit/802e1dde53dfda07371e6a83dcf0e05e2650d0a2)]:
+  - @bpmnkit/core@0.0.20
+
 ## 0.0.19
 
 ### Patch Changes
