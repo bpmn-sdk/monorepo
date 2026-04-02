@@ -1,5 +1,24 @@
 # @bpmnkit/studio
 
+## 0.0.7
+
+### Patch Changes
+
+- [`802e1dd`](https://github.com/bpmnkit/monorepo/commit/802e1dde53dfda07371e6a83dcf0e05e2650d0a2) Thanks [@urbanisierung](https://github.com/urbanisierung)! - Minor fixes.
+
+- Updated dependencies [[`802e1dd`](https://github.com/bpmnkit/monorepo/commit/802e1dde53dfda07371e6a83dcf0e05e2650d0a2)]:
+  - @bpmnkit/reebe-wasm@0.1.2
+  - @bpmnkit/api@0.0.16
+  - @bpmnkit/canvas@0.0.20
+  - @bpmnkit/core@0.0.20
+  - @bpmnkit/editor@0.0.23
+  - @bpmnkit/engine@0.1.19
+  - @bpmnkit/operate@0.0.20
+  - @bpmnkit/plugins@0.0.23
+  - @bpmnkit/profiles@0.0.14
+  - @bpmnkit/ui@0.0.12
+  - @bpmnkit/user-tasks@0.0.7
+
 ## 0.0.6
 
 ### Patch Changes

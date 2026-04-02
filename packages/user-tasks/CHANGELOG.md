@@ -1,5 +1,17 @@
 # @bpmnkit/user-tasks
 
+## 0.0.7
+
+### Patch Changes
+
+- [`802e1dd`](https://github.com/bpmnkit/monorepo/commit/802e1dde53dfda07371e6a83dcf0e05e2650d0a2) Thanks [@urbanisierung](https://github.com/urbanisierung)! - Minor fixes.
+
+- Updated dependencies [[`802e1dd`](https://github.com/bpmnkit/monorepo/commit/802e1dde53dfda07371e6a83dcf0e05e2650d0a2)]:
+  - @bpmnkit/api@0.0.16
+  - @bpmnkit/core@0.0.20
+  - @bpmnkit/plugins@0.0.23
+  - @bpmnkit/ui@0.0.12
+
 ## 0.0.6
 
 ### Patch Changes
