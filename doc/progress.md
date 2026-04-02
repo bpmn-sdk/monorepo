@@ -1,5 +1,42 @@
 # Progress
 
+## 2026-04-02 — Feat: Local automation workflows — Phase 3 (element templates & connector UX)
+
+**`apps/proxy/src/worker-templates.ts`**:
+- All 8 worker templates finalized: property `id`s, `constraints.notEmpty` on required fields, proper groups, descriptions
+- Added File Watch Trigger template (`io.bpmnkit.trigger.file-watch:1`, job type `io.bpmnkit:trigger:file-watch:1`)
+- Using modern `zeebe:taskDefinition` binding with `property: "type"` instead of deprecated `zeebe:taskDefinition:type`
+
+**`packages/plugins/src/connector-catalog/builtin-templates.ts`** (new):
+- Static copy of all 8 worker templates typed as `ElementTemplate` from the plugins package
+- Always available in the connector catalog — no proxy required
+
+**`packages/plugins/src/connector-catalog/panel.ts`** (new):
+- `CatalogPanel` — vanilla DOM modal with two tabs: "Built-in Workers" and "Community APIs"
+- Built-in tab: card grid (icon, name, description, Use button), search filter
+- Community tab: scrollable list of all 30+ OpenAPI catalog entries, search filter
+- Footer: "Import from URL…" and "Import from file…" actions
+- Closes on backdrop click or Escape key
+
+**`packages/plugins/src/connector-catalog/css.ts`**:
+- Added full panel styles: overlay, panel, header, tabs, search input, card grid, community list, empty state, footer
+- Light theme overrides via `[data-bpmnkit-hud-theme="light"]`
+
+**`packages/plugins/src/connector-catalog/index.ts`**:
+- Static built-in templates auto-registered at install (no proxy required)
+- `CatalogPanel` created and wired to registrar + palette callbacks
+- "Browse connectors…" palette command opens the panel
+- Returns `ConnectorCatalogPlugin` (extends `CanvasPlugin`) with `openCatalog()` method
+- Exports: `BUILTIN_WORKER_TEMPLATES`, `ConnectorCatalogPlugin`
+
+**`packages/plugins/tests/config-panel-bpmn/template-round-trip.test.ts`** (new):
+- 21 tests covering all worker templates:
+  - In-memory write→read adapter round-trips (CLI, LLM, FS Read/Write, JS, File Watch)
+  - Template stamp write and removal
+  - Default value fallback behavior
+  - XML `Bpmn.export` → `Bpmn.parse` round-trips verifying field preservation
+  - Parameterized test: all 8 templates write the correct `zeebe:taskDefinition` type
+
 ## 2026-04-02 — Feat: Local automation workflows — Phase 1 completion + Phase 2 (triggers)
 
 **Phase 1 completion:**

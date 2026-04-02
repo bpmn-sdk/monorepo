@@ -1,53 +1,11 @@
 /**
- * Element template definitions for bpmnkit built-in workers.
- * Served via GET /worker-templates — consumed by the Studio connector catalog.
+ * Static catalog of bpmnkit built-in worker element templates.
  *
- * Follows the Camunda element template schema so they are compatible with
- * the config-panel-bpmn template renderer.
+ * These are always available in the connector catalog regardless of whether
+ * the local proxy is running. They mirror the runtime definitions served by
+ * `GET /worker-templates` on the proxy.
  */
-
-export interface TemplateProperty {
-	id?: string
-	label?: string
-	description?: string
-	type?: string
-	value?: string | number | boolean
-	optional?: boolean
-	feel?: "optional" | "required" | "static"
-	group?: string
-	choices?: Array<{ name: string; value: string }>
-	constraints?: { notEmpty?: boolean }
-	binding: {
-		type:
-			| "zeebe:taskDefinition"
-			| "zeebe:taskDefinition:type"
-			| "zeebe:taskHeader"
-			| "zeebe:input"
-			| "zeebe:output"
-			| "property"
-		property?: "type" | "retries"
-		key?: string
-		name?: string
-		source?: string
-	}
-	condition?: { property: string; equals: string }
-}
-
-export interface ElementTemplate {
-	$schema?: string
-	id: string
-	name: string
-	version: number
-	description: string
-	documentationRef?: string
-	category: { id: string; name: string }
-	appliesTo: string[]
-	icon?: { contents: string }
-	groups?: Array<{ id: string; label: string }>
-	properties: TemplateProperty[]
-}
-
-const CATEGORY = { id: "bpmnkit", name: "Built-in" }
+import type { ElementTemplate } from "../config-panel-bpmn/template-types.js"
 
 const CLI_ICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="16" height="16"><rect width="16" height="16" rx="3" fill="#1e1e2e"/><text x="3" y="12" font-family="monospace" font-size="10" fill="#cdd6f4">&gt;_</text></svg>`
 const LLM_ICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="16" height="16"><rect width="16" height="16" rx="3" fill="#1e1e2e"/><circle cx="8" cy="8" r="5" fill="none" stroke="#6b9df7" stroke-width="1.5"/><path d="M6 8h4M8 6v4" stroke="#6b9df7" stroke-width="1.5"/></svg>`
@@ -55,7 +13,7 @@ const FS_ICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" wid
 const JS_ICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="16" height="16"><rect width="16" height="16" rx="3" fill="#f59e0b"/><text x="2" y="12" font-family="monospace" font-size="9" font-weight="bold" fill="#1e1e2e">JS</text></svg>`
 const WATCH_ICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="16" height="16"><rect width="16" height="16" rx="3" fill="#1e1e2e"/><path d="M3 10V7l5-4 5 4v3" fill="none" stroke="#a78bfa" stroke-width="1.5"/><path d="M5 10h6v4H5z" fill="none" stroke="#a78bfa" stroke-width="1.5"/></svg>`
 
-export const WORKER_TEMPLATES: ElementTemplate[] = [
+export const BUILTIN_WORKER_TEMPLATES: ElementTemplate[] = [
 	// ── CLI Worker ────────────────────────────────────────────────────────────
 	{
 		id: "io.bpmnkit.cli",
@@ -63,7 +21,6 @@ export const WORKER_TEMPLATES: ElementTemplate[] = [
 		version: 1,
 		description:
 			"Run any shell command. Use {{varName}} to interpolate process variables, {{secrets.NAME}} for secrets.",
-		category: CATEGORY,
 		appliesTo: ["bpmn:ServiceTask"],
 		icon: { contents: CLI_ICON },
 		groups: [
@@ -132,7 +89,6 @@ export const WORKER_TEMPLATES: ElementTemplate[] = [
 		name: "LLM Prompt",
 		version: 1,
 		description: "Call an AI model (Claude, Copilot, or Gemini) with a prompt.",
-		category: CATEGORY,
 		appliesTo: ["bpmn:ServiceTask"],
 		icon: { contents: LLM_ICON },
 		groups: [
@@ -200,7 +156,6 @@ export const WORKER_TEMPLATES: ElementTemplate[] = [
 		name: "Read File",
 		version: 1,
 		description: "Read a file from the local filesystem into a process variable.",
-		category: CATEGORY,
 		appliesTo: ["bpmn:ServiceTask"],
 		icon: { contents: FS_ICON },
 		groups: [
@@ -243,7 +198,6 @@ export const WORKER_TEMPLATES: ElementTemplate[] = [
 		version: 1,
 		description:
 			"Write a process variable to a file. Parent directories are created automatically.",
-		category: CATEGORY,
 		appliesTo: ["bpmn:ServiceTask"],
 		icon: { contents: FS_ICON },
 		groups: [{ id: "file", label: "File" }],
@@ -283,7 +237,6 @@ export const WORKER_TEMPLATES: ElementTemplate[] = [
 		name: "Append to File",
 		version: 1,
 		description: "Append content to a file. Creates the file if it does not exist.",
-		category: CATEGORY,
 		appliesTo: ["bpmn:ServiceTask"],
 		icon: { contents: FS_ICON },
 		groups: [{ id: "file", label: "File" }],
@@ -323,7 +276,6 @@ export const WORKER_TEMPLATES: ElementTemplate[] = [
 		name: "List Directory",
 		version: 1,
 		description: "List files in a directory. Returns an array of filenames.",
-		category: CATEGORY,
 		appliesTo: ["bpmn:ServiceTask"],
 		icon: { contents: FS_ICON },
 		groups: [
@@ -366,7 +318,6 @@ export const WORKER_TEMPLATES: ElementTemplate[] = [
 		version: 1,
 		description:
 			"Evaluate a JavaScript expression. All process variables are available via the `variables` object.",
-		category: CATEGORY,
 		appliesTo: ["bpmn:ServiceTask"],
 		icon: { contents: JS_ICON },
 		groups: [
@@ -409,7 +360,6 @@ export const WORKER_TEMPLATES: ElementTemplate[] = [
 		version: 1,
 		description:
 			"Watch a directory and start a process instance when files are created or changed.",
-		category: CATEGORY,
 		appliesTo: ["bpmn:ServiceTask"],
 		icon: { contents: WATCH_ICON },
 		groups: [

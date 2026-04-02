@@ -1,5 +1,25 @@
 # Features
 
+## Local Automation Workflows — Phase 3: Connector UX (2026-04-02) — `packages/plugins`
+
+Built-in workers are now a first-class part of the connector catalog with full form UI.
+
+**Connector catalog panel** (Ctrl+K → "Browse connectors…"):
+- "Built-in Workers" tab: card grid for all 8 bpmnkit workers — always visible, no proxy needed
+- "Community APIs" tab: 30+ OpenAPI-backed connector entries with search
+- Click "Use" on a worker card to register it; select any service task to apply via the Connector field
+- Footer: Import from URL / Import from file actions
+
+**Template form renderer** — all worker fields rendered correctly in the config panel:
+- Text with `feel: "optional"` → FEEL expression field with toggle (prompts, paths, content)
+- Dropdown → searchable select (model picker, events picker)
+- Boolean → toggle (ignore exit code)
+- Number → numeric text field (timeout)
+- `{{secrets.NAME}}` syntax works in any String/Text field (documented in field descriptions)
+
+**Static templates** in `packages/plugins/src/connector-catalog/builtin-templates.ts`:
+- 8 templates always embedded in the plugin — no network call needed to discover workers
+
 ## Local Automation Workflows — Phase 2: Triggers (2026-04-02) — `apps/proxy`
 
 Workflows now start automatically without a "Run" click.

@@ -167,27 +167,36 @@ actually execute shell commands, call an LLM, and read/write files.
 
 ### Action items
 
-- [ ] Finalize element template schema for built-in workers (Phase 1 stub → complete)
-  - Each worker has: display name, icon, property groups, input bindings, output bindings
-  - Inputs bound to IO mapping sources with type (string, expression, secret, select)
-  - Outputs bound to result variables with sensible defaults
+- [x] Finalize element template schema for built-in workers (`apps/proxy/src/worker-templates.ts`)
+  - All 8 workers have: property `id`s, `constraints.notEmpty` on required fields, proper groups, icons
+  - Added File Watch Trigger template (`io.bpmnkit.trigger.file-watch:1`)
+  - Using modern `zeebe:taskDefinition` binding with `property: "type"`
 
-- [ ] `packages/plugins/src/config-panel-bpmn/` — template form renderer
-  - Render property groups from element template JSON
-  - Input types: `text`, `feel`, `select`, `secret` (renders `{{secrets.NAME}}` picker), `boolean`, `number`
-  - Two-way sync: form ↔ BPMN XML extension elements
+- [x] `packages/plugins/src/config-panel-bpmn/` — template form renderer
+  - The existing `buildRegistrationFromTemplate()` handles all worker template field types
+  - String with `feel: "optional"` → FEEL expression field with toggle (used for prompts, paths, content)
+  - Dropdown → searchable select (used for model, events)
+  - Boolean → toggle (used for ignoreExitCode)
+  - Number → text with numeric placeholder (used for timeout)
+  - Secrets: `{{secrets.NAME}}` works in any String/Text/FEEL field (documented in field hints)
 
-- [ ] Connector catalog plugin — "Built-in" tab
-  - Always shows built-in templates regardless of proxy status
-  - "Community" tab shows REST connector templates from OpenAPI catalog
-  - Search across both
+- [x] Connector catalog plugin — "Built-in" tab and "Community" tab
+  - `packages/plugins/src/connector-catalog/builtin-templates.ts` — 8 static templates, always available
+  - `packages/plugins/src/connector-catalog/panel.ts` — `CatalogPanel` DOM component
+  - "Built-in Workers" tab: card grid with icon, name, description, Use button; search filter
+  - "Community APIs" tab: scrollable list of 30+ OpenAPI entries; search filter
+  - "Browse connectors…" command in palette opens the panel
+  - Plugin now exports `openCatalog()` method for programmatic access
+  - Static templates auto-registered at install time (no proxy required)
+  - `ConnectorCatalogPlugin` interface exported with `openCatalog()`
 
-- [ ] `packages/connector-gen/src/bpmnkit-catalog.ts` — built-in template catalog entries
-  - CLI Worker, LLM Worker, FS Read/Write/List, JS Eval, HTTP REST (existing)
-  - Each entry: name, description, icon, category, job type
+- [x] Static built-in catalog: `packages/plugins/src/connector-catalog/builtin-templates.ts`
+  - 8 worker templates typed as the plugin's `ElementTemplate` — no proxy dependency
 
-- [ ] Template-to-BPMN serialization round-trip tests
-  - Apply template → serialize XML → parse XML → template values preserved
+- [x] Template-to-BPMN serialization round-trip tests (`packages/plugins/tests/config-panel-bpmn/template-round-trip.test.ts`)
+  - 21 tests: in-memory write→read round-trips for all 6 main worker types
+  - XML serialize→parse round-trips verifying field preservation and modelerTemplate stamping
+  - Parameterized test verifying all 8 templates write the correct zeebe:taskDefinition type
 
 ---
 

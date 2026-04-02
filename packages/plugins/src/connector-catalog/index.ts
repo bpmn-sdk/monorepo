@@ -1,15 +1,13 @@
 /**
  * @bpmnkit/canvas-plugin-connector-catalog — Import API connectors from
- * OpenAPI specs into the BPMN editor via the command palette.
+ * OpenAPI specs into the BPMN editor via the command palette and a visual
+ * catalog panel.
  *
- * Exposes 30+ pre-configured APIs (GitHub, Stripe, Slack, …) as searchable
- * commands in Ctrl+K / ⌘K. Selecting one fetches the spec, generates connector
- * templates via `@bpmnkit/connector-gen`, and registers them in the
- * config-panel-bpmn connector selector — no restart required.
+ * The catalog panel (Ctrl+K → "Browse connectors…") shows two tabs:
+ *   • Built-in Workers — bpmnkit workers, always available without a proxy
+ *   • Community APIs  — 30+ pre-configured OpenAPI specs (GitHub, Stripe, …)
  *
- * Additional commands accept any OpenAPI 3.x spec URL ("Import from OpenAPI
- * URL…") or a local file upload ("Import from OpenAPI file…") for custom,
- * private, or CORS-restricted APIs.
+ * Additional commands accept any OpenAPI 3.x spec URL or a local file upload.
  *
  * ## Usage
  * ```typescript
@@ -35,13 +33,16 @@ import {
 import type { ConnectorTemplate } from "@bpmnkit/connector-gen/browser"
 import type { CommandPalettePlugin } from "../command-palette/index.js"
 import type { ElementTemplate } from "../config-panel-bpmn/index.js"
+import { BUILTIN_WORKER_TEMPLATES } from "./builtin-templates.js"
 import {
 	CONNECTOR_CATALOG_CSS,
 	CONNECTOR_CATALOG_STYLE_ID,
 	injectConnectorCatalogStyles,
 } from "./css.js"
+import { CatalogPanel } from "./panel.js"
 
 export { CONNECTOR_CATALOG_CSS, CONNECTOR_CATALOG_STYLE_ID, injectConnectorCatalogStyles }
+export { BUILTIN_WORKER_TEMPLATES }
 
 // ── Public types ──────────────────────────────────────────────────────────────
 
@@ -55,6 +56,11 @@ export interface ConnectorCatalogOptions {
 	 * built-in worker templates are fetched from `<proxyUrl>/worker-templates`
 	 * and registered automatically on plugin install. */
 	proxyUrl?: string
+}
+
+/** Extended plugin interface — exposes `openCatalog()` for programmatic use. */
+export interface ConnectorCatalogPlugin extends CanvasPlugin {
+	openCatalog(): void
 }
 
 // ── Toast helper ──────────────────────────────────────────────────────────────
@@ -162,7 +168,6 @@ async function loadBuiltinWorkers(proxyUrl: string, registrar: TemplateRegistrar
 }
 
 async function loadFromUrl(url: string, registrar: TemplateRegistrar): Promise<void> {
-	// Derive idPrefix and a display prefix from the hostname
 	let idPrefix = "io.custom"
 	let prefix = "Custom"
 	try {
@@ -192,11 +197,13 @@ async function loadFromUrl(url: string, registrar: TemplateRegistrar): Promise<v
 /**
  * Creates the connector catalog plugin.
  *
- * Registers one command per built-in catalog entry plus an "Import from
- * OpenAPI URL" command. All commands appear in the command palette (Ctrl+K /
- * ⌘K). Selecting a catalog entry fetches the spec, generates connector
- * templates, and registers them immediately in the config panel connector
- * selector.
+ * Registers a visual catalog panel (two tabs: Built-in Workers + Community
+ * APIs) plus command palette commands for all catalog entries. The panel is
+ * accessible via the "Browse connectors…" palette command.
+ *
+ * Built-in worker templates are registered immediately (static, no proxy).
+ * When `options.proxyUrl` is set, additional templates are fetched from the
+ * local proxy at startup.
  *
  * @param registrar - The config-panel-bpmn plugin (or any object with
  *   `registerTemplate`).
@@ -207,18 +214,56 @@ export function createConnectorCatalogPlugin(
 	registrar: TemplateRegistrar,
 	palette: CommandPalettePlugin,
 	options?: ConnectorCatalogOptions,
-): CanvasPlugin {
+): ConnectorCatalogPlugin {
 	let _deregister: (() => void) | null = null
+	let _panel: CatalogPanel | null = null
 
-	return {
+	const plugin: ConnectorCatalogPlugin = {
 		name: "connector-catalog",
 
 		install() {
 			injectConnectorCatalogStyles()
 
-			// Load built-in worker templates from the local proxy, if configured
+			// Register static built-in worker templates immediately
+			for (const t of BUILTIN_WORKER_TEMPLATES) {
+				registrar.registerTemplate(t)
+			}
+
+			// Also fetch from proxy if configured (may add more or updated templates)
 			if (options?.proxyUrl) {
 				void loadBuiltinWorkers(options.proxyUrl, registrar)
+			}
+
+			// Build the visual catalog panel (lazy — created on first open)
+			_panel = new CatalogPanel({
+				builtinTemplates: BUILTIN_WORKER_TEMPLATES,
+				catalogEntries: CATALOG,
+				onUseBuiltin(template) {
+					// Already registered above — just confirm to the user
+					const toast = showToast(
+						`"${template.name}" ready — select a service task to apply it`,
+						"success",
+					)
+					setTimeout(() => toast.remove(), 3500)
+				},
+				onLoadCatalogEntry(id) {
+					void loadCatalogEntry(id, registrar)
+				},
+				onLoadFromUrl(url) {
+					void loadFromUrl(url, registrar)
+				},
+				onLoadFromFile() {
+					loadFromFile(registrar)
+				},
+			})
+
+			const browseCmd = {
+				id: "connector-catalog:browse",
+				title: "Browse connectors\u2026",
+				description: "Open the connector catalog to pick a built-in worker or import an API",
+				action() {
+					_panel?.open()
+				},
 			}
 
 			const catalogCmds = CATALOG.map((entry) => ({
@@ -253,12 +298,20 @@ export function createConnectorCatalogPlugin(
 				},
 			}
 
-			_deregister = palette.addCommands([...catalogCmds, urlCmd, fileCmd])
+			_deregister = palette.addCommands([browseCmd, ...catalogCmds, urlCmd, fileCmd])
 		},
 
 		uninstall() {
 			_deregister?.()
 			_deregister = null
+			_panel?.close()
+			_panel = null
+		},
+
+		openCatalog() {
+			_panel?.open()
 		},
 	}
+
+	return plugin
 }
