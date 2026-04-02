@@ -206,7 +206,7 @@ actually execute shell commands, call an LLM, and read/write files.
 
 ### Action items
 
-- [ ] `packages/plugins/src/config-panel-bpmn/` — multi-instance panel
+- [x] `packages/plugins/src/config-panel-bpmn/` — multi-instance panel
   - Detect when a sub-process is selected
   - Toggle: Sequential / Parallel / None
   - Collection expression input (FEEL): `= emails` — the array to iterate over

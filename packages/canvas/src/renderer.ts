@@ -240,14 +240,22 @@ function gatewayMarker(type: string): string {
 
 // ── Sub-process bottom markers ────────────────────────────────────────────────
 
-function subProcessMarker(type: string): string {
+function subProcessMarker(type: string, multiInstance?: "sequential" | "parallel"): string {
+	let base: string
 	if (type === "adHocSubProcess") {
-		// Tilde (~) for ad-hoc
-		return `<path d="M-7 0Q-4 -4 0 0Q4 4 7 0" class="bpmnkit-icon"/>`
-	}
-	// Standard expand marker: + in a small box
-	return `<rect x="-7" y="-7" width="14" height="14" rx="1" class="bpmnkit-icon"/>
+		base = `<path d="M-7 0Q-4 -4 0 0Q4 4 7 0" class="bpmnkit-icon"/>`
+	} else {
+		base = `<rect x="-7" y="-7" width="14" height="14" rx="1" class="bpmnkit-icon"/>
 <path d="M0 -4v8M-4 0h8" class="bpmnkit-icon"/>`
+	}
+	if (multiInstance === "sequential") {
+		// Three horizontal lines ≡ (sequential)
+		base += `<g transform="translate(16 0)"><path d="M-4 -4h8M-4 0h8M-4 4h8" class="bpmnkit-icon"/></g>`
+	} else if (multiInstance === "parallel") {
+		// Three vertical lines ||| (parallel)
+		base += `<g transform="translate(16 0)"><path d="M-4 -4v8M0 -4v8M4 -4v8" class="bpmnkit-icon"/></g>`
+	}
+	return base
 }
 
 // ── Model index helpers ───────────────────────────────────────────────────────
@@ -483,9 +491,11 @@ function renderTask(
 		el?.type === "eventSubProcess" ||
 		el?.type === "transaction"
 	) {
+		const lc = "loopCharacteristics" in el ? el.loopCharacteristics : undefined
+		const multiInstance = lc ? (lc.isSequential ? "sequential" : "parallel") : undefined
 		const markerG = svgEl("g")
 		attr(markerG, { transform: `translate(${width / 2} ${height - 10})` })
-		markerG.innerHTML = subProcessMarker(el.type)
+		markerG.innerHTML = subProcessMarker(el.type, multiInstance)
 		g.appendChild(markerG)
 	}
 

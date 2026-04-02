@@ -1,5 +1,21 @@
 # Features
 
+## Local Automation Workflows — Phase 4: Multi-Instance & Flow UX (2026-04-02)
+
+Sub-processes can now be configured as multi-instance loops directly from the config panel.
+
+**Multi-instance config panel** (select any sub-process):
+- "Multi-instance" group with loop type dropdown: None / Parallel / Sequential
+- Collection field (FEEL expression): the array to iterate over — e.g. `= emails`
+- Element variable field: name for the current item — e.g. `email`
+- Collection and element variable fields are conditionally hidden when mode is "None"
+
+**Canvas markers** — multi-instance sub-processes show the standard BPMN bottom markers:
+- Parallel: three vertical lines `|||` to the right of the expand `+` marker
+- Sequential: three horizontal lines `≡` to the right of the expand `+` marker
+
+**BPMN model** — `BpmnMultiInstanceLoopCharacteristics` now carries `isSequential?: boolean`, parsed from and serialized to the native BPMN `isSequential` attribute. The builder's `MultiInstanceOptions.isSequential` field is now wired through.
+
 ## Local Automation Workflows — Phase 3: Connector UX (2026-04-02) — `packages/plugins`
 
 Built-in workers are now a first-class part of the connector catalog with full form UI.

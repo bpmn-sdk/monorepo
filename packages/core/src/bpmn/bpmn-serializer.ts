@@ -169,8 +169,10 @@ function serializeLoopCharacteristics(
 	bp: string,
 ): XmlElement[] {
 	if (!lc) return []
+	const attrs: Record<string, string> = {}
+	if (lc.isSequential) attrs.isSequential = "true"
 	return [
-		el(`${bp}:multiInstanceLoopCharacteristics`, {}, [
+		el(`${bp}:multiInstanceLoopCharacteristics`, attrs, [
 			...serializeExtensionElements(lc.extensionElements, bp),
 		]),
 	]

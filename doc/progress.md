@@ -1,5 +1,39 @@
 # Progress
 
+## 2026-04-02 — Feat: Local automation workflows — Phase 4 (multi-instance & flow UX)
+
+**`packages/core/src/bpmn/bpmn-model.ts`**:
+- Added `isSequential?: boolean` to `BpmnMultiInstanceLoopCharacteristics`
+
+**`packages/core/src/bpmn/bpmn-parser.ts`**:
+- `parseLoopCharacteristics()` now reads `isSequential` attribute from `<multiInstanceLoopCharacteristics>`
+
+**`packages/core/src/bpmn/bpmn-serializer.ts`**:
+- `serializeLoopCharacteristics()` now writes `isSequential="true"` when set
+
+**`packages/core/src/bpmn/bpmn-builder.ts`**:
+- `buildMultiInstance()` now propagates `isSequential` from `MultiInstanceOptions` to the model
+
+**`packages/plugins/src/config-panel-bpmn/util.ts`**:
+- Added `ZeebeLoopCharacteristics` interface
+- Added `parseZeebeLoopCharacteristics()` — reads `inputCollection`, `inputElement`, `outputCollection`, `outputElement` from `zeebe:loopCharacteristics` extension element
+- Added `buildZeebeLoopCharacteristics()` — creates a `zeebe:loopCharacteristics` XmlElement
+
+**`packages/plugins/src/config-panel-bpmn/index.ts`**:
+- Removed `"subProcess"` from `GENERAL_TYPES`
+- Added `SUB_PROCESS_SCHEMA` — General group (name, documentation) + Multi-instance group (loop type select, collection FEEL field, element variable text field with conditions)
+- Added `SUB_PROCESS_ADAPTER` — reads/writes `loopCharacteristics` on sub-process elements
+- Registered `"subProcess"` with the new schema
+
+**`packages/canvas/src/renderer.ts`**:
+- `subProcessMarker()` now accepts optional `multiInstance?: "sequential" | "parallel"` parameter
+- Parallel: appends three vertical lines `|||` to the right of the expand marker
+- Sequential: appends three horizontal lines `≡` to the right of the expand marker
+- Call site passes `lc.isSequential ? "sequential" : "parallel"` when `loopCharacteristics` is set
+
+**`packages/plugins/tests/config-panel-bpmn/multi-instance.test.ts`** (new):
+- 12 tests: `parseZeebeLoopCharacteristics` (3), sub-process adapter read (3), adapter write (3), BPMN XML round-trip (3)
+
 ## 2026-04-02 — Feat: Local automation workflows — Phase 3 (element templates & connector UX)
 
 **`apps/proxy/src/worker-templates.ts`**:
