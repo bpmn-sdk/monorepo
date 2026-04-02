@@ -32,7 +32,12 @@ function makeSubProcessDefs(
 		: never
 	if (lc) {
 		const extEls = lc.collection
-			? [buildZeebeLoopCharacteristics({ inputCollection: lc.collection, inputElement: lc.elementVariable ?? "" })]
+			? [
+					buildZeebeLoopCharacteristics({
+						inputCollection: lc.collection,
+						inputElement: lc.elementVariable ?? "",
+					}),
+				]
 			: []
 		loopCharacteristics = { isSequential: lc.isSequential, extensionElements: extEls }
 	}
@@ -86,11 +91,7 @@ function getAdapter(type: string): {
 		string,
 		{
 			read: (defs: BpmnDefinitions, id: string) => Record<string, unknown>
-			write: (
-				defs: BpmnDefinitions,
-				id: string,
-				values: Record<string, unknown>,
-			) => BpmnDefinitions
+			write: (defs: BpmnDefinitions, id: string, values: Record<string, unknown>) => BpmnDefinitions
 		}
 	>()
 	const mockPanel = {
@@ -141,7 +142,9 @@ describe("parseZeebeLoopCharacteristics", () => {
 	})
 
 	it("parses inputCollection and inputElement", () => {
-		const ext = [buildZeebeLoopCharacteristics({ inputCollection: "= emails", inputElement: "email" })]
+		const ext = [
+			buildZeebeLoopCharacteristics({ inputCollection: "= emails", inputElement: "email" }),
+		]
 		const result = parseZeebeLoopCharacteristics(ext)
 		expect(result).toEqual({
 			inputCollection: "= emails",
@@ -201,7 +204,7 @@ describe("sub-process adapter — write", () => {
 		})
 		const updated = adapter.write(defs, "sp1", { multiInstanceMode: "none" })
 		const el = updated.processes[0]?.flowElements.find((e) => e.id === "sp1")
-		expect("loopCharacteristics" in el! && el.loopCharacteristics).toBeUndefined()
+		expect(el != null && "loopCharacteristics" in el && el.loopCharacteristics).toBeUndefined()
 	})
 
 	it("writes parallel loopCharacteristics with collection and elementVariable", () => {
@@ -217,7 +220,9 @@ describe("sub-process adapter — write", () => {
 		}
 		expect(el.loopCharacteristics?.isSequential).toBeUndefined()
 		const loop = parseZeebeLoopCharacteristics(
-			el.loopCharacteristics?.extensionElements as ReturnType<typeof buildZeebeLoopCharacteristics>[],
+			el.loopCharacteristics?.extensionElements as ReturnType<
+				typeof buildZeebeLoopCharacteristics
+			>[],
 		)
 		expect(loop?.inputCollection).toBe("= emails")
 		expect(loop?.inputElement).toBe("email")
