@@ -1,5 +1,17 @@
 # @bpmnkit/user-tasks
 
+## 0.0.6
+
+### Patch Changes
+
+- [#76](https://github.com/bpmnkit/monorepo/pull/76) [`8d1a978`](https://github.com/bpmnkit/monorepo/commit/8d1a978e0b8c321106d95226134cbba6433ab4af) Thanks [@urbanisierung](https://github.com/urbanisierung)! - AI preparation
+
+- Updated dependencies [[`8d1a978`](https://github.com/bpmnkit/monorepo/commit/8d1a978e0b8c321106d95226134cbba6433ab4af)]:
+  - @bpmnkit/plugins@0.0.22
+  - @bpmnkit/core@0.0.19
+  - @bpmnkit/api@0.0.15
+  - @bpmnkit/ui@0.0.11
+
 ## 0.0.5
 
 ### Patch Changes

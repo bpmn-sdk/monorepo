@@ -1,5 +1,19 @@
 # @bpmnkit/cli
 
+## 0.0.21
+
+### Patch Changes
+
+- [#76](https://github.com/bpmnkit/monorepo/pull/76) [`8d1a978`](https://github.com/bpmnkit/monorepo/commit/8d1a978e0b8c321106d95226134cbba6433ab4af) Thanks [@urbanisierung](https://github.com/urbanisierung)! - AI preparation
+
+- Updated dependencies [[`8d1a978`](https://github.com/bpmnkit/monorepo/commit/8d1a978e0b8c321106d95226134cbba6433ab4af)]:
+  - @bpmnkit/engine@0.1.18
+  - @bpmnkit/core@0.0.19
+  - @bpmnkit/api@0.0.15
+  - @bpmnkit/ascii@0.0.19
+  - @bpmnkit/connector-gen@0.0.10
+  - @bpmnkit/profiles@0.0.13
+
 ## 0.0.20
 
 ### Patch Changes

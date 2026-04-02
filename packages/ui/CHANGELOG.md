@@ -1,5 +1,11 @@
 # @bpmnkit/ui
 
+## 0.0.11
+
+### Patch Changes
+
+- [#76](https://github.com/bpmnkit/monorepo/pull/76) [`8d1a978`](https://github.com/bpmnkit/monorepo/commit/8d1a978e0b8c321106d95226134cbba6433ab4af) Thanks [@urbanisierung](https://github.com/urbanisierung)! - AI preparation
+
 ## 0.0.10
 
 ### Patch Changes
