@@ -1,6 +1,6 @@
 {
 	"name": "@bpmnkit/casen-report",
-	"version": "0.1.2",
+	"version": "0.1.3",
 	"private": false,
 	"description": "Render HTML reports from Camunda 8 incident and SLA data",
 	"type": "module",

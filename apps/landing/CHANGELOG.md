@@ -1,5 +1,18 @@
 # @bpmnkit/landing
 
+## 0.0.22
+
+### Patch Changes
+
+- Updated dependencies [[`8d1a978`](https://github.com/bpmnkit/monorepo/commit/8d1a978e0b8c321106d95226134cbba6433ab4af)]:
+  - @bpmnkit/plugins@0.0.22
+  - @bpmnkit/canvas@0.0.19
+  - @bpmnkit/engine@0.1.18
+  - @bpmnkit/core@0.0.19
+  - @bpmnkit/connector-gen@0.0.10
+  - @bpmnkit/editor@0.0.22
+  - @bpmnkit/operate@0.0.19
+
 ## 0.0.21
 
 ### Patch Changes
