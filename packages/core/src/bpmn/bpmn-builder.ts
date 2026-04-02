@@ -369,7 +369,7 @@ function buildMultiInstance(options: MultiInstanceOptions): BpmnMultiInstanceLoo
 			children: [],
 		})
 	}
-	return { extensionElements: extChildren }
+	return { isSequential: options.isSequential || undefined, extensionElements: extChildren }
 }
 
 function buildAdHocLoopCharacteristics(lc: {

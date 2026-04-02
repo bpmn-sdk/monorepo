@@ -263,7 +263,8 @@ function parseLoopCharacteristics(
 ): BpmnMultiInstanceLoopCharacteristics | undefined {
 	const loopEl = findChild(element, "multiInstanceLoopCharacteristics")
 	if (!loopEl) return undefined
-	return { extensionElements: parseExtensionElements(loopEl) }
+	const isSequential = loopEl.attributes.isSequential === "true" ? true : undefined
+	return { isSequential, extensionElements: parseExtensionElements(loopEl) }
 }
 
 // ---------------------------------------------------------------------------

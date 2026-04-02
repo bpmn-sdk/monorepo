@@ -14,13 +14,17 @@
 	"dependencies": {
 		"@bpmnkit/api": "workspace:*",
 		"@bpmnkit/core": "workspace:*",
-		"@bpmnkit/profiles": "workspace:*"
+		"@bpmnkit/profiles": "workspace:*",
+		"better-sqlite3": "^12.8.0",
+		"imapflow": "^1.2.18",
+		"nodemailer": "^6.10.1"
 	},
 	"scripts": {
 		"start": "node dist/index.js",
 		"build": "tsc",
 		"typecheck": "tsc --noEmit",
 		"check": "biome check .",
+		"test": "vitest run",
 		"dev": "node --watch dist/index.js",
 		"bridge": "esbuild src/bridge.ts --bundle --format=iife --global-name=Bridge --platform=neutral --outfile=dist/bridge.bundle.js",
 		"bundle": "esbuild src/index.ts --bundle --platform=node --format=cjs --outfile=dist/bundle.cjs && esbuild src/mcp-server.ts --bundle --platform=node --format=cjs --outfile=dist/mcp-server.cjs && pnpm run bridge"

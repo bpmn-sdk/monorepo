@@ -1,6 +1,7 @@
 import { BpmnCanvas } from "@bpmnkit/canvas"
 import { Bpmn, Dmn, Form } from "@bpmnkit/core"
 import {
+	BookOpen,
 	ChevronDown,
 	ChevronRight,
 	FileText,
@@ -11,6 +12,7 @@ import {
 	List,
 	Move,
 	Plus,
+	Sparkles,
 	Trash2,
 	Upload,
 } from "lucide-react"
@@ -27,6 +29,8 @@ import { useProjectsStore } from "../stores/projects.js"
 import { useThemeStore } from "../stores/theme.js"
 import { toast } from "../stores/toast.js"
 import { useUiStore } from "../stores/ui.js"
+import type { ProcessTemplate } from "../templates/index.js"
+import { PROCESS_TEMPLATES } from "../templates/index.js"
 
 type ModelType = "bpmn" | "dmn" | "form" | "md"
 type ViewMode = "grid" | "list"
@@ -311,7 +315,7 @@ function MoveDialog({
 export function Models() {
 	const { models, saveModel, deleteModel, moveModel } = useModelsStore()
 	const [, navigate] = useLocation()
-	const { setBreadcrumbs } = useUiStore()
+	const { setBreadcrumbs, openAI } = useUiStore()
 	const { activeProjectId, projects } = useProjectsStore()
 
 	// Project-switch animation: fade out → swap content key → fade in
@@ -337,6 +341,7 @@ export function Models() {
 	const [newType, setNewType] = useState<ModelType>("bpmn")
 	const [confirmDelete, setConfirmDelete] = useState<ModelFile | null>(null)
 	const [moveTarget, setMoveTarget] = useState<ModelFile | null>(null)
+	const [templateGalleryOpen, setTemplateGalleryOpen] = useState(false)
 	const fileInputRef = useRef<HTMLInputElement>(null)
 
 	// Folder state (used in both FS and IndexedDB mode)
@@ -422,6 +427,36 @@ export function Models() {
 		const model = await saveModel(modelData)
 		setCreating(false)
 		setNewName("")
+		navigate(`/models/${model.id}`)
+	}
+
+	async function handleCreateFromTemplate(tpl: ProcessTemplate) {
+		let modelData: Parameters<typeof saveModel>[0]
+		const fileName = `${tpl.name}.bpmn`
+
+		if (fsMode) {
+			const relPath = selectedFolder ? `${selectedFolder}/${fileName}` : fileName
+			modelData = {
+				id: crypto.randomUUID(),
+				name: tpl.name,
+				type: "bpmn" as ModelType,
+				content: tpl.bpmn,
+				path: relPath,
+				createdAt: Date.now(),
+			}
+		} else {
+			modelData = {
+				id: crypto.randomUUID(),
+				name: tpl.name,
+				type: "bpmn" as ModelType,
+				content: tpl.bpmn,
+				folder: selectedFolder || undefined,
+				createdAt: Date.now(),
+			}
+		}
+
+		const model = await saveModel(modelData)
+		setTemplateGalleryOpen(false)
 		navigate(`/models/${model.id}`)
 	}
 
@@ -603,6 +638,10 @@ export function Models() {
 									<FolderPlus size={14} />
 									New Folder
 								</Button>
+								<Button variant="outline" size="sm" onClick={() => setTemplateGalleryOpen(true)}>
+									<BookOpen size={14} />
+									Templates
+								</Button>
 								<Button size="sm" onClick={() => setCreating(true)}>
 									<Plus size={14} />
 									New Model
@@ -680,6 +719,21 @@ export function Models() {
 								<Button onClick={() => setCreating(true)}>
 									<Plus size={14} />
 									Create model
+								</Button>
+								<Button variant="outline" onClick={() => setTemplateGalleryOpen(true)}>
+									<BookOpen size={14} />
+									Browse templates
+								</Button>
+								<Button
+									variant="outline"
+									onClick={() =>
+										openAI(
+											"Create a BPMN automation workflow for me. Describe what it should do step by step, and I'll design the diagram with the right worker task types (CLI, LLM, file system, HTTP scraper, or email).",
+										)
+									}
+								>
+									<Sparkles size={14} />
+									Describe what to automate
 								</Button>
 							</div>
 						) : viewMode === "grid" ? (
@@ -894,6 +948,31 @@ export function Models() {
 					onMove={(toFolder) => handleMove(moveTarget, toFolder)}
 				/>
 			)}
+
+			{/* Template gallery dialog */}
+			<Dialog open={templateGalleryOpen} onOpenChange={setTemplateGalleryOpen}>
+				<DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+					<DialogHeader>
+						<DialogTitle>Process Templates</DialogTitle>
+					</DialogHeader>
+					<div className="grid grid-cols-1 gap-3 sm:grid-cols-2 mt-2">
+						{PROCESS_TEMPLATES.map((tpl) => (
+							<button
+								key={tpl.id}
+								type="button"
+								onClick={() => void handleCreateFromTemplate(tpl)}
+								className="text-left rounded-lg border border-border bg-surface p-4 hover:border-accent hover:bg-accent/5 transition-colors"
+							>
+								<div className="text-sm font-medium text-fg">{tpl.name}</div>
+								<div className="text-xs text-muted mt-1">{tpl.description}</div>
+								<div className="mt-2 inline-flex items-center rounded-full bg-surface-2 px-2 py-0.5 text-[11px] text-muted capitalize">
+									{tpl.category}
+								</div>
+							</button>
+						))}
+					</div>
+				</DialogContent>
+			</Dialog>
 		</div>
 	)
 }

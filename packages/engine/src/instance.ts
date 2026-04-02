@@ -10,6 +10,8 @@ import { generateId } from "@bpmnkit/core"
 import { evaluate, parseExpression } from "@bpmnkit/feel"
 import type { FeelValue } from "@bpmnkit/feel"
 import { evaluateDecision } from "./dmn.js"
+import { resolveSecretString } from "./secrets.js"
+import type { SecretResolver } from "./secrets.js"
 import { scheduleTimer } from "./timers.js"
 import type { JobHandler, ProcessEvent } from "./types.js"
 import { VariableStore } from "./variables.js"
@@ -79,6 +81,7 @@ export class ProcessInstance {
 	private readonly decisions: Map<string, DmnDecision>
 	private readonly forms: Map<string, FormDefinition>
 	private readonly jobWorkers: Map<string, JobHandler>
+	private readonly secretResolver: SecretResolver | undefined
 
 	/**
 	 * Optional hook called just before an element completes (token moves on).
@@ -93,12 +96,14 @@ export class ProcessInstance {
 		forms: Map<string, FormDefinition>,
 		jobWorkers: Map<string, JobHandler>,
 		initialVars: Record<string, unknown>,
+		secretResolver?: SecretResolver,
 	) {
 		this.id = generateId("pi")
 		this.processId = process.id
 		this.decisions = decisions
 		this.forms = forms
 		this.jobWorkers = jobWorkers
+		this.secretResolver = secretResolver
 
 		this.variables = new VariableStore()
 		this.rootScopeId = `scope_${this.id}`
@@ -282,10 +287,25 @@ export class ProcessInstance {
 		const ext = parseZeebeExt(el.extensionElements)
 		if (ext.ioMapping) {
 			for (const inp of ext.ioMapping.inputs) {
-				const val = this.evalFeel(inp.source, scopeId, {
-					elementId: el.id,
-					property: `input:${inp.target}`,
-				})
+				let val: unknown
+				if (this.secretResolver !== undefined && inp.source.includes("{{secrets.")) {
+					const resolved = await resolveSecretString(inp.source, this.secretResolver)
+					// If source starts with "=", it's a FEEL expression — evaluate after secret substitution.
+					// Otherwise it's a literal string — use the resolved value directly.
+					if (inp.source.trimStart().startsWith("=")) {
+						val = this.evalFeel(resolved, scopeId, {
+							elementId: el.id,
+							property: `input:${inp.target}`,
+						})
+					} else {
+						val = resolved
+					}
+				} else {
+					val = this.evalFeel(inp.source, scopeId, {
+						elementId: el.id,
+						property: `input:${inp.target}`,
+					})
+				}
 				this.variables.setLocal(scopeId, inp.target, val)
 				this.emit({ type: "variable:set", name: inp.target, value: val, scopeId })
 			}
@@ -445,7 +465,16 @@ export class ProcessInstance {
 		}
 
 		const jobId = generateId("job")
-		const headers = ext.taskHeaders ?? {}
+		const rawHeaders = ext.taskHeaders ?? {}
+		let headers: Record<string, string>
+		if (this.secretResolver !== undefined) {
+			headers = {}
+			for (const [k, v] of Object.entries(rawHeaders)) {
+				headers[k] = await resolveSecretString(v, this.secretResolver)
+			}
+		} else {
+			headers = rawHeaders
+		}
 		const vars = this.variables.getAll(ctx.scopeId)
 
 		let jobError: string | undefined

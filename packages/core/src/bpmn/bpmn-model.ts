@@ -152,6 +152,8 @@ export type BpmnEventDefinition =
 
 /** Multi-instance loop configuration attached to a task or sub-process. */
 export interface BpmnMultiInstanceLoopCharacteristics {
+	/** When true, iterations run one at a time (sequential). When false or absent, runs in parallel. */
+	isSequential?: boolean
 	extensionElements: XmlElement[]
 }
 

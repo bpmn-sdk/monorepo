@@ -1,5 +1,97 @@
 # Features
 
+## Local Automation Workflows — Phase 4: Multi-Instance & Flow UX (2026-04-02)
+
+Sub-processes can now be configured as multi-instance loops directly from the config panel, with visual feedback on the canvas and variable scope visibility in the variable-flow overlay.
+
+**Multi-instance config panel** (select any sub-process):
+- "Process each item in a list" action button — one click to configure parallel for-each with `item` as the element variable
+- Loop type dropdown (Parallel / Sequential), Collection (FEEL), and Element variable fields appear after setup
+- Fields are hidden when no loop is configured, keeping the panel clean
+
+**Canvas markers** — multi-instance sub-processes show standard BPMN bottom markers:
+- Parallel: three vertical lines `|||` to the right of the expand `+` marker
+- Sequential: three horizontal lines `≡` to the right of the expand `+` marker
+
+**Variable flow overlay** — the iteration variable (e.g. `email`) is now shown in scope tooltips for sequence flows inside multi-instance sub-processes. Inner elements that produce additional variables also appear in scope.
+
+**BPMN model** — `BpmnMultiInstanceLoopCharacteristics` now carries `isSequential?: boolean`, parsed from and serialized to the native BPMN `isSequential` attribute. The builder's `MultiInstanceOptions.isSequential` field is now wired through.
+
+## Local Automation Workflows — Phase 3: Connector UX (2026-04-02) — `packages/plugins`
+
+Built-in workers are now a first-class part of the connector catalog with full form UI.
+
+**Connector catalog panel** (Ctrl+K → "Browse connectors…"):
+- "Built-in Workers" tab: card grid for all 8 bpmnkit workers — always visible, no proxy needed
+- "Community APIs" tab: 30+ OpenAPI-backed connector entries with search
+- Click "Use" on a worker card to register it; select any service task to apply via the Connector field
+- Footer: Import from URL / Import from file actions
+
+**Template form renderer** — all worker fields rendered correctly in the config panel:
+- Text with `feel: "optional"` → FEEL expression field with toggle (prompts, paths, content)
+- Dropdown → searchable select (model picker, events picker)
+- Boolean → toggle (ignore exit code)
+- Number → numeric text field (timeout)
+- `{{secrets.NAME}}` syntax works in any String/Text field (documented in field descriptions)
+
+**Static templates** in `packages/plugins/src/connector-catalog/builtin-templates.ts`:
+- 8 templates always embedded in the plugin — no network call needed to discover workers
+
+## Local Automation Workflows — Phase 2: Triggers (2026-04-02) — `apps/proxy`
+
+Workflows now start automatically without a "Run" click.
+
+**Webhook trigger** (`POST /webhooks/:processId`):
+- Any HTTP client can start a process instance; request body becomes process variables
+- Optional `WEBHOOK_TOKEN` env var for Bearer token protection
+
+**Timer trigger** (scan + schedule):
+- Parses `<timeDuration>`, `<timeDate>`, `<timeCycle>` from deployed BPMN timer start events
+- ISO 8601 duration/date/repeating-interval support (`PT1H`, `R/PT30M`, `2026-01-01T00:00:00Z`)
+- Persists last-fired timestamps to `~/.bpmnkit/timer-state.json`
+
+**File-watcher trigger** (`io.bpmnkit:trigger:file-watch:1`):
+- Service tasks with `watchPath` header trigger a process instance on file add/change
+- `glob` header for filename filtering; `events` header for add/change/all
+- Injects `{ filePath, fileName, fileContent, relativePath, eventType }` as process variables
+
+**Connector catalog integration**:
+- Built-in worker templates auto-loaded from proxy on Studio startup and shown in the connector catalog
+
+Set `BPMNKIT_TRIGGERS=false` to disable all triggers.
+
+## Local Automation Workflows — Phase 1 (2026-04-02) — `apps/proxy`
+
+bpmnkit now executes BPMN service tasks locally. Deploy a diagram to a running reebe instance and the
+proxy's built-in worker daemon picks up jobs automatically.
+
+**Built-in workers** (all configurable via element templates, no code required):
+
+| Job type | Purpose |
+|---|---|
+| `io.bpmnkit:cli:1` | Run any shell command; `{{var}}` interpolation; outputs stdout/stderr/exitCode |
+| `io.bpmnkit:llm:1` | Call Claude/Copilot/Gemini with a prompt; auto-detects available adapter |
+| `io.bpmnkit:fs:read:1` | Read a file into a process variable |
+| `io.bpmnkit:fs:write:1` | Write a process variable to a file |
+| `io.bpmnkit:fs:append:1` | Append to a file |
+| `io.bpmnkit:fs:list:1` | List a directory into an array variable |
+| `io.bpmnkit:js:1` | Evaluate a JS expression with process variables in scope |
+
+- `GET /worker-templates` — serves element template JSON for all built-in workers
+- `GET /status` — now includes `workers` object with active state, job types, poll count
+- Set `BPMNKIT_WORKERS=false` to disable the daemon
+
+## Connector Secrets (2026-04-02) — `packages/engine`, `apps/proxy`, `apps/studio`
+
+Use `{{secrets.NAME}}` in REST connector fields (URL, auth token, headers) to keep credentials out of BPMN diagrams — matching Camunda's native secrets syntax.
+
+- **`SecretResolver` interface** (`@bpmnkit/engine`) — pluggable resolution strategy; `EnvSecretResolver` for standalone/Node.js
+- **Proxy endpoint** (`POST /secrets/:name`) — proxy encrypts env var values with a client-supplied AES-256-GCM key before sending; the key is ephemeral (generated fresh on each Studio boot) and never stored
+- **Session key store** (`useSecretsStore`) — generates key on boot, caches resolved secrets for the session, exposes `proxySecretResolver` for use in job workers
+- **WASM adapter** — resolves secrets in URL, headers, and auth token before making HTTP calls
+- **TS engine** — resolves secrets in IO mapping inputs and task headers at job execution time
+- **Settings panel** — scans all BPMN models for `{{secrets.*}}` references and shows which are configured vs missing in the proxy environment
+
 ## File System Persistence & Project Management (2026-04-01) — `apps/proxy`, `apps/studio`, `packages/plugins`
 
 Studio models can now be stored as real files on disk instead of (or alongside) browser IndexedDB.

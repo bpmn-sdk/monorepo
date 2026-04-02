@@ -31,6 +31,7 @@ import type {
 	BpmnDefinitions,
 	BpmnEventDefinition,
 	BpmnFlowElement,
+	BpmnMultiInstanceLoopCharacteristics,
 	BpmnTimerEventDefinition,
 } from "@bpmnkit/core"
 import {
@@ -57,6 +58,7 @@ export { CAMUNDA_CONNECTOR_TEMPLATES } from "./templates/generated.js"
 export { templateToServiceTaskOptions } from "./template-to-service-task.js"
 import {
 	buildPropertiesWithExampleOutput,
+	buildZeebeLoopCharacteristics,
 	findFlowElement,
 	findSequenceFlow,
 	getExampleOutputJson,
@@ -66,6 +68,7 @@ import {
 	parseZeebeError,
 	parseZeebeEscalation,
 	parseZeebeExtensions,
+	parseZeebeLoopCharacteristics,
 	parseZeebeMessage,
 	parseZeebeScript,
 	parseZeebeSignal,
@@ -451,11 +454,130 @@ const GENERAL_TYPES: CreateShapeType[] = [
 	"inclusiveGateway",
 	"eventBasedGateway",
 	"complexGateway",
-	"subProcess",
 	"transaction",
 	"manualTask",
 	"task",
 ]
+
+// ── Sub-process schema (general + multi-instance) ─────────────────────────────
+
+const SUB_PROCESS_SCHEMA: PanelSchema = {
+	compact: [{ key: "name", label: "Name", type: "text", placeholder: "Sub-process name" }],
+	groups: [
+		{
+			id: "general",
+			label: "General",
+			fields: [
+				{ key: "name", label: "Name", type: "text", placeholder: "Sub-process name" },
+				{
+					key: "documentation",
+					label: "Documentation",
+					type: "textarea",
+					placeholder: "Add notes or documentation for this element…",
+				},
+			],
+		},
+		{
+			id: "multi-instance",
+			label: "Multi-instance",
+			fields: [
+				// Guided setup button — visible only when no loop is configured
+				{
+					key: "_setupForEach",
+					label: "Process each item in a list",
+					type: "action",
+					hint: "Configure this sub-process to run once for each item in a collection.",
+					condition: (v) => v.multiInstanceMode === "none",
+					onClick: (_values, setValue) => {
+						setValue("multiInstanceMode", "parallel")
+						setValue("elementVariable", "item")
+					},
+				},
+				{
+					key: "multiInstanceMode",
+					label: "Loop type",
+					type: "select",
+					options: [
+						{ value: "none", label: "None" },
+						{ value: "parallel", label: "Parallel (for each, all at once)" },
+						{ value: "sequential", label: "Sequential (for each, one at a time)" },
+					],
+					condition: (v) => v.multiInstanceMode !== "none",
+				},
+				{
+					key: "collection",
+					label: "Collection",
+					type: "feel-expression",
+					placeholder: "= emails",
+					hint: "FEEL expression that returns the array to iterate over.",
+					condition: (v) => v.multiInstanceMode !== "none",
+				},
+				{
+					key: "elementVariable",
+					label: "Element variable",
+					type: "text",
+					placeholder: "item",
+					hint: "Variable name for the current iteration item. Available inside the sub-process as a process variable.",
+					condition: (v) => v.multiInstanceMode !== "none",
+				},
+			],
+		},
+	],
+}
+
+const SUB_PROCESS_ADAPTER: PanelAdapter = {
+	read(defs, id) {
+		const el = findFlowElement(defs, id)
+		if (!el) return {}
+		const lc = "loopCharacteristics" in el ? el.loopCharacteristics : undefined
+		const loop = parseZeebeLoopCharacteristics(lc?.extensionElements ?? [])
+		let multiInstanceMode = "none"
+		if (lc) {
+			multiInstanceMode = lc.isSequential ? "sequential" : "parallel"
+		}
+		return {
+			name: el.name ?? "",
+			documentation: el.documentation ?? "",
+			multiInstanceMode,
+			collection: loop?.inputCollection ?? "",
+			elementVariable: loop?.inputElement ?? "",
+		}
+	},
+	write(defs, id, values) {
+		return updateFlowElement(defs, id, (el) => {
+			const mode = typeof values.multiInstanceMode === "string" ? values.multiInstanceMode : "none"
+			const collection = typeof values.collection === "string" ? values.collection : ""
+			const elementVariable =
+				typeof values.elementVariable === "string" ? values.elementVariable : ""
+
+			let loopCharacteristics: BpmnMultiInstanceLoopCharacteristics | undefined
+			if (mode !== "none") {
+				const extEls = collection
+					? [
+							buildZeebeLoopCharacteristics({
+								inputCollection: collection,
+								inputElement: elementVariable,
+							}),
+						]
+					: []
+				loopCharacteristics = {
+					isSequential: mode === "sequential" ? true : undefined,
+					extensionElements: extEls,
+				}
+			}
+
+			return {
+				...el,
+				name: typeof values.name === "string" ? values.name : el.name,
+				documentation:
+					typeof values.documentation === "string"
+						? values.documentation || undefined
+						: el.documentation,
+				loopCharacteristics,
+			}
+		})
+	},
+}
 
 // ── User task schema (formId) ─────────────────────────────────────────────────
 
@@ -1925,6 +2047,8 @@ export function createConfigPanelBpmnPlugin(
 			)
 			// Service task: template-aware adapter
 			configPanel.registerSchema("serviceTask", GENERIC_SERVICE_TASK_SCHEMA, SERVICE_TASK_ADAPTER)
+			// Sub-process: general fields + multi-instance configuration
+			configPanel.registerSchema("subProcess", SUB_PROCESS_SCHEMA, SUB_PROCESS_ADAPTER)
 			// Ad-hoc subprocess: template-aware adapter (AI Agent pattern)
 			configPanel.registerSchema("adHocSubProcess", GENERIC_ADHOC_SCHEMA, ADHOC_SUBPROCESS_ADAPTER)
 			// Script task: FEEL expression + result variable

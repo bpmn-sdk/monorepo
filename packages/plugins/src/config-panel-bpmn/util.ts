@@ -112,6 +112,39 @@ export function parseZeebeExtensions(extensionElements: XmlElement[]): ZeebeExte
 	return ext
 }
 
+/** Parsed `zeebe:loopCharacteristics` extension element from a multi-instance loop. */
+export interface ZeebeLoopCharacteristics {
+	inputCollection: string
+	inputElement: string
+	outputCollection?: string
+	outputElement?: string
+}
+
+/** Read `zeebe:loopCharacteristics` from a `multiInstanceLoopCharacteristics` extensionElements list. */
+export function parseZeebeLoopCharacteristics(
+	extensionElements: XmlElement[],
+): ZeebeLoopCharacteristics | undefined {
+	const loopEl = extensionElements.find((e) => xmlLocalName(e.name) === "loopCharacteristics")
+	if (!loopEl) return undefined
+	return {
+		inputCollection: loopEl.attributes.inputCollection ?? "",
+		inputElement: loopEl.attributes.inputElement ?? "",
+		outputCollection: loopEl.attributes.outputCollection,
+		outputElement: loopEl.attributes.outputElement,
+	}
+}
+
+/** Build a `zeebe:loopCharacteristics` XmlElement from collection/element options. */
+export function buildZeebeLoopCharacteristics(opts: {
+	inputCollection: string
+	inputElement: string
+}): XmlElement {
+	const attrs: Record<string, string> = {}
+	if (opts.inputCollection) attrs.inputCollection = opts.inputCollection
+	if (opts.inputElement) attrs.inputElement = opts.inputElement
+	return { name: "zeebe:loopCharacteristics", attributes: attrs, children: [] }
+}
+
 const EXAMPLE_OUTPUT_JSON_KEY = "camundaModeler:exampleOutputJson"
 
 /** Read the example output JSON string from parsed zeebe extensions. */

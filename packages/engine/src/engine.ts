@@ -1,5 +1,6 @@
 import type { BpmnDefinitions, DmnDecision, DmnDefinitions, FormDefinition } from "@bpmnkit/core"
 import { ProcessInstance } from "./instance.js"
+import type { SecretResolver } from "./secrets.js"
 import type { JobHandler } from "./types.js"
 
 /** Options for {@link Engine.start}. */
@@ -11,11 +12,22 @@ export interface StartOptions {
 	beforeComplete?: (elementId: string) => Promise<void>
 }
 
+/** Options for the {@link Engine} constructor. */
+export interface EngineOptions {
+	/** Resolver for `{{secrets.NAME}}` placeholders in connector configurations. */
+	secretResolver?: SecretResolver
+}
+
 export class Engine {
 	private readonly processes = new Map<string, import("@bpmnkit/core").BpmnProcess>()
 	private readonly decisions = new Map<string, DmnDecision>()
 	private readonly forms = new Map<string, FormDefinition>()
 	private readonly workers = new Map<string, JobHandler>()
+	private readonly secretResolver: SecretResolver | undefined
+
+	constructor(options?: EngineOptions) {
+		this.secretResolver = options?.secretResolver
+	}
 
 	/**
 	 * Deploy BPMN processes, DMN decisions, and form definitions.
@@ -70,6 +82,7 @@ export class Engine {
 			this.forms,
 			this.workers,
 			variables ?? {},
+			this.secretResolver,
 		)
 		if (options?.beforeComplete !== undefined) {
 			instance.beforeComplete = options.beforeComplete

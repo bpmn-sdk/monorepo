@@ -1,5 +1,287 @@
 # Progress
 
+## 2026-04-02 — Feat: Local automation workflows — all remaining items complete
+
+**Multi-instance subprocess execution (reebe engine — Rust):**
+- `apps/reebe/crates/reebe-engine/src/processor/bpmn_element.rs` — `activate_element` SubProcess arm: detects `sp.multi_instance`, evaluates `input_collection` FEEL expression against process variables, stores `__mi_items` (full array) and `__mi_idx` (0) as variables scoped to the subprocess `ei_key`, and sets the `input_element` variable to the first item
+- `complete_element` `is_subprocess_end` block: checks for `__mi_items`/`__mi_idx` variables; if present, collects per-iteration output (`output_element`/`output_collection`), advances index and re-activates start events for next iteration; when all iterations done (or non-MI), falls through to normal subprocess completion
+- Sequential mode fully implemented; parallel mode is out of scope for now
+
+**"Re-run from here" feature:**
+- `apps/proxy/src/routes/run-history.ts` — added `handleRerunHistory`: looks up run, fetches process instance from reebe to get `bpmnProcessId`, merges original variables with any overrides, starts a new process instance
+- `apps/proxy/src/index.ts` — registered `POST /run-history/:id/rerun`
+- `apps/studio/src/api/queries.ts` — added `useRerunHistory()` mutation
+- `apps/studio/src/pages/RunHistory.tsx` — `RerunDialog` component with pre-filled JSON variable textarea; "Re-run" button shown on failed runs
+
+**"Run" button trigger dropdown (Phase 2 remaining):**
+- `apps/studio/src/pages/ModelDetail.tsx` — `StudioDeployPane` now has a 4-tab trigger selector: Manual (existing variable form), Webhook (URL + curl example), Timer (ISO 8601 hint), File Watch (setup instructions)
+
+## 2026-04-02 — Feat: Local automation workflows — Phase 6 complete (polish & ecosystem)
+
+**`apps/proxy/src/workers/http.ts`** (new):
+- HTTP scraper worker (`io.bpmnkit:http:scrape:1`)
+- `fetch(url)` with configurable timeout; extracts `<title>`, strips HTML to plain text
+- Returns `{ url, html, text, title, statusCode }` (optionally under a `resultVariable`)
+
+**`apps/proxy/src/workers/email.ts`** (new):
+- `io.bpmnkit:email:fetch:1` — IMAP fetch via `imapflow`; returns `[{ uid, subject, from, to, date, body }]`
+- `io.bpmnkit:email:send:1` — SMTP send via `nodemailer`; reads `to`/`subject`/`body` from process variables
+- All credentials use `{{secrets.*}}` interpolation
+
+**Security hardening (proxy workers):**
+- `cli.ts` — `BPMNKIT_CLI_ALLOWED` env var: comma-separated command-name allowlist; silently bypassed if unset
+- `fs.ts` — `BPMNKIT_FS_ROOT` env var: all paths must resolve under this directory
+- `js.ts` — replaced `new Function` with `node:vm` `runInNewContext`; only `variables` accessible, no Node.js globals
+
+**`apps/proxy/src/worker-templates.ts`** / **`packages/plugins/src/connector-catalog/builtin-templates.ts`**:
+- Added HTTP Scraper, Fetch Emails, Send Email element templates
+
+**`apps/studio/src/templates/index.ts`** (new):
+- 5 BPMN process starter templates: Summarize Documents, Monitor URL, Code Review Assistant, Batch CLI, Fetch+Summarize
+- Valid BPMN 2.0 XML with Zeebe extensions + BPMNDi layout
+
+**`apps/studio/src/pages/Models.tsx`**:
+- "Templates" button in header opens template gallery dialog
+- Empty state: "Browse templates" + "Describe what to automate" (opens AI drawer with starter prompt)
+- Template gallery dialog — card-per-template with name, description, category pill; creates model on click
+
+## 2026-04-02 — Feat: Local automation workflows — Phase 5 complete (observability & audit)
+
+**`apps/proxy/src/routes/run-history.ts`** (new):
+- SQLite run history store at `~/.bpmnkit/run-history.db` using `better-sqlite3`
+- Tables: `runs` (per process instance) and `steps` (per job execution)
+- Type-specific input extraction: LLM gets interpolated prompt+system; CLI gets command; FS gets path; JS gets expression; secrets masked as `***`
+- Exports `onJobStart`, `onJobComplete`, `onJobFail` called from worker dispatch loop
+- Route handlers: `GET /run-history`, `GET /run-history/:id`, `DELETE /run-history`
+
+**`apps/proxy/src/worker.ts`**:
+- `dispatchJob()` now calls `onJobStart`/`onJobComplete`/`onJobFail` around each job handler
+
+**`apps/proxy/src/index.ts`**:
+- Registered all three run-history routes
+
+**`apps/studio/src/api/types.ts`**:
+- Added `RunHistoryStep`, `RunHistoryRun`, `RunHistoryList` interfaces
+
+**`apps/studio/src/api/keys.ts`** / **`queries.ts`**:
+- Added `useRunHistory`, `useRunHistoryDetail`, `useClearRunHistory` hooks with 5s/3s polling
+
+**`apps/studio/src/pages/RunHistory.tsx`** (new):
+- Split list/detail layout with 5s auto-refresh on list, 3s on selected run
+- `StepCard` with collapsible LLM (prompt + response), CLI (command + stdout/stderr), FS, JS rendering
+- `StatePill` component; `JobTypeIcon` for each worker type
+- Clear history button with confirmation
+
+**`apps/studio/src/app.tsx`**:
+- Added `/run-history` route
+
+**`apps/studio/src/layout/Sidebar.tsx`**:
+- Added "Run History" nav item (History icon, shortcut `g h`) to both developer and operator orderings; added `/run-history` to `PROXY_REQUIRED`
+
+## 2026-04-02 — Feat: Local automation workflows — Phase 4 complete (multi-instance & flow UX)
+
+**`packages/core/src/bpmn/optimize/variable-flow.ts`**:
+- After top-level edge-scope computation, recurse into multi-instance sub-processes
+- For each sub-process with `loopCharacteristics` containing `inputElement` in `zeebe:loopCharacteristics`, emit `data-flow/edge-scope` findings for all inner sequence flows
+- Inner scope is seeded with the iteration variable (e.g. `email`) plus any variables produced by upstream inner elements
+- 4 new tests in `packages/core/tests/variable-flow.test.ts`
+
+**`packages/plugins/src/config-panel-bpmn/index.ts`**:
+- `SUB_PROCESS_SCHEMA` multi-instance group: added guided "Process each item in a list" action button (visible when mode=none) that sets loop type to parallel with `item` as the element variable
+- `multiInstanceMode` select field is now conditionally hidden when mode=none (only shown once configured)
+- Extended hint on `elementVariable` field: clarifies the variable is available inside the sub-process
+
+## 2026-04-02 — Feat: Local automation workflows — Phase 4 (multi-instance config panel & canvas markers)
+
+**`packages/core/src/bpmn/bpmn-model.ts`**:
+- Added `isSequential?: boolean` to `BpmnMultiInstanceLoopCharacteristics`
+
+**`packages/core/src/bpmn/bpmn-parser.ts`**:
+- `parseLoopCharacteristics()` now reads `isSequential` attribute from `<multiInstanceLoopCharacteristics>`
+
+**`packages/core/src/bpmn/bpmn-serializer.ts`**:
+- `serializeLoopCharacteristics()` now writes `isSequential="true"` when set
+
+**`packages/core/src/bpmn/bpmn-builder.ts`**:
+- `buildMultiInstance()` now propagates `isSequential` from `MultiInstanceOptions` to the model
+
+**`packages/plugins/src/config-panel-bpmn/util.ts`**:
+- Added `ZeebeLoopCharacteristics` interface
+- Added `parseZeebeLoopCharacteristics()` — reads `inputCollection`, `inputElement`, `outputCollection`, `outputElement` from `zeebe:loopCharacteristics` extension element
+- Added `buildZeebeLoopCharacteristics()` — creates a `zeebe:loopCharacteristics` XmlElement
+
+**`packages/plugins/src/config-panel-bpmn/index.ts`**:
+- Removed `"subProcess"` from `GENERAL_TYPES`
+- Added `SUB_PROCESS_SCHEMA` — General group (name, documentation) + Multi-instance group (loop type select, collection FEEL field, element variable text field with conditions)
+- Added `SUB_PROCESS_ADAPTER` — reads/writes `loopCharacteristics` on sub-process elements
+- Registered `"subProcess"` with the new schema
+
+**`packages/canvas/src/renderer.ts`**:
+- `subProcessMarker()` now accepts optional `multiInstance?: "sequential" | "parallel"` parameter
+- Parallel: appends three vertical lines `|||` to the right of the expand marker
+- Sequential: appends three horizontal lines `≡` to the right of the expand marker
+- Call site passes `lc.isSequential ? "sequential" : "parallel"` when `loopCharacteristics` is set
+
+**`packages/plugins/tests/config-panel-bpmn/multi-instance.test.ts`** (new):
+- 12 tests: `parseZeebeLoopCharacteristics` (3), sub-process adapter read (3), adapter write (3), BPMN XML round-trip (3)
+
+## 2026-04-02 — Feat: Local automation workflows — Phase 3 (element templates & connector UX)
+
+**`apps/proxy/src/worker-templates.ts`**:
+- All 8 worker templates finalized: property `id`s, `constraints.notEmpty` on required fields, proper groups, descriptions
+- Added File Watch Trigger template (`io.bpmnkit.trigger.file-watch:1`, job type `io.bpmnkit:trigger:file-watch:1`)
+- Using modern `zeebe:taskDefinition` binding with `property: "type"` instead of deprecated `zeebe:taskDefinition:type`
+
+**`packages/plugins/src/connector-catalog/builtin-templates.ts`** (new):
+- Static copy of all 8 worker templates typed as `ElementTemplate` from the plugins package
+- Always available in the connector catalog — no proxy required
+
+**`packages/plugins/src/connector-catalog/panel.ts`** (new):
+- `CatalogPanel` — vanilla DOM modal with two tabs: "Built-in Workers" and "Community APIs"
+- Built-in tab: card grid (icon, name, description, Use button), search filter
+- Community tab: scrollable list of all 30+ OpenAPI catalog entries, search filter
+- Footer: "Import from URL…" and "Import from file…" actions
+- Closes on backdrop click or Escape key
+
+**`packages/plugins/src/connector-catalog/css.ts`**:
+- Added full panel styles: overlay, panel, header, tabs, search input, card grid, community list, empty state, footer
+- Light theme overrides via `[data-bpmnkit-hud-theme="light"]`
+
+**`packages/plugins/src/connector-catalog/index.ts`**:
+- Static built-in templates auto-registered at install (no proxy required)
+- `CatalogPanel` created and wired to registrar + palette callbacks
+- "Browse connectors…" palette command opens the panel
+- Returns `ConnectorCatalogPlugin` (extends `CanvasPlugin`) with `openCatalog()` method
+- Exports: `BUILTIN_WORKER_TEMPLATES`, `ConnectorCatalogPlugin`
+
+**`packages/plugins/tests/config-panel-bpmn/template-round-trip.test.ts`** (new):
+- 21 tests covering all worker templates:
+  - In-memory write→read adapter round-trips (CLI, LLM, FS Read/Write, JS, File Watch)
+  - Template stamp write and removal
+  - Default value fallback behavior
+  - XML `Bpmn.export` → `Bpmn.parse` round-trips verifying field preservation
+  - Parameterized test: all 8 templates write the correct `zeebe:taskDefinition` type
+
+## 2026-04-02 — Feat: Local automation workflows — Phase 1 completion + Phase 2 (triggers)
+
+**Phase 1 completion:**
+
+**`packages/plugins/src/connector-catalog/index.ts`**:
+- Added optional `options?: ConnectorCatalogOptions` to `createConnectorCatalogPlugin()`
+- When `proxyUrl` is set, fetches `GET /worker-templates` on install and registers all built-in worker templates automatically
+
+**`apps/studio/src/pages/ModelDetail.tsx`**:
+- Passes `useClusterStore.getState().proxyUrl` to `createConnectorCatalogPlugin` so Studio auto-loads built-in worker templates on startup
+
+**`apps/proxy/tests/worker.test.ts`** (new) + `vitest.config.ts` (new):
+- 19 tests covering `interpolate()` (variables + secrets), CLI worker (command exec, variable interpolation, exit code handling, resultVariable), and FS workers (read/write/append/list, parent dir creation, resultVariable wrapping)
+
+**Phase 2 — Trigger Infrastructure:**
+
+**`apps/proxy/src/triggers/webhook.ts`** (new):
+- `POST /webhooks/:processId` — starts a process instance with request body as variables
+- Optional `WEBHOOK_TOKEN` env var for `Authorization: Bearer` protection
+- Returns `{ processInstanceKey }` synchronously
+
+**`apps/proxy/src/triggers/timer.ts`** (new):
+- Scans deployed processes for BPMN timer start events (`timeDuration`, `timeDate`, `timeCycle`)
+- Fires `POST /v2/process-instances` at the appropriate times
+- Persists last-fired timestamps to `~/.bpmnkit/timer-state.json` to survive restarts
+- Rescans deployed processes every 60 s; ticks every 5 s
+
+**`apps/proxy/src/triggers/file-watcher.ts`** (new):
+- Scans for service tasks with job type `io.bpmnkit:trigger:file-watch:1` and `watchPath` header
+- Sets up `fs.watch` on each configured path; fires process instance with `{ filePath, fileName, fileContent, relativePath, eventType }` variables
+- Supports `glob` header for filename filtering and `events` header (add/change/all)
+- Rescans every 60 s; restarts watchers when deployed processes change
+
+**`apps/proxy/src/triggers/index.ts`** (new):
+- Orchestrator: starts timer + file-watch triggers; exports `matchWebhookRoute` and `handleWebhook`
+- Respects `BPMNKIT_TRIGGERS=false` to opt out
+
+**`apps/proxy/src/index.ts`**:
+- Imports and starts `startTriggers()` after server binds
+- Webhook route wired into main request handler: `POST /webhooks/:processId`
+
+## 2026-04-02 — Feat: Local automation workflows — Phase 1 (worker daemon + core workers)
+
+Full spec: [`doc/automation-workflows.md`](automation-workflows.md)
+
+**`apps/proxy/src/worker.ts`** (new):
+- Worker daemon: polls active profile's reebe instance every 1 s via `POST /v2/jobs/activation`
+- Registry of built-in handlers keyed by job type
+- `interpolate(template, vars)` helper — replaces `{{varName}}` and `{{secrets.NAME}}` in strings
+- `startWorkerDaemon()` — called from server startup; respects `BPMNKIT_WORKERS=false`
+- `workerState` exported for `/status` introspection
+
+**`apps/proxy/src/workers/cli.ts`** (new) — `io.bpmnkit:cli:1`:
+- Runs any shell command with `{{var}}` interpolation; headers: `command`, `cwd`, `timeout`, `ignoreExitCode`
+- Outputs `{ stdout, stderr, exitCode }`; fails job on non-zero exit (unless `ignoreExitCode=true`)
+
+**`apps/proxy/src/workers/llm.ts`** (new) — `io.bpmnkit:llm:1`:
+- Calls first available LLM adapter (Claude → Copilot → Gemini); reuses existing proxy adapters
+- Variable `prompt` (with `{{var}}` interpolation); headers: `system`, `model`, `resultVariable`
+- Collects streamed tokens into `{ response }` output variable
+
+**`apps/proxy/src/workers/fs.ts`** (new) — `io.bpmnkit:fs:read|write|append|list:1`:
+- Read/write/append/list file system operations; path from variable or header, `~/` expansion
+- Write/append create parent directories automatically
+
+**`apps/proxy/src/workers/js.ts`** (new) — `io.bpmnkit:js:1`:
+- Evaluates a JS expression with `variables` in scope; `new Function` sandbox
+- Header `expression`, output stored in `resultVariable` (default `"result"`)
+
+**`apps/proxy/src/worker-templates.ts`** (new):
+- Camunda-schema element template definitions for all 7 built-in worker types
+- Served at `GET /worker-templates`
+
+**`apps/proxy/src/index.ts`**:
+- Imports and starts `startWorkerDaemon()` after server binds
+- `/status` now includes `workers: { active, jobTypes, pollCount, lastError }`
+- `GET /worker-templates` endpoint returns built-in template catalog
+
+## 2026-04-02 — Feat: Connector secrets (`{{secrets.NAME}}`)
+
+**`packages/engine/src/secrets.ts`** (new):
+- `SecretResolver` interface with `resolve(name): Promise<string | undefined>`
+- `resolveSecretString(value, resolver)` — replaces all `{{secrets.NAME}}` placeholders, throws on missing secrets, resolves all unique names in parallel
+- `EnvSecretResolver` — reads from `process.env` (Node.js / standalone)
+
+**`packages/engine/src/engine.ts`**:
+- New `EngineOptions` interface with optional `secretResolver?: SecretResolver`
+- `Engine` constructor now accepts `EngineOptions`
+- Secret resolver is threaded through to `ProcessInstance`
+
+**`packages/engine/src/instance.ts`**:
+- IO mapping inputs containing `{{secrets.*}}`: resolved before FEEL evaluation; `=`-prefixed sources are FEEL-evaluated after substitution, bare literals are returned directly
+- Task headers: all values resolved before being passed to the job handler
+
+**`packages/engine/src/index.ts`**:
+- Exports `SecretResolver`, `EnvSecretResolver`, `resolveSecretString`, `EngineOptions`
+
+**`packages/engine/tests/secrets.test.ts`** (new):
+- 8 tests covering placeholder replacement, missing secrets, repeated placeholders, `EnvSecretResolver`
+
+**`apps/proxy/src/index.ts`**:
+- `POST /secrets/check` — bulk presence check (`{ names: string[] }` → `{ [name]: boolean }`)
+- `POST /secrets/:name` — reads env var, encrypts with client-supplied AES-256-GCM key, returns `{ encrypted, iv }` (both base64); 404 if not configured
+
+**`apps/studio/src/stores/secrets.ts`** (new):
+- Zustand store generating an ephemeral AES-256-GCM `CryptoKey` on app boot (never persisted)
+- `resolve(name)` — POSTs to proxy with exported key, decrypts response, caches result for the session
+- `checkMany(names)` — batch proxy presence check for the settings panel
+- Exports `proxySecretResolver: SecretResolver` for use in wasm-adapter and engine
+
+**`apps/studio/src/main.tsx`**:
+- Calls `useSecretsStore.getState().init()` on boot to generate the session key
+
+**`apps/studio/src/api/wasm-adapter.ts`**:
+- `applySecrets(value)` helper using `resolveSecretString` + `proxySecretResolver`
+- `handleHttpJob`: resolves secrets in `url`, all header values, `authentication.token`, and custom job headers before making the HTTP request
+
+**`apps/studio/src/pages/Settings.tsx`**:
+- New "Connector Secrets" section: scans all BPMN models for `{{secrets.*}}` references, checks each against the proxy, displays configured/missing status with icons
+
 ## 2026-04-01 — Feat: File system persistence + project management
 
 Full design: [`doc/projects-files.md`](projects-files.md)

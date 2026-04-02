@@ -980,6 +980,60 @@ impl BpmnElementProcessor {
                     }),
                 });
 
+                // Initialize multi-instance state if configured.
+                if let Some(mi) = &sp.multi_instance {
+                    let vars = state.backend.get_variables_by_scope(process_instance_key).await.unwrap_or_default();
+                    let mut ctx_map = serde_json::Map::new();
+                    for v in vars { ctx_map.insert(v.name, v.value); }
+                    let ctx = reebe_feel::FeelContext::from_json(serde_json::Value::Object(ctx_map));
+
+                    let items: Vec<serde_json::Value> = reebe_feel::parse_and_evaluate(&mi.input_collection, &ctx)
+                        .ok()
+                        .and_then(|v| {
+                            let jv = serde_json::Value::from(v);
+                            jv.as_array().cloned()
+                        })
+                        .unwrap_or_default();
+
+                    let mi_items_key = key_gen.next_key().await?;
+                    state.backend.upsert_variable(&Variable {
+                        key: mi_items_key,
+                        partition_id: state.partition_id,
+                        name: "__mi_items".to_string(),
+                        value: serde_json::Value::Array(items.clone()),
+                        scope_key: ei_key,
+                        process_instance_key,
+                        tenant_id: tenant_id.clone(),
+                        is_preview: false,
+                    }).await?;
+
+                    let mi_idx_key = key_gen.next_key().await?;
+                    state.backend.upsert_variable(&Variable {
+                        key: mi_idx_key,
+                        partition_id: state.partition_id,
+                        name: "__mi_idx".to_string(),
+                        value: serde_json::Value::Number(serde_json::Number::from(0i64)),
+                        scope_key: ei_key,
+                        process_instance_key,
+                        tenant_id: tenant_id.clone(),
+                        is_preview: false,
+                    }).await?;
+
+                    if let (Some(item_var), Some(first_item)) = (&mi.input_element, items.first()) {
+                        let iv_key = key_gen.next_key().await?;
+                        state.backend.upsert_variable(&Variable {
+                            key: iv_key,
+                            partition_id: state.partition_id,
+                            name: item_var.clone(),
+                            value: first_item.clone(),
+                            scope_key: ei_key,
+                            process_instance_key,
+                            tenant_id: tenant_id.clone(),
+                            is_preview: false,
+                        }).await?;
+                    }
+                }
+
                 // Fire ACTIVATE_ELEMENT for each start event inside the subprocess.
                 // Use ei_key as the flowScopeKey so end-event handling can detect the scope.
                 for start_id in &sp.start_events {
@@ -1234,8 +1288,130 @@ impl BpmnElementProcessor {
                 .unwrap_or(false);
 
             if is_subprocess_end {
-                // The subprocess is done — complete its element and let the outer flow continue.
                 let sp_ei = scope_ei.unwrap();
+
+                // Check for multi-instance state scoped to the subprocess element instance.
+                let sp_vars = state.backend.get_variables_by_scope(sp_ei.key).await.unwrap_or_default();
+                let mi_items_opt = sp_vars.iter().find(|v| v.name == "__mi_items").map(|v| v.value.clone());
+                let mi_idx_opt = sp_vars.iter().find(|v| v.name == "__mi_idx").and_then(|v| v.value.as_i64());
+
+                if let (Some(items_val), Some(current_idx)) = (mi_items_opt, mi_idx_opt) {
+                    let items = items_val.as_array().cloned().unwrap_or_default();
+
+                    // Fetch process definition once for both MI config and start events.
+                    let (sp_mi, start_events) = if let Ok(pd) = state.backend.get_process_definition_by_key(process_definition_key).await {
+                        if let Ok(processes) = reebe_bpmn::parse_bpmn(&pd.bpmn_xml) {
+                            let found = processes.iter()
+                                .find(|p| p.id == sp_ei.bpmn_process_id || p.id == bpmn_process_id)
+                                .and_then(|p| p.get_element_recursive(&sp_ei.element_id))
+                                .and_then(|el| if let reebe_bpmn::FlowElement::SubProcess(sp) = el {
+                                    Some((sp.multi_instance.clone(), sp.start_events.clone()))
+                                } else {
+                                    None
+                                });
+                            found.map(|(mi, se)| (mi, se)).unwrap_or((None, vec![]))
+                        } else {
+                            (None, vec![])
+                        }
+                    } else {
+                        (None, vec![])
+                    };
+
+                    // Collect output for this iteration if configured.
+                    if let Some(ref mi) = sp_mi {
+                        if let (Some(out_expr), Some(out_collection_name)) = (&mi.output_element, &mi.output_collection) {
+                            let mut ctx_map = serde_json::Map::new();
+                            for v in &sp_vars { ctx_map.insert(v.name.clone(), v.value.clone()); }
+                            let ctx = reebe_feel::FeelContext::from_json(serde_json::Value::Object(ctx_map));
+                            let expr = out_expr.trim().strip_prefix('=').unwrap_or(out_expr.trim());
+                            if let Ok(val) = reebe_feel::evaluate(expr, &ctx) {
+                                let jv = serde_json::Value::from(val);
+                                let mut outputs: Vec<serde_json::Value> = sp_vars.iter()
+                                    .find(|v| v.name == "__mi_outputs")
+                                    .and_then(|v| v.value.as_array().cloned())
+                                    .unwrap_or_default();
+                                outputs.push(jv);
+                                let out_key = key_gen.next_key().await?;
+                                state.backend.upsert_variable(&Variable {
+                                    key: out_key,
+                                    partition_id: state.partition_id,
+                                    name: "__mi_outputs".to_string(),
+                                    value: serde_json::Value::Array(outputs.clone()),
+                                    scope_key: sp_ei.key,
+                                    process_instance_key,
+                                    tenant_id: tenant_id.clone(),
+                                    is_preview: false,
+                                }).await?;
+                                // Write output_collection to process scope after each iteration.
+                                let oc_key = key_gen.next_key().await?;
+                                state.backend.upsert_variable(&Variable {
+                                    key: oc_key,
+                                    partition_id: state.partition_id,
+                                    name: out_collection_name.clone(),
+                                    value: serde_json::Value::Array(outputs),
+                                    scope_key: process_instance_key,
+                                    process_instance_key,
+                                    tenant_id: tenant_id.clone(),
+                                    is_preview: false,
+                                }).await?;
+                            }
+                        }
+                    }
+
+                    let next_idx = current_idx + 1;
+                    if next_idx < items.len() as i64 {
+                        // Advance index.
+                        let idx_key = key_gen.next_key().await?;
+                        state.backend.upsert_variable(&Variable {
+                            key: idx_key,
+                            partition_id: state.partition_id,
+                            name: "__mi_idx".to_string(),
+                            value: serde_json::Value::Number(serde_json::Number::from(next_idx)),
+                            scope_key: sp_ei.key,
+                            process_instance_key,
+                            tenant_id: tenant_id.clone(),
+                            is_preview: false,
+                        }).await?;
+
+                        // Set input_element for next iteration.
+                        if let Some(ref mi) = sp_mi {
+                            if let (Some(item_var), Some(next_item)) = (&mi.input_element, items.get(next_idx as usize)) {
+                                let iv_key = key_gen.next_key().await?;
+                                state.backend.upsert_variable(&Variable {
+                                    key: iv_key,
+                                    partition_id: state.partition_id,
+                                    name: item_var.clone(),
+                                    value: next_item.clone(),
+                                    scope_key: sp_ei.key,
+                                    process_instance_key,
+                                    tenant_id: tenant_id.clone(),
+                                    is_preview: false,
+                                }).await?;
+                            }
+                        }
+
+                        // Re-activate start events for the next iteration.
+                        for start_id in &start_events {
+                            writers.commands.push(CommandToWrite {
+                                value_type: "PROCESS_INSTANCE".to_string(),
+                                intent: "ACTIVATE_ELEMENT".to_string(),
+                                key: process_instance_key,
+                                payload: serde_json::json!({
+                                    "processInstanceKey": process_instance_key.to_string(),
+                                    "processDefinitionKey": process_definition_key.to_string(),
+                                    "bpmnProcessId": bpmn_process_id,
+                                    "elementId": start_id,
+                                    "flowScopeKey": sp_ei.key.to_string(),
+                                    "tenantId": tenant_id,
+                                }),
+                            });
+                        }
+                        return Ok(());
+                    }
+                    // All iterations done — fall through to complete the subprocess normally.
+                }
+
+                // Complete the subprocess (non-MI or MI that finished all iterations).
                 state.backend.update_element_instance_state(sp_ei.key, "COMPLETED").await?;
                 writers.events.push(EventToWrite {
                     value_type: "PROCESS_INSTANCE".to_string(),

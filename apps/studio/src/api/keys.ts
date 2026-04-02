@@ -14,4 +14,6 @@ export const keys = {
 	jobs: (filter?: object) => ["jobs", filter] as const,
 	dashboard: () => ["dashboard"] as const,
 	profiles: () => ["profiles"] as const,
+	runHistory: () => ["run-history"] as const,
+	runHistoryDetail: (id: string) => ["run-history", id] as const,
 } as const

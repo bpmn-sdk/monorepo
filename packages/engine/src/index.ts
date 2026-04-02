@@ -1,5 +1,7 @@
 export { Engine } from "./engine.js"
-export type { StartOptions } from "./engine.js"
+export type { StartOptions, EngineOptions } from "./engine.js"
+export { EnvSecretResolver, resolveSecretString } from "./secrets.js"
+export type { SecretResolver } from "./secrets.js"
 export { ProcessInstance } from "./instance.js"
 export type { ProcessEvent, Job, JobHandler } from "./types.js"
 export { VariableStore } from "./variables.js"
