@@ -219,9 +219,9 @@ actually execute shell commands, call an LLM, and read/write files.
   - Parallel: spawn N child scopes simultaneously, wait for all to complete
   - Aggregate outputs: collect `outputElement` into parent-scope array
 
-- [ ] Variable flow plugin: show iteration variable in scope tooltip
+- [x] Variable flow plugin: show iteration variable in scope tooltip
 
-- [ ] Guided "for each" modal in Studio
+- [x] Guided "for each" modal in Studio
   - When user clicks a sub-process: "Process each item in a list?" → configures multi-instance
   - Plain-English summary: "Runs once for each item in `emails`, in parallel"
 

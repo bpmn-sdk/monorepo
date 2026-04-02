@@ -481,6 +481,18 @@ const SUB_PROCESS_SCHEMA: PanelSchema = {
 			id: "multi-instance",
 			label: "Multi-instance",
 			fields: [
+				// Guided setup button — visible only when no loop is configured
+				{
+					key: "_setupForEach",
+					label: "Process each item in a list",
+					type: "action",
+					hint: "Configure this sub-process to run once for each item in a collection.",
+					condition: (v) => v.multiInstanceMode === "none",
+					onClick: (_values, setValue) => {
+						setValue("multiInstanceMode", "parallel")
+						setValue("elementVariable", "item")
+					},
+				},
 				{
 					key: "multiInstanceMode",
 					label: "Loop type",
@@ -490,6 +502,7 @@ const SUB_PROCESS_SCHEMA: PanelSchema = {
 						{ value: "parallel", label: "Parallel (for each, all at once)" },
 						{ value: "sequential", label: "Sequential (for each, one at a time)" },
 					],
+					condition: (v) => v.multiInstanceMode !== "none",
 				},
 				{
 					key: "collection",
@@ -504,7 +517,7 @@ const SUB_PROCESS_SCHEMA: PanelSchema = {
 					label: "Element variable",
 					type: "text",
 					placeholder: "item",
-					hint: "Variable name for the current iteration item.",
+					hint: "Variable name for the current iteration item. Available inside the sub-process as a process variable.",
 					condition: (v) => v.multiInstanceMode !== "none",
 				},
 			],

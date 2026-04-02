@@ -1,6 +1,19 @@
 # Progress
 
-## 2026-04-02 — Feat: Local automation workflows — Phase 4 (multi-instance & flow UX)
+## 2026-04-02 — Feat: Local automation workflows — Phase 4 complete (multi-instance & flow UX)
+
+**`packages/core/src/bpmn/optimize/variable-flow.ts`**:
+- After top-level edge-scope computation, recurse into multi-instance sub-processes
+- For each sub-process with `loopCharacteristics` containing `inputElement` in `zeebe:loopCharacteristics`, emit `data-flow/edge-scope` findings for all inner sequence flows
+- Inner scope is seeded with the iteration variable (e.g. `email`) plus any variables produced by upstream inner elements
+- 4 new tests in `packages/core/tests/variable-flow.test.ts`
+
+**`packages/plugins/src/config-panel-bpmn/index.ts`**:
+- `SUB_PROCESS_SCHEMA` multi-instance group: added guided "Process each item in a list" action button (visible when mode=none) that sets loop type to parallel with `item` as the element variable
+- `multiInstanceMode` select field is now conditionally hidden when mode=none (only shown once configured)
+- Extended hint on `elementVariable` field: clarifies the variable is available inside the sub-process
+
+## 2026-04-02 — Feat: Local automation workflows — Phase 4 (multi-instance config panel & canvas markers)
 
 **`packages/core/src/bpmn/bpmn-model.ts`**:
 - Added `isSequential?: boolean` to `BpmnMultiInstanceLoopCharacteristics`

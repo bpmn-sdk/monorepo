@@ -2,17 +2,18 @@
 
 ## Local Automation Workflows — Phase 4: Multi-Instance & Flow UX (2026-04-02)
 
-Sub-processes can now be configured as multi-instance loops directly from the config panel.
+Sub-processes can now be configured as multi-instance loops directly from the config panel, with visual feedback on the canvas and variable scope visibility in the variable-flow overlay.
 
 **Multi-instance config panel** (select any sub-process):
-- "Multi-instance" group with loop type dropdown: None / Parallel / Sequential
-- Collection field (FEEL expression): the array to iterate over — e.g. `= emails`
-- Element variable field: name for the current item — e.g. `email`
-- Collection and element variable fields are conditionally hidden when mode is "None"
+- "Process each item in a list" action button — one click to configure parallel for-each with `item` as the element variable
+- Loop type dropdown (Parallel / Sequential), Collection (FEEL), and Element variable fields appear after setup
+- Fields are hidden when no loop is configured, keeping the panel clean
 
-**Canvas markers** — multi-instance sub-processes show the standard BPMN bottom markers:
+**Canvas markers** — multi-instance sub-processes show standard BPMN bottom markers:
 - Parallel: three vertical lines `|||` to the right of the expand `+` marker
 - Sequential: three horizontal lines `≡` to the right of the expand `+` marker
+
+**Variable flow overlay** — the iteration variable (e.g. `email`) is now shown in scope tooltips for sequence flows inside multi-instance sub-processes. Inner elements that produce additional variables also appear in scope.
 
 **BPMN model** — `BpmnMultiInstanceLoopCharacteristics` now carries `isSequential?: boolean`, parsed from and serialized to the native BPMN `isSequential` attribute. The builder's `MultiInstanceOptions.isSequential` field is now wired through.
 

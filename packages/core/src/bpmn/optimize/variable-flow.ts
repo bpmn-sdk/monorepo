@@ -1,6 +1,6 @@
 import type { FeelNode } from "@bpmnkit/feel"
 import { parseExpression } from "@bpmnkit/feel"
-import type { BpmnProcess } from "../bpmn-model.js"
+import type { BpmnProcess, BpmnSubProcess } from "../bpmn-model.js"
 import type { OptimizationFinding } from "./types.js"
 import { buildFlowIndex, readZeebeIoMapping, readZeebeTaskType } from "./utils.js"
 
@@ -445,6 +445,87 @@ export function analyzeVariableFlow(p: BpmnProcess): OptimizationFinding[] {
 			elementIds: [flow.id],
 			produces: scopeVars,
 		})
+	}
+
+	// ── Multi-instance sub-process inner scopes ──────────────────────────────────
+	// For each multi-instance sub-process, emit edge-scope findings for inner
+	// sequence flows seeded with the iteration variable (inputElement).
+
+	for (const el of p.flowElements) {
+		if (el.type !== "subProcess") continue
+		const sp = el as BpmnSubProcess
+		if (!sp.loopCharacteristics) continue
+
+		// Extract inputElement from zeebe:loopCharacteristics extension element
+		const loopExt = sp.loopCharacteristics.extensionElements.find(
+			(e) => e.name === "zeebe:loopCharacteristics",
+		)
+		const inputElement = loopExt?.attributes.inputElement?.trim()
+		if (!inputElement) continue
+
+		// Collect variables produced by inner elements (from IO mapping outputs)
+		const innerProduces = new Map<string, string[]>()
+		for (const inner of sp.flowElements) {
+			const io = readZeebeIoMapping(inner.extensionElements)
+			if (io) {
+				for (const out of io.outputs) {
+					if (out.target.trim() === "") continue
+					const list = innerProduces.get(inner.id) ?? []
+					if (!list.includes(out.target.trim())) list.push(out.target.trim())
+					innerProduces.set(inner.id, list)
+				}
+			}
+		}
+
+		// Build inner reverse adjacency for BFS
+		const innerReverseAdj = new Map<string, Set<string>>()
+		for (const flow of sp.sequenceFlows) {
+			const set = innerReverseAdj.get(flow.targetRef) ?? new Set<string>()
+			set.add(flow.sourceRef)
+			innerReverseAdj.set(flow.targetRef, set)
+		}
+
+		function innerAllPredecessors(elementId: string): Set<string> {
+			const visited = new Set<string>()
+			const queue: string[] = [elementId]
+			while (queue.length > 0) {
+				const current = queue.shift()
+				if (current === undefined) break
+				const preds = innerReverseAdj.get(current)
+				if (preds === undefined) continue
+				for (const pred of preds) {
+					if (!visited.has(pred)) {
+						visited.add(pred)
+						queue.push(pred)
+					}
+				}
+			}
+			return visited
+		}
+
+		// Emit edge-scope findings for inner sequence flows
+		for (const flow of sp.sequenceFlows) {
+			const predIds = innerAllPredecessors(flow.sourceRef)
+			predIds.add(flow.sourceRef)
+
+			// Scope always includes the iteration variable, plus anything inner elements produce
+			const inScope = new Set<string>([inputElement])
+			for (const predId of predIds) {
+				for (const v of innerProduces.get(predId) ?? []) inScope.add(v)
+			}
+
+			const scopeVars = [...inScope].sort()
+			findings.push({
+				id: `data-flow/edge-scope:${flow.id}`,
+				category: "data-flow",
+				severity: "info",
+				message: `Variables in scope at flow "${flow.id}": ${scopeVars.join(", ")}.`,
+				suggestion: "",
+				processId,
+				elementIds: [flow.id],
+				produces: scopeVars,
+			})
+		}
 	}
 
 	return findings
