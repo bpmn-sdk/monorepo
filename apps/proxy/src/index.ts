@@ -41,6 +41,9 @@ import {
 	buildSearchSystemPrompt,
 	buildSystemPrompt,
 } from "./prompt.js"
+import { handleWebhook, matchWebhookRoute, startTriggers } from "./triggers/index.js"
+import { WORKER_TEMPLATES } from "./worker-templates.js"
+import { startWorkerDaemon, workerState } from "./worker.js"
 
 const PORT = process.env.AI_SERVER_PORT ? Number(process.env.AI_SERVER_PORT) : 3033
 
@@ -281,8 +284,32 @@ const server = http.createServer(async (req, res) => {
 		console.log(`[server] /status → available: [${names.join(", ")}]`)
 		res.writeHead(200, { "Content-Type": "application/json" })
 		res.end(
-			JSON.stringify({ ready: available.length > 0, backend: names[0] ?? null, available: names }),
+			JSON.stringify({
+				ready: available.length > 0,
+				backend: names[0] ?? null,
+				available: names,
+				workers: {
+					active: workerState.active,
+					jobTypes: workerState.jobTypes,
+					pollCount: workerState.pollCount,
+					lastError: workerState.lastError,
+				},
+			}),
 		)
+		return
+	}
+
+	// ── GET /worker-templates — built-in element templates for Studio ────────
+	if (url.pathname === "/worker-templates" && req.method === "GET") {
+		res.writeHead(200, { "Content-Type": "application/json" })
+		res.end(JSON.stringify(WORKER_TEMPLATES))
+		return
+	}
+
+	// ── POST /webhooks/:processId — webhook trigger ───────────────────────────
+	const webhookMatch = matchWebhookRoute(req)
+	if (webhookMatch) {
+		await handleWebhook(req, res, webhookMatch.processId)
 		return
 	}
 
@@ -1652,4 +1679,6 @@ const server = http.createServer(async (req, res) => {
 server.listen(PORT, () => {
 	console.log(`BPMN Kit AI Server running at http://localhost:${PORT}`)
 	console.log("Press Ctrl+C to stop")
+	startWorkerDaemon()
+	startTriggers()
 })

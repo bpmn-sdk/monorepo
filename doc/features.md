@@ -1,5 +1,49 @@
 # Features
 
+## Local Automation Workflows — Phase 2: Triggers (2026-04-02) — `apps/proxy`
+
+Workflows now start automatically without a "Run" click.
+
+**Webhook trigger** (`POST /webhooks/:processId`):
+- Any HTTP client can start a process instance; request body becomes process variables
+- Optional `WEBHOOK_TOKEN` env var for Bearer token protection
+
+**Timer trigger** (scan + schedule):
+- Parses `<timeDuration>`, `<timeDate>`, `<timeCycle>` from deployed BPMN timer start events
+- ISO 8601 duration/date/repeating-interval support (`PT1H`, `R/PT30M`, `2026-01-01T00:00:00Z`)
+- Persists last-fired timestamps to `~/.bpmnkit/timer-state.json`
+
+**File-watcher trigger** (`io.bpmnkit:trigger:file-watch:1`):
+- Service tasks with `watchPath` header trigger a process instance on file add/change
+- `glob` header for filename filtering; `events` header for add/change/all
+- Injects `{ filePath, fileName, fileContent, relativePath, eventType }` as process variables
+
+**Connector catalog integration**:
+- Built-in worker templates auto-loaded from proxy on Studio startup and shown in the connector catalog
+
+Set `BPMNKIT_TRIGGERS=false` to disable all triggers.
+
+## Local Automation Workflows — Phase 1 (2026-04-02) — `apps/proxy`
+
+bpmnkit now executes BPMN service tasks locally. Deploy a diagram to a running reebe instance and the
+proxy's built-in worker daemon picks up jobs automatically.
+
+**Built-in workers** (all configurable via element templates, no code required):
+
+| Job type | Purpose |
+|---|---|
+| `io.bpmnkit:cli:1` | Run any shell command; `{{var}}` interpolation; outputs stdout/stderr/exitCode |
+| `io.bpmnkit:llm:1` | Call Claude/Copilot/Gemini with a prompt; auto-detects available adapter |
+| `io.bpmnkit:fs:read:1` | Read a file into a process variable |
+| `io.bpmnkit:fs:write:1` | Write a process variable to a file |
+| `io.bpmnkit:fs:append:1` | Append to a file |
+| `io.bpmnkit:fs:list:1` | List a directory into an array variable |
+| `io.bpmnkit:js:1` | Evaluate a JS expression with process variables in scope |
+
+- `GET /worker-templates` — serves element template JSON for all built-in workers
+- `GET /status` — now includes `workers` object with active state, job types, poll count
+- Set `BPMNKIT_WORKERS=false` to disable the daemon
+
 ## Connector Secrets (2026-04-02) — `packages/engine`, `apps/proxy`, `apps/studio`
 
 Use `{{secrets.NAME}}` in REST connector fields (URL, auth token, headers) to keep credentials out of BPMN diagrams — matching Camunda's native secrets syntax.

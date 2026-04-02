@@ -50,6 +50,13 @@ export interface TemplateRegistrar {
 	registerTemplate(template: ElementTemplate): void
 }
 
+export interface ConnectorCatalogOptions {
+	/** Base URL of the bpmnkit proxy (e.g. "http://localhost:3033"). When set,
+	 * built-in worker templates are fetched from `<proxyUrl>/worker-templates`
+	 * and registered automatically on plugin install. */
+	proxyUrl?: string
+}
+
 // ── Toast helper ──────────────────────────────────────────────────────────────
 
 function showToast(message: string, variant: "loading" | "success" | "error"): HTMLElement {
@@ -141,6 +148,19 @@ function loadFromFile(registrar: TemplateRegistrar): void {
 	input.click()
 }
 
+async function loadBuiltinWorkers(proxyUrl: string, registrar: TemplateRegistrar): Promise<void> {
+	try {
+		const res = await fetch(`${proxyUrl}/worker-templates`)
+		if (!res.ok) return
+		const templates = (await res.json()) as ElementTemplate[]
+		for (const t of templates) {
+			registrar.registerTemplate(t)
+		}
+	} catch {
+		// proxy unavailable — built-in workers simply aren't registered
+	}
+}
+
 async function loadFromUrl(url: string, registrar: TemplateRegistrar): Promise<void> {
 	// Derive idPrefix and a display prefix from the hostname
 	let idPrefix = "io.custom"
@@ -181,10 +201,12 @@ async function loadFromUrl(url: string, registrar: TemplateRegistrar): Promise<v
  * @param registrar - The config-panel-bpmn plugin (or any object with
  *   `registerTemplate`).
  * @param palette - The command palette plugin.
+ * @param options - Optional configuration.
  */
 export function createConnectorCatalogPlugin(
 	registrar: TemplateRegistrar,
 	palette: CommandPalettePlugin,
+	options?: ConnectorCatalogOptions,
 ): CanvasPlugin {
 	let _deregister: (() => void) | null = null
 
@@ -193,6 +215,11 @@ export function createConnectorCatalogPlugin(
 
 		install() {
 			injectConnectorCatalogStyles()
+
+			// Load built-in worker templates from the local proxy, if configured
+			if (options?.proxyUrl) {
+				void loadBuiltinWorkers(options.proxyUrl, registrar)
+			}
 
 			const catalogCmds = CATALOG.map((entry) => ({
 				id: `connector-catalog:${entry.id}`,

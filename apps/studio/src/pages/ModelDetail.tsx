@@ -959,7 +959,9 @@ export function ModelDetail() {
 			bridgePalette,
 			() => editorRef.current,
 		)
-		const connectorCatalog = createConnectorCatalogPlugin(configPanelBpmn, bridgePalette)
+		const connectorCatalog = createConnectorCatalogPlugin(configPanelBpmn, bridgePalette, {
+			proxyUrl: useClusterStore.getState().proxyUrl,
+		})
 		const presentation = createPresentationPlugin({
 			palette: bridgePalette,
 			onEnter: () => {

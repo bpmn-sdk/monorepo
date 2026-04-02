@@ -1,5 +1,83 @@
 # Progress
 
+## 2026-04-02 — Feat: Local automation workflows — Phase 1 completion + Phase 2 (triggers)
+
+**Phase 1 completion:**
+
+**`packages/plugins/src/connector-catalog/index.ts`**:
+- Added optional `options?: ConnectorCatalogOptions` to `createConnectorCatalogPlugin()`
+- When `proxyUrl` is set, fetches `GET /worker-templates` on install and registers all built-in worker templates automatically
+
+**`apps/studio/src/pages/ModelDetail.tsx`**:
+- Passes `useClusterStore.getState().proxyUrl` to `createConnectorCatalogPlugin` so Studio auto-loads built-in worker templates on startup
+
+**`apps/proxy/tests/worker.test.ts`** (new) + `vitest.config.ts` (new):
+- 19 tests covering `interpolate()` (variables + secrets), CLI worker (command exec, variable interpolation, exit code handling, resultVariable), and FS workers (read/write/append/list, parent dir creation, resultVariable wrapping)
+
+**Phase 2 — Trigger Infrastructure:**
+
+**`apps/proxy/src/triggers/webhook.ts`** (new):
+- `POST /webhooks/:processId` — starts a process instance with request body as variables
+- Optional `WEBHOOK_TOKEN` env var for `Authorization: Bearer` protection
+- Returns `{ processInstanceKey }` synchronously
+
+**`apps/proxy/src/triggers/timer.ts`** (new):
+- Scans deployed processes for BPMN timer start events (`timeDuration`, `timeDate`, `timeCycle`)
+- Fires `POST /v2/process-instances` at the appropriate times
+- Persists last-fired timestamps to `~/.bpmnkit/timer-state.json` to survive restarts
+- Rescans deployed processes every 60 s; ticks every 5 s
+
+**`apps/proxy/src/triggers/file-watcher.ts`** (new):
+- Scans for service tasks with job type `io.bpmnkit:trigger:file-watch:1` and `watchPath` header
+- Sets up `fs.watch` on each configured path; fires process instance with `{ filePath, fileName, fileContent, relativePath, eventType }` variables
+- Supports `glob` header for filename filtering and `events` header (add/change/all)
+- Rescans every 60 s; restarts watchers when deployed processes change
+
+**`apps/proxy/src/triggers/index.ts`** (new):
+- Orchestrator: starts timer + file-watch triggers; exports `matchWebhookRoute` and `handleWebhook`
+- Respects `BPMNKIT_TRIGGERS=false` to opt out
+
+**`apps/proxy/src/index.ts`**:
+- Imports and starts `startTriggers()` after server binds
+- Webhook route wired into main request handler: `POST /webhooks/:processId`
+
+## 2026-04-02 — Feat: Local automation workflows — Phase 1 (worker daemon + core workers)
+
+Full spec: [`doc/automation-workflows.md`](automation-workflows.md)
+
+**`apps/proxy/src/worker.ts`** (new):
+- Worker daemon: polls active profile's reebe instance every 1 s via `POST /v2/jobs/activation`
+- Registry of built-in handlers keyed by job type
+- `interpolate(template, vars)` helper — replaces `{{varName}}` and `{{secrets.NAME}}` in strings
+- `startWorkerDaemon()` — called from server startup; respects `BPMNKIT_WORKERS=false`
+- `workerState` exported for `/status` introspection
+
+**`apps/proxy/src/workers/cli.ts`** (new) — `io.bpmnkit:cli:1`:
+- Runs any shell command with `{{var}}` interpolation; headers: `command`, `cwd`, `timeout`, `ignoreExitCode`
+- Outputs `{ stdout, stderr, exitCode }`; fails job on non-zero exit (unless `ignoreExitCode=true`)
+
+**`apps/proxy/src/workers/llm.ts`** (new) — `io.bpmnkit:llm:1`:
+- Calls first available LLM adapter (Claude → Copilot → Gemini); reuses existing proxy adapters
+- Variable `prompt` (with `{{var}}` interpolation); headers: `system`, `model`, `resultVariable`
+- Collects streamed tokens into `{ response }` output variable
+
+**`apps/proxy/src/workers/fs.ts`** (new) — `io.bpmnkit:fs:read|write|append|list:1`:
+- Read/write/append/list file system operations; path from variable or header, `~/` expansion
+- Write/append create parent directories automatically
+
+**`apps/proxy/src/workers/js.ts`** (new) — `io.bpmnkit:js:1`:
+- Evaluates a JS expression with `variables` in scope; `new Function` sandbox
+- Header `expression`, output stored in `resultVariable` (default `"result"`)
+
+**`apps/proxy/src/worker-templates.ts`** (new):
+- Camunda-schema element template definitions for all 7 built-in worker types
+- Served at `GET /worker-templates`
+
+**`apps/proxy/src/index.ts`**:
+- Imports and starts `startWorkerDaemon()` after server binds
+- `/status` now includes `workers: { active, jobTypes, pollCount, lastError }`
+- `GET /worker-templates` endpoint returns built-in template catalog
+
 ## 2026-04-02 — Feat: Connector secrets (`{{secrets.NAME}}`)
 
 **`packages/engine/src/secrets.ts`** (new):
