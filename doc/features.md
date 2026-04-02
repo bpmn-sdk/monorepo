@@ -1,5 +1,16 @@
 # Features
 
+## Connector Secrets (2026-04-02) — `packages/engine`, `apps/proxy`, `apps/studio`
+
+Use `{{secrets.NAME}}` in REST connector fields (URL, auth token, headers) to keep credentials out of BPMN diagrams — matching Camunda's native secrets syntax.
+
+- **`SecretResolver` interface** (`@bpmnkit/engine`) — pluggable resolution strategy; `EnvSecretResolver` for standalone/Node.js
+- **Proxy endpoint** (`POST /secrets/:name`) — proxy encrypts env var values with a client-supplied AES-256-GCM key before sending; the key is ephemeral (generated fresh on each Studio boot) and never stored
+- **Session key store** (`useSecretsStore`) — generates key on boot, caches resolved secrets for the session, exposes `proxySecretResolver` for use in job workers
+- **WASM adapter** — resolves secrets in URL, headers, and auth token before making HTTP calls
+- **TS engine** — resolves secrets in IO mapping inputs and task headers at job execution time
+- **Settings panel** — scans all BPMN models for `{{secrets.*}}` references and shows which are configured vs missing in the proxy environment
+
 ## File System Persistence & Project Management (2026-04-01) — `apps/proxy`, `apps/studio`, `packages/plugins`
 
 Studio models can now be stored as real files on disk instead of (or alongside) browser IndexedDB.

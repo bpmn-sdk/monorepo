@@ -1,5 +1,47 @@
 # Progress
 
+## 2026-04-02 — Feat: Connector secrets (`{{secrets.NAME}}`)
+
+**`packages/engine/src/secrets.ts`** (new):
+- `SecretResolver` interface with `resolve(name): Promise<string | undefined>`
+- `resolveSecretString(value, resolver)` — replaces all `{{secrets.NAME}}` placeholders, throws on missing secrets, resolves all unique names in parallel
+- `EnvSecretResolver` — reads from `process.env` (Node.js / standalone)
+
+**`packages/engine/src/engine.ts`**:
+- New `EngineOptions` interface with optional `secretResolver?: SecretResolver`
+- `Engine` constructor now accepts `EngineOptions`
+- Secret resolver is threaded through to `ProcessInstance`
+
+**`packages/engine/src/instance.ts`**:
+- IO mapping inputs containing `{{secrets.*}}`: resolved before FEEL evaluation; `=`-prefixed sources are FEEL-evaluated after substitution, bare literals are returned directly
+- Task headers: all values resolved before being passed to the job handler
+
+**`packages/engine/src/index.ts`**:
+- Exports `SecretResolver`, `EnvSecretResolver`, `resolveSecretString`, `EngineOptions`
+
+**`packages/engine/tests/secrets.test.ts`** (new):
+- 8 tests covering placeholder replacement, missing secrets, repeated placeholders, `EnvSecretResolver`
+
+**`apps/proxy/src/index.ts`**:
+- `POST /secrets/check` — bulk presence check (`{ names: string[] }` → `{ [name]: boolean }`)
+- `POST /secrets/:name` — reads env var, encrypts with client-supplied AES-256-GCM key, returns `{ encrypted, iv }` (both base64); 404 if not configured
+
+**`apps/studio/src/stores/secrets.ts`** (new):
+- Zustand store generating an ephemeral AES-256-GCM `CryptoKey` on app boot (never persisted)
+- `resolve(name)` — POSTs to proxy with exported key, decrypts response, caches result for the session
+- `checkMany(names)` — batch proxy presence check for the settings panel
+- Exports `proxySecretResolver: SecretResolver` for use in wasm-adapter and engine
+
+**`apps/studio/src/main.tsx`**:
+- Calls `useSecretsStore.getState().init()` on boot to generate the session key
+
+**`apps/studio/src/api/wasm-adapter.ts`**:
+- `applySecrets(value)` helper using `resolveSecretString` + `proxySecretResolver`
+- `handleHttpJob`: resolves secrets in `url`, all header values, `authentication.token`, and custom job headers before making the HTTP request
+
+**`apps/studio/src/pages/Settings.tsx`**:
+- New "Connector Secrets" section: scans all BPMN models for `{{secrets.*}}` references, checks each against the proxy, displays configured/missing status with icons
+
 ## 2026-04-01 — Feat: File system persistence + project management
 
 Full design: [`doc/projects-files.md`](projects-files.md)

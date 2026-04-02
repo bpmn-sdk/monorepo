@@ -6,7 +6,9 @@
  * studio's TanStack Query hooks.
  */
 
+import { resolveSecretString } from "@bpmnkit/engine"
 import type { WasmEngine } from "@bpmnkit/reebe-wasm"
+import { proxySecretResolver } from "../stores/secrets.js"
 import { queryClient } from "./queryClient.js"
 import type {
 	ElementInstance,
@@ -201,6 +203,11 @@ async function handleJob(eng: WasmEngine, job: WasmJob, allVars: WasmVariable[])
 	}
 }
 
+/** Resolve `{{secrets.NAME}}` placeholders in a string using the proxy resolver. */
+async function applySecrets(value: string): Promise<string> {
+	return resolveSecretString(value, proxySecretResolver)
+}
+
 async function handleHttpJob(
 	eng: WasmEngine,
 	job: WasmJob,
@@ -215,7 +222,8 @@ async function handleHttpJob(
 		varMap[v.name] = v.value
 	}
 
-	const url = typeof varMap.url === "string" ? varMap.url : undefined
+	const rawUrl = typeof varMap.url === "string" ? varMap.url : undefined
+	const url = rawUrl ? await applySecrets(rawUrl) : undefined
 	const method = typeof varMap.method === "string" ? varMap.method.toUpperCase() : "GET"
 	const reqBody =
 		method !== "GET" && method !== "HEAD" && varMap.body !== undefined
@@ -226,14 +234,15 @@ async function handleHttpJob(
 	const headersRaw = varMap.headers
 	if (headersRaw && typeof headersRaw === "object") {
 		for (const [k, v] of Object.entries(headersRaw as Record<string, unknown>)) {
-			if (typeof v === "string") headers[k] = v
+			if (typeof v === "string") headers[k] = await applySecrets(v)
 		}
 	}
 	const auth = varMap.authentication
 	if (auth && typeof auth === "object") {
 		const a = auth as Record<string, unknown>
 		if (a.type === "bearer" && typeof a.token === "string") {
-			headers.authorization = `Bearer ${a.token}`
+			const token = await applySecrets(a.token)
+			headers.authorization = `Bearer ${token}`
 		} else if (
 			a.type === "basic" &&
 			typeof a.username === "string" &&
@@ -243,7 +252,7 @@ async function handleHttpJob(
 		}
 	}
 	for (const [k, v] of Object.entries(job.custom_headers ?? {})) {
-		if (typeof v === "string") headers[k] = v
+		if (typeof v === "string") headers[k] = await applySecrets(v)
 	}
 
 	if (!url) {

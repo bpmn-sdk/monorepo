@@ -1528,6 +1528,79 @@ const server = http.createServer(async (req, res) => {
 		return
 	}
 
+	// ── POST /secrets/check — bulk existence check for secret names ───────────
+	if (url.pathname === "/secrets/check" && req.method === "POST") {
+		const body = await readBody(req)
+		let names: string[] = []
+		try {
+			names = ((JSON.parse(body) as { names?: unknown }).names ?? []) as string[]
+		} catch {
+			/* treat as empty list */
+		}
+		const result: Record<string, boolean> = {}
+		for (const name of names) {
+			result[name] = process.env[name] !== undefined
+		}
+		res.writeHead(200, { "Content-Type": "application/json" })
+		res.end(JSON.stringify(result))
+		return
+	}
+
+	// ── POST /secrets/:name — resolve and encrypt a secret for the client ─────
+	if (url.pathname.startsWith("/secrets/") && req.method === "POST") {
+		const name = url.pathname.slice("/secrets/".length)
+		if (!name) {
+			res.writeHead(400, { "Content-Type": "application/json" })
+			res.end(JSON.stringify({ error: "Secret name required" }))
+			return
+		}
+		const secretValue = process.env[name]
+		if (secretValue === undefined) {
+			res.writeHead(404, { "Content-Type": "application/json" })
+			res.end(JSON.stringify({ error: `Secret "${name}" is not configured` }))
+			return
+		}
+		const body = await readBody(req)
+		let keyBase64: string
+		try {
+			const parsed = JSON.parse(body) as { key?: unknown }
+			if (typeof parsed.key !== "string" || !parsed.key) throw new Error("missing key")
+			keyBase64 = parsed.key
+		} catch {
+			res.writeHead(400, { "Content-Type": "application/json" })
+			res.end(JSON.stringify({ error: "Body must be { key: string } with a base64 AES-256 key" }))
+			return
+		}
+		try {
+			const rawKey = Buffer.from(keyBase64, "base64")
+			const cryptoKey = await globalThis.crypto.subtle.importKey(
+				"raw",
+				rawKey,
+				{ name: "AES-GCM" },
+				false,
+				["encrypt"],
+			)
+			const iv = globalThis.crypto.getRandomValues(new Uint8Array(12))
+			const encrypted = await globalThis.crypto.subtle.encrypt(
+				{ name: "AES-GCM", iv },
+				cryptoKey,
+				new TextEncoder().encode(secretValue),
+			)
+			res.writeHead(200, { "Content-Type": "application/json" })
+			res.end(
+				JSON.stringify({
+					encrypted: Buffer.from(encrypted).toString("base64"),
+					iv: Buffer.from(iv).toString("base64"),
+				}),
+			)
+		} catch (err) {
+			console.error(`[secrets] encryption failed for "${name}":`, err)
+			res.writeHead(500, { "Content-Type": "application/json" })
+			res.end(JSON.stringify({ error: "Encryption failed" }))
+		}
+		return
+	}
+
 	// ── POST /http-request — CORS bypass for wasm worker REST connectors ─────
 	if (url.pathname === "/http-request" && req.method === "POST") {
 		const body = await readBody(req)

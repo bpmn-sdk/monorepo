@@ -1,4 +1,4 @@
-import { Folder, Plus, Trash2 } from "lucide-react"
+import { CheckCircle2, Folder, Plus, RefreshCw, Trash2, XCircle } from "lucide-react"
 import { useEffect, useState } from "preact/hooks"
 import { useProfiles } from "../api/queries.js"
 import { ProfileTag } from "../components/ProfileTag.js"
@@ -8,9 +8,20 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../components/
 import { Input } from "../components/ui/input.js"
 import { Separator } from "../components/ui/separator.js"
 import { useClusterStore } from "../stores/cluster.js"
+import { useModelsStore } from "../stores/models.js"
 import { useProjectsStore } from "../stores/projects.js"
+import { useSecretsStore } from "../stores/secrets.js"
 import { toast } from "../stores/toast.js"
 import { useUiStore } from "../stores/ui.js"
+
+/** Extract all unique `{{secrets.NAME}}` references from a string. */
+function extractSecretNames(text: string): string[] {
+	const found = new Set<string>()
+	for (const m of text.matchAll(/\{\{secrets\.([^}]+)\}\}/g)) {
+		if (m[1]) found.add(m[1])
+	}
+	return [...found]
+}
 
 export function Settings() {
 	const { proxyUrl, activeProfile, setActiveProfile, setProxyUrl, loadProfiles } = useClusterStore()
@@ -19,11 +30,41 @@ export function Settings() {
 	const { setBreadcrumbs } = useUiStore()
 	const { projects, activeProjectId, load, addProject, removeProject, setActiveProject } =
 		useProjectsStore()
+	const { models } = useModelsStore()
+	const { checkMany } = useSecretsStore()
 
 	const [addingProject, setAddingProject] = useState(false)
 	const [newProjectName, setNewProjectName] = useState("")
 	const [newProjectPath, setNewProjectPath] = useState("")
 	const [validating, setValidating] = useState(false)
+
+	// ── Secrets panel state ──────────────────────────────────────────────────
+	const [secretsStatus, setSecretsStatus] = useState<Record<string, boolean> | null>(null)
+	const [checkingSecrets, setCheckingSecrets] = useState(false)
+
+	async function handleCheckSecrets() {
+		const allNames = new Set<string>()
+		for (const m of models) {
+			if (m.type === "bpmn") {
+				for (const name of extractSecretNames(m.content)) {
+					allNames.add(name)
+				}
+			}
+		}
+		if (allNames.size === 0) {
+			toast.info("No {{secrets.*}} references found in any BPMN model")
+			return
+		}
+		setCheckingSecrets(true)
+		try {
+			const result = await checkMany([...allNames])
+			setSecretsStatus(result)
+		} catch {
+			toast.error("Could not reach the proxy server")
+		} finally {
+			setCheckingSecrets(false)
+		}
+	}
 
 	useEffect(() => {
 		setBreadcrumbs([{ label: "Settings" }])
@@ -261,6 +302,65 @@ export function Settings() {
 						</table>
 					</div>
 				)}
+			</section>
+
+			<Separator className="mb-6" />
+
+			{/* Connector Secrets */}
+			<section className="mb-6">
+				<div className="flex items-center justify-between mb-3">
+					<div>
+						<h2 className="text-sm font-medium text-fg">Connector Secrets</h2>
+						<p className="text-xs text-muted">
+							Use <code className="font-mono bg-surface-2 px-1 rounded">{"{{secrets.NAME}}"}</code>{" "}
+							in REST connector fields. The proxy resolves them from environment variables.
+						</p>
+					</div>
+					<Button
+						variant="outline"
+						size="sm"
+						onClick={() => void handleCheckSecrets()}
+						disabled={checkingSecrets}
+					>
+						<RefreshCw size={14} className={checkingSecrets ? "animate-spin" : ""} />
+						Scan Models
+					</Button>
+				</div>
+
+				<div className="rounded-lg border border-border bg-surface overflow-hidden mb-3">
+					{secretsStatus === null ? (
+						<div className="px-4 py-3 text-sm text-muted">
+							Click "Scan Models" to check which secrets are configured.
+						</div>
+					) : Object.keys(secretsStatus).length === 0 ? (
+						<div className="px-4 py-3 text-sm text-muted">
+							No <code className="font-mono text-xs">{"{{secrets.*}}"}</code> references found in
+							your BPMN models.
+						</div>
+					) : (
+						Object.entries(secretsStatus).map(([name, exists]) => (
+							<div
+								key={name}
+								className="flex items-center gap-3 px-4 py-2.5 border-b border-border/50 last:border-0"
+							>
+								{exists ? (
+									<CheckCircle2 size={14} className="text-success shrink-0" />
+								) : (
+									<XCircle size={14} className="text-danger shrink-0" />
+								)}
+								<code className="font-mono text-sm text-fg flex-1">{name}</code>
+								<span className={`text-xs ${exists ? "text-success" : "text-danger"}`}>
+									{exists ? "configured" : "missing"}
+								</span>
+							</div>
+						))
+					)}
+				</div>
+
+				<p className="text-xs text-muted">
+					Set secrets as environment variables on the proxy machine before starting it:
+				</p>
+				<code className="mt-1 block text-xs text-muted font-mono">MY_API_KEY=value pnpm proxy</code>
 			</section>
 
 			<Separator className="mb-6" />

@@ -4,10 +4,14 @@ import "./styles/globals.css"
 import { useClusterStore } from "./stores/cluster.js"
 import { useModelsStore } from "./stores/models.js"
 import { useProjectsStore } from "./stores/projects.js"
+import { useSecretsStore } from "./stores/secrets.js"
 import { useThemeStore } from "./stores/theme.js"
 
 // Initialize theme before render to avoid flash
 useThemeStore.getState().init()
+
+// Generate ephemeral session key for connector secrets encryption
+void useSecretsStore.getState().init()
 
 // Initialize cluster store (loads profiles)
 void useClusterStore.getState().loadProfiles()
