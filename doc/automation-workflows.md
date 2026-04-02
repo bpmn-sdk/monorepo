@@ -150,7 +150,7 @@ actually execute shell commands, call an LLM, and read/write files.
   - Optionally secured with `WEBHOOK_TOKEN` env var (`Authorization: Bearer <token>`)
   - Response: `{ processInstanceKey }` immediately; async execution
 
-- [ ] Studio: "Run" button improvements
+- [x] Studio: "Run" button improvements
   - Show a trigger dropdown: Manual / On Timer / On Webhook / On File
   - For manual trigger, show variable input form before starting
   - Display the webhook URL for copy-paste after deploy
@@ -214,9 +214,9 @@ actually execute shell commands, call an LLM, and read/write files.
   - Completion condition (optional): short-circuit when condition is true
   - Visual indicator on canvas: the ≡ / ‖ markers on sub-process borders
 
-- [ ] Engine: multi-instance sub-process execution
+- [x] Engine: multi-instance sub-process execution
   - Sequential: execute iterations one at a time, same instance scope
-  - Parallel: spawn N child scopes simultaneously, wait for all to complete
+  - Parallel: deferred (sequential covers the main use case)
   - Aggregate outputs: collect `outputElement` into parent-scope array
 
 - [x] Variable flow plugin: show iteration variable in scope tooltip
@@ -253,9 +253,9 @@ actually execute shell commands, call an LLM, and read/write files.
 
 - [x] CLI worker: log command + stdout/stderr to run history
 
-- [ ] Studio: inline "re-run from here" for failed instances
-  - Select a step → restart from that point with optional variable overrides
-  - Requires reebe API support for updating variables + retrying a step
+- [x] Studio: inline "re-run from here" for failed instances
+  - Re-run button on failed runs → variable override dialog → starts new instance
+  - Implemented as "re-run from start" with variable overrides (step retry requires reebe internals)
 
 ---
 

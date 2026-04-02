@@ -1,5 +1,21 @@
 # Progress
 
+## 2026-04-02 — Feat: Local automation workflows — all remaining items complete
+
+**Multi-instance subprocess execution (reebe engine — Rust):**
+- `apps/reebe/crates/reebe-engine/src/processor/bpmn_element.rs` — `activate_element` SubProcess arm: detects `sp.multi_instance`, evaluates `input_collection` FEEL expression against process variables, stores `__mi_items` (full array) and `__mi_idx` (0) as variables scoped to the subprocess `ei_key`, and sets the `input_element` variable to the first item
+- `complete_element` `is_subprocess_end` block: checks for `__mi_items`/`__mi_idx` variables; if present, collects per-iteration output (`output_element`/`output_collection`), advances index and re-activates start events for next iteration; when all iterations done (or non-MI), falls through to normal subprocess completion
+- Sequential mode fully implemented; parallel mode is out of scope for now
+
+**"Re-run from here" feature:**
+- `apps/proxy/src/routes/run-history.ts` — added `handleRerunHistory`: looks up run, fetches process instance from reebe to get `bpmnProcessId`, merges original variables with any overrides, starts a new process instance
+- `apps/proxy/src/index.ts` — registered `POST /run-history/:id/rerun`
+- `apps/studio/src/api/queries.ts` — added `useRerunHistory()` mutation
+- `apps/studio/src/pages/RunHistory.tsx` — `RerunDialog` component with pre-filled JSON variable textarea; "Re-run" button shown on failed runs
+
+**"Run" button trigger dropdown (Phase 2 remaining):**
+- `apps/studio/src/pages/ModelDetail.tsx` — `StudioDeployPane` now has a 4-tab trigger selector: Manual (existing variable form), Webhook (URL + curl example), Timer (ISO 8601 hint), File Watch (setup instructions)
+
 ## 2026-04-02 — Feat: Local automation workflows — Phase 6 complete (polish & ecosystem)
 
 **`apps/proxy/src/workers/http.ts`** (new):

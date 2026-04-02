@@ -417,3 +417,17 @@ export function useClearRunHistory() {
 		},
 	})
 }
+
+export function useRerunHistory() {
+	const qc = useQueryClient()
+	return useMutation({
+		mutationFn: ({
+			id,
+			variableOverrides,
+		}: { id: string; variableOverrides?: Record<string, unknown> }) =>
+			proxyPost<{ processInstanceKey: string }>(`/run-history/${id}/rerun`, { variableOverrides }),
+		onSuccess: () => {
+			void qc.invalidateQueries({ queryKey: keys.runHistory() })
+		},
+	})
+}

@@ -2,6 +2,7 @@ import { mkdirSync } from "node:fs"
 import type http from "node:http"
 import { homedir } from "node:os"
 import { join } from "node:path"
+import { getActiveProfile, getAuthHeader } from "@bpmnkit/profiles"
 /**
  * Run history store — persists worker job execution history to SQLite.
  *
@@ -300,6 +301,91 @@ export function handleDeleteRunHistory(_req: http.IncomingMessage, res: http.Ser
 export function matchRunHistoryRoute(req: http.IncomingMessage): { id: string } | null {
 	const url = new URL(req.url ?? "/", "http://x")
 	const m = url.pathname.match(/^\/run-history\/([^/]+)$/)
+	if (m?.[1]) return { id: m[1] }
+	return null
+}
+
+// ── Re-run handler ────────────────────────────────────────────────────────────
+
+function readBody(req: http.IncomingMessage): Promise<string> {
+	return new Promise((resolve, reject) => {
+		const chunks: Buffer[] = []
+		req.on("data", (chunk: Buffer) => chunks.push(chunk))
+		req.on("end", () => resolve(Buffer.concat(chunks).toString("utf8")))
+		req.on("error", reject)
+	})
+}
+
+/** POST /run-history/:id/rerun — start a new process instance from a historical run. */
+export async function handleRerunHistory(
+	req: http.IncomingMessage,
+	res: http.ServerResponse,
+	runId: string,
+): Promise<void> {
+	try {
+		const d = getDb()
+		const run = d.prepare("SELECT * FROM runs WHERE id=?").get(runId) as RunRow | undefined
+		if (!run) {
+			jsonResp(res, { error: "Not found" }, 404)
+			return
+		}
+
+		const profile = getActiveProfile()
+		if (!profile?.config.baseUrl) {
+			jsonResp(res, { error: "No active reebe profile" }, 503)
+			return
+		}
+		const baseUrl = profile.config.baseUrl.replace(/\/$/, "")
+		let authHeader = ""
+		try {
+			authHeader = await getAuthHeader(profile.config)
+		} catch {
+			// proceed without auth
+		}
+
+		// Parse optional variableOverrides from request body.
+		let variableOverrides: Record<string, unknown> = {}
+		try {
+			const raw = await readBody(req)
+			if (raw.trim()) {
+				const parsed = JSON.parse(raw) as { variableOverrides?: Record<string, unknown> }
+				variableOverrides = parsed.variableOverrides ?? {}
+			}
+		} catch {
+			// ignore parse errors — no overrides
+		}
+
+		// Merge original snapshot with overrides.
+		let variables: Record<string, unknown> = {}
+		try {
+			variables = JSON.parse(run.variablesSnapshot) as Record<string, unknown>
+		} catch {
+			// use empty object
+		}
+		variables = { ...variables, ...variableOverrides }
+
+		const processId = run.processId ?? ""
+		const startRes = await fetch(`${baseUrl}/v2/process-instances`, {
+			method: "POST",
+			headers: { authorization: authHeader, "content-type": "application/json" },
+			body: JSON.stringify({ processDefinitionId: processId, variables }),
+		})
+		if (!startRes.ok) {
+			jsonResp(res, { error: "Failed to start process instance" }, 502)
+			return
+		}
+		const newPi = (await startRes.json()) as { processInstanceKey: string }
+		jsonResp(res, { processInstanceKey: newPi.processInstanceKey })
+	} catch (err) {
+		jsonResp(res, { error: String(err) }, 500)
+	}
+}
+
+/** Route matcher — returns run ID if URL matches /run-history/:id/rerun */
+export function matchRerunHistoryRoute(req: http.IncomingMessage): { id: string } | null {
+	if (req.method !== "POST") return null
+	const url = new URL(req.url ?? "/", "http://x")
+	const m = url.pathname.match(/^\/run-history\/([^/]+)\/rerun$/)
 	if (m?.[1]) return { id: m[1] }
 	return null
 }

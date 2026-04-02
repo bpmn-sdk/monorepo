@@ -45,6 +45,8 @@ import {
 	handleDeleteRunHistory,
 	handleGetRunHistory,
 	handleGetRunHistoryDetail,
+	handleRerunHistory,
+	matchRerunHistoryRoute,
 	matchRunHistoryRoute,
 } from "./routes/run-history.js"
 import { handleWebhook, matchWebhookRoute, startTriggers } from "./triggers/index.js"
@@ -319,6 +321,11 @@ const server = http.createServer(async (req, res) => {
 	}
 	if (url.pathname === "/run-history" && req.method === "DELETE") {
 		handleDeleteRunHistory(req, res)
+		return
+	}
+	const rerunMatch = matchRerunHistoryRoute(req)
+	if (rerunMatch) {
+		await handleRerunHistory(req, res, rerunMatch.id)
 		return
 	}
 	const runHistoryMatch = matchRunHistoryRoute(req)

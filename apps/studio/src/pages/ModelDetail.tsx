@@ -16,7 +16,10 @@ import {
 	ArrowLeft,
 	BookOpen,
 	CheckCircle,
+	Clock,
+	Copy,
 	ExternalLink,
+	Eye,
 	FileCode,
 	Image,
 	Link2,
@@ -65,13 +68,17 @@ function getCompanionDmns(xml: string, models: ModelFile[]) {
 
 // ── Deploy pane component (rendered into dock's deploy pane) ─────────────────
 
+type TriggerMode = "manual" | "webhook" | "timer" | "file-watch"
+
 function StudioDeployPane({ modelId, getXml }: { modelId: string; getXml: () => string | null }) {
 	const { models, saveModel, upsertModel } = useModelsStore()
+	const { proxyUrl } = useClusterStore()
 	const model = models.find((m) => m.id === modelId)
 	const [processIdInput, setProcessIdInput] = useState(model?.processDefinitionId ?? "")
 	const [startVars, setStartVars] = useState("{}")
 	const [startError, setStartError] = useState<string | null>(null)
 	const [startedKey, setStartedKey] = useState<string | null>(null)
+	const [triggerMode, setTriggerMode] = useState<TriggerMode>("manual")
 	const { data, refetch } = useDefinitions(
 		model?.processDefinitionId ? { bpmnProcessId: model.processDefinitionId } : undefined,
 	)
@@ -153,50 +160,136 @@ function StudioDeployPane({ modelId, getXml }: { modelId: string; getXml: () => 
 
 			{isDeployed && (
 				<div className="border border-border rounded-lg p-3 flex flex-col gap-3">
-					<p className="text-xs font-semibold text-muted uppercase tracking-wider flex items-center gap-1.5">
-						<Play size={11} />
-						Start instance
-					</p>
-					<div className="flex flex-col gap-1">
-						<label className="text-xs text-muted" htmlFor="deploy-pane-vars">
-							Variables (JSON)
-						</label>
-						<textarea
-							id="deploy-pane-vars"
-							value={startVars}
-							onInput={(e) => setStartVars((e.target as HTMLTextAreaElement).value)}
-							rows={2}
-							className="w-full rounded-md border border-border bg-surface px-3 py-2 text-xs font-mono text-fg placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-accent resize-none"
-							placeholder="{}"
-						/>
+					{/* Trigger mode selector */}
+					<div className="flex rounded-md border border-border overflow-hidden text-xs">
+						{(
+							[
+								{ mode: "manual", label: "Manual", icon: <Play size={11} /> },
+								{ mode: "webhook", label: "Webhook", icon: <Link2 size={11} /> },
+								{ mode: "timer", label: "Timer", icon: <Clock size={11} /> },
+								{ mode: "file-watch", label: "File Watch", icon: <Eye size={11} /> },
+							] satisfies { mode: TriggerMode; label: string; icon: preact.JSX.Element }[]
+						).map(({ mode, label, icon }) => (
+							<button
+								key={mode}
+								type="button"
+								onClick={() => setTriggerMode(mode)}
+								className={`flex-1 flex items-center justify-center gap-1 px-2 py-1.5 transition-colors border-r border-border last:border-r-0 ${
+									triggerMode === mode
+										? "bg-accent text-white"
+										: "bg-surface text-muted hover:bg-surface-2"
+								}`}
+							>
+								{icon}
+								<span className="hidden sm:inline">{label}</span>
+							</button>
+						))}
 					</div>
-					{startError && <p className="text-xs text-danger">{startError}</p>}
-					{startedKey && (
-						<p className="text-xs text-success">
-							Started —{" "}
-							<Link href={`/instances/${startedKey}`} className="underline hover:text-accent">
-								view #{startedKey}
-							</Link>
-						</p>
+
+					{/* Manual mode */}
+					{triggerMode === "manual" && (
+						<>
+							<div className="flex flex-col gap-1">
+								<label className="text-xs text-muted" htmlFor="deploy-pane-vars">
+									Variables (JSON)
+								</label>
+								<textarea
+									id="deploy-pane-vars"
+									value={startVars}
+									onInput={(e) => setStartVars((e.target as HTMLTextAreaElement).value)}
+									rows={2}
+									className="w-full rounded-md border border-border bg-surface px-3 py-2 text-xs font-mono text-fg placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-accent resize-none"
+									placeholder="{}"
+								/>
+							</div>
+							{startError && <p className="text-xs text-danger">{startError}</p>}
+							{startedKey && (
+								<p className="text-xs text-success">
+									Started —{" "}
+									<Link href={`/instances/${startedKey}`} className="underline hover:text-accent">
+										view #{startedKey}
+									</Link>
+								</p>
+							)}
+							<Button
+								size="sm"
+								onClick={() => void handleStart()}
+								disabled={createInstance.isPending}
+								className="self-start"
+							>
+								{createInstance.isPending ? (
+									<>
+										<RotateCw size={13} className="animate-spin" />
+										Starting…
+									</>
+								) : (
+									<>
+										<Play size={13} />
+										Start
+									</>
+								)}
+							</Button>
+						</>
 					)}
-					<Button
-						size="sm"
-						onClick={() => void handleStart()}
-						disabled={createInstance.isPending}
-						className="self-start"
-					>
-						{createInstance.isPending ? (
-							<>
-								<RotateCw size={13} className="animate-spin" />
-								Starting…
-							</>
-						) : (
-							<>
-								<Play size={13} />
-								Start
-							</>
-						)}
-					</Button>
+
+					{/* Webhook mode */}
+					{triggerMode === "webhook" &&
+						(() => {
+							const webhookUrl = `${proxyUrl}/webhooks/${latestDef.bpmnProcessId ?? latestDef.processDefinitionId}`
+							return (
+								<>
+									<div className="flex items-center gap-1.5">
+										<code className="flex-1 rounded-md border border-border bg-surface-2 px-2 py-1.5 text-xs font-mono text-fg break-all">
+											{webhookUrl}
+										</code>
+										<button
+											type="button"
+											onClick={() => {
+												void navigator.clipboard.writeText(webhookUrl)
+												toast.success("Copied!")
+											}}
+											className="shrink-0 rounded-md border border-border bg-surface p-1.5 text-muted hover:bg-surface-2 hover:text-fg transition-colors"
+											aria-label="Copy webhook URL"
+										>
+											<Copy size={13} />
+										</button>
+									</div>
+									<p className="text-xs text-muted">
+										Send a POST request to this URL with your variables as the JSON body.
+									</p>
+									<pre className="rounded-md border border-border bg-surface-2 px-3 py-2 text-xs font-mono text-fg overflow-x-auto whitespace-pre-wrap break-all">
+										{`curl -X POST ${webhookUrl} \\\n  -H "Content-Type: application/json" \\\n  -d '{"key": "value"}'`}
+									</pre>
+								</>
+							)
+						})()}
+
+					{/* Timer mode */}
+					{triggerMode === "timer" && (
+						<>
+							<p className="text-xs text-fg">
+								Timer triggers are configured directly in the BPMN diagram using Timer Start Events.
+							</p>
+							<p className="text-xs text-muted">
+								Use ISO 8601 duration (e.g. <code className="font-mono">PT1H</code> for hourly),
+								date, or cron cycle expressions.
+							</p>
+						</>
+					)}
+
+					{/* File Watch mode */}
+					{triggerMode === "file-watch" && (
+						<>
+							<p className="text-xs text-fg">
+								File watch triggers are configured using the File Watch Trigger service task in the
+								BPMN diagram.
+							</p>
+							<p className="text-xs text-muted">
+								The worker daemon polls for jobs of type{" "}
+								<code className="font-mono">io.bpmnkit:trigger:file-watch:1</code>.
+							</p>
+						</>
+					)}
 				</div>
 			)}
 

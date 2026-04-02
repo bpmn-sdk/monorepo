@@ -8,12 +8,18 @@ import {
 	Code2,
 	FileText,
 	Loader2,
+	RotateCcw,
 	Terminal,
 	Trash2,
 } from "lucide-react"
 import { useState } from "preact/hooks"
 import { useEffect } from "preact/hooks"
-import { useClearRunHistory, useRunHistory, useRunHistoryDetail } from "../api/queries.js"
+import {
+	useClearRunHistory,
+	useRerunHistory,
+	useRunHistory,
+	useRunHistoryDetail,
+} from "../api/queries.js"
 import type { RunHistoryRun, RunHistoryStep } from "../api/types.js"
 import { ErrorState } from "../components/ErrorState.js"
 import { Button } from "../components/ui/button.js"
@@ -321,6 +327,67 @@ function RunDetail({ runId, onClose }: { runId: string; onClose: () => void }) {
 	)
 }
 
+// ── Re-run dialog ─────────────────────────────────────────────────────────────
+
+function RerunDialog({
+	run,
+	onClose,
+}: {
+	run: RunHistoryRun
+	onClose: () => void
+}) {
+	const [vars, setVars] = useState(() =>
+		JSON.stringify(JSON.parse(run.variablesSnapshot ?? "{}"), null, 2),
+	)
+	const [parseError, setParseError] = useState<string | null>(null)
+	const rerunMutation = useRerunHistory()
+
+	async function handleConfirm() {
+		let overrides: Record<string, unknown> = {}
+		try {
+			overrides = JSON.parse(vars) as Record<string, unknown>
+			setParseError(null)
+		} catch {
+			setParseError("Invalid JSON")
+			return
+		}
+		try {
+			const result = await rerunMutation.mutateAsync({ id: run.id, variableOverrides: overrides })
+			toast.success(`Re-run started: ${result.processInstanceKey}`)
+			onClose()
+		} catch {
+			toast.error("Failed to start re-run")
+		}
+	}
+
+	return (
+		<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+			<div className="bg-surface rounded-xl border border-border shadow-lg w-full max-w-lg p-6 space-y-4">
+				<h2 className="text-sm font-semibold">Re-run process</h2>
+				<p className="text-xs text-muted">
+					Edit variables below then confirm to start a new process instance.
+				</p>
+				<textarea
+					className="w-full font-mono text-xs bg-surface-2 border border-border rounded-lg p-3 resize-y h-48 focus:outline-none focus:ring-1 focus:ring-accent"
+					value={vars}
+					onInput={(e) => setVars((e.target as HTMLTextAreaElement).value)}
+					spellcheck={false}
+				/>
+				{parseError && <p className="text-xs text-danger">{parseError}</p>}
+				<div className="flex justify-end gap-2">
+					<Button variant="ghost" size="sm" onClick={onClose}>
+						Cancel
+					</Button>
+					<Button size="sm" onClick={() => void handleConfirm()} disabled={rerunMutation.isPending}>
+						{rerunMutation.isPending ? <Loader2 size={13} className="animate-spin mr-1" /> : null}
+						Re-run
+					</Button>
+				</div>
+			</div>
+		</div>
+	)
+}
+
 // ── Run list ──────────────────────────────────────────────────────────────────
 
 function RunRow({
@@ -332,25 +399,45 @@ function RunRow({
 	active: boolean
 	onClick: () => void
 }) {
+	const [showRerun, setShowRerun] = useState(false)
+
 	return (
-		<button
-			type="button"
-			onClick={onClick}
-			className={`flex w-full items-center gap-3 px-4 py-3 text-left border-b border-border/50 hover:bg-surface-2 transition-colors ${
-				active ? "bg-accent/10" : ""
-			}`}
-		>
-			<StatePill state={run.state} />
-			<div className="flex-1 min-w-0">
-				<div className="font-mono text-xs text-muted truncate">{run.processInstanceKey}</div>
-				<div className="text-xs text-muted/60 mt-0.5">{formatDate(run.startedAt)}</div>
-			</div>
-			<div className="text-xs text-muted text-right shrink-0">
-				<div>{run.stepCount ?? 0} steps</div>
-				{(run.failedSteps ?? 0) > 0 && <div className="text-danger">{run.failedSteps} failed</div>}
-			</div>
-			<ChevronRight size={14} className="text-muted shrink-0" />
-		</button>
+		<>
+			<button
+				type="button"
+				onClick={onClick}
+				className={`flex w-full items-center gap-3 px-4 py-3 text-left border-b border-border/50 hover:bg-surface-2 transition-colors ${
+					active ? "bg-accent/10" : ""
+				}`}
+			>
+				<StatePill state={run.state} />
+				<div className="flex-1 min-w-0">
+					<div className="font-mono text-xs text-muted truncate">{run.processInstanceKey}</div>
+					<div className="text-xs text-muted/60 mt-0.5">{formatDate(run.startedAt)}</div>
+				</div>
+				<div className="text-xs text-muted text-right shrink-0">
+					<div>{run.stepCount ?? 0} steps</div>
+					{(run.failedSteps ?? 0) > 0 && (
+						<div className="text-danger">{run.failedSteps} failed</div>
+					)}
+				</div>
+				{run.state === "failed" && (
+					<button
+						type="button"
+						aria-label="Re-run"
+						className="shrink-0 p-1 rounded hover:bg-accent/10 text-muted hover:text-accent transition-colors"
+						onClick={(e) => {
+							e.stopPropagation()
+							setShowRerun(true)
+						}}
+					>
+						<RotateCcw size={13} />
+					</button>
+				)}
+				<ChevronRight size={14} className="text-muted shrink-0" />
+			</button>
+			{showRerun && <RerunDialog run={run} onClose={() => setShowRerun(false)} />}
+		</>
 	)
 }
 
