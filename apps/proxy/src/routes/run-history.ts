@@ -103,6 +103,22 @@ function extractInputs(job: WorkerJob): string {
 			case "io.bpmnkit:js:1": {
 				return JSON.stringify({ expression: job.customHeaders.expression ?? "" })
 			}
+			case "io.bpmnkit:http:scrape:1": {
+				const url = interpolate(job.customHeaders.url ?? "", job.variables)
+				return JSON.stringify({ url })
+			}
+			case "io.bpmnkit:email:fetch:1": {
+				return JSON.stringify({
+					folder: job.customHeaders.folder ?? "INBOX",
+					limit: job.customHeaders.limit ?? "10",
+					unreadOnly: job.customHeaders.unreadOnly ?? "true",
+				})
+			}
+			case "io.bpmnkit:email:send:1": {
+				const to = String(job.variables.to ?? job.customHeaders.to ?? "")
+				const subject = String(job.variables.subject ?? job.customHeaders.subject ?? "")
+				return JSON.stringify({ to, subject })
+			}
 			default:
 				return JSON.stringify({ headers: job.customHeaders })
 		}

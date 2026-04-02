@@ -36,6 +36,7 @@
 		"@tauri-apps/cli": "^2",
 		"@types/better-sqlite3": "^7.6.13",
 		"@types/node": "^22.0.0",
+		"@types/nodemailer": "^6.4.17",
 		"astro": "^6",
 		"esbuild": "^0.25.0",
 		"happy-dom": "^20.7.0",

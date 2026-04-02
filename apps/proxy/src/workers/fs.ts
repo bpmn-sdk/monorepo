@@ -11,7 +11,17 @@ export const JOB_TYPE_LIST = "io.bpmnkit:fs:list:1"
 
 function resolvePath(raw: string, vars: Record<string, unknown>): string {
 	const p = interpolate(raw, vars)
-	return p.startsWith("~/") || p === "~" ? homedir() + p.slice(1) : resolve(p)
+	const resolved = p.startsWith("~/") || p === "~" ? homedir() + p.slice(1) : resolve(p)
+	const root = process.env.BPMNKIT_FS_ROOT
+	if (root) {
+		const rootResolved = resolve(root)
+		if (!resolved.startsWith(`${rootResolved}/`) && resolved !== rootResolved) {
+			throw new Error(
+				`Path "${resolved}" is outside the allowed root "${rootResolved}". Set BPMNKIT_FS_ROOT to change this.`,
+			)
+		}
+	}
+	return resolved
 }
 
 /**

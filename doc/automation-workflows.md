@@ -265,30 +265,31 @@ actually execute shell commands, call an LLM, and read/write files.
 
 ### Action items
 
-- [ ] Email worker (`io.bpmnkit:email:fetch:1`, `io.bpmnkit:email:send:1`)
+- [x] Email worker (`io.bpmnkit:email:fetch:1`, `io.bpmnkit:email:send:1`)
   - IMAP fetch: returns array of `{ subject, from, body, date }` objects
   - SMTP send: inputs `to`, `subject`, `body` (HTML or plain text)
   - Credentials via `{{secrets.*}}`
 
-- [ ] HTTP scraper worker (`io.bpmnkit:http:scrape:1`)
+- [x] HTTP scraper worker (`io.bpmnkit:http:scrape:1`)
   - Fetches a URL, returns `{ html, text, title }` using `node:fetch` + simple HTML stripper
   - Useful for "open each link and summarize"
 
-- [ ] Process template library
-  - 5–10 ready-to-import BPMN files covering common patterns:
-    - "Summarize a folder of documents"
-    - "Monitor a URL and alert on change"
-    - "Weekly digest email from RSS feeds"
-    - "Code review assistant — watch a folder, AI reviews new files"
+- [x] Process template library
+  - 5 ready-to-import BPMN files covering common patterns:
+    - "Summarize Documents in Folder"
+    - "Monitor URL for Changes"
+    - "Code Review Assistant"
+    - "Batch Process with CLI"
+    - "Fetch and Summarize Webpage"
 
-- [ ] Studio onboarding: "What would you like to automate?"
+- [x] Studio onboarding: "What would you like to automate?"
   - AI chat that generates a starter BPMN based on the user's description
-  - Uses the existing AI diagram generation feature
+  - "Describe what to automate" button in empty state opens AI drawer with starter prompt
 
-- [ ] Worker security hardening
-  - CLI worker: optional `allowedCommands` allowlist in proxy config
-  - FS worker: optional `rootDir` restriction (like existing `fsValidate`)
-  - JS worker: stricter sandbox (VM module)
+- [x] Worker security hardening
+  - CLI worker: optional `allowedCommands` allowlist via `BPMNKIT_CLI_ALLOWED` env var
+  - FS worker: optional `rootDir` restriction via `BPMNKIT_FS_ROOT` env var
+  - JS worker: stricter sandbox using `node:vm` `runInNewContext`
 
 ---
 

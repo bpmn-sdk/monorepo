@@ -7,7 +7,9 @@
 import { getActiveProfile, getAuthHeader } from "@bpmnkit/profiles"
 import { onJobComplete, onJobFail, onJobStart } from "./routes/run-history.js"
 import * as cliWorker from "./workers/cli.js"
+import * as emailWorker from "./workers/email.js"
 import * as fsWorker from "./workers/fs.js"
+import * as httpWorker from "./workers/http.js"
 import * as jsWorker from "./workers/js.js"
 import * as llmWorker from "./workers/llm.js"
 
@@ -53,6 +55,9 @@ const registry = new Map<string, WorkerHandler>([
 	[fsWorker.JOB_TYPE_APPEND, fsWorker.handleAppend],
 	[fsWorker.JOB_TYPE_LIST, fsWorker.handleList],
 	[jsWorker.JOB_TYPE, jsWorker.handle],
+	[httpWorker.JOB_TYPE, httpWorker.handle],
+	[emailWorker.JOB_TYPE_FETCH, emailWorker.handleFetch],
+	[emailWorker.JOB_TYPE_SEND, emailWorker.handleSend],
 ])
 
 // ── Daemon state (exported for /status) ──────────────────────────────────────

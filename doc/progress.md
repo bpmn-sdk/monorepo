@@ -1,5 +1,34 @@
 # Progress
 
+## 2026-04-02 — Feat: Local automation workflows — Phase 6 complete (polish & ecosystem)
+
+**`apps/proxy/src/workers/http.ts`** (new):
+- HTTP scraper worker (`io.bpmnkit:http:scrape:1`)
+- `fetch(url)` with configurable timeout; extracts `<title>`, strips HTML to plain text
+- Returns `{ url, html, text, title, statusCode }` (optionally under a `resultVariable`)
+
+**`apps/proxy/src/workers/email.ts`** (new):
+- `io.bpmnkit:email:fetch:1` — IMAP fetch via `imapflow`; returns `[{ uid, subject, from, to, date, body }]`
+- `io.bpmnkit:email:send:1` — SMTP send via `nodemailer`; reads `to`/`subject`/`body` from process variables
+- All credentials use `{{secrets.*}}` interpolation
+
+**Security hardening (proxy workers):**
+- `cli.ts` — `BPMNKIT_CLI_ALLOWED` env var: comma-separated command-name allowlist; silently bypassed if unset
+- `fs.ts` — `BPMNKIT_FS_ROOT` env var: all paths must resolve under this directory
+- `js.ts` — replaced `new Function` with `node:vm` `runInNewContext`; only `variables` accessible, no Node.js globals
+
+**`apps/proxy/src/worker-templates.ts`** / **`packages/plugins/src/connector-catalog/builtin-templates.ts`**:
+- Added HTTP Scraper, Fetch Emails, Send Email element templates
+
+**`apps/studio/src/templates/index.ts`** (new):
+- 5 BPMN process starter templates: Summarize Documents, Monitor URL, Code Review Assistant, Batch CLI, Fetch+Summarize
+- Valid BPMN 2.0 XML with Zeebe extensions + BPMNDi layout
+
+**`apps/studio/src/pages/Models.tsx`**:
+- "Templates" button in header opens template gallery dialog
+- Empty state: "Browse templates" + "Describe what to automate" (opens AI drawer with starter prompt)
+- Template gallery dialog — card-per-template with name, description, category pill; creates model on click
+
 ## 2026-04-02 — Feat: Local automation workflows — Phase 5 complete (observability & audit)
 
 **`apps/proxy/src/routes/run-history.ts`** (new):

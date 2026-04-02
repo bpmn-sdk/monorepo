@@ -1,3 +1,4 @@
+import { runInNewContext } from "node:vm"
 import type { WorkerJob } from "../worker.js"
 
 export const JOB_TYPE = "io.bpmnkit:js:1"
@@ -19,8 +20,7 @@ export async function handle(job: WorkerJob): Promise<Record<string, unknown>> {
 
 	const resultVariable = job.customHeaders.resultVariable ?? "result"
 
-	const fn = new Function("variables", `"use strict"; return (${expression})`)
-	const result: unknown = fn(job.variables)
+	const result: unknown = runInNewContext(`(${expression})`, { variables: job.variables })
 
 	return { [resultVariable]: result }
 }

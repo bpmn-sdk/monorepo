@@ -12,6 +12,8 @@ const LLM_ICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" wi
 const FS_ICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="16" height="16"><rect width="16" height="16" rx="3" fill="#1e1e2e"/><path d="M3 5h10v8H3z" fill="none" stroke="#2dd4bf" stroke-width="1.5"/><path d="M3 5l2-2h4l2 2" fill="none" stroke="#2dd4bf" stroke-width="1.5"/></svg>`
 const JS_ICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="16" height="16"><rect width="16" height="16" rx="3" fill="#f59e0b"/><text x="2" y="12" font-family="monospace" font-size="9" font-weight="bold" fill="#1e1e2e">JS</text></svg>`
 const WATCH_ICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="16" height="16"><rect width="16" height="16" rx="3" fill="#1e1e2e"/><path d="M3 10V7l5-4 5 4v3" fill="none" stroke="#a78bfa" stroke-width="1.5"/><path d="M5 10h6v4H5z" fill="none" stroke="#a78bfa" stroke-width="1.5"/></svg>`
+const HTTP_ICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="16" height="16"><rect width="16" height="16" rx="3" fill="#1e1e2e"/><circle cx="8" cy="8" r="5" fill="none" stroke="#2dd4bf" stroke-width="1.5"/><path d="M3 8h10M8 3c-2 2-2 8 0 10M8 3c2 2 2 8 0 10" stroke="#2dd4bf" stroke-width="1" fill="none"/></svg>`
+const EMAIL_ICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="16" height="16"><rect width="16" height="16" rx="3" fill="#1e1e2e"/><rect x="2" y="4" width="12" height="8" rx="1" fill="none" stroke="#f59e0b" stroke-width="1.5"/><path d="M2 5l6 4 6-4" stroke="#f59e0b" stroke-width="1.5" fill="none"/></svg>`
 
 export const BUILTIN_WORKER_TEMPLATES: ElementTemplate[] = [
 	// ── CLI Worker ────────────────────────────────────────────────────────────
@@ -404,6 +406,207 @@ export const BUILTIN_WORKER_TEMPLATES: ElementTemplate[] = [
 				optional: true,
 				group: "filter",
 				binding: { type: "zeebe:taskHeader", key: "glob" },
+			},
+		],
+	},
+
+	// ── HTTP Scraper ──────────────────────────────────────────────────────────
+	{
+		id: "io.bpmnkit.http.scrape",
+		name: "HTTP Scraper",
+		version: 1,
+		description:
+			"Fetch a URL and extract its text content and title. Returns { html, text, title, statusCode }.",
+		appliesTo: ["bpmn:ServiceTask"],
+		icon: { contents: HTTP_ICON },
+		groups: [
+			{ id: "request", label: "Request" },
+			{ id: "output", label: "Output" },
+		],
+		properties: [
+			{
+				id: "taskType",
+				type: "Hidden",
+				value: "io.bpmnkit:http:scrape:1",
+				binding: { type: "zeebe:taskDefinition", property: "type" },
+			},
+			{
+				id: "url",
+				label: "URL",
+				description: "URL to fetch. Use {{varName}} for variables or {{secrets.NAME}} for secrets.",
+				type: "String",
+				feel: "optional",
+				group: "request",
+				constraints: { notEmpty: true },
+				binding: { type: "zeebe:taskHeader", key: "url" },
+			},
+			{
+				id: "timeout",
+				label: "Timeout (seconds)",
+				type: "Number",
+				value: 30,
+				group: "request",
+				binding: { type: "zeebe:taskHeader", key: "timeout" },
+			},
+			{
+				id: "resultVariable",
+				label: "Result variable",
+				description: "Process variable to store { url, html, text, title, statusCode }.",
+				type: "String",
+				value: "scrapeResult",
+				group: "output",
+				binding: { type: "zeebe:taskHeader", key: "resultVariable" },
+			},
+		],
+	},
+
+	// ── Email Fetch ───────────────────────────────────────────────────────────
+	{
+		id: "io.bpmnkit.email.fetch",
+		name: "Fetch Emails",
+		version: 1,
+		description:
+			"Fetch emails from an IMAP mailbox. Returns an array of { uid, subject, from, date, body }.",
+		appliesTo: ["bpmn:ServiceTask"],
+		icon: { contents: EMAIL_ICON },
+		groups: [
+			{ id: "connection", label: "Connection" },
+			{ id: "filter", label: "Filter" },
+			{ id: "output", label: "Output" },
+		],
+		properties: [
+			{
+				id: "taskType",
+				type: "Hidden",
+				value: "io.bpmnkit:email:fetch:1",
+				binding: { type: "zeebe:taskDefinition", property: "type" },
+			},
+			{
+				id: "imapHost",
+				label: "IMAP host",
+				type: "String",
+				group: "connection",
+				constraints: { notEmpty: true },
+				binding: { type: "zeebe:taskHeader", key: "imapHost" },
+			},
+			{
+				id: "imapPort",
+				label: "IMAP port",
+				type: "Number",
+				value: 993,
+				group: "connection",
+				binding: { type: "zeebe:taskHeader", key: "imapPort" },
+			},
+			{
+				id: "imapUser",
+				label: "Username",
+				type: "String",
+				group: "connection",
+				constraints: { notEmpty: true },
+				binding: { type: "zeebe:taskHeader", key: "imapUser" },
+			},
+			{
+				id: "imapPassword",
+				label: "Password",
+				type: "String",
+				group: "connection",
+				constraints: { notEmpty: true },
+				binding: { type: "zeebe:taskHeader", key: "imapPassword" },
+			},
+			{
+				id: "folder",
+				label: "Folder",
+				type: "String",
+				value: "INBOX",
+				group: "filter",
+				binding: { type: "zeebe:taskHeader", key: "folder" },
+			},
+			{
+				id: "limit",
+				label: "Max messages",
+				type: "Number",
+				value: 10,
+				group: "filter",
+				binding: { type: "zeebe:taskHeader", key: "limit" },
+			},
+			{
+				id: "unreadOnly",
+				label: "Unread only",
+				type: "Boolean",
+				value: true,
+				group: "filter",
+				binding: { type: "zeebe:taskHeader", key: "unreadOnly" },
+			},
+			{
+				id: "resultVariable",
+				label: "Result variable",
+				type: "String",
+				value: "emails",
+				group: "output",
+				binding: { type: "zeebe:taskHeader", key: "resultVariable" },
+			},
+		],
+	},
+
+	// ── Email Send ────────────────────────────────────────────────────────────
+	{
+		id: "io.bpmnkit.email.send",
+		name: "Send Email",
+		version: 1,
+		description: "Send an email via SMTP. Reads to/subject/body from process variables.",
+		appliesTo: ["bpmn:ServiceTask"],
+		icon: { contents: EMAIL_ICON },
+		groups: [
+			{ id: "connection", label: "Connection" },
+			{ id: "message", label: "Message" },
+		],
+		properties: [
+			{
+				id: "taskType",
+				type: "Hidden",
+				value: "io.bpmnkit:email:send:1",
+				binding: { type: "zeebe:taskDefinition", property: "type" },
+			},
+			{
+				id: "smtpHost",
+				label: "SMTP host",
+				type: "String",
+				group: "connection",
+				constraints: { notEmpty: true },
+				binding: { type: "zeebe:taskHeader", key: "smtpHost" },
+			},
+			{
+				id: "smtpPort",
+				label: "SMTP port",
+				type: "Number",
+				value: 587,
+				group: "connection",
+				binding: { type: "zeebe:taskHeader", key: "smtpPort" },
+			},
+			{
+				id: "smtpUser",
+				label: "Username",
+				type: "String",
+				group: "connection",
+				constraints: { notEmpty: true },
+				binding: { type: "zeebe:taskHeader", key: "smtpUser" },
+			},
+			{
+				id: "smtpPassword",
+				label: "Password",
+				type: "String",
+				group: "connection",
+				constraints: { notEmpty: true },
+				binding: { type: "zeebe:taskHeader", key: "smtpPassword" },
+			},
+			{
+				id: "from",
+				label: "From address",
+				description: "Sender address. Defaults to SMTP username.",
+				type: "String",
+				optional: true,
+				group: "message",
+				binding: { type: "zeebe:taskHeader", key: "from" },
 			},
 		],
 	},

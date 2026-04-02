@@ -32,6 +32,20 @@ export async function handle(job: WorkerJob): Promise<Record<string, unknown>> {
 
 	const command = interpolate(commandTemplate, job.variables)
 
+	const allowed = process.env.BPMNKIT_CLI_ALLOWED
+	if (allowed) {
+		const prefixes = allowed
+			.split(",")
+			.map((s) => s.trim())
+			.filter(Boolean)
+		const commandName = command.trimStart().split(/\s+/)[0] ?? ""
+		if (!prefixes.some((p) => commandName === p || commandName.startsWith(`${p}/`))) {
+			throw new Error(
+				`CLI command "${commandName}" is not in the allowlist. Set BPMNKIT_CLI_ALLOWED to allow it.`,
+			)
+		}
+	}
+
 	console.log(`[worker:cli] running: ${command}`)
 
 	let stdout = ""
