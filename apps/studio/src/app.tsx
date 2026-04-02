@@ -15,6 +15,7 @@ import { Instances } from "./pages/Instances.js"
 import { ModelDetail } from "./pages/ModelDetail.js"
 import { Models } from "./pages/Models.js"
 import { NotFound } from "./pages/NotFound.js"
+import { RunHistory } from "./pages/RunHistory.js"
 import { Settings } from "./pages/Settings.js"
 import { TaskDetail } from "./pages/TaskDetail.js"
 import { Tasks } from "./pages/Tasks.js"
@@ -39,6 +40,7 @@ export function App() {
 							<Route path="/tasks/:key" component={TaskDetail} />
 							<Route path="/decisions" component={Decisions} />
 							<Route path="/decisions/:key" component={DecisionDetail} />
+							<Route path="/run-history" component={RunHistory} />
 							<Route path="/settings" component={Settings} />
 							<Route component={NotFound} />
 						</Switch>

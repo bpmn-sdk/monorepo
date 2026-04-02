@@ -233,25 +233,25 @@ actually execute shell commands, call an LLM, and read/write files.
 
 ### Action items
 
-- [ ] `apps/proxy/src/routes/run-history.ts` — local run history store
+- [x] `apps/proxy/src/routes/run-history.ts` — local run history store
   - SQLite (via `better-sqlite3`) at `~/.bpmnkit/run-history.db`
   - Schema: `runs(id, processId, startedAt, endedAt, state, variables_snapshot)`
   - Schema: `steps(id, runId, elementId, elementName, startedAt, endedAt, state, inputs, outputs)`
   - `GET /run-history` — paginated list of runs
   - `GET /run-history/:id` — full run detail with steps
 
-- [ ] Studio: Run History page
+- [x] Studio: Run History page
   - Timeline view: sequence of completed elements with timestamps
   - Variable state at each step (diff from previous)
   - AI step outputs highlighted inline
   - Failure details: error message, element where it failed
 
-- [ ] LLM worker: log prompts + responses to run history
+- [x] LLM worker: log prompts + responses to run history
   - Full prompt (after variable interpolation) stored in step `inputs`
   - Response stored in step `outputs`
   - Allows replay/debugging of AI calls
 
-- [ ] CLI worker: log command + stdout/stderr to run history
+- [x] CLI worker: log command + stdout/stderr to run history
 
 - [ ] Studio: inline "re-run from here" for failed instances
   - Select a step → restart from that point with optional variable overrides

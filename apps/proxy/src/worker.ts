@@ -5,6 +5,7 @@
  * Activated on proxy startup; respects BPMNKIT_WORKERS=false to opt out.
  */
 import { getActiveProfile, getAuthHeader } from "@bpmnkit/profiles"
+import { onJobComplete, onJobFail, onJobStart } from "./routes/run-history.js"
 import * as cliWorker from "./workers/cli.js"
 import * as fsWorker from "./workers/fs.js"
 import * as jsWorker from "./workers/js.js"
@@ -139,14 +140,20 @@ async function dispatchJob(
 	handler: WorkerHandler,
 ): Promise<void> {
 	console.log(`[worker] job ${job.jobKey} type=${job.type} pi=${job.processInstanceKey}`)
+	onJobStart(job)
+	const startMs = Date.now()
 	try {
 		const outputs = await handler(job)
+		const durationMs = Date.now() - startMs
 		await completeJob(baseUrl, authHeader, job.jobKey, outputs)
-		console.log(`[worker] job ${job.jobKey} completed`)
+		onJobComplete(job, outputs, durationMs)
+		console.log(`[worker] job ${job.jobKey} completed in ${durationMs}ms`)
 	} catch (err) {
+		const durationMs = Date.now() - startMs
 		const message = err instanceof Error ? err.message : String(err)
 		console.error(`[worker] job ${job.jobKey} failed: ${message}`)
 		await failJob(baseUrl, authHeader, job.jobKey, message, 0)
+		onJobFail(job, message, durationMs)
 	}
 }
 

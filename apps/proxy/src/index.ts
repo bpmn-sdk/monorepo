@@ -41,6 +41,12 @@ import {
 	buildSearchSystemPrompt,
 	buildSystemPrompt,
 } from "./prompt.js"
+import {
+	handleDeleteRunHistory,
+	handleGetRunHistory,
+	handleGetRunHistoryDetail,
+	matchRunHistoryRoute,
+} from "./routes/run-history.js"
 import { handleWebhook, matchWebhookRoute, startTriggers } from "./triggers/index.js"
 import { WORKER_TEMPLATES } from "./worker-templates.js"
 import { startWorkerDaemon, workerState } from "./worker.js"
@@ -303,6 +309,21 @@ const server = http.createServer(async (req, res) => {
 	if (url.pathname === "/worker-templates" && req.method === "GET") {
 		res.writeHead(200, { "Content-Type": "application/json" })
 		res.end(JSON.stringify(WORKER_TEMPLATES))
+		return
+	}
+
+	// ── Run history routes ────────────────────────────────────────────────────
+	if (url.pathname === "/run-history" && req.method === "GET") {
+		handleGetRunHistory(req, res)
+		return
+	}
+	if (url.pathname === "/run-history" && req.method === "DELETE") {
+		handleDeleteRunHistory(req, res)
+		return
+	}
+	const runHistoryMatch = matchRunHistoryRoute(req)
+	if (runHistoryMatch && req.method === "GET") {
+		handleGetRunHistoryDetail(req, res, runHistoryMatch.id)
 		return
 	}
 

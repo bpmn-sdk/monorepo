@@ -3,6 +3,7 @@ import {
 	CheckSquare,
 	FolderOpen,
 	GitBranch,
+	History,
 	Layers,
 	LayoutDashboard,
 	PanelLeftClose,
@@ -44,6 +45,7 @@ const PROXY_REQUIRED = new Set([
 	"/incidents",
 	"/tasks",
 	"/decisions",
+	"/run-history",
 ])
 
 const ALL_ITEMS: NavItem[] = [
@@ -54,6 +56,7 @@ const ALL_ITEMS: NavItem[] = [
 	{ icon: AlertTriangle, label: "Incidents", path: "/incidents", shortcut: "g n" },
 	{ icon: CheckSquare, label: "Tasks", path: "/tasks", shortcut: "g t" },
 	{ icon: GitBranch, label: "Decisions", path: "/decisions", shortcut: "g c" },
+	{ icon: History, label: "Run History", path: "/run-history", shortcut: "g h" },
 	{ icon: Settings, label: "Settings", path: "/settings", shortcut: "g s" },
 ]
 
@@ -65,6 +68,7 @@ const DEVELOPER_ORDER = [
 	"/incidents",
 	"/tasks",
 	"/decisions",
+	"/run-history",
 	"/settings",
 ]
 const OPERATOR_ORDER = [
@@ -74,6 +78,7 @@ const OPERATOR_ORDER = [
 	"/tasks",
 	"/definitions",
 	"/decisions",
+	"/run-history",
 	"/models",
 	"/settings",
 ]

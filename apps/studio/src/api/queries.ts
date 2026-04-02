@@ -12,6 +12,8 @@ import type {
 	ProcessDefinition,
 	ProcessInstance,
 	Profile,
+	RunHistoryList,
+	RunHistoryRun,
 	UserTask,
 	Variable,
 } from "./types.js"
@@ -378,6 +380,40 @@ export function useCompleteTask() {
 		onSuccess: (_data, { taskKey }) => {
 			void qc.invalidateQueries({ queryKey: keys.task(taskKey) })
 			void qc.invalidateQueries({ queryKey: ["tasks"] })
+		},
+	})
+}
+
+// ── Run History ────────────────────────────────────────────────────────────────
+
+export function useRunHistory(limit = 50, offset = 0) {
+	const proxyEnabled = useProxyEnabled()
+	return useQuery({
+		queryKey: keys.runHistory(),
+		queryFn: () => proxyFetch<RunHistoryList>(`/run-history?limit=${limit}&offset=${offset}`),
+		enabled: proxyEnabled,
+		staleTime: 0,
+		refetchInterval: 5_000,
+	})
+}
+
+export function useRunHistoryDetail(id: string) {
+	const proxyEnabled = useProxyEnabled()
+	return useQuery({
+		queryKey: keys.runHistoryDetail(id),
+		queryFn: () => proxyFetch<RunHistoryRun>(`/run-history/${id}`),
+		enabled: proxyEnabled && !!id,
+		staleTime: 0,
+		refetchInterval: 3_000,
+	})
+}
+
+export function useClearRunHistory() {
+	const qc = useQueryClient()
+	return useMutation({
+		mutationFn: () => proxyDelete<{ deleted: boolean }>("/run-history"),
+		onSuccess: () => {
+			void qc.invalidateQueries({ queryKey: keys.runHistory() })
 		},
 	})
 }

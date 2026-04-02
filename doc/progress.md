@@ -1,5 +1,38 @@
 # Progress
 
+## 2026-04-02 — Feat: Local automation workflows — Phase 5 complete (observability & audit)
+
+**`apps/proxy/src/routes/run-history.ts`** (new):
+- SQLite run history store at `~/.bpmnkit/run-history.db` using `better-sqlite3`
+- Tables: `runs` (per process instance) and `steps` (per job execution)
+- Type-specific input extraction: LLM gets interpolated prompt+system; CLI gets command; FS gets path; JS gets expression; secrets masked as `***`
+- Exports `onJobStart`, `onJobComplete`, `onJobFail` called from worker dispatch loop
+- Route handlers: `GET /run-history`, `GET /run-history/:id`, `DELETE /run-history`
+
+**`apps/proxy/src/worker.ts`**:
+- `dispatchJob()` now calls `onJobStart`/`onJobComplete`/`onJobFail` around each job handler
+
+**`apps/proxy/src/index.ts`**:
+- Registered all three run-history routes
+
+**`apps/studio/src/api/types.ts`**:
+- Added `RunHistoryStep`, `RunHistoryRun`, `RunHistoryList` interfaces
+
+**`apps/studio/src/api/keys.ts`** / **`queries.ts`**:
+- Added `useRunHistory`, `useRunHistoryDetail`, `useClearRunHistory` hooks with 5s/3s polling
+
+**`apps/studio/src/pages/RunHistory.tsx`** (new):
+- Split list/detail layout with 5s auto-refresh on list, 3s on selected run
+- `StepCard` with collapsible LLM (prompt + response), CLI (command + stdout/stderr), FS, JS rendering
+- `StatePill` component; `JobTypeIcon` for each worker type
+- Clear history button with confirmation
+
+**`apps/studio/src/app.tsx`**:
+- Added `/run-history` route
+
+**`apps/studio/src/layout/Sidebar.tsx`**:
+- Added "Run History" nav item (History icon, shortcut `g h`) to both developer and operator orderings; added `/run-history` to `PROXY_REQUIRED`
+
 ## 2026-04-02 — Feat: Local automation workflows — Phase 4 complete (multi-instance & flow UX)
 
 **`packages/core/src/bpmn/optimize/variable-flow.ts`**:

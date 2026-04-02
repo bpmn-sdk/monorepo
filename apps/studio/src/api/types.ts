@@ -78,6 +78,40 @@ export interface ElementInstance {
 	state: string
 }
 
+export interface RunHistoryStep {
+	id: string
+	runId: string
+	elementId: string
+	jobType: string
+	startedAt: string
+	endedAt: string | null
+	durationMs: number | null
+	state: "active" | "completed" | "failed"
+	inputs: string // JSON string
+	outputs: string // JSON string
+	errorMessage: string | null
+}
+
+export interface RunHistoryRun {
+	id: string
+	processInstanceKey: string
+	processId: string | null
+	startedAt: string
+	endedAt: string | null
+	state: "active" | "completed" | "failed"
+	variablesSnapshot: string // JSON string
+	stepCount?: number
+	failedSteps?: number
+	steps?: RunHistoryStep[]
+}
+
+export interface RunHistoryList {
+	items: RunHistoryRun[]
+	total: number
+	limit: number
+	offset: number
+}
+
 export interface PageResponse<T> {
 	items: T[]
 	page?: { totalItems: number }

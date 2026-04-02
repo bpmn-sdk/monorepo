@@ -7,14 +7,19 @@
 		"bpmn-ai-server": "./dist/index.js",
 		"bpmn-mcp": "./dist/mcp-server.js"
 	},
-	"files": ["LICENSE", "README.md", "dist/**/*.js"],
+	"files": [
+		"LICENSE",
+		"README.md",
+		"dist/**/*.js"
+	],
 	"engines": {
 		"node": ">=20"
 	},
 	"dependencies": {
 		"@bpmnkit/api": "workspace:*",
 		"@bpmnkit/core": "workspace:*",
-		"@bpmnkit/profiles": "workspace:*"
+		"@bpmnkit/profiles": "workspace:*",
+		"better-sqlite3": "^12.8.0"
 	},
 	"scripts": {
 		"start": "node dist/index.js",

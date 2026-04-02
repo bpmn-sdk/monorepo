@@ -34,6 +34,7 @@
 		"@resvg/resvg-js": "^2.6.2",
 		"@tailwindcss/vite": "^4.0.0",
 		"@tauri-apps/cli": "^2",
+		"@types/better-sqlite3": "^7.6.13",
 		"@types/node": "^22.0.0",
 		"astro": "^6",
 		"esbuild": "^0.25.0",
