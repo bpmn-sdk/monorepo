@@ -860,6 +860,11 @@ Two bugs combined to prevent intermediate timer events from completing:
 - **`apps/studio/src/api/wasm-adapter.ts`**: Fixed `create_process_instance` response parsing — the engine returns `{ processInstanceKey: "..." }` not `{ key: ... }`. Using the wrong field returned `"0"` for every instance key, making all created instances unfindable.
 - **`apps/studio/src/pages/InstanceDetail.tsx`**: Added `WasmInstanceDetail` component (mirrors `WasmDefinitionDetail` pattern). When the reebe-wasm profile is active, renders a native view showing instance state, incidents, variables, and a cancel button — instead of `createInstanceDetailView` from `@bpmnkit/operate` which makes raw HTTP calls to the proxy, bypassing the wasm adapter.
 
+## 2026-04-02 — Fix: learn deploy builds reebe-wasm before Turbo
+
+- **`.github/workflows/deploy-learn.yml`**: Added the same Rust + `wasm-pack` bootstrap used by `ci.yml` and `deploy-studio.yml` (`rustup target add wasm32-unknown-unknown`, `Swatinem/rust-cache`, `jetli/wasm-pack-action`, then `wasm-pack build apps/reebe/crates/reebe-wasm --target web --out-dir "$GITHUB_WORKSPACE/apps/reebe-wasm"`) before `pnpm turbo build --filter @bpmnkit/learn`.
+- Root cause: `@bpmnkit/engine` imports `@bpmnkit/reebe-wasm`, but `apps/reebe-wasm` only commits the stub `package.json`; the generated `reebe_wasm.d.ts`/JS/WASM artifacts are ignored and therefore missing on GitHub Actions fresh checkouts unless the workflow builds them first.
+
 ## 2026-03-26 — Fix: reebe-wasm serde_wasm_bindgen JSON serialization
 
 - **`apps/reebe/crates/reebe-wasm/src/lib.rs`**: Replaced all `serde_wasm_bindgen::to_value(&x)` calls with a `json_compatible()` serializer. The default serializer converts Rust `Map`/`serde_json::Value::Object` into JS `Map` objects (not plain objects), so `JSON.stringify(result)` returned `{}` — silently hiding deploy responses and all engine command results. Added `to_js()` and `to_js_result()` helpers using `Serializer::json_compatible()`.

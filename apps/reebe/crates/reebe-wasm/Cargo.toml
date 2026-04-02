@@ -2,7 +2,7 @@
 name = "reebe-wasm"
 version.workspace = true
 edition.workspace = true
-license.workspace = true
+license = "Apache-2.0"
 description = "WebAssembly playground for the Reebe BPMN workflow engine"
 
 [lib]
