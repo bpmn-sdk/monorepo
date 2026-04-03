@@ -86,7 +86,7 @@ export function Instances() {
 					placeholder="Search by process ID or key..."
 					value={search}
 					onInput={(e) => setSearch((e.target as HTMLInputElement).value)}
-					className="max-w-80"
+					className="w-full max-w-80"
 					aria-label="Search instances"
 				/>
 				<div className="flex rounded border border-border bg-surface-2 text-xs overflow-hidden">
@@ -107,80 +107,82 @@ export function Instances() {
 			</div>
 
 			<div className="rounded-lg border border-border bg-surface overflow-hidden">
-				<table className="w-full text-sm">
-					<thead>
-						<tr className="border-b border-border bg-surface-2 text-left text-xs text-muted">
-							<th className="px-4 py-3 w-8">
-								<span className="sr-only">Select</span>
-							</th>
-							<th className="px-4 py-3 font-medium">State</th>
-							<th className="px-4 py-3 font-medium">Process ID</th>
-							<th className="px-4 py-3 font-medium">Key</th>
-							<th className="px-4 py-3 font-medium">Started</th>
-							<th className="px-4 py-3 font-medium">Ended</th>
-						</tr>
-					</thead>
-					<tbody>
-						{isLoading &&
-							(["s0", "s1", "s2", "s3", "s4"] as const).map((sk) => (
-								<tr key={sk} className="border-b border-border/50">
-									{(["a", "b", "c", "d", "e", "f"] as const).map((col) => (
-										<td key={col} className="px-4 py-3">
-											<div className="h-4 animate-pulse rounded bg-surface-2" />
-										</td>
-									))}
+				<div className="overflow-x-auto">
+					<table className="w-full text-sm min-w-[480px]">
+						<thead>
+							<tr className="border-b border-border bg-surface-2 text-left text-xs text-muted">
+								<th className="px-4 py-3 w-8">
+									<span className="sr-only">Select</span>
+								</th>
+								<th className="px-4 py-3 font-medium">State</th>
+								<th className="px-4 py-3 font-medium">Process ID</th>
+								<th className="px-4 py-3 font-medium">Key</th>
+								<th className="px-4 py-3 font-medium">Started</th>
+								<th className="px-4 py-3 font-medium">Ended</th>
+							</tr>
+						</thead>
+						<tbody>
+							{isLoading &&
+								(["s0", "s1", "s2", "s3", "s4"] as const).map((sk) => (
+									<tr key={sk} className="border-b border-border/50">
+										{(["a", "b", "c", "d", "e", "f"] as const).map((col) => (
+											<td key={col} className="px-4 py-3">
+												<div className="h-4 animate-pulse rounded bg-surface-2" />
+											</td>
+										))}
+									</tr>
+								))}
+							{filtered?.map((inst) => (
+								<tr
+									key={inst.processInstanceKey}
+									className="border-b border-border/50 hover:bg-surface-2 cursor-pointer"
+								>
+									<td className="px-4 py-3">
+										<input
+											type="checkbox"
+											checked={selected.has(inst.processInstanceKey)}
+											onClick={(e) => e.stopPropagation()}
+											onChange={() => toggleSelect(inst.processInstanceKey)}
+											aria-label={`Select instance ${inst.processInstanceKey}`}
+											className="cursor-pointer"
+										/>
+									</td>
+									<td className="px-4 py-3">
+										<Link href={`/instances/${inst.processInstanceKey}`}>
+											<StatusPill state={inst.state} />
+										</Link>
+									</td>
+									<td className="px-4 py-3 font-mono text-xs text-muted">
+										<Link href={`/instances/${inst.processInstanceKey}`} className="hover:text-fg">
+											{inst.processDefinitionId}
+										</Link>
+									</td>
+									<td className="px-4 py-3 font-mono text-xs text-muted">
+										<Link
+											href={`/instances/${inst.processInstanceKey}`}
+											className="hover:text-accent"
+										>
+											{inst.processInstanceKey}
+										</Link>
+									</td>
+									<td className="px-4 py-3 text-muted text-xs">
+										{inst.startDate ? new Date(inst.startDate).toLocaleString() : "—"}
+									</td>
+									<td className="px-4 py-3 text-muted text-xs">
+										{inst.endDate ? new Date(inst.endDate).toLocaleString() : "—"}
+									</td>
 								</tr>
 							))}
-						{filtered?.map((inst) => (
-							<tr
-								key={inst.processInstanceKey}
-								className="border-b border-border/50 hover:bg-surface-2 cursor-pointer"
-							>
-								<td className="px-4 py-3">
-									<input
-										type="checkbox"
-										checked={selected.has(inst.processInstanceKey)}
-										onClick={(e) => e.stopPropagation()}
-										onChange={() => toggleSelect(inst.processInstanceKey)}
-										aria-label={`Select instance ${inst.processInstanceKey}`}
-										className="cursor-pointer"
-									/>
-								</td>
-								<td className="px-4 py-3">
-									<Link href={`/instances/${inst.processInstanceKey}`}>
-										<StatusPill state={inst.state} />
-									</Link>
-								</td>
-								<td className="px-4 py-3 font-mono text-xs text-muted">
-									<Link href={`/instances/${inst.processInstanceKey}`} className="hover:text-fg">
-										{inst.processDefinitionId}
-									</Link>
-								</td>
-								<td className="px-4 py-3 font-mono text-xs text-muted">
-									<Link
-										href={`/instances/${inst.processInstanceKey}`}
-										className="hover:text-accent"
-									>
-										{inst.processInstanceKey}
-									</Link>
-								</td>
-								<td className="px-4 py-3 text-muted text-xs">
-									{inst.startDate ? new Date(inst.startDate).toLocaleString() : "—"}
-								</td>
-								<td className="px-4 py-3 text-muted text-xs">
-									{inst.endDate ? new Date(inst.endDate).toLocaleString() : "—"}
-								</td>
-							</tr>
-						))}
-						{!isLoading && filtered?.length === 0 && (
-							<tr>
-								<td colSpan={6} className="px-4 py-8 text-center text-sm text-muted">
-									No instances found.
-								</td>
-							</tr>
-						)}
-					</tbody>
-				</table>
+							{!isLoading && filtered?.length === 0 && (
+								<tr>
+									<td colSpan={6} className="px-4 py-8 text-center text-sm text-muted">
+										No instances found.
+									</td>
+								</tr>
+							)}
+						</tbody>
+					</table>
+				</div>
 			</div>
 		</div>
 	)

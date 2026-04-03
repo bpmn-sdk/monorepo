@@ -130,123 +130,125 @@ export function Definitions() {
 					placeholder="Search by name or process ID..."
 					value={search}
 					onInput={(e) => setSearch((e.target as HTMLInputElement).value)}
-					className="max-w-80"
+					className="w-full max-w-80"
 					aria-label="Search definitions"
 				/>
 			</div>
 
 			<div className="rounded-lg border border-border bg-surface overflow-hidden">
-				<table className="w-full text-sm">
-					<thead>
-						<tr className="border-b border-border bg-surface-2 text-left text-xs text-muted">
-							<th className="px-4 py-3 font-medium w-8" />
-							<th className="px-4 py-3 font-medium">Process</th>
-							<th className="px-4 py-3 font-medium">Versions</th>
-							<th className="px-4 py-3 font-medium">Latest deployed</th>
-							<th className="px-4 py-3 font-medium sr-only">Actions</th>
-						</tr>
-					</thead>
-					<tbody>
-						{isLoading &&
-							(["s0", "s1", "s2", "s3"] as const).map((sk) => (
-								<tr key={sk} className="border-b border-border/50">
-									{(["a", "b", "c", "d", "e"] as const).map((col) => (
-										<td key={col} className="px-4 py-3">
-											<div className="h-4 animate-pulse rounded bg-surface-2" />
-										</td>
-									))}
-								</tr>
-							))}
-						{filtered.map((group) => {
-							const expanded = expandedIds.has(group.processDefinitionId)
-							const localModel = findLocalModel(group.processDefinitionId)
-							const hasMultiple = group.versions.length > 1
-
-							return [
-								<tr
-									key={group.processDefinitionId}
-									className="border-b border-border/50 hover:bg-surface-2 transition-colors"
-								>
-									{/* Expand toggle */}
-									<td className="px-4 py-3">
-										{hasMultiple && (
-											<button
-												type="button"
-												onClick={() => toggleExpand(group.processDefinitionId)}
-												className="text-muted hover:text-fg transition-colors"
-												aria-label={expanded ? "Collapse versions" : "Expand versions"}
-											>
-												{expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-											</button>
-										)}
-									</td>
-
-									{/* Name + process ID */}
-									<td className="px-4 py-3">
-										<Link
-											href={`/definitions/${group.latest.processDefinitionKey}`}
-											className="font-medium text-fg hover:text-accent block transition-colors"
-										>
-											{group.name}
-										</Link>
-										<span className="text-xs font-mono text-muted">
-											{group.processDefinitionId}
-										</span>
-									</td>
-
-									{/* Version count — click to expand */}
-									<td className="px-4 py-3">
-										{hasMultiple ? (
-											<button
-												type="button"
-												onClick={() => toggleExpand(group.processDefinitionId)}
-												className="inline-flex items-center gap-1 text-xs text-accent hover:underline"
-											>
-												<Layers size={12} />
-												{group.versions.length} versions
-											</button>
-										) : (
-											<span className="text-xs text-muted">v{group.latest.version}</span>
-										)}
-									</td>
-
-									{/* Latest deployment date */}
-									<td className="px-4 py-3 text-xs text-muted">
-										{group.latest.deploymentTime
-											? new Date(group.latest.deploymentTime).toLocaleDateString()
-											: "—"}
-									</td>
-
-									{/* Actions */}
-									<td className="px-4 py-3">
-										{localModel && (
-											<Link
-												href={`/models/${localModel.id}`}
-												className="inline-flex items-center gap-1 text-xs text-accent hover:underline"
-											>
-												<ExternalLink size={11} />
-												Open local
-											</Link>
-										)}
-									</td>
-								</tr>,
-								expanded && (
-									<VersionsTable
-										key={`${group.processDefinitionId}-versions`}
-										versions={group.versions}
-									/>
-								),
-							]
-						})}
-						{!isLoading && filtered.length === 0 && (
-							<tr>
-								<td colSpan={5} className="px-4 py-8 text-center text-sm text-muted">
-									No definitions found.
-								</td>
+				<div className="overflow-x-auto">
+					<table className="w-full text-sm min-w-[520px]">
+						<thead>
+							<tr className="border-b border-border bg-surface-2 text-left text-xs text-muted">
+								<th className="px-4 py-3 font-medium w-8" />
+								<th className="px-4 py-3 font-medium">Process</th>
+								<th className="px-4 py-3 font-medium">Versions</th>
+								<th className="px-4 py-3 font-medium">Latest deployed</th>
+								<th className="px-4 py-3 font-medium sr-only">Actions</th>
 							</tr>
-						)}
-					</tbody>
-				</table>
+						</thead>
+						<tbody>
+							{isLoading &&
+								(["s0", "s1", "s2", "s3"] as const).map((sk) => (
+									<tr key={sk} className="border-b border-border/50">
+										{(["a", "b", "c", "d", "e"] as const).map((col) => (
+											<td key={col} className="px-4 py-3">
+												<div className="h-4 animate-pulse rounded bg-surface-2" />
+											</td>
+										))}
+									</tr>
+								))}
+							{filtered.map((group) => {
+								const expanded = expandedIds.has(group.processDefinitionId)
+								const localModel = findLocalModel(group.processDefinitionId)
+								const hasMultiple = group.versions.length > 1
+
+								return [
+									<tr
+										key={group.processDefinitionId}
+										className="border-b border-border/50 hover:bg-surface-2 transition-colors"
+									>
+										{/* Expand toggle */}
+										<td className="px-4 py-3">
+											{hasMultiple && (
+												<button
+													type="button"
+													onClick={() => toggleExpand(group.processDefinitionId)}
+													className="text-muted hover:text-fg transition-colors"
+													aria-label={expanded ? "Collapse versions" : "Expand versions"}
+												>
+													{expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+												</button>
+											)}
+										</td>
+
+										{/* Name + process ID */}
+										<td className="px-4 py-3">
+											<Link
+												href={`/definitions/${group.latest.processDefinitionKey}`}
+												className="font-medium text-fg hover:text-accent block transition-colors"
+											>
+												{group.name}
+											</Link>
+											<span className="text-xs font-mono text-muted">
+												{group.processDefinitionId}
+											</span>
+										</td>
+
+										{/* Version count — click to expand */}
+										<td className="px-4 py-3">
+											{hasMultiple ? (
+												<button
+													type="button"
+													onClick={() => toggleExpand(group.processDefinitionId)}
+													className="inline-flex items-center gap-1 text-xs text-accent hover:underline"
+												>
+													<Layers size={12} />
+													{group.versions.length} versions
+												</button>
+											) : (
+												<span className="text-xs text-muted">v{group.latest.version}</span>
+											)}
+										</td>
+
+										{/* Latest deployment date */}
+										<td className="px-4 py-3 text-xs text-muted">
+											{group.latest.deploymentTime
+												? new Date(group.latest.deploymentTime).toLocaleDateString()
+												: "—"}
+										</td>
+
+										{/* Actions */}
+										<td className="px-4 py-3">
+											{localModel && (
+												<Link
+													href={`/models/${localModel.id}`}
+													className="inline-flex items-center gap-1 text-xs text-accent hover:underline"
+												>
+													<ExternalLink size={11} />
+													Open local
+												</Link>
+											)}
+										</td>
+									</tr>,
+									expanded && (
+										<VersionsTable
+											key={`${group.processDefinitionId}-versions`}
+											versions={group.versions}
+										/>
+									),
+								]
+							})}
+							{!isLoading && filtered.length === 0 && (
+								<tr>
+									<td colSpan={5} className="px-4 py-8 text-center text-sm text-muted">
+										No definitions found.
+									</td>
+								</tr>
+							)}
+						</tbody>
+					</table>
+				</div>
 			</div>
 		</div>
 	)

@@ -18,7 +18,7 @@ export function TopBar() {
 			<button
 				type="button"
 				onClick={toggleSidebar}
-				className="flex items-center gap-2 shrink-0 rounded hover:opacity-80 transition-opacity duration-150"
+				className="flex items-center gap-2 shrink-0 rounded hover:opacity-80 active:opacity-60 transition-opacity duration-150"
 				aria-label="Toggle sidebar"
 				title="Toggle sidebar ["
 			>
@@ -62,7 +62,7 @@ export function TopBar() {
 			{activeProject && (
 				<Link
 					href="/settings"
-					className="flex items-center gap-1.5 ml-4 px-2 py-1 rounded text-xs text-muted hover:text-fg hover:bg-surface-2 transition-colors"
+					className="hidden sm:flex items-center gap-1.5 ml-4 px-2 py-1 rounded text-xs text-muted hover:text-fg hover:bg-surface-2 transition-colors"
 					title={`Project: ${activeProject.path}`}
 				>
 					<FolderOpen size={13} />
@@ -75,7 +75,7 @@ export function TopBar() {
 					<button
 						type="button"
 						onClick={() => setSimulationMode(!simulationMode)}
-						className={`flex h-8 items-center gap-1.5 rounded border px-2 text-xs transition-colors ${
+						className={`flex h-8 items-center gap-1.5 rounded border px-2 text-xs transition-colors active:opacity-70 ${
 							simulationMode
 								? "border-warn bg-warn/10 text-warn"
 								: "border-border text-muted hover:text-fg"
@@ -92,7 +92,7 @@ export function TopBar() {
 				<button
 					type="button"
 					onClick={toggleAI}
-					className={`flex h-8 w-8 items-center justify-center rounded border transition-colors ${
+					className={`flex h-8 w-8 items-center justify-center rounded border transition-colors active:opacity-70 ${
 						aiOpen
 							? "border-accent bg-accent/10 text-accent"
 							: "border-border text-muted hover:text-fg"

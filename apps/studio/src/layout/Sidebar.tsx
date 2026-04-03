@@ -101,7 +101,7 @@ export function Sidebar() {
 		await loadProfiles()
 		setReconnecting(false)
 	}
-	const { sidebarExpanded, toggleSidebar, openCommandPalette } = useUiStore()
+	const { sidebarExpanded, toggleSidebar, setSidebarExpanded, openCommandPalette } = useUiStore()
 	const items = getOrderedItems(mode)
 
 	function isActive(path: string) {
@@ -114,9 +114,11 @@ export function Sidebar() {
 
 	return (
 		<nav
-			className={`flex shrink-0 flex-col bg-nav py-2 transition-[width] duration-200 ease-in-out ${
-				sidebarExpanded ? "w-52 border-r border-border/40" : "w-16"
-			}`}
+			className={`flex shrink-0 flex-col bg-nav py-2
+				fixed inset-y-0 left-0 z-50
+				md:relative md:inset-auto md:z-auto
+				transition-[transform,width] duration-200 ease-in-out
+				${sidebarExpanded ? "translate-x-0 w-64 md:w-52 md:border-r md:border-border/40" : "-translate-x-full md:translate-x-0 md:w-16"}`}
 			aria-label="Main navigation"
 		>
 			{/* Top: profile picker + search */}
@@ -124,7 +126,7 @@ export function Sidebar() {
 				{/* Cluster / profile picker */}
 				<DropdownMenu>
 					<DropdownMenuTrigger
-						className={`flex w-full items-center gap-2.5 rounded-md h-9 px-2.5 text-nav-fg hover:text-nav-fg-active hover:bg-white/5 transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-accent ${
+						className={`flex w-full items-center gap-2.5 rounded-md h-9 px-2.5 text-nav-fg hover:text-nav-fg-active hover:bg-white/5 active:bg-white/10 transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-accent ${
 							sidebarExpanded ? "justify-start" : "justify-center"
 						}`}
 						aria-label="Select cluster profile"
@@ -185,7 +187,7 @@ export function Sidebar() {
 				{/* Project picker */}
 				<DropdownMenu>
 					<DropdownMenuTrigger
-						className={`flex w-full items-center gap-2.5 rounded-md h-9 px-2.5 text-nav-fg hover:text-nav-fg-active hover:bg-white/5 transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-accent ${
+						className={`flex w-full items-center gap-2.5 rounded-md h-9 px-2.5 text-nav-fg hover:text-nav-fg-active hover:bg-white/5 active:bg-white/10 transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-accent ${
 							sidebarExpanded ? "justify-start" : "justify-center"
 						}`}
 						aria-label="Select project"
@@ -242,7 +244,7 @@ export function Sidebar() {
 							type="button"
 							onClick={() => void handleReconnect()}
 							disabled={reconnecting}
-							className={`flex w-full items-center gap-2.5 rounded-md h-9 px-2.5 text-warn hover:text-warn/80 hover:bg-white/5 transition-colors duration-150 disabled:opacity-50 ${
+							className={`flex w-full items-center gap-2.5 rounded-md h-9 px-2.5 text-warn hover:text-warn/80 hover:bg-white/5 active:bg-white/10 transition-colors duration-150 disabled:opacity-50 ${
 								sidebarExpanded ? "justify-start" : "justify-center"
 							}`}
 							aria-label="Retry proxy connection"
@@ -272,7 +274,7 @@ export function Sidebar() {
 					<button
 						type="button"
 						onClick={openCommandPalette}
-						className={`flex w-full items-center gap-2.5 rounded-md h-9 px-2.5 text-nav-fg hover:text-nav-fg-active hover:bg-white/5 transition-colors duration-150 ${
+						className={`flex w-full items-center gap-2.5 rounded-md h-9 px-2.5 text-nav-fg hover:text-nav-fg-active hover:bg-white/5 active:bg-white/10 transition-colors duration-150 ${
 							sidebarExpanded ? "justify-start" : "justify-center"
 						}`}
 						aria-label="Open search"
@@ -314,10 +316,14 @@ export function Sidebar() {
 						<div key={item.path} className={`group relative ${dimmed ? "opacity-40" : ""}`}>
 							<button
 								type="button"
-								onClick={() => navigateWithTransition(item.path, navigate)}
+								onClick={() => {
+									navigateWithTransition(item.path, navigate)
+									// Close the sidebar overlay when navigating on mobile
+									if (window.innerWidth < 768) setSidebarExpanded(false)
+								}}
 								aria-label={item.label}
 								aria-current={active ? "page" : undefined}
-								className={`relative flex w-full items-center gap-3 rounded-md h-9 px-2.5 transition-all duration-150 ${
+								className={`relative flex w-full items-center gap-3 rounded-md h-9 px-2.5 transition-all duration-150 active:bg-white/10 ${
 									active
 										? "bg-white/10 text-nav-fg-active"
 										: "text-nav-fg hover:text-nav-fg-active hover:bg-white/5"
@@ -358,7 +364,7 @@ export function Sidebar() {
 				<button
 					type="button"
 					onClick={toggleSidebar}
-					className="flex w-full items-center gap-3 rounded-md h-9 px-2.5 text-nav-fg hover:text-nav-fg-active hover:bg-white/5 transition-colors duration-150"
+					className="flex w-full items-center gap-3 rounded-md h-9 px-2.5 text-nav-fg hover:text-nav-fg-active hover:bg-white/5 active:bg-white/10 transition-colors duration-150"
 					aria-label={sidebarExpanded ? "Collapse sidebar" : "Expand sidebar"}
 					title={sidebarExpanded ? "Collapse sidebar [" : "Expand sidebar ["}
 				>
