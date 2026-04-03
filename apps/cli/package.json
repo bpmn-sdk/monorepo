@@ -22,7 +22,8 @@
 		"@bpmnkit/connector-gen": "workspace:*",
 		"@bpmnkit/core": "workspace:*",
 		"@bpmnkit/engine": "workspace:*",
-		"@bpmnkit/profiles": "workspace:*"
+		"@bpmnkit/profiles": "workspace:*",
+		"@bpmnkit/proxy": "workspace:*"
 	},
 	"publishConfig": {
 		"access": "public"

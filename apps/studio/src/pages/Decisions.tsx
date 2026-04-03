@@ -45,7 +45,7 @@ export function Decisions() {
 					placeholder="Search by name or decision ID..."
 					value={search}
 					onInput={(e) => setSearch((e.target as HTMLInputElement).value)}
-					className="max-w-80"
+					className="w-full max-w-80"
 					aria-label="Search decisions"
 				/>
 			</div>

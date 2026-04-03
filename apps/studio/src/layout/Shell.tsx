@@ -26,7 +26,7 @@ const ROUTE_MAP: Record<string, string> = {
 
 export function Shell({ children }: ShellProps) {
 	const [, navigate] = useLocation()
-	const { toggleCommandPalette, toggleAI, toggleSidebar, zenMode } = useUiStore()
+	const { toggleCommandPalette, toggleAI, toggleSidebar, zenMode, sidebarExpanded } = useUiStore()
 
 	// Global keyboard shortcuts + link-click interceptor for view transitions
 	useEffect(() => {
@@ -117,6 +117,17 @@ export function Shell({ children }: ShellProps) {
 
 	return (
 		<div className="flex h-full flex-col overflow-hidden">
+			{/* Mobile backdrop — closes the sidebar when tapped outside */}
+			{!zenMode && sidebarExpanded && (
+				<div
+					role="button"
+					tabIndex={-1}
+					className="fixed inset-0 z-40 bg-black/50 md:hidden"
+					onClick={toggleSidebar}
+					onKeyDown={(e) => e.key === "Escape" && toggleSidebar()}
+					aria-label="Close navigation"
+				/>
+			)}
 			{!zenMode && <TopBar />}
 			<div className="flex flex-1 overflow-hidden">
 				{!zenMode && <Sidebar />}

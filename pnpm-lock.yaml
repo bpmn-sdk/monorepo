@@ -92,6 +92,9 @@ importers:
       '@bpmnkit/profiles':
         specifier: workspace:*
         version: link:../../packages/profiles
+      '@bpmnkit/proxy':
+        specifier: workspace:*
+        version: link:../proxy
 
   apps/desktop:
     dependencies:

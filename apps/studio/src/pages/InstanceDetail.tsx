@@ -279,10 +279,10 @@ export function WasmInstanceDetail({
 		: variables
 
 	return (
-		<div className="h-full flex">
+		<div className="h-full flex flex-col md:flex-row">
 			{modalVar && <VariableModal variable={modalVar} onClose={() => setModalVar(null)} />}
-			{/* Left: BPMN canvas with token overlay */}
-			<div className="flex-1 relative border-r border-border bg-surface-2">
+			{/* BPMN canvas — hidden on mobile (too small to be useful), visible on desktop */}
+			<div className="hidden md:flex flex-1 relative border-r border-border bg-surface-2">
 				<div ref={canvasContainerRef} className="absolute inset-0" />
 				{!xmlData && (
 					<div className="absolute inset-0 flex items-center justify-center">
@@ -291,8 +291,8 @@ export function WasmInstanceDetail({
 				)}
 			</div>
 
-			{/* Right: info panel */}
-			<div className="w-80 flex flex-col overflow-y-auto p-5 gap-5">
+			{/* Info panel — full width on mobile, fixed 320px on desktop */}
+			<div className="w-full md:w-80 flex flex-col overflow-y-auto p-5 gap-5">
 				{/* Header */}
 				<div className="flex items-start justify-between gap-3">
 					<div>

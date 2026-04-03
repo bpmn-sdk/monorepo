@@ -131,7 +131,7 @@ function EditorAiPanel({ onClose }: { onClose(): void }) {
 	}, [editorAiContext])
 
 	return (
-		<div className="flex w-[360px] flex-col h-full border-l border-border">
+		<div className="flex w-full md:w-[360px] flex-col h-full border-l border-border">
 			<div className="flex items-center justify-between border-b border-border px-3 py-2 shrink-0">
 				<div>
 					<div className="text-sm font-medium text-fg">AI Assistant</div>
@@ -260,7 +260,7 @@ function TextChat({ contextLabel, onClose }: { contextLabel: string; onClose(): 
 	}
 
 	return (
-		<div className="flex w-[280px] flex-col h-full border-l border-border">
+		<div className="flex w-full md:w-[280px] flex-col h-full border-l border-border">
 			{/* Header */}
 			<div className="flex items-center justify-between border-b border-border px-3 py-2 shrink-0">
 				<div>
@@ -367,9 +367,20 @@ export function AIDrawer() {
 
 	return (
 		<div
-			className={`flex shrink-0 flex-col overflow-hidden bg-surface transition-[max-width] duration-300 ease-out ${
-				aiOpen ? "pointer-events-auto" : "pointer-events-none"
-			} ${isEditorMode ? (aiOpen ? "max-w-[360px]" : "max-w-0") : aiOpen ? "max-w-[280px]" : "max-w-0"}`}
+			className={`flex flex-col overflow-hidden bg-surface ${aiOpen ? "pointer-events-auto" : "pointer-events-none"} ${
+				aiOpen
+					? // Mobile: full-screen fixed overlay. Desktop: inline sliding panel.
+						"fixed inset-0 z-50 md:relative md:inset-auto md:z-auto md:shrink-0"
+					: "hidden md:flex md:shrink-0"
+			} md:transition-[max-width] md:duration-300 md:ease-out ${
+				isEditorMode
+					? aiOpen
+						? "md:max-w-[360px]"
+						: "md:max-w-0"
+					: aiOpen
+						? "md:max-w-[280px]"
+						: "md:max-w-0"
+			}`}
 			aria-hidden={!aiOpen}
 			role="complementary"
 		>

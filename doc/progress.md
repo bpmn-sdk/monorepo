@@ -1,5 +1,50 @@
 # Progress
 
+## 2026-04-03 — Feat: Mobile-first improvements for apps/studio
+
+**Navigation (Shell + Sidebar):**
+- Sidebar becomes a fixed full-width overlay on mobile (slides in from left via `translate-x`)
+- On desktop the existing collapse/expand behavior is unchanged
+- Dark semi-transparent backdrop appears behind the open sidebar on mobile; tapping it closes the sidebar
+- Nav item clicks on mobile auto-close the sidebar
+- `active:bg-white/10` touch-feedback added to all sidebar interactive elements
+
+**AI Drawer (AIDrawer.tsx):**
+- On mobile: renders as a fixed full-screen overlay (`fixed inset-0 z-50`) instead of a narrow side panel
+- Inner panel widths changed from `w-[280/360px]` to `w-full md:w-[280/360px]`
+- On desktop: unchanged inline slide-in behaviour
+
+**TopBar:**
+- Active project link hidden on `xs` screens (`hidden sm:flex`) to avoid clutter
+- `active:opacity-70` touch feedback on all header buttons
+
+**Tables (Incidents, Instances, Tasks, Definitions):**
+- Tables wrapped in `overflow-x-auto` so they scroll horizontally on small screens
+- `min-w-[480–560px]` prevents columns from collapsing below a readable size
+
+**Search inputs:**
+- Changed from `max-w-80` to `w-full max-w-80` so they fill the viewport on mobile
+
+**InstanceDetail:**
+- Layout changed from `flex-row` to `flex-col md:flex-row`
+- BPMN canvas hidden on mobile (`hidden md:flex`) — the diagram is unreadable at phone widths
+- Info panel (variables, incidents, jobs) takes full width on mobile
+
+## 2026-04-03 — Feat: CLI can start proxy server and Reebe engine
+
+Added two new pinned command groups to `apps/cli`:
+
+- **`casen proxy [start]`** — spawns `bpmn-ai-server` (from `@bpmnkit/proxy`) with an optional `--port` flag (default 3033). Running `casen proxy` without a subcommand starts immediately.
+- **`casen reebe [start]`** — spawns `reebe-server` with `--port` (default 8080), `--database-url` (PostgreSQL or omit for embedded SQLite), and `--config` flags. Running `casen reebe` without a subcommand starts immediately.
+
+Both commands stream the child process output directly to the terminal and show a clear install/build error if the binary is not found.
+
+Files changed:
+- `apps/cli/src/commands/proxy.ts` (new)
+- `apps/cli/src/commands/reebe.ts` (new)
+- `apps/cli/src/commands/index.ts` — added both groups to `pinnedGroups`
+- `apps/cli/src/run.ts` — direct-start shortcut for `casen proxy` / `casen reebe`
+
 ## 2026-04-02 — Feat: Local automation workflows — all remaining items complete
 
 **Multi-instance subprocess execution (reebe engine — Rust):**
