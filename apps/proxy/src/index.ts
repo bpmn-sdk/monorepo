@@ -1704,9 +1704,15 @@ const server = http.createServer(async (req, res) => {
 	res.end("Not Found")
 })
 
-server.listen(PORT, () => {
-	console.log(`BPMN Kit AI Server running at http://localhost:${PORT}`)
-	console.log("Press Ctrl+C to stop")
-	startWorkerDaemon()
-	startTriggers()
-})
+export function startServer(port = PORT): void {
+	server.listen(port, () => {
+		console.log(`BPMN Kit AI Server running at http://localhost:${port}`)
+		console.log("Press Ctrl+C to stop")
+		startWorkerDaemon()
+		startTriggers()
+	})
+}
+
+// Auto-start when run directly as a binary (not imported as a library)
+const __isMain = fileURLToPath(import.meta.url) === process.argv[1]
+if (__isMain) startServer()

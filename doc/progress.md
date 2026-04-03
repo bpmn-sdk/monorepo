@@ -1,5 +1,20 @@
 # Progress
 
+## 2026-04-03 — Feat: CLI can start proxy server and Reebe engine
+
+Added two new pinned command groups to `apps/cli`:
+
+- **`casen proxy [start]`** — spawns `bpmn-ai-server` (from `@bpmnkit/proxy`) with an optional `--port` flag (default 3033). Running `casen proxy` without a subcommand starts immediately.
+- **`casen reebe [start]`** — spawns `reebe-server` with `--port` (default 8080), `--database-url` (PostgreSQL or omit for embedded SQLite), and `--config` flags. Running `casen reebe` without a subcommand starts immediately.
+
+Both commands stream the child process output directly to the terminal and show a clear install/build error if the binary is not found.
+
+Files changed:
+- `apps/cli/src/commands/proxy.ts` (new)
+- `apps/cli/src/commands/reebe.ts` (new)
+- `apps/cli/src/commands/index.ts` — added both groups to `pinnedGroups`
+- `apps/cli/src/run.ts` — direct-start shortcut for `casen proxy` / `casen reebe`
+
 ## 2026-04-02 — Feat: Local automation workflows — all remaining items complete
 
 **Multi-instance subprocess execution (reebe engine — Rust):**

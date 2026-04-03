@@ -1,5 +1,19 @@
 # Features
 
+## CLI — Start Proxy & Reebe from the CLI (2026-04-03)
+
+The `casen` CLI is now the single entry point for starting local infrastructure:
+
+| Command | What it does |
+|---|---|
+| `casen proxy` | Start the AI bridge + Camunda API proxy server (port 3033) |
+| `casen proxy start --port 4000` | Start on a custom port |
+| `casen reebe` | Start the Reebe workflow engine with embedded SQLite (port 8080) |
+| `casen reebe start --database-url postgres://…` | Start with PostgreSQL |
+| `casen reebe start --port 9090` | Start on a custom port |
+
+Both commands appear in the pinned section of the main TUI and stream server output directly to the terminal.
+
 ## Local Automation Workflows — Phase 4: Multi-Instance & Flow UX (2026-04-02)
 
 Sub-processes can now be configured as multi-instance loops directly from the config panel, with visual feedback on the canvas and variable scope visibility in the variable-flow overlay.

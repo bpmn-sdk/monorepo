@@ -142,6 +142,15 @@ export async function run(argv: string[]): Promise<void> {
 		return
 	}
 
+	// ── proxy / reebe: run start directly when no subcommand is given ────────
+	if ((group.name === "proxy" || group.name === "reebe") && positional.length === 1 && !wantHelp) {
+		const output = createOutputWriter(outputFormat, noColor)
+		const ctx: RunContext = { positional: [], flags, output, getClient, getAdminClient }
+		const cmd = group.commands[0]
+		if (cmd) await cmd.run(ctx)
+		return
+	}
+
 	// ── worker: treat positional[1] as the job type argument ─────────────────
 	if (group.name === "worker" && positional.length >= 2 && !wantHelp) {
 		const output = createOutputWriter(outputFormat, noColor)

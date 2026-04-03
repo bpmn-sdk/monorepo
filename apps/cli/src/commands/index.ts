@@ -22,6 +22,8 @@ import { connectorGroup } from "./connector.js"
 import { lintGroup } from "./lint.js"
 import { pluginGroup } from "./plugin.js"
 import { profileGroup } from "./profile.js"
+import { proxyGroup } from "./proxy.js"
+import { reebeGroup } from "./reebe.js"
 import { computeRelations } from "./relations.js"
 import { settingsGroup } from "./settings.js"
 import { storyGroup } from "./story.js"
@@ -71,6 +73,8 @@ const workerGroup: CommandGroup = {
 export const pinnedGroups: CommandGroup[] = [
 	askGroup,
 	lintGroup,
+	proxyGroup,
+	reebeGroup,
 	storyGroup,
 	settingsGroup,
 	testGroup,
