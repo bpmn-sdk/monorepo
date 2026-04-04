@@ -148,6 +148,27 @@ package.json       # Root package.json (all devDependencies here)
 biome.json         # Biome configuration
 ```
 
+## Adding a New Package
+
+When creating a new published package under `packages/` or `apps/`, complete all of the following before finishing:
+
+1. **`package.json` required fields** — must include: `description`, `keywords` (≥ 3 entries), `license: "MIT"`, `repository.url` (pointing to `github.com/bpmnkit/monorepo`), `homepage: "https://bpmnkit.com"`, `bugs.url`, `publishConfig.access: "public"`. Match the field order of existing packages (build config first, then metadata).
+
+2. **`scripts/generate-readmes.mjs`** — add an entry to the `packages` object with `name`, `description`, and `content` (Overview, Features, Installation, Quick Start, API Reference). Also add the package to the `footer()` function's related packages list.
+
+3. **`scripts/sync-license.mjs`** — add the package path to the `PUBLISHED` array.
+
+4. **`scripts/check-packages.mjs`** — add the package path to the `PUBLISHED` array.
+
+5. **Run the scripts** to generate `LICENSE` and `README.md`:
+   ```sh
+   node scripts/sync-license.mjs
+   node scripts/generate-readmes.mjs
+   node scripts/check-packages.mjs   # must exit 0
+   ```
+
+Never hand-write a `README.md` or `LICENSE` for a published package — they are generated/synced by these scripts and will be overwritten on the next build.
+
 ## Dependency Management
 
 - **All `devDependencies` must be declared in the root `package.json`** — never in individual app or package `package.json` files

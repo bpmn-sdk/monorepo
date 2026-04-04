@@ -1,0 +1,33 @@
+{
+	"name": "@bpmnkit/worker-client",
+	"version": "0.0.1",
+	"type": "module",
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js"
+		}
+	},
+	"files": ["LICENSE", "README.md", "dist/**/*.js", "dist/**/*.d.ts"],
+	"scripts": {
+		"build": "tsc",
+		"typecheck": "tsc --noEmit",
+		"check": "biome check ."
+	},
+	"description": "Thin Zeebe REST client for standalone workers — no BPMNKit SDK required at runtime",
+	"keywords": ["zeebe", "camunda", "bpmn", "worker", "job-worker", "workflow", "typescript"],
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/bpmnkit/monorepo"
+	},
+	"homepage": "https://bpmnkit.com",
+	"bugs": {
+		"url": "https://github.com/bpmnkit/monorepo/issues"
+	},
+	"publishConfig": {
+		"access": "public"
+	}
+}

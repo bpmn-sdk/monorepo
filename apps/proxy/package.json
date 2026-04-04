@@ -5,7 +5,8 @@
 	"type": "module",
 	"bin": {
 		"bpmn-ai-server": "./dist/index.js",
-		"bpmn-mcp": "./dist/mcp-server.js"
+		"bpmn-mcp": "./dist/mcp-server.js",
+		"bpmn-aikit": "./dist/aikit-mcp.js"
 	},
 	"exports": {
 		".": {
@@ -20,6 +21,7 @@
 	"dependencies": {
 		"@bpmnkit/api": "workspace:*",
 		"@bpmnkit/core": "workspace:*",
+		"@bpmnkit/patterns": "workspace:*",
 		"@bpmnkit/profiles": "workspace:*",
 		"better-sqlite3": "^12.8.0",
 		"imapflow": "^1.2.18",
@@ -33,7 +35,7 @@
 		"test": "vitest run",
 		"dev": "node --watch dist/index.js",
 		"bridge": "esbuild src/bridge.ts --bundle --format=iife --global-name=Bridge --platform=neutral --outfile=dist/bridge.bundle.js",
-		"bundle": "esbuild src/index.ts --bundle --platform=node --format=cjs --outfile=dist/bundle.cjs && esbuild src/mcp-server.ts --bundle --platform=node --format=cjs --outfile=dist/mcp-server.cjs && pnpm run bridge"
+		"bundle": "esbuild src/index.ts --bundle --platform=node --format=cjs --outfile=dist/bundle.cjs && esbuild src/mcp-server.ts --bundle --platform=node --format=cjs --outfile=dist/mcp-server.cjs && esbuild src/aikit-mcp.ts --bundle --platform=node --format=cjs --outfile=dist/aikit-mcp.cjs && pnpm run bridge"
 	},
 	"publishConfig": {
 		"access": "public"

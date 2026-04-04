@@ -58,6 +58,29 @@ The `casen` CLI is a standalone tool — install it globally:
 pnpm add -g casen
 ```
 
+With the CLI installed, you can use the AI-first workflow to implement processes from natural
+language using Claude Code:
+
+```sh
+casen skills install   # install /implement, /review, /test, /deploy slash commands
+casen proxy            # start the AI bridge
+casen reebe            # start local workflow engine
+```
+
+Then in Claude Code: `/implement an invoice approval process`
+
+See [AI-Driven Implementation](/guides/ai-implement/) for a full walkthrough.
+
+## Worker client
+
+For standalone workers that connect to Zeebe without the full SDK:
+
+```sh
+npm install @bpmnkit/worker-client
+```
+
+Workers scaffolded by `/implement` depend only on this package at runtime.
+
 ## TypeScript Requirements
 
 All packages require **TypeScript 5.0+** with `strict: true`. The recommended `tsconfig.json` settings:

@@ -1,5 +1,75 @@
 # Progress
 
+## 2026-04-04 — Feat: AIKit Phase 5 — Documentation
+
+**`apps/docs` — new pages:**
+- `guides/ai-implement.md` — full walkthrough of `/implement`: prerequisites, what gets created, domain patterns, deploying, implementing workers, re-running
+- `guides/workers-standalone.md` — standalone worker lifecycle: scaffold anatomy, env vars, development vs production, Docker, Camunda SaaS, built-in worker catalog
+- `packages/worker-client.md` — `@bpmnkit/worker-client` API reference: `createWorkerClient`, `poll`, `ActivatedJob` (complete/fail/throwError), OAuth2, env vars
+- `guides/patterns.md` — pattern library guide: all 7 patterns, matching algorithm, pattern schema, using from code, adding custom patterns
+- `cli/skills.md` — AIKit slash commands reference: `/implement`, `/review`, `/test`, `/deploy`, installation, MCP server requirement
+
+**`apps/docs` — updated pages:**
+- `getting-started/installation.md` — added Worker client section and AI-first workflow note after CLI install
+- `getting-started/quick-start.md` — added AI-first tip callout and link to `/guides/ai-implement`
+- `cli/casen.md` — added AIKit Skills section (skills table) and Worker commands section
+
+**`doc/roadmap.md`** — added full AIKit section (Phases 1–5) with all items checked
+
+## 2026-04-04 — Feat: AIKit Phase 3 + 4 — Worker infrastructure and Claude Code skills
+
+**`packages/worker-client` (new package `@bpmnkit/worker-client`):**
+- Thin TypeScript Zeebe REST client for standalone workers — no BPMNKit SDK required at runtime
+- `createWorkerClient(options?)` factory — reads env vars: `ZEEBE_ADDRESS`, `ZEEBE_CLIENT_ID`, `ZEEBE_CLIENT_SECRET`, `ZEEBE_TOKEN_URL`, `ZEEBE_TOKEN_AUDIENCE`
+- `poll(jobType, options?)` — async generator yielding `ActivatedJob` objects with `complete()`, `fail()`, `throwError()`
+- OAuth2 client credentials support for Camunda SaaS (with token caching, 60s pre-expiry refresh)
+- Works against both reebe (local) and Camunda 8 (same Zeebe REST spec)
+
+**`apps/proxy` — upgraded worker scaffold:**
+- `worker_scaffold` now generates TypeScript (`index.ts`) using `@bpmnkit/worker-client`
+- Generated `package.json` includes `tsx` (dev) for `npm start` with no build step, plus `tsc` build for production
+- Generated `tsconfig.json` for standalone compilation
+- Multi-stage Docker example in generated `README.md`
+
+**`apps/cli` — new `casen worker start [name]` command:**
+- Scans `./workers/` directory for scaffolded workers (package.json with `bpmnkit.jobType`)
+- `casen worker start` — starts all scaffolded workers via `npm start` in each directory
+- `casen worker start <name>` — start a specific worker by name
+- Routing in `run.ts` updated: `positional[1] === "start"` routes to the new command; legacy job-type routing preserved
+
+**`apps/cli` — new `casen skills install` command:**
+- Copies bundled AIKit skill files from the CLI package to `.claude/commands/` in the current project
+- `--force` flag to overwrite existing skills
+- Ships skills as `apps/cli/skills/*.md`, included in npm `files` array
+
+**`.claude/commands/` — 4 new Claude Code slash commands:**
+- `/implement <description>` — end-to-end: pattern lookup → bpmn_create → worker wiring → bpmn_validate → bpmn_simulate → deploy prompt
+- `/review <path>` — bpmn_validate with structured findings report and auto-fix offer
+- `/test <path>` — process structure analysis, worker coverage, scenario suggestions
+- `/deploy <path>` — validation gate + bpmn_deploy to local reebe or Camunda 8
+
+## 2026-04-04 — Feat: AIKit Phase 1 + 2 — Intent-driven process automation
+
+**`packages/patterns` (new package `@bpmnkit/patterns`):**
+- Domain pattern library with 7 seed patterns: invoice-approval, employee-onboarding, supplier-contract-review, incident-response, loan-origination, content-moderation, order-fulfillment
+- Each pattern: id, name, description, keywords, readme (domain context + regulations), worker specs with real API options, variations, compact BPMN template
+- `findPattern(query)` — keyword-scoring match from free-text description to best-fit pattern
+- `ALL_PATTERNS` array — all patterns in one import
+
+**`apps/proxy` — AIKit MCP server (`bpmn-aikit` binary):**
+- New `src/aikit-mcp.ts` — standalone stdio MCP server (JSON-RPC 2.0, same pattern as `bpmn-mcp`)
+- 11 MCP tools: `bpmn_create`, `bpmn_read`, `bpmn_update`, `bpmn_validate`, `bpmn_deploy`, `bpmn_simulate`, `bpmn_run_history`, `worker_list`, `worker_scaffold`, `pattern_list`, `pattern_get`
+- `bpmn_create` — calls proxy `/chat` SSE endpoint, writes result to disk, returns path
+- `bpmn_validate` — uses `@bpmnkit/core` `optimize()` directly, returns structured findings
+- `bpmn_deploy` — deploys via Zeebe REST API (local reebe or Camunda 8 via active profile)
+- `bpmn_simulate` — Phase 1: structural analysis (validation + worker coverage check)
+- `worker_scaffold` — generates standalone Node.js worker (Zeebe REST polling, no BPMNKit dependency)
+- `worker_list` — built-in workers catalog + scans local `workers/` directory
+- `pattern_list/get` — serves pattern library data to Claude
+
+**`.claude/mcp.json` (new):**
+- Project-level MCP config registers `bpmnkit-aikit` server with Claude Code automatically
+
 ## 2026-04-03 — Feat: Mobile-first improvements for apps/studio
 
 **Navigation (Shell + Sidebar):**

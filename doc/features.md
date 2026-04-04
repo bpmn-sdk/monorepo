@@ -904,3 +904,19 @@ New package that wires storage and tabs together so client apps don't need to ma
 - **Hit policies** — UNIQUE (default), FIRST, ANY, COLLECT, RULE ORDER, OUTPUT ORDER, PRIORITY
 - **Roundtrip fidelity** — semantic equivalence preserved on parse→export cycle
 - **Namespace preservation** — DMN, DMNDI, DC, modeler namespace declarations roundtrip correctly
+
+## AIKit — Intent-Driven Process Automation (2026-04-04)
+
+- **`/implement` skill** — Claude Code slash command: pattern lookup → BPMN generation → worker wiring → validation → coverage check → deploy prompt
+- **`/review` skill** — validate any BPMN file, structured findings by severity, auto-fix offer
+- **`/test` skill** — process structure analysis, worker coverage report, scenario suggestions
+- **`/deploy` skill** — validation gate + deploy to local reebe or Camunda 8
+- **`casen skills install`** — copies bundled skill files to `.claude/commands/` in any project
+- **BPMNKit AIKit MCP server** (`bpmn-aikit` binary) — 11 MCP tools callable by Claude: `bpmn_create`, `bpmn_read`, `bpmn_update`, `bpmn_validate`, `bpmn_deploy`, `bpmn_simulate`, `bpmn_run_history`, `worker_list`, `worker_scaffold`, `pattern_list`, `pattern_get`
+- **`@bpmnkit/patterns` package** — domain pattern library with 7 seed patterns: invoice-approval, employee-onboarding, supplier-contract-review, incident-response, loan-origination, content-moderation, order-fulfillment
+- **Pattern schema** — each pattern includes: domain readme (regulations, conventions), compact BPMN template, worker specs with real API options, and common variations
+- **Keyword-based pattern matching** — `findPattern(query)` matches user descriptions to patterns via keyword scoring
+- **`@bpmnkit/worker-client` package** — thin Zeebe REST client for standalone workers; OAuth2 support for Camunda SaaS; `createWorkerClient()` + async `poll()` generator
+- **Worker scaffolder** — `worker_scaffold` MCP tool generates TypeScript workers (`index.ts`) using `@bpmnkit/worker-client`; `tsx` for dev (no build step), `tsc` for production; multi-stage Docker in README
+- **`casen worker start [name]`** — starts scaffolded workers from `./workers/` directory via `npm start`
+- **`.claude/mcp.json`** — project-level MCP config registers `bpmnkit-aikit` server with Claude Code automatically
