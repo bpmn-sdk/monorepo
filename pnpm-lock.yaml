@@ -186,6 +186,9 @@ importers:
       '@bpmnkit/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@bpmnkit/patterns':
+        specifier: workspace:*
+        version: link:../../packages/patterns
       '@bpmnkit/profiles':
         specifier: workspace:*
         version: link:../../packages/profiles
@@ -360,6 +363,8 @@ importers:
       '@bpmnkit/ui':
         specifier: workspace:*
         version: link:../ui
+
+  packages/patterns: {}
 
   packages/plugins:
     dependencies:

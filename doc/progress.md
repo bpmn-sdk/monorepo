@@ -1,5 +1,27 @@
 # Progress
 
+## 2026-04-04 — Feat: AIKit Phase 1 + 2 — Intent-driven process automation
+
+**`packages/patterns` (new package `@bpmnkit/patterns`):**
+- Domain pattern library with 7 seed patterns: invoice-approval, employee-onboarding, supplier-contract-review, incident-response, loan-origination, content-moderation, order-fulfillment
+- Each pattern: id, name, description, keywords, readme (domain context + regulations), worker specs with real API options, variations, compact BPMN template
+- `findPattern(query)` — keyword-scoring match from free-text description to best-fit pattern
+- `ALL_PATTERNS` array — all patterns in one import
+
+**`apps/proxy` — AIKit MCP server (`bpmn-aikit` binary):**
+- New `src/aikit-mcp.ts` — standalone stdio MCP server (JSON-RPC 2.0, same pattern as `bpmn-mcp`)
+- 11 MCP tools: `bpmn_create`, `bpmn_read`, `bpmn_update`, `bpmn_validate`, `bpmn_deploy`, `bpmn_simulate`, `bpmn_run_history`, `worker_list`, `worker_scaffold`, `pattern_list`, `pattern_get`
+- `bpmn_create` — calls proxy `/chat` SSE endpoint, writes result to disk, returns path
+- `bpmn_validate` — uses `@bpmnkit/core` `optimize()` directly, returns structured findings
+- `bpmn_deploy` — deploys via Zeebe REST API (local reebe or Camunda 8 via active profile)
+- `bpmn_simulate` — Phase 1: structural analysis (validation + worker coverage check)
+- `worker_scaffold` — generates standalone Node.js worker (Zeebe REST polling, no BPMNKit dependency)
+- `worker_list` — built-in workers catalog + scans local `workers/` directory
+- `pattern_list/get` — serves pattern library data to Claude
+
+**`.claude/mcp.json` (new):**
+- Project-level MCP config registers `bpmnkit-aikit` server with Claude Code automatically
+
 ## 2026-04-03 — Feat: Mobile-first improvements for apps/studio
 
 **Navigation (Shell + Sidebar):**

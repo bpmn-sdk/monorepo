@@ -904,3 +904,13 @@ New package that wires storage and tabs together so client apps don't need to ma
 - **Hit policies** — UNIQUE (default), FIRST, ANY, COLLECT, RULE ORDER, OUTPUT ORDER, PRIORITY
 - **Roundtrip fidelity** — semantic equivalence preserved on parse→export cycle
 - **Namespace preservation** — DMN, DMNDI, DC, modeler namespace declarations roundtrip correctly
+
+## AIKit — Intent-Driven Process Automation (2026-04-04)
+
+- **`/implement` skill entry point** — Claude Code skill that orchestrates autonomous process implementation from a natural language description
+- **BPMNKit AIKit MCP server** (`bpmn-aikit` binary) — 11 MCP tools callable by Claude: `bpmn_create`, `bpmn_read`, `bpmn_update`, `bpmn_validate`, `bpmn_deploy`, `bpmn_simulate`, `bpmn_run_history`, `worker_list`, `worker_scaffold`, `pattern_list`, `pattern_get`
+- **`@bpmnkit/patterns` package** — domain pattern library with 7 seed patterns: invoice-approval, employee-onboarding, supplier-contract-review, incident-response, loan-origination, content-moderation, order-fulfillment
+- **Pattern schema** — each pattern includes: domain readme (regulations, conventions), compact BPMN template, worker specs with real API options, and common variations
+- **Keyword-based pattern matching** — `findPattern(query)` matches user descriptions to patterns via keyword scoring
+- **Worker scaffolder** — `worker_scaffold` MCP tool generates standalone Node.js workers (index.js, package.json, README.md) using Zeebe REST API directly, no BPMNKit runtime dependency
+- **`.claude/mcp.json`** — project-level MCP config registers `bpmnkit-aikit` server with Claude Code automatically

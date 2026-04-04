@@ -1,0 +1,12 @@
+{
+	"mcpServers": {
+		"bpmnkit-aikit": {
+			"type": "stdio",
+			"command": "node",
+			"args": ["apps/proxy/dist/aikit-mcp.js"],
+			"env": {
+				"BPMNKIT_PROXY_URL": "http://localhost:3033"
+			}
+		}
+	}
+}

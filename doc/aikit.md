@@ -114,29 +114,29 @@ Expand `apps/proxy/src/mcp-server.ts` into the complete programmatic interface f
 
 **BPMN tools**
 
-- [ ] `bpmn_create(description, context?)` — calls existing AI endpoint, returns compact BPMN path
-- [ ] `bpmn_read(path)` — returns compact representation of an existing file
-- [ ] `bpmn_update(path, instruction)` — calls existing improve endpoint, writes result
-- [ ] `bpmn_validate(path)` — runs pattern advisor + schema validation, returns findings
-- [ ] `bpmn_deploy(path, target)` — deploys to reebe or Camunda 8 (target: `"local" | "camunda8"`)
-- [ ] `bpmn_simulate(path, scenarios[])` — runs process-runner scenarios, returns pass/fail + diffs
-- [ ] `bpmn_run_history(processId)` — queries SQLite run history, returns recent executions
+- [x] `bpmn_create(description, context?)` — calls existing AI endpoint, returns compact BPMN path
+- [x] `bpmn_read(path)` — returns compact representation of an existing file
+- [x] `bpmn_update(path, instruction)` — calls existing improve endpoint, writes result
+- [x] `bpmn_validate(path)` — runs pattern advisor + schema validation, returns findings
+- [x] `bpmn_deploy(path, target)` — deploys to reebe or Camunda 8 (target: `"local" | "camunda8"`)
+- [x] `bpmn_simulate(path, scenarios[])` — runs process-runner scenarios, returns pass/fail + diffs
+- [x] `bpmn_run_history(processId)` — queries SQLite run history, returns recent executions
 
 **Worker tools**
 
-- [ ] `worker_list()` — returns catalog of all available workers (built-in + installed) with jobType, inputs, outputs, and source
-- [ ] `worker_scaffold(jobType, spec)` — generates standalone TypeScript worker into `workers/<name>/index.ts`
+- [x] `worker_list()` — returns catalog of all available workers (built-in + installed) with jobType, inputs, outputs, and source
+- [x] `worker_scaffold(jobType, spec)` — generates standalone TypeScript worker into `workers/<name>/index.ts`
 
 **Pattern tools**
 
-- [ ] `pattern_list()` — returns available domain patterns with name, description, and matched keywords
-- [ ] `pattern_get(domain)` — returns full pattern: compact BPMN template + worker requirements + notes
+- [x] `pattern_list()` — returns available domain patterns with name, description, and matched keywords
+- [x] `pattern_get(domain)` — returns full pattern: compact BPMN template + worker requirements + notes
 
 **Infrastructure**
 
-- [ ] Wire all tools into existing MCP stdio server
-- [ ] Write MCP tool integration tests (call each tool via MCP protocol)
-- [ ] Verify Claude Code can discover and call tools via `.claude/mcp.json` project config
+- [x] Wire all tools into existing MCP stdio server
+- [x] Write MCP tool integration tests (call each tool via MCP protocol)
+- [x] Verify Claude Code can discover and call tools via `.claude/mcp.json` project config
 
 ---
 
@@ -148,8 +148,8 @@ Patterns are hints, not rigid templates. Claude adapts them to the user's specif
 
 **Format**
 
-- [ ] Create `packages/patterns/` with a README explaining the schema
-- [ ] Define the pattern schema:
+- [x] Create `packages/patterns/` with a README explaining the schema
+- [x] Define the pattern schema:
   - `README.md` — domain context, common variations, relevant regulations or conventions
   - `template.bpmn` — representative flow in compact format (starting point, not fixed output)
   - `workers.yaml` — typical service tasks: jobType, inputs, outputs, integration options
@@ -157,13 +157,13 @@ Patterns are hints, not rigid templates. Claude adapts them to the user's specif
 
 **Seed patterns** (representative spread across domains)
 
-- [ ] `invoice-approval/` — finance / accounts payable
-- [ ] `employee-onboarding/` — HR
-- [ ] `supplier-contract-review/` — procurement / legal
-- [ ] `incident-response/` — IT / ops
-- [ ] `loan-origination/` — financial services
-- [ ] `content-moderation/` — trust & safety
-- [ ] `order-fulfillment/` — e-commerce / supply chain
+- [x] `invoice-approval/` — finance / accounts payable
+- [x] `employee-onboarding/` — HR
+- [x] `supplier-contract-review/` — procurement / legal
+- [x] `incident-response/` — IT / ops
+- [x] `loan-origination/` — financial services
+- [x] `content-moderation/` — trust & safety
+- [x] `order-fulfillment/` — e-commerce / supply chain
 
 ---
 
