@@ -235,15 +235,15 @@ The `/implement` skill and its companions. Lives in `.claude/skills/` — shippe
 
 Update the public documentation site to reflect all new capabilities.
 
-- [ ] New page: `content/docs/guides/ai-implement.mdx` — walkthrough of `/implement`, from intent to deployed process, with multiple example process types
-- [ ] New page: `content/docs/guides/workers-standalone.mdx` — how standalone workers work, scaffolding, deployment options (Docker / PM2 / `casen worker start`)
-- [ ] New page: `content/docs/packages/worker-client.mdx` — `@bpmnkit/worker-client` API reference
-- [ ] New page: `content/docs/guides/patterns.mdx` — pattern library: format, how Claude uses them, how to contribute new patterns
-- [ ] Update: `content/docs/cli/` — document `/implement`, `/review`, `/test`, `/deploy` skills and `casen skills install`
-- [ ] Update: `content/docs/getting-started/` — mention AI-first workflow as the recommended entry point
-- [ ] Update `doc/features.md` — add AIKit section listing all new capabilities
-- [ ] Update `doc/roadmap.md` — add AIKit phases and check items as they complete
-- [ ] Update `doc/progress.md` — changelog entry for each phase as shipped
+- [x] New page: `content/docs/guides/ai-implement.md` — walkthrough of `/implement`, from intent to deployed process, with multiple example process types
+- [x] New page: `content/docs/guides/workers-standalone.md` — how standalone workers work, scaffolding, deployment options (Docker / `casen worker start`)
+- [x] New page: `content/docs/packages/worker-client.md` — `@bpmnkit/worker-client` API reference
+- [x] New page: `content/docs/guides/patterns.md` — pattern library: format, how Claude uses them, how to contribute new patterns
+- [x] New page: `content/docs/cli/skills.md` — document `/implement`, `/review`, `/test`, `/deploy` skills and `casen skills install`
+- [x] Update: `content/docs/getting-started/` — mention AI-first workflow as the recommended entry point
+- [x] Update `doc/features.md` — add AIKit section listing all new capabilities
+- [x] Update `doc/roadmap.md` — add AIKit phases and check items as they complete
+- [x] Update `doc/progress.md` — changelog entry for each phase as shipped
 
 ---
 

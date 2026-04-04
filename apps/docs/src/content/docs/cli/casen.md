@@ -170,6 +170,37 @@ Once installed, plugin commands appear in the main TUI and in tab-completion alo
 
 To build your own plugin, see [Plugin Authoring](/cli/plugin-authoring/).
 
+## AIKit Skills
+
+`casen` ships four Claude Code slash commands for AI-driven process development.
+Install them into the current project:
+
+```sh
+casen skills install
+```
+
+| Command | Description |
+|---|---|
+| `/implement <description>` | Generate BPMN + scaffold workers + validate + deploy |
+| `/review <path>` | Validate a BPMN file and get structured findings |
+| `/test <path>` | Analyse structure, worker coverage, and suggest scenarios |
+| `/deploy <path>` | Deploy a BPMN to local reebe or Camunda 8 |
+
+See [AIKit Skills](/cli/skills/) for full documentation.
+
+## Worker commands
+
+```sh
+# Run a simple auto-complete worker (for testing)
+casen worker payment-service
+
+# Start scaffolded workers from ./workers/
+casen worker start
+
+# Start a specific scaffolded worker
+casen worker start send-invoice
+```
+
 ## MCP Server Mode
 
 `casen` can act as an MCP (Model Context Protocol) server, exposing all cluster operations

@@ -154,6 +154,47 @@ Medium effort. Expands the builder experience to non-technical stakeholders.
 
 ---
 
+## AIKit — Intent-Driven Process Automation
+
+> Full spec: [`doc/aikit.md`](aikit.md)
+
+### Phase 1 — MCP Foundation
+
+- [x] `bpmn_create`, `bpmn_read`, `bpmn_update`, `bpmn_validate`, `bpmn_deploy`, `bpmn_simulate`, `bpmn_run_history`
+- [x] `worker_list`, `worker_scaffold`, `pattern_list`, `pattern_get`
+- [x] Wire all tools into `bpmn-aikit` stdio MCP server
+- [x] `.claude/mcp.json` project config
+
+### Phase 2 — Pattern Library
+
+- [x] `@bpmnkit/patterns` package with 7 seed patterns
+- [x] `findPattern(query)` keyword-scoring match
+- [x] Pattern schema: readme, template, workers, variations
+
+### Phase 3 — Standalone Worker Infrastructure
+
+- [x] `@bpmnkit/worker-client` — thin Zeebe REST wrapper with OAuth2 support
+- [x] `worker_scaffold` upgraded to generate TypeScript using `@bpmnkit/worker-client`
+- [x] `casen worker start [name]` — starts scaffolded workers from `./workers/`
+
+### Phase 4 — Claude Code Skills
+
+- [x] `/implement` — end-to-end orchestration skill
+- [x] `/review`, `/test`, `/deploy` — standalone skills
+- [x] `casen skills install` — copies bundled skills to `.claude/commands/`
+
+### Phase 5 — Docs
+
+- [x] `guides/ai-implement.md` — `/implement` walkthrough
+- [x] `guides/workers-standalone.md` — standalone worker lifecycle
+- [x] `packages/worker-client.md` — `@bpmnkit/worker-client` API reference
+- [x] `guides/patterns.md` — pattern library guide
+- [x] `cli/skills.md` — slash commands reference
+- [x] Updated getting-started pages to mention AI-first workflow
+- [x] Updated `cli/casen.md` with AIKit skills and worker commands sections
+
+---
+
 ## CLI Enhancements
 
 - [x] `casen test <file.bpmn>` — run process spec scenarios (Phase 3)

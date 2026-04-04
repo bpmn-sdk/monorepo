@@ -1,5 +1,21 @@
 # Progress
 
+## 2026-04-04 — Feat: AIKit Phase 5 — Documentation
+
+**`apps/docs` — new pages:**
+- `guides/ai-implement.md` — full walkthrough of `/implement`: prerequisites, what gets created, domain patterns, deploying, implementing workers, re-running
+- `guides/workers-standalone.md` — standalone worker lifecycle: scaffold anatomy, env vars, development vs production, Docker, Camunda SaaS, built-in worker catalog
+- `packages/worker-client.md` — `@bpmnkit/worker-client` API reference: `createWorkerClient`, `poll`, `ActivatedJob` (complete/fail/throwError), OAuth2, env vars
+- `guides/patterns.md` — pattern library guide: all 7 patterns, matching algorithm, pattern schema, using from code, adding custom patterns
+- `cli/skills.md` — AIKit slash commands reference: `/implement`, `/review`, `/test`, `/deploy`, installation, MCP server requirement
+
+**`apps/docs` — updated pages:**
+- `getting-started/installation.md` — added Worker client section and AI-first workflow note after CLI install
+- `getting-started/quick-start.md` — added AI-first tip callout and link to `/guides/ai-implement`
+- `cli/casen.md` — added AIKit Skills section (skills table) and Worker commands section
+
+**`doc/roadmap.md`** — added full AIKit section (Phases 1–5) with all items checked
+
 ## 2026-04-04 — Feat: AIKit Phase 3 + 4 — Worker infrastructure and Claude Code skills
 
 **`packages/worker-client` (new package `@bpmnkit/worker-client`):**
