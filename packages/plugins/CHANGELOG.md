@@ -1,5 +1,19 @@
 # @bpmnkit/plugins
 
+## 0.0.24
+
+### Patch Changes
+
+- [#81](https://github.com/bpmnkit/monorepo/pull/81) [`d79affd`](https://github.com/bpmnkit/monorepo/commit/d79affda9b61f5edc400e00b23c54ab037f9ce40) Thanks [@urbanisierung](https://github.com/urbanisierung)! - AI preparation
+
+- Updated dependencies [[`d79affd`](https://github.com/bpmnkit/monorepo/commit/d79affda9b61f5edc400e00b23c54ab037f9ce40)]:
+  - @bpmnkit/connector-gen@0.0.12
+  - @bpmnkit/canvas@0.0.21
+  - @bpmnkit/editor@0.0.24
+  - @bpmnkit/ascii@0.0.21
+  - @bpmnkit/core@0.0.21
+  - @bpmnkit/feel@0.0.17
+
 ## 0.0.23
 
 ### Patch Changes
