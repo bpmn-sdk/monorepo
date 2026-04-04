@@ -1,0 +1,169 @@
+/**
+ * @bpmnkit/worker-client — Thin Zeebe REST client for standalone workers.
+ *
+ * Reads from environment (all optional):
+ *   ZEEBE_ADDRESS        — REST base URL (default: http://localhost:26500)
+ *   ZEEBE_CLIENT_ID      — OAuth2 client ID (Camunda SaaS)
+ *   ZEEBE_CLIENT_SECRET  — OAuth2 client secret (Camunda SaaS)
+ *   ZEEBE_TOKEN_URL      — OAuth2 token URL (default: https://login.cloud.camunda.io/oauth/token)
+ *   ZEEBE_TOKEN_AUDIENCE — OAuth2 audience (default: zeebe.camunda.io)
+ */
+
+export interface WorkerClientOptions {
+	/** Zeebe/reebe REST base URL. Defaults to ZEEBE_ADDRESS env var or http://localhost:26500 */
+	address?: string
+	/** OAuth2 client ID for Camunda SaaS. Defaults to ZEEBE_CLIENT_ID env var. */
+	clientId?: string
+	/** OAuth2 client secret for Camunda SaaS. Defaults to ZEEBE_CLIENT_SECRET env var. */
+	clientSecret?: string
+	/** OAuth2 token URL. Defaults to ZEEBE_TOKEN_URL or Camunda SaaS endpoint. */
+	tokenUrl?: string
+	/** OAuth2 audience. Defaults to ZEEBE_TOKEN_AUDIENCE or "zeebe.camunda.io". */
+	audience?: string
+	/** Worker name sent during job activation. Defaults to "bpmnkit-worker". */
+	workerName?: string
+}
+
+export interface ActivatedJob {
+	/** Unique job key. */
+	key: string
+	/** Job type as defined in the BPMN task definition. */
+	jobType: string
+	processInstanceKey: string
+	bpmnProcessId: string
+	elementId: string
+	/** Remaining retries. Decrement when calling fail(). */
+	retries: number
+	/** Process variables passed to this job. */
+	variables: Record<string, unknown>
+	/** Complete the job, optionally returning output variables. */
+	complete(variables?: Record<string, unknown>): Promise<void>
+	/** Fail the job with an error message. Retries defaults to job.retries - 1. */
+	fail(message: string, retries?: number): Promise<void>
+	/** Throw a BPMN error, which can be caught by an error boundary event. */
+	throwError(errorCode: string, message: string, variables?: Record<string, unknown>): Promise<void>
+}
+
+export interface PollOptions {
+	/** Maximum jobs to activate per poll request. Default: 5 */
+	maxJobs?: number
+	/** Job activation lock timeout in milliseconds. Default: 300_000 (5 minutes) */
+	timeout?: number
+}
+
+export interface WorkerClient {
+	/**
+	 * Async generator that continuously polls for jobs of the given type.
+	 * Yields one ActivatedJob at a time. Pauses 5 seconds between polls when idle.
+	 *
+	 * @example
+	 * for await (const job of client.poll("com.example:my-task:1")) {
+	 *   const result = await doWork(job.variables)
+	 *   await job.complete(result)
+	 * }
+	 */
+	poll(jobType: string, options?: PollOptions): AsyncGenerator<ActivatedJob>
+}
+
+export function createWorkerClient(options?: WorkerClientOptions): WorkerClient {
+	const address = (
+		options?.address ??
+		process.env.ZEEBE_ADDRESS ??
+		"http://localhost:26500"
+	).replace(/\/$/, "")
+	const clientId = options?.clientId ?? process.env.ZEEBE_CLIENT_ID
+	const clientSecret = options?.clientSecret ?? process.env.ZEEBE_CLIENT_SECRET
+	const tokenUrl =
+		options?.tokenUrl ?? process.env.ZEEBE_TOKEN_URL ?? "https://login.cloud.camunda.io/oauth/token"
+	const audience = options?.audience ?? process.env.ZEEBE_TOKEN_AUDIENCE ?? "zeebe.camunda.io"
+	const workerName = options?.workerName ?? "bpmnkit-worker"
+
+	let tokenCache: { token: string; expiresAt: number } | undefined
+
+	async function getAuthHeader(): Promise<string | undefined> {
+		if (!clientId || !clientSecret) return undefined
+		if (tokenCache && Date.now() < tokenCache.expiresAt - 60_000) {
+			return `Bearer ${tokenCache.token}`
+		}
+		const res = await fetch(tokenUrl, {
+			method: "POST",
+			headers: { "Content-Type": "application/x-www-form-urlencoded" },
+			body: new URLSearchParams({
+				grant_type: "client_credentials",
+				client_id: clientId,
+				client_secret: clientSecret,
+				audience,
+			}).toString(),
+		})
+		if (!res.ok) throw new Error(`OAuth2 token request failed: ${res.status}`)
+		const data = (await res.json()) as { access_token: string; expires_in: number }
+		tokenCache = { token: data.access_token, expiresAt: Date.now() + data.expires_in * 1_000 }
+		return `Bearer ${tokenCache.token}`
+	}
+
+	async function zeebePost(path: string, body: unknown): Promise<Response> {
+		const auth = await getAuthHeader()
+		const headers: Record<string, string> = { "Content-Type": "application/json" }
+		if (auth) headers.authorization = auth
+		return fetch(`${address}${path}`, {
+			method: "POST",
+			headers,
+			body: JSON.stringify(body),
+		})
+	}
+
+	async function* poll(jobType: string, pollOptions?: PollOptions): AsyncGenerator<ActivatedJob> {
+		const maxJobs = pollOptions?.maxJobs ?? 5
+		const timeout = pollOptions?.timeout ?? 300_000
+
+		for (;;) {
+			let rawJobs: Array<Record<string, unknown>> = []
+			try {
+				const res = await zeebePost("/v2/jobs/activation", {
+					type: jobType,
+					maxJobsToActivate: maxJobs,
+					timeout,
+					worker: workerName,
+				})
+				if (res.ok) {
+					const data = (await res.json()) as { jobs?: Array<Record<string, unknown>> }
+					rawJobs = data.jobs ?? []
+				}
+			} catch {
+				/* network error — retry after delay */
+			}
+
+			for (const raw of rawJobs) {
+				const key = String(raw.key ?? raw.jobKey ?? "")
+				yield {
+					key,
+					jobType: String(raw.type ?? jobType),
+					processInstanceKey: String(raw.processInstanceKey ?? ""),
+					bpmnProcessId: String(raw.bpmnProcessId ?? raw.processDefinitionId ?? ""),
+					elementId: String(raw.elementId ?? ""),
+					retries: Number(raw.retries ?? 0),
+					variables: (raw.variables as Record<string, unknown>) ?? {},
+					async complete(variables = {}) {
+						await zeebePost(`/v2/jobs/${key}/completion`, { variables })
+					},
+					async fail(message, retries = 0) {
+						await zeebePost(`/v2/jobs/${key}/failure`, { errorMessage: message, retries })
+					},
+					async throwError(errorCode, message, variables = {}) {
+						await zeebePost(`/v2/jobs/${key}/error`, {
+							errorCode,
+							errorMessage: message,
+							variables,
+						})
+					},
+				}
+			}
+
+			if (rawJobs.length === 0) {
+				await new Promise((r) => setTimeout(r, 5_000))
+			}
+		}
+	}
+
+	return { poll }
+}

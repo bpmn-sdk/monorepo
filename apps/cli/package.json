@@ -6,7 +6,7 @@
 	"bin": {
 		"casen": "./dist/index.js"
 	},
-	"files": ["LICENSE", "README.md", "dist/**/*.js"],
+	"files": ["LICENSE", "README.md", "dist/**/*.js", "skills/**/*.md"],
 	"engines": {
 		"node": ">=20"
 	},

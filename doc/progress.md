@@ -1,5 +1,37 @@
 # Progress
 
+## 2026-04-04 — Feat: AIKit Phase 3 + 4 — Worker infrastructure and Claude Code skills
+
+**`packages/worker-client` (new package `@bpmnkit/worker-client`):**
+- Thin TypeScript Zeebe REST client for standalone workers — no BPMNKit SDK required at runtime
+- `createWorkerClient(options?)` factory — reads env vars: `ZEEBE_ADDRESS`, `ZEEBE_CLIENT_ID`, `ZEEBE_CLIENT_SECRET`, `ZEEBE_TOKEN_URL`, `ZEEBE_TOKEN_AUDIENCE`
+- `poll(jobType, options?)` — async generator yielding `ActivatedJob` objects with `complete()`, `fail()`, `throwError()`
+- OAuth2 client credentials support for Camunda SaaS (with token caching, 60s pre-expiry refresh)
+- Works against both reebe (local) and Camunda 8 (same Zeebe REST spec)
+
+**`apps/proxy` — upgraded worker scaffold:**
+- `worker_scaffold` now generates TypeScript (`index.ts`) using `@bpmnkit/worker-client`
+- Generated `package.json` includes `tsx` (dev) for `npm start` with no build step, plus `tsc` build for production
+- Generated `tsconfig.json` for standalone compilation
+- Multi-stage Docker example in generated `README.md`
+
+**`apps/cli` — new `casen worker start [name]` command:**
+- Scans `./workers/` directory for scaffolded workers (package.json with `bpmnkit.jobType`)
+- `casen worker start` — starts all scaffolded workers via `npm start` in each directory
+- `casen worker start <name>` — start a specific worker by name
+- Routing in `run.ts` updated: `positional[1] === "start"` routes to the new command; legacy job-type routing preserved
+
+**`apps/cli` — new `casen skills install` command:**
+- Copies bundled AIKit skill files from the CLI package to `.claude/commands/` in the current project
+- `--force` flag to overwrite existing skills
+- Ships skills as `apps/cli/skills/*.md`, included in npm `files` array
+
+**`.claude/commands/` — 4 new Claude Code slash commands:**
+- `/implement <description>` — end-to-end: pattern lookup → bpmn_create → worker wiring → bpmn_validate → bpmn_simulate → deploy prompt
+- `/review <path>` — bpmn_validate with structured findings report and auto-fix offer
+- `/test <path>` — process structure analysis, worker coverage, scenario suggestions
+- `/deploy <path>` — validation gate + bpmn_deploy to local reebe or Camunda 8
+
 ## 2026-04-04 — Feat: AIKit Phase 1 + 2 — Intent-driven process automation
 
 **`packages/patterns` (new package `@bpmnkit/patterns`):**

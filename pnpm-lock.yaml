@@ -410,6 +410,8 @@ importers:
         specifier: workspace:*
         version: link:../ui
 
+  packages/worker-client: {}
+
   plugins-cli/casen-report:
     devDependencies:
       '@bpmnkit/api':

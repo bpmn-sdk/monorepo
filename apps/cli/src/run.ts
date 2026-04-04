@@ -151,9 +151,25 @@ export async function run(argv: string[]): Promise<void> {
 		return
 	}
 
-	// ── worker: treat positional[1] as the job type argument ─────────────────
+	// ── worker: route `casen worker start [name]` or treat positional[1] as job type ──
 	if (group.name === "worker" && positional.length >= 2 && !wantHelp) {
 		const output = createOutputWriter(outputFormat, noColor)
+		// `casen worker start [name]` → route to the start command
+		if (positional[1] === "start") {
+			const startCmd = group.commands.find((c) => c.name === "start")
+			if (startCmd) {
+				const ctx: RunContext = {
+					positional: positional.slice(2),
+					flags,
+					output,
+					getClient,
+					getAdminClient,
+				}
+				await startCmd.run(ctx)
+				return
+			}
+		}
+		// Legacy: treat positional[1] as the job type argument for the auto-complete worker
 		const ctx: RunContext = {
 			positional: positional.slice(1),
 			flags,

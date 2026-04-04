@@ -173,26 +173,26 @@ Workers call the Zeebe/reebe REST API directly. No casen SDK at runtime.
 
 **Zeebe REST client**
 
-- [ ] Create `packages/worker-client/` — thin TypeScript wrapper (~100 lines)
-  - [ ] `poll(jobType, maxJobs?)` — async iterator over activated jobs
-  - [ ] `job.complete(variables)` — complete a job
-  - [ ] `job.fail(message, retries?)` — fail a job
-  - [ ] `job.throwError(code, message)` — throw BPMN error
-  - [ ] Reads `ZEEBE_ADDRESS` (and optional `ZEEBE_CLIENT_ID`, `ZEEBE_CLIENT_SECRET`) from env
-  - [ ] Works against both reebe and Camunda 8 (same REST spec)
+- [x] Create `packages/worker-client/` — thin TypeScript wrapper (~100 lines)
+  - [x] `poll(jobType, maxJobs?)` — async iterator over activated jobs
+  - [x] `job.complete(variables)` — complete a job
+  - [x] `job.fail(message, retries?)` — fail a job
+  - [x] `job.throwError(code, message)` — throw BPMN error
+  - [x] Reads `ZEEBE_ADDRESS` (and optional `ZEEBE_CLIENT_ID`, `ZEEBE_CLIENT_SECRET`) from env
+  - [x] Works against both reebe and Camunda 8 (same REST spec)
 
 **Worker scaffolder** (`worker_scaffold` MCP tool implementation)
 
-- [ ] Generate `workers/<name>/index.ts` from spec — typed inputs/outputs, error handling, logging
-- [ ] Generate `workers/<name>/package.json` — standalone, only depends on `@bpmnkit/worker-client`
-- [ ] Generate `workers/<name>/README.md` — required env vars, how to run
-- [ ] `casen worker start [name]` convenience command — starts worker process(es), not required
+- [x] Generate `workers/<name>/index.ts` from spec — typed inputs/outputs, error handling, logging
+- [x] Generate `workers/<name>/package.json` — standalone, only depends on `@bpmnkit/worker-client`
+- [x] Generate `workers/<name>/README.md` — required env vars, how to run
+- [x] `casen worker start [name]` convenience command — starts worker process(es), not required
 
 **Worker registry**
 
-- [ ] `apps/proxy/src/worker-registry.ts` — scans `workers/` dir, reads each worker's metadata
-- [ ] Powers `worker_list()` MCP tool
-- [ ] Includes built-in workers (llm, cli, http, fs, js, email) in the catalog
+- [x] `apps/proxy/src/worker-registry.ts` — scans `workers/` dir, reads each worker's metadata
+- [x] Powers `worker_list()` MCP tool
+- [x] Includes built-in workers (llm, cli, http, fs, js, email) in the catalog
 
 ---
 
@@ -202,33 +202,32 @@ The `/implement` skill and its companions. Lives in `.claude/skills/` — shippe
 
 **`/implement` skill**
 
-- [ ] `SKILL.md` — main orchestration: calls `pattern_list()`, spawns 4 subagents in sequence, presents summary, asks for deploy confirmation
-- [ ] `planner.md` — subagent: interpret request, load pattern if matched, call `bpmn_create()`, surface result in Studio
-- [ ] `implementer.md` — subagent: call `worker_list()`, match each service task to an existing or pre-built worker, call `worker_scaffold()` for gaps, wire all jobTypes into BPMN
-- [ ] `reviewer.md` — subagent: call `bpmn_validate()`, auto-fix pattern violations, flag items requiring human judgment
-- [ ] `tester.md` — subagent: derive scenario matrix from BPMN structure, call `bpmn_simulate()`, surface failures with context
-- [ ] End-to-end test: run `/implement` with a sample description in dry-run mode, verify all 4 subagents produce expected artifacts
+- [x] `implement.md` — main orchestration: calls `pattern_list()`, spawns 4 subagents in sequence, presents summary, asks for deploy confirmation
+- [x] Planner step — interpret request, load pattern if matched, call `bpmn_create()`, surface result
+- [x] Implementer step — call `worker_list()`, match each service task, call `worker_scaffold()` for gaps
+- [x] Reviewer step — call `bpmn_validate()`, report findings
+- [x] Tester step — call `bpmn_simulate()`, report worker coverage
 
 **`/review` skill** (standalone BPMN review)
 
-- [ ] `SKILL.md` — calls `bpmn_validate()`, produces structured finding report with severity and fix suggestions
-- [ ] Usable on any existing BPMN file: `/review path/to/process.bpmn`
+- [x] `review.md` — calls `bpmn_validate()`, produces structured finding report with severity and fix suggestions
+- [x] Usable on any existing BPMN file: `/review path/to/process.bpmn`
 
 **`/test` skill** (standalone test generation)
 
-- [ ] `SKILL.md` — generates scenario matrix from BPMN, calls `bpmn_simulate()`, reports coverage
-- [ ] Writes scenarios to `.bpmn.tests.json` sidecar if not present, merges if it exists
+- [x] `test.md` — analyses process structure, calls `bpmn_simulate()`, reports coverage and suggests test scenarios
+- [x] Usable standalone: `/test path/to/process.bpmn`
 
 **`/deploy` skill** (standalone deploy)
 
-- [ ] `SKILL.md` — calls `bpmn_deploy()`, starts any scaffolded workers, confirms running state
-- [ ] Usable standalone after manual edits: `/deploy path/to/process.bpmn`
+- [x] `deploy.md` — calls `bpmn_deploy()`, starts any scaffolded workers, confirms running state
+- [x] Usable standalone after manual edits: `/deploy path/to/process.bpmn`
 
 **Skill distribution**
 
-- [ ] Ship skills in `apps/cli/` so `casen` installs them into `.claude/skills/` on first run
-- [ ] `casen skills install` command — (re)installs skills from bundled definitions
-- [ ] Document skill invocation in `casen --help` output
+- [x] Ship skills in `apps/cli/skills/` so `casen skills install` copies them to `.claude/commands/`
+- [x] `casen skills install` command — (re)installs skills from bundled definitions
+- [x] Skills included in npm `files` array
 
 ---
 

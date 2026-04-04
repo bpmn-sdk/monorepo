@@ -26,8 +26,10 @@ import { proxyGroup } from "./proxy.js"
 import { reebeGroup } from "./reebe.js"
 import { computeRelations } from "./relations.js"
 import { settingsGroup } from "./settings.js"
+import { skillsGroup } from "./skills.js"
 import { storyGroup } from "./story.js"
 import { testGroup } from "./test.js"
+import { workerStartCmd } from "./worker-start.js"
 import { workerCmd } from "./worker.js"
 
 // Inject custom commands into generated groups without modifying generated files.
@@ -65,8 +67,9 @@ const sortedOtherGroups = [
 
 const workerGroup: CommandGroup = {
 	name: "worker",
-	description: workerCmd.description,
-	commands: [workerCmd],
+	description:
+		"Run job workers — auto-complete (casen worker <type>) or start scaffolded workers (casen worker start)",
+	commands: [workerCmd, workerStartCmd],
 }
 
 /** Pinned groups shown above the separator in the main TUI menu. */
@@ -75,6 +78,7 @@ export const pinnedGroups: CommandGroup[] = [
 	lintGroup,
 	proxyGroup,
 	reebeGroup,
+	skillsGroup,
 	storyGroup,
 	settingsGroup,
 	testGroup,
