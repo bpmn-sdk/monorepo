@@ -1,7 +1,6 @@
 {
 	"name": "@bpmnkit/patterns",
 	"version": "0.0.1",
-	"description": "Domain process patterns for BPMNKit AIKit — provides compact BPMN templates and worker specs for common business processes",
 	"type": "module",
 	"main": "./dist/index.js",
 	"types": "./dist/index.d.ts",
@@ -17,16 +16,18 @@
 		"typecheck": "tsc --noEmit",
 		"check": "biome check ."
 	},
-	"publishConfig": {
-		"access": "public"
-	},
+	"description": "Domain process patterns for BPMNKit AIKit — compact BPMN templates and worker specs for common business processes",
+	"keywords": ["bpmn", "camunda", "zeebe", "workflow", "ai", "aikit", "patterns", "typescript"],
+	"license": "MIT",
 	"repository": {
 		"type": "git",
 		"url": "https://github.com/bpmnkit/monorepo"
 	},
-	"license": "MIT",
 	"homepage": "https://bpmnkit.com",
 	"bugs": {
 		"url": "https://github.com/bpmnkit/monorepo/issues"
+	},
+	"publishConfig": {
+		"access": "public"
 	}
 }

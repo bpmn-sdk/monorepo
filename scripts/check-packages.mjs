@@ -28,6 +28,8 @@ const PUBLISHED = [
 	"packages/operate",
 	"packages/astro-shared",
 	"packages/connector-gen",
+	"packages/patterns",
+	"packages/worker-client",
 	"apps/cli",
 	"apps/proxy",
 	"plugins-cli/casen-report",

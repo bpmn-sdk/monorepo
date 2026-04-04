@@ -52,6 +52,8 @@ function footer(currentPkg) {
 		{ name: "@bpmnkit/connector-gen", desc: "Generate connector templates from OpenAPI specs" },
 		{ name: "@bpmnkit/cli", desc: "Camunda 8 command-line interface (casen)" },
 		{ name: "@bpmnkit/proxy", desc: "Local AI bridge and Camunda API proxy server" },
+		{ name: "@bpmnkit/patterns", desc: "Domain process patterns for BPMNKit AIKit" },
+		{ name: "@bpmnkit/worker-client", desc: "Thin Zeebe REST client for standalone workers" },
 		{ name: "@bpmnkit/cli-sdk", desc: "Plugin authoring SDK for the casen CLI" },
 		{ name: "@bpmnkit/create-casen-plugin", desc: "Scaffold a new casen CLI plugin in seconds" },
 		{ name: "@bpmnkit/casen-report", desc: "HTML reports from Camunda 8 incident and SLA data" },
@@ -1993,6 +1995,202 @@ HTML reports are self-contained single-file documents — no external CSS, no fo
 - **Summary stat cards** — totals, breach counts, compliance rate
 - **Sortable data table** — all fetched rows with status badges
 - **Generated timestamp** — so reports can be archived
+`,
+	},
+
+	// ── patterns ──────────────────────────────────────────────────────────────
+	"packages/patterns": {
+		name: "@bpmnkit/patterns",
+		description:
+			"Domain process patterns for BPMNKit AIKit — compact BPMN templates and worker specs for common business processes",
+		content: `## Overview
+
+\`@bpmnkit/patterns\` is the domain knowledge library for the BPMNKit AIKit. When Claude runs the \`/implement\` skill, it calls \`pattern_list\` to check for a matching domain pattern and loads the relevant template and worker specs as context before generating a BPMN process.
+
+Patterns are hints, not rigid templates. Claude adapts them to the user's specific request, or ignores them entirely when the request doesn't match any known domain.
+
+## Features
+
+- **7 seed patterns** — invoice-approval, employee-onboarding, supplier-contract-review, incident-response, loan-origination, content-moderation, order-fulfillment
+- **Rich domain context** — each pattern includes a README with conventions, regulations, and common variations
+- **Worker specs** — typical service tasks with job types, typed inputs/outputs, and real integration options
+- **Compact BPMN templates** — token-efficient starting-point structure for LLM-based generation
+- **Keyword matching** — \`findPattern(query)\` scores keyword hits to find the best-fit pattern from a free-text description
+
+## Installation
+
+\`\`\`sh
+npm install @bpmnkit/patterns
+\`\`\`
+
+## Quick Start
+
+\`\`\`typescript
+import { ALL_PATTERNS, findPattern } from "@bpmnkit/patterns"
+
+// List all available patterns
+console.log(ALL_PATTERNS.map((p) => p.id))
+// ["invoice-approval", "employee-onboarding", ...]
+
+// Find by keyword match
+const pattern = findPattern("employee onboarding workflow with Okta")
+console.log(pattern?.id)        // "employee-onboarding"
+console.log(pattern?.workers)   // [{jobType: "create-accounts", ...}, ...]
+
+// Find by exact ID
+const invoice = findPattern("invoice-approval")
+console.log(invoice?.readme)    // domain context for the LLM
+\`\`\`
+
+## Available Patterns
+
+| ID | Domain | Typical Workers |
+|----|--------|-----------------|
+| \`invoice-approval\` | Finance / accounts payable | validate-invoice, check-duplicate, notify-approver, trigger-payment |
+| \`employee-onboarding\` | HR | create-accounts, send-welcome-email, create-jira-ticket, schedule-orientation |
+| \`supplier-contract-review\` | Procurement / legal | classify-contract, risk-scan, store-in-clm, request-esignature |
+| \`incident-response\` | IT / ops | classify-incident, page-oncall, create-incident-channel, update-status-page |
+| \`loan-origination\` | Financial services | verify-identity, credit-check, risk-scoring, generate-offer, disburse-funds |
+| \`content-moderation\` | Trust & safety | ai-scan, apply-action, report-csam, notify-user |
+| \`order-fulfillment\` | E-commerce | validate-inventory, process-payment, create-warehouse-order, create-shipment |
+
+## API Reference
+
+\`\`\`typescript
+// All patterns
+export const ALL_PATTERNS: Pattern[]
+
+// Find by exact ID or keyword match (returns best match or undefined)
+export function findPattern(query: string): Pattern | undefined
+
+// Pattern schema
+export interface Pattern {
+  id: string
+  name: string
+  description: string
+  keywords: string[]
+  readme: string                 // domain context text for the LLM
+  workers: WorkerSpec[]
+  variations: string[]
+  template: PatternTemplate      // compact BPMN structure
+}
+
+export interface WorkerSpec {
+  name: string
+  jobType: string
+  description: string
+  inputs: Record<string, string>
+  outputs: Record<string, string>
+  integrationOptions?: string[]  // e.g. ["Stripe", "Adyen", "Braintree"]
+}
+\`\`\`
+
+## Used by AIKit
+
+This package is consumed by the BPMNKit AIKit MCP server (\`@bpmnkit/proxy\`). When Claude Code runs \`/implement\`, it calls the \`pattern_list\` and \`pattern_get\` MCP tools which delegate to this library.
+
+See the [Pattern Library guide](https://docs.bpmnkit.com/guides/patterns/) for a full walkthrough.
+`,
+	},
+
+	// ── worker-client ─────────────────────────────────────────────────────────
+	"packages/worker-client": {
+		name: "@bpmnkit/worker-client",
+		description:
+			"Thin Zeebe REST client for standalone workers — no BPMNKit SDK required at runtime",
+		content: `## Overview
+
+\`@bpmnkit/worker-client\` is a minimal TypeScript wrapper around the Zeebe REST API. It is the only runtime dependency for workers scaffolded by the BPMNKit AIKit \`/implement\` skill. It works with both local [reebe](https://github.com/bpmnkit/monorepo) and Camunda 8 cloud.
+
+The key principle: workers built with this package have **zero BPMNKit runtime dependency**. They are standalone Node.js programs that can run anywhere.
+
+## Features
+
+- **Async generator polling** — \`client.poll(jobType)\` yields one \`ActivatedJob\` at a time; idles cleanly between polls
+- **Job lifecycle** — \`complete(variables)\`, \`fail(message, retries)\`, \`throwError(code, message, variables)\`
+- **OAuth2 for Camunda SaaS** — token fetching and caching built in; no manual auth management
+- **Env-var driven** — reads \`ZEEBE_ADDRESS\`, \`ZEEBE_CLIENT_ID\`, \`ZEEBE_CLIENT_SECRET\` automatically
+- **Zero dependencies** — pure Node.js \`fetch\`, no external packages
+
+## Installation
+
+\`\`\`sh
+npm install @bpmnkit/worker-client
+\`\`\`
+
+## Quick Start
+
+\`\`\`typescript
+import { createWorkerClient } from "@bpmnkit/worker-client"
+
+const client = createWorkerClient()  // reads ZEEBE_ADDRESS from env
+
+for await (const job of client.poll("com.example:send-email:1")) {
+  try {
+    await sendEmail(job.variables)
+    await job.complete({ sent: true })
+    console.log("completed", job.key)
+  } catch (err) {
+    await job.fail(err instanceof Error ? err.message : String(err), job.retries - 1)
+  }
+}
+\`\`\`
+
+## API Reference
+
+### \`createWorkerClient(options?)\`
+
+\`\`\`typescript
+const client = createWorkerClient({
+  address:      "http://localhost:26500",  // or ZEEBE_ADDRESS
+  clientId:     "...",                     // or ZEEBE_CLIENT_ID  (Camunda SaaS)
+  clientSecret: "...",                     // or ZEEBE_CLIENT_SECRET
+  tokenUrl:     "...",                     // or ZEEBE_TOKEN_URL
+  audience:     "zeebe.camunda.io",        // or ZEEBE_TOKEN_AUDIENCE
+  workerName:   "my-worker",
+})
+\`\`\`
+
+### \`client.poll(jobType, options?)\`
+
+Async generator. Continuously polls Zeebe. Pauses 5 seconds between polls when idle.
+
+\`\`\`typescript
+for await (const job of client.poll("my-job-type", { maxJobs: 10, timeout: 60_000 })) {
+  // job.key, job.variables, job.retries, job.bpmnProcessId, ...
+  await job.complete({ result: "ok" })
+}
+\`\`\`
+
+### Job methods
+
+\`\`\`typescript
+// Return output variables to the process
+await job.complete({ approved: true })
+
+// Fail the job (Zeebe retries or raises incident at retries=0)
+await job.fail("upstream timeout", job.retries - 1)
+
+// Throw a BPMN error (caught by an error boundary event in the diagram)
+await job.throwError("PAYMENT_DECLINED", "Card issuer declined", { code: "05" })
+\`\`\`
+
+## Environment Variables
+
+| Variable | Description |
+|----------|-------------|
+| \`ZEEBE_ADDRESS\` | Zeebe REST base URL (default: \`http://localhost:26500\`) |
+| \`ZEEBE_CLIENT_ID\` | OAuth2 client ID (Camunda SaaS) |
+| \`ZEEBE_CLIENT_SECRET\` | OAuth2 client secret (Camunda SaaS) |
+| \`ZEEBE_TOKEN_URL\` | OAuth2 token URL |
+| \`ZEEBE_TOKEN_AUDIENCE\` | OAuth2 audience |
+
+## Used by AIKit
+
+Workers generated by \`/implement\` (via the \`worker_scaffold\` MCP tool) depend only on this package.
+They are TypeScript programs with their own \`package.json\` — fully standalone, no other BPMNKit packages needed.
+
+See the [Standalone Workers guide](https://docs.bpmnkit.com/guides/workers-standalone/) for deployment options (local dev, Docker, Camunda SaaS).
 `,
 	},
 }
