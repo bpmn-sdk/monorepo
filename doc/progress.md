@@ -1,5 +1,22 @@
 # Progress
 
+## 2026-04-05 — Fix: Neon theme friendliness — raise background lightness stack
+
+**`packages/ui/src/tokens.css` + `packages/ui/src/css.ts`:**
+- `--bpmnkit-bg`: `oklch(5% → 11%)` — eliminate near-black harshness; land in Catppuccin Crust range
+- `--bpmnkit-surface`: `oklch(9% → 15%)` — match Catppuccin Base (`#1e1e2e`), the validated "friendly dark" sweet spot
+- `--bpmnkit-surface-2`: `oklch(12% → 19%)` — Dracula range; clear lift from surface
+- `--bpmnkit-panel-bg`: `oklch(8% → 13%)` — panels follow the raised stack
+- `--bpmnkit-nav-bg`: `oklch(5% → 8%)` — stays darker than bg to maintain nav/content contrast
+- `--bpmnkit-fg-muted`: `oklch(55% → 60%)` — maintain readability against lighter surface
+- `--bpmnkit-accent`: `oklch(55% → 65%)` — better contrast against raised surface; still saturated neon
+- `--bpmnkit-accent-bright`: `oklch(73% → 76%)` — align with Catppuccin/Dracula accent range
+- `--bpmnkit-accent-subtle`: opacity updated to match new accent lightness
+- `--bpmnkit-border`: chroma `0.28 → 0.24`, opacity `0.2 → 0.18` — structural, not distracting
+- `--bpmnkit-panel-border`: same border adjustment
+
+Hue (270–280°), foreground, all semantic colors (teal/success/warn/danger) unchanged.
+
 ## 2026-04-04 — Feat: AIKit Phase 5 — Documentation
 
 **`apps/docs` — new pages:**
