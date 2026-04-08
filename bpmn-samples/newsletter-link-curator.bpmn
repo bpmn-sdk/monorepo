@@ -175,7 +175,7 @@
       <bpmn:extensionElements>
         <zeebe:taskDefinition type="io.bpmnkit:js:1" />
         <zeebe:taskHeaders>
-          <zeebe:header key="expression" value="(() => { const all = variables.allRelevantLinks || []; const today = new Date().toISOString().split('T')[0]; let out = ''; for (let i = 0; i < all.length; i++) { const g = all[i]; if (!Array.isArray(g) || g.length === 0) continue; const s = g[0].sender || 'unknown'; out += '\n## ' + today + ' — ' + s + '\n\n'; for (let j = 0; j < g.length; j++) { const l = g[j]; out += '- [' + (l.title || l.url) + '](' + l.url + ')' + (l.reason ? ' — ' + l.reason : '') + '\n'; } } return out; })()" />
+          <zeebe:header key="expression" value="(() => { const all = variables.allRelevantLinks || []; const today = new Date().toISOString().split('T')[0]; let out = ''; for (let i = 0; i &lt; all.length; i++) { const g = all[i]; if (!Array.isArray(g) || g.length === 0) continue; const s = g[0].sender || 'unknown'; out += '\n## ' + today + ' — ' + s + '\n\n'; for (let j = 0; j &lt; g.length; j++) { const l = g[j]; out += '- [' + (l.title || l.url) + '](' + l.url + ')' + (l.reason ? ' — ' + l.reason : '') + '\n'; } } return out; })()" />
           <zeebe:header key="resultVariable" value="content" />
         </zeebe:taskHeaders>
       </bpmn:extensionElements>
