@@ -8,7 +8,13 @@
 import { readFileSync } from 'node:fs'
 
 const input = readFileSync('/dev/stdin', 'utf8')
-const msg = JSON.parse(input)
+let msg
+try {
+  msg = JSON.parse(input)
+} catch {
+  process.stdout.write(JSON.stringify({ sender: 'unknown', extractedLinks: [], extractedLinksJson: '[]' }))
+  process.exit(0)
+}
 
 // Extract sender from message headers
 const headers = msg.payload?.headers ?? []
@@ -50,7 +56,7 @@ for (const raw of rawUrls) {
   seen.add(url)
 
   if (/unsubscribe|optout|opt-out/i.test(url)) continue
-  if (/utm_|click\.|track\./i.test(url)) continue
+  if (/[?&]utm_|\/\/(click|track)\./i.test(url)) continue
   if (/mailto:|tel:/i.test(url)) continue
 
   // Skip root-domain-only URLs (e.g. https://example.com/)
