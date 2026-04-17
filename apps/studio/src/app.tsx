@@ -2,6 +2,7 @@ import { TooltipProvider } from "@radix-ui/react-tooltip"
 import { QueryClientProvider } from "@tanstack/react-query"
 import { Route, Router, Switch } from "wouter"
 import { queryClient } from "./api/queryClient.js"
+import { WelcomeModal } from "./components/WelcomeModal.js"
 import { Shell } from "./layout/Shell.js"
 import { Dashboard } from "./pages/Dashboard.js"
 import { DecisionDetail } from "./pages/DecisionDetail.js"
@@ -46,6 +47,7 @@ export function App() {
 						</Switch>
 					</Shell>
 				</Router>
+				<WelcomeModal />
 			</TooltipProvider>
 		</QueryClientProvider>
 	)
