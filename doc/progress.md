@@ -1,5 +1,15 @@
 # Progress
 
+## 2026-04-17 — Feat: Studio onboarding overhaul + Models folder bug fix
+
+**`apps/studio`:**
+- Added welcome modal (auto-shown on first visit, re-openable via sidebar "Get started" link)
+- Added collapsible onboarding checklist to Dashboard — 4 steps: open example, connect cluster, deploy, run instance
+- Checklist shows CLI snippet for connecting a Zeebe cluster; auto-hides when all steps complete
+- Added "Get started" link to sidebar (Sparkles icon; disappears after user hides the checklist)
+- Fixed IndexedDB folder race condition in Models view (split async DB read from synchronous tree rebuild)
+- Fixed file input not resetting after import in Models view (prevented re-importing same files)
+
 ## 2026-04-05 — Fix: Neon theme friendliness — raise background lightness stack
 
 **`packages/ui/src/tokens.css` + `packages/ui/src/css.ts`:**
