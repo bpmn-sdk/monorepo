@@ -385,7 +385,7 @@ function OnboardingChecklist() {
 	const [exampleOpened, setExampleOpened] = useState(obs.exampleOpened)
 	const [instanceStarted, setInstanceStarted] = useState(obs.instanceStarted)
 
-	if (hidden) return null
+	if (!obs.seen || hidden) return null
 
 	const step1Done = exampleOpened
 	const step2Done = !!activeProfile
@@ -522,7 +522,7 @@ casen studio --profile my-cluster`}</pre>
 						<>
 							<span>Get started</span>
 							<span className="text-muted font-normal">
-								{completedCount}/{steps.length} steps
+								{completedCount}/{steps.length} steps complete
 							</span>
 						</>
 					)}
