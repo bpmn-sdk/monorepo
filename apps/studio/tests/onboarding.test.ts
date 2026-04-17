@@ -17,8 +17,12 @@ import {
 const store: Record<string, string> = {}
 const localStorageMock = {
 	getItem: (k: string) => store[k] ?? null,
-	setItem: (k: string, v: string) => { store[k] = v },
-	removeItem: (k: string) => { delete store[k] },
+	setItem: (k: string, v: string) => {
+		store[k] = v
+	},
+	removeItem: (k: string) => {
+		delete store[k]
+	},
 }
 Object.defineProperty(globalThis, "localStorage", { value: localStorageMock, writable: true })
 
