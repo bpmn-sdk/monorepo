@@ -12,6 +12,7 @@ import {
 	RotateCw,
 	Search,
 	Settings,
+	Sparkles,
 } from "lucide-react"
 import { useState } from "preact/hooks"
 import { Link } from "wouter"
@@ -24,6 +25,7 @@ import {
 	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from "../components/ui/dropdown-menu.js"
+import { getOnboardingState } from "../lib/onboarding.js"
 import { navigateWithTransition } from "../lib/transition.js"
 import { useClusterStore } from "../stores/cluster.js"
 import { useModeStore } from "../stores/mode.js"
@@ -101,7 +103,13 @@ export function Sidebar() {
 		await loadProfiles()
 		setReconnecting(false)
 	}
-	const { sidebarExpanded, toggleSidebar, setSidebarExpanded, openCommandPalette } = useUiStore()
+	const {
+		sidebarExpanded,
+		toggleSidebar,
+		setSidebarExpanded,
+		openCommandPalette,
+		openWelcomeModal,
+	} = useUiStore()
 	const items = getOrderedItems(mode)
 
 	function isActive(path: string) {
@@ -358,6 +366,30 @@ export function Sidebar() {
 					)
 				})}
 			</div>
+
+			{/* Get started */}
+			{!getOnboardingState().hidden && (
+				<div className="px-2">
+					<button
+						type="button"
+						onClick={openWelcomeModal}
+						className={`flex w-full items-center gap-3 rounded-md h-9 px-2.5 text-nav-fg hover:text-nav-fg-active hover:bg-white/5 active:bg-white/10 transition-colors duration-150 ${
+							sidebarExpanded ? "justify-start" : "justify-center"
+						}`}
+						aria-label="Get started"
+						title="Get started"
+					>
+						<Sparkles size={18} className="shrink-0 text-accent" />
+						<span
+							className={`text-sm whitespace-nowrap overflow-hidden transition-[max-width,opacity] duration-150 ${
+								sidebarExpanded ? "max-w-xs opacity-100" : "max-w-0 opacity-0"
+							}`}
+						>
+							Get started
+						</span>
+					</button>
+				</div>
+			)}
 
 			{/* Bottom: collapse toggle */}
 			<div className="px-2 pt-2 border-t border-white/10 mt-2">
