@@ -59,43 +59,45 @@ export function WelcomeModal() {
 
 	return (
 		<Dialog open={showWelcomeModal} onOpenChange={(o: boolean) => !o && dismiss()}>
-			<DialogContent className="max-w-md">
-				<div className="flex flex-col items-center text-center gap-2 pt-2 pb-1">
-					<div className="flex items-center justify-center w-12 h-12 rounded-full bg-accent/15 mb-1">
-						<Rocket size={22} className="text-accent" />
+			<DialogContent className="max-w-lg">
+				<div className="flex flex-col items-center text-center gap-3 pt-4 pb-2">
+					<div className="flex items-center justify-center w-16 h-16 rounded-full bg-accent/15 mb-1">
+						<Rocket size={28} className="text-accent" />
 					</div>
-					<DialogTitle className="text-xl font-semibold text-fg">
+					<DialogTitle className="text-2xl font-semibold text-fg">
 						Welcome to BPMNkit Studio
 					</DialogTitle>
-					<p className="text-sm text-muted">
+					<p className="text-sm text-muted max-w-sm">
 						Design, deploy, and monitor BPMN processes for Zeebe workflows.
 					</p>
 				</div>
 
-				<div className="grid grid-cols-2 gap-3 mt-2">
+				<div className="grid grid-cols-2 gap-4 mt-4">
 					<button
 						type="button"
 						onClick={() => void handleOpenExample()}
-						className="flex flex-col items-start gap-1.5 rounded-lg border border-accent bg-accent/10 p-4 text-left hover:bg-accent/15 transition-colors"
+						className="flex flex-col items-start gap-2 rounded-lg border border-accent bg-accent/10 p-5 text-left hover:bg-accent/15 transition-colors"
 					>
-						<Sparkles size={18} className="text-accent" />
+						<Sparkles size={20} className="text-accent" />
 						<span className="text-sm font-medium text-fg">Open example process</span>
-						<span className="text-xs text-muted">
+						<span className="text-xs text-muted leading-relaxed">
 							HTTP request + AI summarise — ready to explore
 						</span>
 					</button>
 					<button
 						type="button"
 						onClick={handleStartScratch}
-						className="flex flex-col items-start gap-1.5 rounded-lg border border-border bg-surface p-4 text-left hover:bg-surface-2 transition-colors"
+						className="flex flex-col items-start gap-2 rounded-lg border border-border bg-surface p-5 text-left hover:bg-surface-2 transition-colors"
 					>
-						<FilePlus2 size={18} className="text-fg" />
+						<FilePlus2 size={20} className="text-fg" />
 						<span className="text-sm font-medium text-fg">Start from scratch</span>
-						<span className="text-xs text-muted">Open the editor and design your own process</span>
+						<span className="text-xs text-muted leading-relaxed">
+							Open the editor and design your own process
+						</span>
 					</button>
 				</div>
 
-				<div className="mt-1 flex items-center justify-between">
+				<div className="mt-4 flex items-center justify-between">
 					<button
 						type="button"
 						onClick={handleConnectCluster}

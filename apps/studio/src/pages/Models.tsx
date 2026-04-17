@@ -359,7 +359,7 @@ export function Models() {
 		setBreadcrumbs([{ label: "Models" }])
 	}, [setBreadcrumbs])
 
-	// Load folder tree (FS or virtual) when mode or models change
+	// Load persisted virtual folders from DB once on mount / mode switch
 	useEffect(() => {
 		if (fsMode) {
 			const fs = getFsAdapter()
@@ -369,15 +369,18 @@ export function Models() {
 				.then(setFsTree)
 				.catch(() => setFsTree([]))
 		} else {
-			// Virtual folders: merge persisted list with folders already on models
-			void storage.getPreference<string[]>("virtual-folders", []).then((saved) => {
-				const fromModels = models.map((m) => m.folder).filter((f): f is string => !!f)
-				const merged = [...new Set([...saved, ...fromModels])]
-				setVirtualFolders(merged)
-				setFsTree(buildVirtualTree(merged))
-			})
+			void storage.getPreference<string[]>("virtual-folders", []).then(setVirtualFolders)
 		}
-	}, [fsMode, models])
+	}, [fsMode])
+
+	// Rebuild folder tree synchronously whenever virtualFolders or models change (no async DB reads)
+	useEffect(() => {
+		if (!fsMode) {
+			const fromModels = models.map((m) => m.folder).filter((f): f is string => !!f)
+			const merged = [...new Set([...virtualFolders, ...fromModels])]
+			setFsTree(buildVirtualTree(merged))
+		}
+	}, [fsMode, virtualFolders, models])
 
 	// Filter models by the selected folder in both FS and IndexedDB modes
 	const folderModels = models.filter((m) => {
@@ -517,6 +520,7 @@ export function Models() {
 			await saveModel(modelData)
 			toast.success(`Imported ${name}`)
 		}
+		if (fileInputRef.current) fileInputRef.current.value = ""
 	}
 
 	async function handleDelete(model: ModelFile) {
