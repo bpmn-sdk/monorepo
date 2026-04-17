@@ -1,19 +1,19 @@
 import {
 	AlertTriangle,
 	CheckSquare,
-	FileCode2,
+	ChevronDown,
+	ChevronUp,
 	GitBranch,
 	Layers,
 	Play,
 	RefreshCw,
-	Rocket,
 	WifiOff,
 	X,
 	Zap,
 } from "lucide-react"
 import type { ComponentChildren } from "preact"
 import { useEffect, useState } from "preact/hooks"
-import { Link } from "wouter"
+import { Link, useLocation } from "wouter"
 import {
 	useDashboardStats,
 	useDefinitions,
@@ -25,10 +25,19 @@ import {
 import type { ProcessDefinition } from "../api/types.js"
 import { ProfileTag } from "../components/ProfileTag.js"
 import { StatusPill } from "../components/StatusPill.js"
+import { Button } from "../components/ui/button.js"
+import {
+	getOnboardingState,
+	hideOnboarding,
+	markExampleOpened,
+	markInstanceStarted,
+	setCollapsed,
+} from "../lib/onboarding.js"
 import { useClusterStore } from "../stores/cluster.js"
 import { useModeStore } from "../stores/mode.js"
 import { useModelsStore } from "../stores/models.js"
 import { useUiStore } from "../stores/ui.js"
+import { PROCESS_TEMPLATES } from "../templates/index.js"
 
 // ── Time series ───────────────────────────────────────────────────────────────
 
@@ -361,61 +370,219 @@ function OfflinePanel({
 	)
 }
 
-// ── Getting started ───────────────────────────────────────────────────────────
+// ── Onboarding checklist ──────────────────────────────────────────────────────
 
-const STEPS = [
-	{
-		n: 1,
-		icon: FileCode2,
-		title: "Create a model",
-		body: "Design a BPMN process in the visual editor or import an existing file.",
-		href: "/models",
-	},
-	{
-		n: 2,
-		icon: Rocket,
-		title: "Deploy a definition",
-		body: "Push your model to the connected Camunda cluster to make it runnable.",
-		href: "/definitions",
-	},
-	{
-		n: 3,
-		icon: Play,
-		title: "Start an instance",
-		body: "Trigger a process instance and monitor its state in real time.",
-		href: "/instances",
-	},
-]
+function OnboardingChecklist() {
+	const { data: stats } = useDashboardStats()
+	const { activeProfile } = useClusterStore()
+	const { saveModel } = useModelsStore()
+	const { openWelcomeModal } = useUiStore()
+	const [, navigate] = useLocation()
 
-function GettingStarted() {
-	return (
-		<div className="flex flex-col gap-3">
-			<p className="text-[11px] font-semibold uppercase tracking-widest text-muted/60">
-				Get started
-			</p>
-			<div className="grid gap-3 sm:grid-cols-3">
-				{STEPS.map(({ n, icon: Icon, title, body, href }) => (
-					<Link
-						key={n}
-						href={href}
-						className="group flex flex-col gap-3 rounded-lg border border-border bg-surface p-4 transition-all duration-150 hover:border-accent/50 hover:bg-surface-2"
+	const obs = getOnboardingState()
+	const [hidden, setHidden] = useState(obs.hidden)
+	const [collapsed, setLocalCollapsed] = useState(obs.collapsed)
+	const [exampleOpened, setExampleOpened] = useState(obs.exampleOpened)
+	const [instanceStarted, setInstanceStarted] = useState(obs.instanceStarted)
+
+	if (hidden) return null
+
+	const step1Done = exampleOpened
+	const step2Done = !!activeProfile
+	const step3Done = (stats?.deployedDefinitions ?? 0) > 0
+	const step4Done = (stats?.runningInstances ?? 0) > 0 || instanceStarted
+
+	const completedCount = [step1Done, step2Done, step3Done, step4Done].filter(Boolean).length
+	const allDone = completedCount === 4
+
+	// Auto-hide 3s after all steps complete
+	useEffect(() => {
+		if (allDone) {
+			const t = setTimeout(() => {
+				hideOnboarding()
+				setHidden(true)
+			}, 3000)
+			return () => clearTimeout(t)
+		}
+	}, [allDone])
+
+	function handleHide() {
+		hideOnboarding()
+		setHidden(true)
+	}
+
+	function handleToggleCollapse() {
+		const next = !collapsed
+		setLocalCollapsed(next)
+		setCollapsed(next)
+	}
+
+	async function handleOpenExample() {
+		const tpl = PROCESS_TEMPLATES.find((t) => t.id === "tpl-fetch-summarize-webpage")
+		if (!tpl) {
+			console.error("onboarding: template tpl-fetch-summarize-webpage not found")
+			return
+		}
+		markExampleOpened()
+		setExampleOpened(true)
+		try {
+			const model = await saveModel({
+				id: crypto.randomUUID(),
+				name: tpl.name,
+				type: "bpmn",
+				content: tpl.bpmn,
+				createdAt: Date.now(),
+			})
+			navigate(`/models/${model.id}`)
+		} catch (err) {
+			console.error("onboarding: failed to save example model", err)
+		}
+	}
+
+	const steps = [
+		{
+			label: "Open an example process",
+			description: "See a real BPMN workflow with HTTP and AI steps.",
+			done: step1Done,
+			action: !step1Done ? (
+				<Button size="sm" variant="outline" onClick={() => void handleOpenExample()}>
+					Open example →
+				</Button>
+			) : null,
+		},
+		{
+			label: "Connect a Zeebe cluster",
+			description: "Use the CLI to connect Studio to your Camunda cluster.",
+			done: step2Done,
+			action: !step2Done ? (
+				<div className="flex flex-col gap-2 mt-2">
+					<pre className="rounded bg-surface-2 border border-border px-3 py-2 text-xs font-mono text-fg whitespace-pre-wrap leading-relaxed">{`# Install CLI
+npm install -g @bpmnkit/cli
+
+# Add a Zeebe profile
+casen profile add my-cluster \\
+  --base-url https://... \\
+  --auth-type oauth2 \\
+  --client-id YOUR_ID \\
+  --client-secret YOUR_SECRET
+
+# Launch Studio with that profile
+casen studio --profile my-cluster`}</pre>
+					<Button size="sm" variant="outline" onClick={() => navigate("/settings")}>
+						Configure in Settings →
+					</Button>
+				</div>
+			) : null,
+		},
+		{
+			label: "Deploy a definition",
+			description: "Push a process model to your connected cluster.",
+			done: step3Done,
+			action:
+				!step3Done && step2Done ? (
+					<Button size="sm" variant="outline" onClick={() => navigate("/definitions")}>
+						Go to Definitions →
+					</Button>
+				) : null,
+		},
+		{
+			label: "Run your first instance",
+			description: "Trigger an instance and watch it execute.",
+			done: step4Done,
+			action:
+				!step4Done && step3Done ? (
+					<Button
+						size="sm"
+						variant="outline"
+						onClick={() => {
+							markInstanceStarted()
+							setInstanceStarted(true)
+							navigate("/instances")
+						}}
 					>
-						<div className="flex items-center gap-3">
-							<span className="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-accent/10 text-xs font-bold text-accent">
-								{n}
+						Start an instance →
+					</Button>
+				) : null,
+		},
+	]
+
+	return (
+		<div className="rounded-lg border border-accent/30 bg-accent/5 overflow-hidden">
+			{/* Header */}
+			<div className="flex items-center justify-between px-4 py-2.5">
+				<button
+					type="button"
+					onClick={handleToggleCollapse}
+					className="flex items-center gap-2 text-sm font-medium text-fg hover:text-accent transition-colors"
+				>
+					{collapsed ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
+					{allDone ? (
+						<span className="text-success">✓ All set! You're ready to automate.</span>
+					) : (
+						<>
+							<span>Get started</span>
+							<span className="text-muted font-normal">
+								{completedCount}/{steps.length} steps
 							</span>
-							<Icon
-								size={15}
-								className="text-muted transition-colors duration-150 group-hover:text-accent"
-							/>
-						</div>
-						<div>
-							<p className="text-sm font-medium text-fg">{title}</p>
-							<p className="mt-0.5 text-xs leading-relaxed text-muted">{body}</p>
-						</div>
-					</Link>
-				))}
+						</>
+					)}
+				</button>
+				<div className="flex items-center gap-2">
+					<button
+						type="button"
+						onClick={() => openWelcomeModal()}
+						className="text-xs text-muted hover:text-fg transition-colors"
+					>
+						Welcome guide
+					</button>
+					<button
+						type="button"
+						onClick={handleHide}
+						className="text-muted hover:text-fg transition-colors"
+						aria-label="Hide checklist"
+					>
+						<X size={14} />
+					</button>
+				</div>
 			</div>
+
+			{/* Progress bar */}
+			<div className="h-0.5 bg-border mx-4">
+				<div
+					className="h-full bg-accent transition-all duration-500"
+					style={{ width: `${(completedCount / steps.length) * 100}%` }}
+				/>
+			</div>
+
+			{/* Steps */}
+			{!collapsed && (
+				<div className="px-4 py-3 flex flex-col gap-3">
+					{steps.map((step) => (
+						<div key={step.label} className="flex gap-3">
+							<div className="mt-0.5 shrink-0">
+								{step.done ? (
+									<span className="flex items-center justify-center w-5 h-5 rounded-full bg-success/20 text-success text-xs">
+										✓
+									</span>
+								) : (
+									<span className="flex items-center justify-center w-5 h-5 rounded-full border border-border text-muted text-xs">
+										○
+									</span>
+								)}
+							</div>
+							<div className="flex flex-col gap-1">
+								<span
+									className={`text-sm font-medium ${step.done ? "text-muted line-through" : "text-fg"}`}
+								>
+									{step.label}
+								</span>
+								{!step.done && <span className="text-xs text-muted">{step.description}</span>}
+								{!step.done && step.action}
+							</div>
+						</div>
+					))}
+				</div>
+			)}
 		</div>
 	)
 }
@@ -446,11 +613,6 @@ export function Dashboard() {
 	const activeProfileData = profiles.find((p) => p.name === activeProfile)
 	const activeIncidentCount = stats?.activeIncidents ?? 0
 	const showBanner = !isOffline && !bannerDismissed && activeIncidentCount > 0
-	const showGettingStarted =
-		!isOffline &&
-		!isDataLoading &&
-		stats?.deployedDefinitions === 0 &&
-		stats?.runningInstances === 0
 
 	useEffect(() => {
 		setBreadcrumbs([{ label: "Dashboard" }])
@@ -480,6 +642,8 @@ export function Dashboard() {
 
 	return (
 		<div className="flex flex-col gap-5 p-6 max-w-6xl mx-auto animate-in fade-in slide-in-from-bottom-2 duration-300">
+			<OnboardingChecklist />
+
 			{/* Status header */}
 			<StatusHeader
 				activeProfile={activeProfile}
@@ -754,9 +918,6 @@ export function Dashboard() {
 							</StatCard>
 						)}
 					</div>
-
-					{/* Getting-started guide — shown on a fresh empty cluster */}
-					{showGettingStarted && <GettingStarted />}
 				</>
 			)}
 		</div>
