@@ -29,7 +29,7 @@ const JOB_TYPE = "<job-type>"
 async function run() {
   for await (const job of activateJobs({ type: JOB_TYPE })) {
     try {
-      const { /* destructure variables */ } = job.variables
+      const variables = job.variables
 
       // TODO: implement job logic
 
