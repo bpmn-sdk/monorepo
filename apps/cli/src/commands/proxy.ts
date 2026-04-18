@@ -1,3 +1,5 @@
+import { spawn } from "node:child_process"
+import { fileURLToPath } from "node:url"
 import { startServer } from "@bpmnkit/proxy"
 import type { Command, CommandGroup } from "../types.js"
 
@@ -23,7 +25,6 @@ const startCmd: Command = {
 
 		startServer(port)
 
-		// Keep the CLI alive until the user presses Ctrl+C
 		await new Promise<void>((resolve) => {
 			process.once("SIGINT", resolve)
 			process.once("SIGTERM", resolve)
@@ -31,8 +32,36 @@ const startCmd: Command = {
 	},
 }
 
+const mcpCmd: Command = {
+	name: "mcp",
+	description: "Start the BPMNKit AIKit MCP server (stdio transport for Claude Code)",
+	examples: [
+		{
+			description: "Start MCP server (used by Claude Code plugin)",
+			command: "casen proxy mcp",
+		},
+	],
+	async run(_ctx) {
+		const aitKitMcpUrl = import.meta.resolve("@bpmnkit/proxy/dist/aikit-mcp.js")
+		const aitKitMcpPath = fileURLToPath(aitKitMcpUrl)
+
+		await new Promise<void>((resolve, reject) => {
+			const child = spawn(process.execPath, [aitKitMcpPath], {
+				stdio: "inherit",
+				env: process.env,
+			})
+
+			child.on("error", reject)
+			child.on("close", (code) => {
+				if (code === 0 || code === null) resolve()
+				else reject(new Error(`aikit-mcp exited with code ${code}`))
+			})
+		})
+	},
+}
+
 export const proxyGroup: CommandGroup = {
 	name: "proxy",
 	description: "Start the local AI bridge and Camunda API proxy server",
-	commands: [startCmd],
+	commands: [startCmd, mcpCmd],
 }

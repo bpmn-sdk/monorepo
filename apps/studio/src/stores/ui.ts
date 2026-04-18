@@ -63,6 +63,7 @@ interface UiState {
 	commandPaletteOpen: boolean
 	sidebarExpanded: boolean
 	zenMode: boolean
+	showWelcomeModal: boolean
 	breadcrumbs: Breadcrumb[]
 	contextCommands: ContextCommand[]
 	paletteViewStack: PaletteView[]
@@ -88,6 +89,8 @@ interface UiState {
 	popPaletteView(): void
 	enterZenMode(): void
 	exitZenMode(): void
+	openWelcomeModal(): void
+	closeWelcomeModal(): void
 }
 
 export const useUiStore = create<UiState>()((set, get) => ({
@@ -101,6 +104,7 @@ export const useUiStore = create<UiState>()((set, get) => ({
 	commandPaletteOpen: false,
 	sidebarExpanded: loadSidebarExpanded(),
 	zenMode: false,
+	showWelcomeModal: false,
 	breadcrumbs: [],
 	contextCommands: [],
 	paletteViewStack: [],
@@ -162,6 +166,9 @@ export const useUiStore = create<UiState>()((set, get) => ({
 
 	enterZenMode: () => set({ zenMode: true }),
 	exitZenMode: () => set({ zenMode: false }),
+
+	openWelcomeModal: () => set({ showWelcomeModal: true }),
+	closeWelcomeModal: () => set({ showWelcomeModal: false }),
 
 	pushPaletteView: (view) =>
 		set((s) => ({ paletteViewStack: [...s.paletteViewStack, view], commandPaletteOpen: true })),
