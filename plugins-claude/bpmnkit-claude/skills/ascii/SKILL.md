@@ -1,14 +1,15 @@
 ---
 name: ascii
-description: Render a BPMN, DMN, or Form file as Unicode box-drawing ASCII art in the terminal. Usage: /bpmnkit:ascii <file>
+description: Show the structure of a BPMN, DMN, or Form file — element list, lint findings, and process layout. Usage: /bpmnkit:ascii <file>
 ---
 
-Render as ASCII art: $ARGUMENTS
+Show the structure of the file: $ARGUMENTS
 
 Steps:
 1. Extract the filename from $ARGUMENTS. If none, find the single `.bpmn`/`.dmn`/`.form` file in cwd (or ask).
-2. Run via Bash: `casen bpmn render <file>` (works for BPMN, DMN, and Form files).
-3. Display the full ASCII output in a code block.
-4. Print a one-line summary: "Rendered <filename> — <N> elements"
+2. Read the file with the Read tool and count elements (startEvents, tasks, gateways, endEvents).
+3. Run via Bash: `casen lint lint <file>` to get element analysis and findings.
+4. Display the output from step 3.
+5. Print a one-line summary: "Structure: <N> elements — <list: e.g. 1 start, 3 tasks, 2 gateways, 2 ends>"
 
 If the file is not found: "File not found: <filename>. Provide a path to a .bpmn, .dmn, or .form file."
