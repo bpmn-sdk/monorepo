@@ -1,5 +1,44 @@
 # Features
 
+## Claude Code Plugin — `/plugin install bpmnkit` (2026-04-17)
+
+A Claude Code plugin that makes Claude AI-first for BPMN workflows. Install once, works automatically.
+
+**Prerequisite:** `npm install -g @bpmnkit/cli`
+
+**Install:** `/plugin install bpmnkit` (or `claude --plugin-dir plugins-claude/bpmnkit-claude` locally)
+
+### Skills (slash commands)
+
+| Skill | What it does |
+|---|---|
+| `/bpmnkit:generate <description>` | Natural language → BPMN file + ASCII preview |
+| `/bpmnkit:review [file]` | Static analysis: pattern checks, variable flow, findings by severity |
+| `/bpmnkit:deploy [file] [--local\|--camunda]` | Deploy to local reebe or Camunda 8 |
+| `/bpmnkit:worker <job-type>` | Scaffold TypeScript worker using `@bpmnkit/worker-client` |
+| `/bpmnkit:test [file]` | Run scenario tests, show path coverage |
+| `/bpmnkit:instances [id] [--active\|--failed]` | List running process instances |
+| `/bpmnkit:incidents [--process-id X]` | List open incidents with suggested actions |
+| `/bpmnkit:ascii <file>` | Render BPMN/DMN/Form as Unicode ASCII art |
+
+### Agents
+
+| Agent | What it does |
+|---|---|
+| `process-builder` | End-to-end: describe → generate → validate → scaffold workers → deploy |
+| `incident-resolver` | Triage → root cause analysis → propose fix → execute → verify |
+
+### Hooks
+
+- **SessionStart** — checks `casen` is installed, auto-starts proxy in background
+- **PostToolUse** — silently lints any `.bpmn` file written during the session
+
+### MCP
+
+Connects to the existing `aikit-mcp.js` server via `casen proxy mcp` (10 tools: `bpmn_create`, `bpmn_read`, `bpmn_update`, `bpmn_validate`, `bpmn_deploy`, `bpmn_simulate`, `bpmn_run_history`, `worker_list`, `worker_scaffold`, `pattern_list`, `pattern_get`).
+
+---
+
 ## CLI — Start Proxy & Reebe from the CLI (2026-04-03)
 
 The `casen` CLI is now the single entry point for starting local infrastructure:

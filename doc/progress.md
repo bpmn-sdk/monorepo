@@ -5179,3 +5179,15 @@ Two new canvas plugin packages for schema-driven element property editing:
 - Added shared `XmlElement` type for opaque extension element preservation
 - Added roundtrip test against `Github>Slack users.dmn` (2-output table, 21 rules)
 - Set up monorepo infrastructure (pnpm, Turborepo, Biome, Vitest, TypeScript strict)
+
+### 2026-04-17 — Claude Code Plugin
+
+- Added `casen proxy mcp` subcommand — spawns aikit-mcp.js stdio server via import.meta.resolve, enables Claude Code plugin MCP config
+- Added `"./dist/aikit-mcp.js"` export to `@bpmnkit/proxy` package.json so the CLI can resolve it
+- Created Claude Code plugin at `plugins-claude/bpmnkit-claude/` — installable via `/plugin install bpmnkit`
+- Plugin manifest: name=bpmnkit, userConfig for camunda_endpoint + camunda_token
+- MCP config: stdio transport via `casen proxy mcp`, passes BPMNKIT_PROXY_URL + user config env vars
+- Hooks: SessionStart checks for casen + auto-starts proxy via nohup; PostToolUse auto-lints .bpmn writes
+- 8 skills: generate, review, deploy, worker (developer); test, instances, incidents, ascii (operator)
+- 2 agents: process-builder (end-to-end design→deploy), incident-resolver (triage→resolve with approval gates)
+- Verified: `casen proxy mcp` MCP handshake returns 10 tools; plugin structure matches Claude Code format
