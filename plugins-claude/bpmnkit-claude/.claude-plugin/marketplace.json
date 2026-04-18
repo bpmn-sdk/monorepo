@@ -1,0 +1,22 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "bpmnkit",
+  "version": "0.1.0",
+  "description": "AI-first BPMN development and operations for Claude Code",
+  "owner": {
+    "name": "BPMNKit",
+    "email": "hello@bpmnkit.com"
+  },
+  "plugins": [
+    {
+      "name": "bpmnkit",
+      "description": "BPMN skills and agents for Claude Code — generate diagrams, scaffold workers, deploy processes, and resolve incidents. Requires: npm install -g @bpmnkit/cli",
+      "version": "0.1.0",
+      "source": "./",
+      "author": {
+        "name": "BPMNKit",
+        "url": "https://bpmnkit.com"
+      }
+    }
+  ]
+}
