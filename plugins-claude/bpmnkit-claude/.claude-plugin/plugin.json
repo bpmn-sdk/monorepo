@@ -1,27 +1,27 @@
 {
-  "name": "bpmnkit",
-  "version": "0.1.0",
-  "description": "AI-first BPMN development and operations for Claude Code. Requires: npm install -g @bpmnkit/cli",
-  "author": {
-    "name": "BPMNKit",
-    "url": "https://bpmnkit.com"
-  },
-  "homepage": "https://bpmnkit.com",
-  "repository": "https://github.com/bpmnkit/monorepo",
-  "license": "MIT",
-  "keywords": ["bpmn", "camunda", "workflow", "process-automation"],
-  "skills": "./skills/",
-  "agents": "./agents/",
-  "hooks": "./hooks/hooks.json",
-  "mcpServers": "./.mcp.json",
-  "userConfig": {
-    "camunda_endpoint": {
-      "description": "Camunda 8 REST API endpoint (optional, leave blank for local reebe)",
-      "sensitive": false
-    },
-    "camunda_token": {
-      "description": "Camunda 8 OAuth2 token (optional, leave blank for local reebe)",
-      "sensitive": true
-    }
-  }
+	"name": "bpmnkit",
+	"version": "0.1.0",
+	"description": "AI-first BPMN development and operations for Claude Code. Requires: npm install -g @bpmnkit/cli",
+	"author": {
+		"name": "BPMNKit",
+		"url": "https://bpmnkit.com"
+	},
+	"homepage": "https://bpmnkit.com",
+	"repository": "https://github.com/bpmnkit/monorepo",
+	"license": "MIT",
+	"keywords": ["bpmn", "camunda", "workflow", "process-automation"],
+	"skills": "./skills/",
+	"agents": "./agents/",
+	"hooks": "./hooks/hooks.json",
+	"mcpServers": "./.mcp.json",
+	"userConfig": {
+		"camunda_endpoint": {
+			"description": "Camunda 8 REST API endpoint (optional, leave blank for local reebe)",
+			"sensitive": false
+		},
+		"camunda_token": {
+			"description": "Camunda 8 OAuth2 token (optional, leave blank for local reebe)",
+			"sensitive": true
+		}
+	}
 }
