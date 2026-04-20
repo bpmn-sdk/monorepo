@@ -1,5 +1,11 @@
 # @bpmnkit/studio
 
+## 0.0.9
+
+### Patch Changes
+
+- [#85](https://github.com/bpmnkit/monorepo/pull/85) [`293d719`](https://github.com/bpmnkit/monorepo/commit/293d71928066dd7ad0d2399b2036ed2496447a8a) Thanks [@urbanisierung](https://github.com/urbanisierung)! - AI plugins
+
 ## 0.0.8
 
 ### Patch Changes
