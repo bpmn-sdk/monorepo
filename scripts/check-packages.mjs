@@ -32,7 +32,6 @@ const PUBLISHED = [
 	"packages/worker-client",
 	"apps/cli",
 	"apps/proxy",
-	"apps/reebe-wasm",
 	"plugins-cli/casen-report",
 	"plugins-cli/casen-worker-http",
 	"plugins-cli/casen-worker-ai",
