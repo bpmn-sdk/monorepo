@@ -1,5 +1,22 @@
 # @bpmnkit/studio
 
+## 0.0.11
+
+### Patch Changes
+
+- Updated dependencies [[`d576e97`](https://github.com/bpmnkit/monorepo/commit/d576e97736b9056c7e6c8cbac585957dc4cd297c)]:
+  - @bpmnkit/profiles@0.0.16
+  - @bpmnkit/operate@0.0.22
+  - @bpmnkit/plugins@0.0.25
+  - @bpmnkit/reebe-wasm@0.1.4
+  - @bpmnkit/canvas@0.0.22
+  - @bpmnkit/editor@0.0.25
+  - @bpmnkit/engine@0.1.22
+  - @bpmnkit/core@0.0.22
+  - @bpmnkit/api@0.0.18
+  - @bpmnkit/ui@0.0.14
+  - @bpmnkit/user-tasks@0.0.9
+
 ## 0.0.10
 
 ### Patch Changes

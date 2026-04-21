@@ -1,5 +1,14 @@
 # @bpmnkit/astro-shared
 
+## 0.0.12
+
+### Patch Changes
+
+- [#89](https://github.com/bpmnkit/monorepo/pull/89) [`d576e97`](https://github.com/bpmnkit/monorepo/commit/d576e97736b9056c7e6c8cbac585957dc4cd297c) Thanks [@urbanisierung](https://github.com/urbanisierung)! - docs
+
+- Updated dependencies [[`d576e97`](https://github.com/bpmnkit/monorepo/commit/d576e97736b9056c7e6c8cbac585957dc4cd297c)]:
+  - @bpmnkit/ui@0.0.14
+
 ## 0.0.11
 
 ### Patch Changes

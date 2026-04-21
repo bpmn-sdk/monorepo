@@ -1,5 +1,19 @@
 # @bpmnkit/plugins
 
+## 0.0.25
+
+### Patch Changes
+
+- [#89](https://github.com/bpmnkit/monorepo/pull/89) [`d576e97`](https://github.com/bpmnkit/monorepo/commit/d576e97736b9056c7e6c8cbac585957dc4cd297c) Thanks [@urbanisierung](https://github.com/urbanisierung)! - docs
+
+- Updated dependencies [[`d576e97`](https://github.com/bpmnkit/monorepo/commit/d576e97736b9056c7e6c8cbac585957dc4cd297c)]:
+  - @bpmnkit/connector-gen@0.0.13
+  - @bpmnkit/canvas@0.0.22
+  - @bpmnkit/editor@0.0.25
+  - @bpmnkit/ascii@0.0.22
+  - @bpmnkit/core@0.0.22
+  - @bpmnkit/feel@0.0.18
+
 ## 0.0.24
 
 ### Patch Changes

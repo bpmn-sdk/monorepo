@@ -1,5 +1,11 @@
 # @bpmnkit/casen-report
 
+## 0.1.6
+
+### Patch Changes
+
+- [#89](https://github.com/bpmnkit/monorepo/pull/89) [`d576e97`](https://github.com/bpmnkit/monorepo/commit/d576e97736b9056c7e6c8cbac585957dc4cd297c) Thanks [@urbanisierung](https://github.com/urbanisierung)! - docs
+
 ## 0.1.5
 
 ### Patch Changes

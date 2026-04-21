@@ -1,5 +1,11 @@
 # @bpmnkit/connector-gen
 
+## 0.0.13
+
+### Patch Changes
+
+- [#89](https://github.com/bpmnkit/monorepo/pull/89) [`d576e97`](https://github.com/bpmnkit/monorepo/commit/d576e97736b9056c7e6c8cbac585957dc4cd297c) Thanks [@urbanisierung](https://github.com/urbanisierung)! - docs
+
 ## 0.0.12
 
 ### Patch Changes
