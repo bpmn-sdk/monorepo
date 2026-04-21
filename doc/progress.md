@@ -1,5 +1,20 @@
 # Progress
 
+## 2026-04-21 — Feat: form_create + dmn_create MCP tools, /design skill, CLI install fix
+
+**`apps/proxy` — 2 new AIKit MCP tools:**
+- `form_create` — generates Camunda Form JSON for user tasks in a BPMN process
+- `dmn_create` — generates DMN decision tables for business rule tasks in a BPMN process
+
+**`apps/cli/skills/design.md` — new `/design` skill:**
+- Design-only workflow: generates BPMN + Camunda forms for user tasks + DMN tables for business rule tasks
+- No worker scaffolding, no deployment prompt
+
+**CLI install fixes:**
+- Moved `@bpmnkit/reebe-wasm` to `optionalDependencies` in `packages/engine` to prevent install failures on unsupported platforms
+- Fixed `@bpmnkit/reebe-wasm` `package.json` for correct npm publishing
+- Fixed docs with wrong install command (`casen` → `@bpmnkit/cli`)
+
 ## 2026-04-17 — Feat: Studio onboarding overhaul + Models folder bug fix
 
 **`apps/studio`:**

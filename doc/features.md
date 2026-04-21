@@ -39,6 +39,20 @@ Connects to the existing `aikit-mcp.js` server via `casen proxy mcp` (10 tools: 
 
 ---
 
+## AIKit MCP — `form_create` Tool (2026-04-21)
+
+Generates a Camunda Form JSON file for a user task in a BPMN process. Called by the `/design` skill and available directly via the AIKit MCP server.
+
+## AIKit MCP — `dmn_create` Tool (2026-04-21)
+
+Generates a DMN decision table XML file for a business rule task in a BPMN process. Called by the `/design` skill and available directly via the AIKit MCP server.
+
+## CLI Skill — `/design` (2026-04-21)
+
+Design-only workflow skill for Claude Code. Given a process description, generates the BPMN flow diagram, Camunda Form JSON for every user task, and DMN decision tables for every business rule task. Does not scaffold workers or prompt for deployment.
+
+Install with `casen skills install`.
+
 ## CLI — Start Proxy & Reebe from the CLI (2026-04-03)
 
 The `casen` CLI is now the single entry point for starting local infrastructure:

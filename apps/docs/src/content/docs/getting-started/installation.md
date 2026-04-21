@@ -55,7 +55,7 @@ pnpm add @bpmnkit/editor
 The `casen` CLI is a standalone tool — install it globally:
 
 ```sh
-pnpm add -g casen
+pnpm add -g @bpmnkit/cli
 ```
 
 With the CLI installed, you can use the AI-first workflow to implement processes from natural

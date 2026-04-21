@@ -30,6 +30,8 @@ import * as copilot from "./adapters/copilot.js"
 import * as gemini from "./adapters/gemini.js"
 import type { FindingInfo, ImproveContext } from "./prompt.js"
 import {
+	buildDmnCreateSystemPrompt,
+	buildFormCreateSystemPrompt,
 	buildImproveSystemPrompt,
 	buildImproveUserMessage,
 	buildIncidentSystemPrompt,
@@ -377,6 +379,80 @@ const server = http.createServer(async (req, res) => {
 		console.log(
 			`[server] /chat → adapter: ${detected.name}, action: ${action ?? "chat"}, mcp: ${detected.adapter.supportsMcp}`,
 		)
+
+		// ── create-form ───────────────────────────────────────────────────────────
+		if (action === "create-form") {
+			const taskDescription = messages[0]?.content ?? ""
+			const systemPrompt = buildFormCreateSystemPrompt("", taskDescription)
+			res.writeHead(200, {
+				"Content-Type": "text/event-stream",
+				"Cache-Control": "no-cache",
+				Connection: "keep-alive",
+			})
+			const accumulated: string[] = []
+			try {
+				await detected.adapter.stream(messages, systemPrompt, null, (token) => {
+					accumulated.push(token)
+					res.write(`data: ${JSON.stringify({ type: "token", text: token })}\n\n`)
+				})
+			} catch (err) {
+				const msg = err instanceof Error ? err.message : String(err)
+				console.error(`[server] create-form adapter error: ${msg}`)
+				res.write(`data: ${JSON.stringify({ type: "error", message: msg })}\n\n`)
+				res.end()
+				return
+			}
+			const fullText = accumulated.join("")
+			const jsonMatch = fullText.match(/```json\s*([\s\S]*?)```/)
+			if (jsonMatch) {
+				// biome-ignore lint/style/noNonNullAssertion: capture group 1 always present when match succeeds
+				const jsonString = jsonMatch[1]!.trim()
+				res.write(`data: ${JSON.stringify({ type: "json", json: jsonString })}\n\n`)
+			} else {
+				res.write(
+					`data: ${JSON.stringify({ type: "error", message: "AI did not produce a form JSON" })}\n\n`,
+				)
+			}
+			res.end()
+			return
+		}
+
+		// ── create-dmn ────────────────────────────────────────────────────────────
+		if (action === "create-dmn") {
+			const taskDescription = messages[0]?.content ?? ""
+			const systemPrompt = buildDmnCreateSystemPrompt("", taskDescription)
+			res.writeHead(200, {
+				"Content-Type": "text/event-stream",
+				"Cache-Control": "no-cache",
+				Connection: "keep-alive",
+			})
+			const accumulated: string[] = []
+			try {
+				await detected.adapter.stream(messages, systemPrompt, null, (token) => {
+					accumulated.push(token)
+					res.write(`data: ${JSON.stringify({ type: "token", text: token })}\n\n`)
+				})
+			} catch (err) {
+				const msg = err instanceof Error ? err.message : String(err)
+				console.error(`[server] create-dmn adapter error: ${msg}`)
+				res.write(`data: ${JSON.stringify({ type: "error", message: msg })}\n\n`)
+				res.end()
+				return
+			}
+			const fullText = accumulated.join("")
+			const xmlMatch = fullText.match(/```xml\s*([\s\S]*?)```/)
+			if (xmlMatch) {
+				// biome-ignore lint/style/noNonNullAssertion: capture group 1 always present when match succeeds
+				const xmlString = xmlMatch[1]!.trim()
+				res.write(`data: ${JSON.stringify({ type: "xml", xml: xmlString })}\n\n`)
+			} else {
+				res.write(
+					`data: ${JSON.stringify({ type: "error", message: "AI did not produce DMN XML" })}\n\n`,
+				)
+			}
+			res.end()
+			return
+		}
 
 		const currentCompact: CompactDiagram | null =
 			context !== null && typeof context === "object" && "processes" in context

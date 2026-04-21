@@ -382,6 +382,50 @@ export function buildImproveUserMessage(ctx: ImproveContext): string {
 	return lines.join("\n")
 }
 
+// ── Form / DMN creation prompt builders ──────────────────────────────────────
+
+export function buildFormCreateSystemPrompt(taskName: string, taskContext: string): string {
+	return [
+		"You are a Camunda Form expert.",
+		`Task name: ${taskName}`,
+		`Process context: ${taskContext}`,
+		"",
+		"Generate a Camunda Form JSON for this user task.",
+		"",
+		"Output format:",
+		"```json",
+		"{",
+		'  "id": "<formId>",',
+		'  "fields": [',
+		'    { "type": "...", "id": "...", "label": "...", "key": "...", "required": true }',
+		"  ]",
+		"}",
+		"```",
+		"",
+		'Valid field types: "textfield", "textarea", "number", "select" (add a values array), "checkbox", "datetime", "group" (contains nested fields).',
+		"Infer sensible fields from the task name and process context.",
+		"Return ONLY valid JSON inside a ```json code block — no explanation.",
+	].join("\n")
+}
+
+export function buildDmnCreateSystemPrompt(decisionId: string, taskContext: string): string {
+	return [
+		"You are a DMN expert.",
+		`Decision ID: ${decisionId}`,
+		`Process context: ${taskContext}`,
+		"",
+		"Generate a complete, valid DMN 1.3 decision table XML for this decision.",
+		"",
+		"Requirements:",
+		"- <definitions> with namespace https://www.omg.org/spec/DMN/20191111/MODEL/",
+		`- <decision id="${decisionId}"> containing a <decisionTable>`,
+		"- At least one input column, one output column, and one rule row.",
+		"",
+		"Infer sensible inputs and outputs from the decision ID and process context.",
+		"Return ONLY the DMN XML inside a ```xml code block — no explanation.",
+	].join("\n")
+}
+
 // ── Fallback prompt builders (for non-MCP adapters like Gemini) ───────────────
 
 /** Full system prompt for non-MCP adapters that must return a CompactDiagram JSON block. */

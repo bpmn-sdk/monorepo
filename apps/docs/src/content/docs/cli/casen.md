@@ -9,7 +9,7 @@ no flags to memorize.
 ## Installation
 
 ```sh
-pnpm add -g casen
+pnpm add -g @bpmnkit/cli
 ```
 
 ## Quick Start

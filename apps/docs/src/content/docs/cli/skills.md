@@ -157,6 +157,38 @@ Deploy a BPMN process to local reebe or Camunda 8.
 
 ---
 
+## `/design`
+
+Design a BPMN process — generates the flow diagram, Camunda forms for user tasks, and DMN decision tables for business rule tasks. No worker scaffolding, no deployment prompt.
+
+```
+/design an invoice approval process for accounts payable
+/design an employee onboarding workflow with manager approval and IT provisioning steps
+```
+
+**What it does:**
+
+1. Calls `bpmn_create` — generates the BPMN process diagram
+2. Calls `form_create` for each user task — generates Camunda Form JSON
+3. Calls `dmn_create` for each business rule task — generates DMN decision tables
+4. Presents a summary of all generated artifacts
+
+**Output:**
+```
+BPMN file: invoice-approval.bpmn
+
+Forms:
+  + created: invoice-approval-submit.form
+  + created: invoice-approval-review.form
+
+DMN tables:
+  + created: invoice-approval-amount-threshold.dmn
+
+No workers scaffolded. No deployment prompted.
+```
+
+---
+
 ## MCP server requirement
 
 The skills use the BPMNKit AIKit MCP server (`bpmn-aikit`) to call BPMNKit tools.
