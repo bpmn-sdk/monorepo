@@ -6,6 +6,7 @@
  *   bpmn_create, bpmn_read, bpmn_update, bpmn_validate, bpmn_deploy,
  *   bpmn_simulate, bpmn_run_history,
  *   worker_list, worker_scaffold,
+ *   form_create, dmn_create,
  *   pattern_list, pattern_get
  *
  * Usage:
@@ -20,7 +21,7 @@
 
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs"
 import { homedir } from "node:os"
-import { basename, join } from "node:path"
+import { basename, dirname, join } from "node:path"
 import { createInterface } from "node:readline"
 import { Bpmn, compactify, optimize } from "@bpmnkit/core"
 import { ALL_PATTERNS, findPattern } from "@bpmnkit/patterns"
@@ -53,7 +54,7 @@ function slugify(text: string): string {
 async function fetchProxyXml(
 	endpoint: string,
 	body: Record<string, unknown>,
-): Promise<{ xml: string | undefined; text: string }> {
+): Promise<{ xml: string | undefined; json: string | undefined; text: string }> {
 	let res: Response
 	try {
 		res = await fetch(`${PROXY_URL}${endpoint}`, {
@@ -73,6 +74,7 @@ async function fetchProxyXml(
 	const reader = res.body.getReader()
 	const decoder = new TextDecoder()
 	let xml: string | undefined
+	let json: string | undefined
 	let errorMsg: string | undefined
 	const tokens: string[] = []
 	let buffer = ""
@@ -90,11 +92,13 @@ async function fetchProxyXml(
 				const event = JSON.parse(trimmed.slice(6)) as {
 					type: string
 					xml?: string
+					json?: string
 					text?: string
 					message?: string
 				}
 				if (event.type === "token" && event.text) tokens.push(event.text)
 				if (event.type === "xml" && event.xml) xml = event.xml
+				if (event.type === "json" && event.json) json = event.json
 				if (event.type === "error") errorMsg = event.message
 			} catch {
 				/* skip malformed events */
@@ -103,7 +107,7 @@ async function fetchProxyXml(
 	}
 
 	if (errorMsg) throw new Error(errorMsg)
-	return { xml, text: tokens.join("") }
+	return { xml, json, text: tokens.join("") }
 }
 
 /** Write BPMN XML to disk and return the absolute path. */
@@ -635,6 +639,46 @@ function toolPatternList(): string {
 	return JSON.stringify({ patterns, total: patterns.length }, null, 2)
 }
 
+async function toolFormCreate(bpmnPath: string, outputDir?: string): Promise<string> {
+	const absPath = expandHome(bpmnPath)
+	if (!existsSync(absPath)) throw new Error(`File not found: ${bpmnPath}`)
+	const xml = readFileSync(absPath, "utf8")
+	const defs = Bpmn.parse(xml)
+	const compact = compactify(defs)
+
+	const userTasks = compact.processes
+		.flatMap((p) => p.elements)
+		.filter((el) => el.type === "userTask" && el.formId)
+
+	if (userTasks.length === 0) return JSON.stringify({ forms: [] })
+
+	const dir = outputDir ? expandHome(outputDir) : dirname(absPath)
+	if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
+
+	for (const el of userTasks) {
+		const { json } = await fetchProxyXml("/chat", {
+			messages: [
+				{
+					role: "user",
+					content: `User task: ${el.name ?? el.id}, formId: ${el.formId as string}, process: ${compact.processes[0]?.name ?? compact.processes[0]?.id ?? "unknown"}`,
+				},
+			],
+			action: "create-form",
+		})
+		if (!json) throw new Error(`AI did not produce a form for task ${el.id}`)
+		writeFileSync(join(dir, `${el.formId as string}.form`), json, "utf8")
+	}
+
+	return JSON.stringify({
+		forms: userTasks.map((el) => ({
+			taskId: el.id,
+			taskName: el.name ?? el.id,
+			formId: el.formId as string,
+			path: join(dir, `${el.formId as string}.form`),
+		})),
+	})
+}
+
 function toolPatternGet(domain: string): string {
 	const pattern = findPattern(domain) ?? ALL_PATTERNS.find((p) => p.id === domain)
 	if (!pattern)
@@ -656,6 +700,52 @@ function toolPatternGet(domain: string): string {
 		null,
 		2,
 	)
+}
+
+async function toolDmnCreate(bpmnPath: string, outputDir?: string): Promise<string> {
+	const absPath = expandHome(bpmnPath)
+	if (!existsSync(absPath)) throw new Error(`File not found: ${bpmnPath}`)
+
+	const xml = readFileSync(absPath, "utf8")
+	const defs = Bpmn.parse(xml)
+	const compact = compactify(defs)
+
+	const brtasks = compact.processes
+		.flatMap((p) => p.elements)
+		.filter(
+			(el): el is typeof el & { decisionId: string } =>
+				el.type === "businessRuleTask" && Boolean(el.decisionId),
+		)
+
+	if (brtasks.length === 0) return JSON.stringify({ decisions: [] })
+
+	const dir = outputDir ? expandHome(outputDir) : dirname(absPath)
+	if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
+
+	for (const el of brtasks) {
+		const { xml: dmnXml } = await fetchProxyXml("/chat", {
+			messages: [
+				{
+					role: "user",
+					content: `Decision: ${el.name ?? el.id}, decisionId: ${el.decisionId}, process: ${compact.processes[0]?.name ?? compact.processes[0]?.id ?? "unknown"}`,
+				},
+			],
+			action: "create-dmn",
+		})
+
+		if (!dmnXml) throw new Error(`AI did not produce DMN for task ${el.id}`)
+
+		writeFileSync(join(dir, `${el.decisionId}.dmn`), dmnXml, "utf8")
+	}
+
+	return JSON.stringify({
+		decisions: brtasks.map((el) => ({
+			taskId: el.id,
+			taskName: el.name ?? el.id,
+			decisionId: el.decisionId,
+			path: join(dir, `${el.decisionId}.dmn`),
+		})),
+	})
 }
 
 // ── Tool definitions ──────────────────────────────────────────────────────────
@@ -841,6 +931,46 @@ const TOOLS = [
 			required: ["domain"],
 		},
 	},
+	{
+		name: "form_create",
+		description:
+			"Generate Camunda form JSON files for all user tasks in a BPMN process that have a formId. " +
+			"Writes one .form file per user task into the output directory (default: same directory as the BPMN file).",
+		inputSchema: {
+			type: "object",
+			properties: {
+				bpmnPath: {
+					type: "string",
+					description: "Path to the BPMN file",
+				},
+				outputDir: {
+					type: "string",
+					description: "Directory to write form files (default: same directory as the BPMN file)",
+				},
+			},
+			required: ["bpmnPath"],
+		},
+	},
+	{
+		name: "dmn_create",
+		description:
+			"Generate DMN decision table XML files for all business rule tasks in a BPMN process that have a decisionId. " +
+			"Writes one .dmn file per business rule task into the output directory (default: same directory as the BPMN file).",
+		inputSchema: {
+			type: "object",
+			properties: {
+				bpmnPath: {
+					type: "string",
+					description: "Path to the BPMN file",
+				},
+				outputDir: {
+					type: "string",
+					description: "Directory to write DMN files (default: same directory as the BPMN file)",
+				},
+			},
+			required: ["bpmnPath"],
+		},
+	},
 ] as const
 
 // ── JSON-RPC 2.0 stdio loop ───────────────────────────────────────────────────
@@ -900,6 +1030,18 @@ async function callTool(name: string, args: Record<string, unknown>): Promise<st
 
 		case "pattern_get":
 			return toolPatternGet(args.domain as string)
+
+		case "form_create": {
+			const path = String(args.bpmnPath ?? "")
+			const outDir = args.outputDir ? String(args.outputDir) : undefined
+			return toolFormCreate(path, outDir)
+		}
+
+		case "dmn_create": {
+			const path = String(args.bpmnPath ?? "")
+			const outDir = args.outputDir ? String(args.outputDir) : undefined
+			return toolDmnCreate(path, outDir)
+		}
 
 		default:
 			throw new Error(`Unknown tool: ${name}`)
