@@ -2,6 +2,8 @@
 description: Analyse a BPMN process — check worker coverage and validation findings
 ---
 
+@.claude/aikit.md
+
 Analyse the BPMN process at the given path.
 
 ## File to test

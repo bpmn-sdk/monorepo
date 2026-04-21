@@ -2,6 +2,8 @@
 description: Implement a BPMN process end-to-end from a natural language description
 ---
 
+@.claude/aikit.md
+
 You are implementing a BPMN process end-to-end using BPMNKit AIKit tools. Work through these steps in order.
 
 ## Request
