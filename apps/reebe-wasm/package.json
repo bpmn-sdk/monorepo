@@ -1,6 +1,6 @@
 {
   "name": "@bpmnkit/reebe-wasm",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "type": "module",
   "main": "reebe_wasm.js",
   "types": "reebe_wasm.d.ts",
@@ -14,7 +14,13 @@
     "./snippets/*"
   ],
   "description": "WebAssembly playground for the Reebe BPMN workflow engine",
-  "keywords": ["bpmn", "wasm", "workflow", "engine", "webassembly"],
+  "keywords": [
+    "bpmn",
+    "wasm",
+    "workflow",
+    "engine",
+    "webassembly"
+  ],
   "license": "MIT",
   "repository": {
     "type": "git",

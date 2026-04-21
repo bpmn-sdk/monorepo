@@ -1,5 +1,15 @@
 # @bpmnkit/cli
 
+## 0.0.26
+
+### Patch Changes
+
+- [#87](https://github.com/bpmnkit/monorepo/pull/87) [`6b3748a`](https://github.com/bpmnkit/monorepo/commit/6b3748a8a6b5dfde418c06873ec4412c5db6cec2) Thanks [@urbanisierung](https://github.com/urbanisierung)! - AIKit extensions
+
+- Updated dependencies [[`6b3748a`](https://github.com/bpmnkit/monorepo/commit/6b3748a8a6b5dfde418c06873ec4412c5db6cec2)]:
+  - @bpmnkit/engine@0.1.21
+  - @bpmnkit/proxy@0.0.24
+
 ## 0.0.25
 
 ### Patch Changes

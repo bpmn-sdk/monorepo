@@ -1,5 +1,11 @@
 # @bpmnkit/ai-server
 
+## 0.0.24
+
+### Patch Changes
+
+- [#87](https://github.com/bpmnkit/monorepo/pull/87) [`6b3748a`](https://github.com/bpmnkit/monorepo/commit/6b3748a8a6b5dfde418c06873ec4412c5db6cec2) Thanks [@urbanisierung](https://github.com/urbanisierung)! - AIKit extensions
+
 ## 0.0.23
 
 ### Patch Changes
