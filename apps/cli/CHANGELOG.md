@@ -1,5 +1,20 @@
 # @bpmnkit/cli
 
+## 0.0.27
+
+### Patch Changes
+
+- [#89](https://github.com/bpmnkit/monorepo/pull/89) [`d576e97`](https://github.com/bpmnkit/monorepo/commit/d576e97736b9056c7e6c8cbac585957dc4cd297c) Thanks [@urbanisierung](https://github.com/urbanisierung)! - docs
+
+- Updated dependencies [[`d576e97`](https://github.com/bpmnkit/monorepo/commit/d576e97736b9056c7e6c8cbac585957dc4cd297c)]:
+  - @bpmnkit/connector-gen@0.0.13
+  - @bpmnkit/profiles@0.0.16
+  - @bpmnkit/engine@0.1.22
+  - @bpmnkit/ascii@0.0.22
+  - @bpmnkit/core@0.0.22
+  - @bpmnkit/api@0.0.18
+  - @bpmnkit/proxy@0.0.25
+
 ## 0.0.26
 
 ### Patch Changes
