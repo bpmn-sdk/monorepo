@@ -1,134 +1,86 @@
 <div align="center">
   <a href="https://bpmnkit.com"><img src="https://bpmnkit.com/favicon.svg" width="72" height="72" alt="BPMN Kit logo"></a>
-  <h1>@bpmnkit/cli-sdk</h1>
-  <p>Plugin authoring SDK for the casen CLI — types, contracts, and helpers</p>
+  <h1>@bpmnkit/reebe-wasm</h1>
+  <p>WebAssembly BPMN workflow engine — runs the Reebe engine in the browser</p>
 
-  [![npm](https://img.shields.io/npm/v/@bpmnkit/cli-sdk?style=flat-square&color=6244d7)](https://www.npmjs.com/package/@bpmnkit/cli-sdk)
-  [![license](https://img.shields.io/npm/l/@bpmnkit/cli-sdk?style=flat-square)](https://github.com/bpmnkit/monorepo/blob/main/LICENSE)
+  [![npm](https://img.shields.io/npm/v/@bpmnkit/reebe-wasm?style=flat-square&color=6244d7)](https://www.npmjs.com/package/@bpmnkit/reebe-wasm)
+  [![license](https://img.shields.io/npm/l/@bpmnkit/reebe-wasm?style=flat-square)](https://github.com/bpmnkit/monorepo/blob/main/LICENSE)
   [![typescript](https://img.shields.io/badge/TypeScript-strict-6244d7?style=flat-square&logo=typescript&logoColor=white)](https://github.com/bpmnkit/monorepo)
   [![ai-assisted](https://img.shields.io/badge/AI--assisted-claude-8b5cf6?style=flat-square)](https://github.com/bpmnkit/monorepo)
   [![experimental](https://img.shields.io/badge/status-experimental-f59e0b?style=flat-square)](https://github.com/bpmnkit/monorepo)
 
-  [Website](https://bpmnkit.com) · [Documentation](https://docs.bpmnkit.com) · [GitHub](https://github.com/bpmnkit/monorepo) · [Changelog](https://github.com/bpmnkit/monorepo/blob/main/packages/cli-sdk/CHANGELOG.md)
+  [Website](https://bpmnkit.com) · [Documentation](https://docs.bpmnkit.com) · [GitHub](https://github.com/bpmnkit/monorepo) · [Changelog](https://github.com/bpmnkit/monorepo/blob/main/apps/reebe-wasm/CHANGELOG.md)
 </div>
 
 ---
 
 ## Overview
 
-`@bpmnkit/cli-sdk` is the official SDK for building `casen` CLI plugins. It exports the `CasenPlugin` contract and all supporting types (`CommandGroup`, `Command`, `RunContext`, `OutputWriter`) so you can build typed, TUI-integrated plugins without depending on casen internals.
+`@bpmnkit/reebe-wasm` is the WebAssembly build of the [Reebe](https://github.com/bpmnkit/monorepo) BPMN workflow engine, compiled from Rust via [wasm-pack](https://rustwasm.github.io/wasm-pack/). It enables full BPMN 2.0 process execution directly in the browser — no server required.
+
+Used internally by `@bpmnkit/engine` for the `./wasm-runner` entry point, which powers the BPMNKit Studio simulator and the `casen test` CLI command.
+
+## Features
+
+- **Full BPMN execution** — gateways, events, subprocesses, boundary events
+- **Zero network calls** — runs entirely in the browser sandbox
+- **DMN decisions** — inline decision table evaluation
+- **FEEL expressions** — condition and mapping evaluation
+- **WebAssembly** — near-native performance, minimal footprint
 
 ## Installation
 
-Install as a `devDependency` in your plugin package:
-
 ```sh
-pnpm add -D @bpmnkit/cli-sdk
-npm install --save-dev @bpmnkit/cli-sdk
+npm install @bpmnkit/reebe-wasm
+pnpm add @bpmnkit/reebe-wasm
 ```
 
-## Quick Start
+> **Note:** This package is a WebAssembly binary. It requires a bundler with WASM support (Vite, Webpack 5+, or a modern Rollup config).
+
+## Usage
+
+Used automatically by `@bpmnkit/engine` when you import from the `./wasm-runner` subpath:
 
 ```typescript
-import type { CasenPlugin } from "@bpmnkit/cli-sdk"
+import { runScenarioWasm } from "@bpmnkit/engine/wasm-runner"
 
-const plugin: CasenPlugin = {
-  id: "com.example.casen-hello",
-  name: "Hello",
-  version: "0.1.0",
-  groups: [
-    {
-      name: "hello",
-      description: "Say hello",
-      commands: [
-        {
-          name: "world",
-          description: "Print a greeting",
-          async run(ctx) {
-            ctx.output.ok("Hello, world!")
-          },
-        },
-      ],
-    },
-  ],
-}
+const result = await runScenarioWasm(bpmnXml, scenario)
+```
 
-export default plugin
+For direct usage:
+
+```typescript
+import init, { WasmEngine } from "@bpmnkit/reebe-wasm"
+
+await init()
+
+const engine = new WasmEngine()
+engine.deploy(bpmnXml)
+const instance = engine.start_instance("my-process", JSON.stringify({ orderId: "123" }))
 ```
 
 ## API Reference
 
-### `CasenPlugin`
+### `WasmEngine`
 
-The top-level contract every plugin must export as its default export.
+| Method | Description |
+|--------|-------------|
+| `deploy(bpmnXml: string)` | Deploy a BPMN process definition |
+| `start_instance(processId, variablesJson)` | Start a new process instance |
+| `complete_job(key, variablesJson)` | Complete a service task job |
+| `fail_job(key, errorMessage, retries)` | Fail a service task job |
+| `get_snapshot()` | Return the current engine state as JSON |
 
-```typescript
-interface CasenPlugin {
-  /** Unique reverse-domain identifier, e.g. "com.acme.casen-deploy" */
-  id: string
-  /** Human-readable name shown in `casen plugin list` */
-  name: string
-  version: string
-  /** Command groups this plugin contributes to the CLI */
-  groups: CommandGroup[]
-}
+## Build from Source
+
+The WASM binary is compiled from the Rust crate at `apps/reebe/crates/reebe-wasm`:
+
+```sh
+# From apps/reebe/
+pnpm build:wasm
 ```
 
-### `CommandGroup`
-
-Maps to a single top-level token: `casen <group>`.
-
-```typescript
-interface CommandGroup {
-  name: string          // kebab-case, e.g. "my-integration"
-  aliases?: string[]
-  description: string
-  commands: Command[]
-}
-```
-
-### `Command`
-
-```typescript
-interface Command {
-  name: string
-  aliases?: string[]
-  description: string
-  args?: ArgSpec[]
-  flags?: FlagSpec[]
-  examples?: Example[]
-  run(ctx: RunContext): Promise<void>
-}
-```
-
-### `RunContext`
-
-Passed to every `run()` function.
-
-```typescript
-interface RunContext {
-  positional: string[]
-  flags: ParsedFlags
-  output: OutputWriter
-  /** Returns a Camunda C8 REST client. Cast to `CamundaClient` from `@bpmnkit/api`. */
-  getClient(): Promise<unknown>
-  getAdminClient(): Promise<unknown>
-}
-```
-
-### `OutputWriter`
-
-```typescript
-interface OutputWriter {
-  readonly format: "table" | "json" | "yaml"
-  readonly isInteractive: boolean
-  printList(data: unknown, columns: ColumnDef[]): void
-  printItem(data: unknown): void
-  print(data: unknown): void
-  ok(msg: string): void    // ✓ message
-  info(msg: string): void  // → message
-}
-```
+Requires [Rust](https://rustup.rs/) and [wasm-pack](https://rustwasm.github.io/wasm-pack/).
 
 ---
 
@@ -151,8 +103,8 @@ interface OutputWriter {
 | [`@bpmnkit/cli`](https://www.npmjs.com/package/@bpmnkit/cli) | Camunda 8 command-line interface (casen) |
 | [`@bpmnkit/proxy`](https://www.npmjs.com/package/@bpmnkit/proxy) | Local AI bridge and Camunda API proxy server |
 | [`@bpmnkit/patterns`](https://www.npmjs.com/package/@bpmnkit/patterns) | Domain process patterns for BPMNKit AIKit |
-| [`@bpmnkit/reebe-wasm`](https://www.npmjs.com/package/@bpmnkit/reebe-wasm) | WebAssembly BPMN engine for browser simulation |
 | [`@bpmnkit/worker-client`](https://www.npmjs.com/package/@bpmnkit/worker-client) | Thin Zeebe REST client for standalone workers |
+| [`@bpmnkit/cli-sdk`](https://www.npmjs.com/package/@bpmnkit/cli-sdk) | Plugin authoring SDK for the casen CLI |
 | [`@bpmnkit/create-casen-plugin`](https://www.npmjs.com/package/@bpmnkit/create-casen-plugin) | Scaffold a new casen CLI plugin in seconds |
 | [`@bpmnkit/casen-report`](https://www.npmjs.com/package/@bpmnkit/casen-report) | HTML reports from Camunda 8 incident and SLA data |
 | [`@bpmnkit/casen-worker-http`](https://www.npmjs.com/package/@bpmnkit/casen-worker-http) | Example HTTP worker plugin — completes jobs with live JSONPlaceholder API data |
