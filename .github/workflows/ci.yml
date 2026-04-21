@@ -38,7 +38,10 @@ jobs:
           version: latest
 
       - name: Build reebe-wasm
-        run: wasm-pack build apps/reebe/crates/reebe-wasm --target web --out-dir "$GITHUB_WORKSPACE/apps/reebe-wasm"
+        run: |
+          WASM_VERSION=$(node -p "require('./apps/reebe-wasm/package.json').version")
+          wasm-pack build apps/reebe/crates/reebe-wasm --target web --scope bpmnkit --out-dir "$GITHUB_WORKSPACE/apps/reebe-wasm"
+          node scripts/patch-wasm-pkg.mjs "$WASM_VERSION"
 
       - name: Build
         run: pnpm build

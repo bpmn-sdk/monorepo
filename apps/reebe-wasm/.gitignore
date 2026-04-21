@@ -1,1 +1,5 @@
 *
+!.gitignore
+!README.md
+!LICENSE
+!package.json
