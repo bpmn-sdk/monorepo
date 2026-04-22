@@ -1,5 +1,15 @@
 # @bpmnkit/user-tasks
 
+## 0.0.9
+
+### Patch Changes
+
+- Updated dependencies [[`d576e97`](https://github.com/bpmnkit/monorepo/commit/d576e97736b9056c7e6c8cbac585957dc4cd297c)]:
+  - @bpmnkit/plugins@0.0.25
+  - @bpmnkit/core@0.0.22
+  - @bpmnkit/api@0.0.18
+  - @bpmnkit/ui@0.0.14
+
 ## 0.0.8
 
 ### Patch Changes

@@ -1,5 +1,18 @@
 # @bpmnkit/operate
 
+## 0.0.22
+
+### Patch Changes
+
+- [#89](https://github.com/bpmnkit/monorepo/pull/89) [`d576e97`](https://github.com/bpmnkit/monorepo/commit/d576e97736b9056c7e6c8cbac585957dc4cd297c) Thanks [@urbanisierung](https://github.com/urbanisierung)! - docs
+
+- Updated dependencies [[`d576e97`](https://github.com/bpmnkit/monorepo/commit/d576e97736b9056c7e6c8cbac585957dc4cd297c)]:
+  - @bpmnkit/plugins@0.0.25
+  - @bpmnkit/canvas@0.0.22
+  - @bpmnkit/core@0.0.22
+  - @bpmnkit/api@0.0.18
+  - @bpmnkit/ui@0.0.14
+
 ## 0.0.21
 
 ### Patch Changes

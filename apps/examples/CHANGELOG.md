@@ -1,5 +1,12 @@
 # @bpmnkit/examples
 
+## 0.0.22
+
+### Patch Changes
+
+- Updated dependencies [[`d576e97`](https://github.com/bpmnkit/monorepo/commit/d576e97736b9056c7e6c8cbac585957dc4cd297c)]:
+  - @bpmnkit/core@0.0.22
+
 ## 0.0.21
 
 ### Patch Changes

@@ -1,5 +1,17 @@
 # @bpmnkit/ai-server
 
+## 0.0.25
+
+### Patch Changes
+
+- [#89](https://github.com/bpmnkit/monorepo/pull/89) [`d576e97`](https://github.com/bpmnkit/monorepo/commit/d576e97736b9056c7e6c8cbac585957dc4cd297c) Thanks [@urbanisierung](https://github.com/urbanisierung)! - docs
+
+- Updated dependencies [[`d576e97`](https://github.com/bpmnkit/monorepo/commit/d576e97736b9056c7e6c8cbac585957dc4cd297c)]:
+  - @bpmnkit/patterns@0.0.3
+  - @bpmnkit/profiles@0.0.16
+  - @bpmnkit/core@0.0.22
+  - @bpmnkit/api@0.0.18
+
 ## 0.0.24
 
 ### Patch Changes

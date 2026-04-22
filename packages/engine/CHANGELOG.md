@@ -1,5 +1,15 @@
 # @bpmnkit/engine
 
+## 0.1.22
+
+### Patch Changes
+
+- [#89](https://github.com/bpmnkit/monorepo/pull/89) [`d576e97`](https://github.com/bpmnkit/monorepo/commit/d576e97736b9056c7e6c8cbac585957dc4cd297c) Thanks [@urbanisierung](https://github.com/urbanisierung)! - docs
+
+- Updated dependencies [[`d576e97`](https://github.com/bpmnkit/monorepo/commit/d576e97736b9056c7e6c8cbac585957dc4cd297c)]:
+  - @bpmnkit/core@0.0.22
+  - @bpmnkit/feel@0.0.18
+
 ## 0.1.21
 
 ### Patch Changes
