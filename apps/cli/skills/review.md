@@ -2,6 +2,8 @@
 description: Review a BPMN file and report findings with severity and fix suggestions
 ---
 
+@.claude/aikit.md
+
 Review the BPMN file at the given path using BPMNKit's pattern advisor.
 
 ## File to review

@@ -6,7 +6,9 @@ import type { Command, CommandGroup } from "../types.js"
 /**
  * Install BPMNKit AIKit skills into `.claude/commands/` in the current project.
  * Skills are markdown prompt files that Claude Code executes as slash commands:
- *   /implement, /review, /test, /deploy
+ *   /design, /implement, /review, /test, /deploy
+ *
+ * Also installs aikit.md into .claude/ as a shared tool reference.
  */
 const skillsInstallCmd: Command = {
 	name: "install",
@@ -31,28 +33,48 @@ const skillsInstallCmd: Command = {
 	async run(ctx) {
 		const force = ctx.flags.force === true
 
-		// Locate the bundled skills directory relative to this binary
-		// Installed layout: dist/index.js → ../skills/<name>.md
+		// Locate the bundled skills directory relative to this file.
+		// Installed layout: dist/commands/skills.js → ../../skills/<name>.md
 		const binDir = fileURLToPath(new URL(".", import.meta.url))
-		const skillsSrc = join(binDir, "..", "skills")
+		const skillsSrc = join(binDir, "..", "..", "skills")
 
 		if (!existsSync(skillsSrc)) {
 			throw new Error(`Bundled skills directory not found at: ${skillsSrc}`)
 		}
 
-		const skillFiles = readdirSync(skillsSrc).filter((f) => f.endsWith(".md"))
-		if (skillFiles.length === 0) {
+		const allFiles = readdirSync(skillsSrc).filter((f) => f.endsWith(".md"))
+		if (allFiles.length === 0) {
 			throw new Error("No skill files found in bundled skills directory")
 		}
 
-		const destDir = join(process.cwd(), ".claude", "commands")
-		mkdirSync(destDir, { recursive: true })
+		// aikit.md goes to .claude/ as a shared reference; everything else is a slash command
+		const REFERENCE_FILE = "aikit.md"
+		const skillFiles = allFiles.filter((f) => f !== REFERENCE_FILE)
+
+		const claudeDir = join(process.cwd(), ".claude")
+		const commandsDir = join(claudeDir, "commands")
+		mkdirSync(commandsDir, { recursive: true })
 
 		let installed = 0
 		let skipped = 0
 
+		// Install the tool reference to .claude/aikit.md
+		const refSrc = join(skillsSrc, REFERENCE_FILE)
+		const refDest = join(claudeDir, REFERENCE_FILE)
+		if (existsSync(refSrc)) {
+			if (existsSync(refDest) && !force) {
+				ctx.output.info(`  skip  ${REFERENCE_FILE} (already exists — use --force to overwrite)`)
+				skipped++
+			} else {
+				writeFileSync(refDest, readFileSync(refSrc, "utf8"), "utf8")
+				ctx.output.ok(`  wrote .claude/${REFERENCE_FILE}`)
+				installed++
+			}
+		}
+
+		// Install slash command skills to .claude/commands/
 		for (const file of skillFiles) {
-			const dest = join(destDir, file)
+			const dest = join(commandsDir, file)
 			if (existsSync(dest) && !force) {
 				ctx.output.info(`  skip  ${file} (already exists — use --force to overwrite)`)
 				skipped++
@@ -60,13 +82,13 @@ const skillsInstallCmd: Command = {
 			}
 			const content = readFileSync(join(skillsSrc, file), "utf8")
 			writeFileSync(dest, content, "utf8")
-			ctx.output.ok(`  wrote ${file}`)
+			ctx.output.ok(`  wrote .claude/commands/${file}`)
 			installed++
 		}
 
 		ctx.output.info("")
 		ctx.output.ok(
-			`Installed ${installed} skill(s)${skipped > 0 ? `, skipped ${skipped}` : ""} → .claude/commands/`,
+			`Installed ${installed} file(s)${skipped > 0 ? `, skipped ${skipped}` : ""} → .claude/`,
 		)
 		ctx.output.info("")
 		ctx.output.info("Available slash commands in Claude Code:")

@@ -2,6 +2,8 @@
 description: Design a BPMN process — flow, forms, and decision tables. No workers, no deployment.
 ---
 
+@.claude/aikit.md
+
 You are designing a BPMN process using BPMNKit AIKit tools. Work through these steps in order.
 
 ## Request

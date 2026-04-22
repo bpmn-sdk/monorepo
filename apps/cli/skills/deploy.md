@@ -2,6 +2,8 @@
 description: Deploy a BPMN process to local reebe or Camunda 8
 ---
 
+@.claude/aikit.md
+
 Deploy the BPMN process at the given path.
 
 ## File to deploy
