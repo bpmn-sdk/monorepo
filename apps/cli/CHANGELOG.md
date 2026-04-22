@@ -1,5 +1,11 @@
 # @bpmnkit/cli
 
+## 0.0.28
+
+### Patch Changes
+
+- [#91](https://github.com/bpmnkit/monorepo/pull/91) [`1e90536`](https://github.com/bpmnkit/monorepo/commit/1e905362cb60fab2e03e0eafbe399eabcb0c80f0) Thanks [@urbanisierung](https://github.com/urbanisierung)! - AI Kit
+
 ## 0.0.27
 
 ### Patch Changes
