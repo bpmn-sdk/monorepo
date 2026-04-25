@@ -24,6 +24,21 @@ The main menu appears. Use ↑ ↓ to navigate, Enter to select, Escape to go ba
 
 ```
 casen
+├── generate        — generate or modify BPMN files without the TUI
+│   └── bpmn        — templates, CompactDiagram JSON, or patch existing files
+├── view            — view BPMN, DMN, and form files in the browser
+│   ├── open        — any mix of .bpmn/.dmn/.form files or folders (auto-detect)
+│   ├── bpmn        — BPMN diagrams rendered as SVG
+│   ├── dmn         — DMN decision tables
+│   └── form        — Camunda form layouts
+├── lint            — static analysis and auto-fix for BPMN files
+│   ├── lint        — run all checks, report findings
+│   └── improve     — AI-assisted improvement suggestions
+├── story           — render a BPMN process as a narrative HTML page
+├── ask             — ask an AI assistant about your process or cluster
+├── connector       — generate element templates from OpenAPI specs
+│   ├── generate    — generate templates from a spec file or catalog entry
+│   └── catalog     — list built-in catalog entries
 ├── profile         — manage connection profiles
 │   ├── list        — show all profiles
 │   ├── add         — create a new profile
@@ -48,6 +63,10 @@ casen
 │   └── update      — set a variable value
 ├── message
 │   └── publish     — publish a message for correlation
+├── worker          — run job workers
+│   ├── <job-type>  — auto-complete worker for a job type
+│   └── start       — start scaffolded workers from ./workers/
+├── proxy           — start the local AI bridge server
 └── plugin          — manage CLI plugins
     ├── search      — discover plugins on npm
     ├── install     — install a plugin from npm or a local path
@@ -56,6 +75,31 @@ casen
     ├── remove      — uninstall a plugin
     └── info        — show details for an installed plugin
 ```
+
+## Generate BPMN files
+
+`casen generate bpmn` creates BPMN files from the command line — no interactive menu required.
+Choose a built-in template, supply a full CompactDiagram JSON definition, or patch an existing file.
+
+```sh
+casen generate bpmn --template approval --process-id leave-request
+casen generate bpmn --input order.bpmn --dump-compact   # inspect as JSON for AI
+casen generate bpmn --input order.bpmn --patch '{"elements":[...],"flows":[...]}'
+```
+
+See [casen generate](/cli/generate/) for full documentation.
+
+## View BPMN, DMN, and Form files
+
+`casen view` opens a local browser-based viewer. Accepts individual files, folders, or a mix.
+
+```sh
+casen view bpmn ./processes/     # all .bpmn files in a folder
+casen view dmn routing.dmn       # DMN decision table
+casen view open ./project/       # any mix of .bpmn/.dmn/.form
+```
+
+See [casen view](/cli/view/) for full documentation.
 
 ## Connection Profiles
 

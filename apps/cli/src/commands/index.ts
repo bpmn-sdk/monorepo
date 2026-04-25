@@ -19,6 +19,7 @@ import {
 } from "./bpmn.js"
 import { completionGroup } from "./completion.js"
 import { connectorGroup } from "./connector.js"
+import { generateGroup } from "./generate.js"
 import { lintGroup } from "./lint.js"
 import { pluginGroup } from "./plugin.js"
 import { profileGroup } from "./profile.js"
@@ -29,6 +30,7 @@ import { settingsGroup } from "./settings.js"
 import { skillsGroup } from "./skills.js"
 import { storyGroup } from "./story.js"
 import { testGroup } from "./test.js"
+import { viewGroup } from "./view.js"
 import { workerStartCmd } from "./worker-start.js"
 import { workerCmd } from "./worker.js"
 
@@ -75,6 +77,7 @@ const workerGroup: CommandGroup = {
 /** Pinned groups shown above the separator in the main TUI menu. */
 export const pinnedGroups: CommandGroup[] = [
 	askGroup,
+	generateGroup,
 	lintGroup,
 	proxyGroup,
 	reebeGroup,
@@ -82,6 +85,7 @@ export const pinnedGroups: CommandGroup[] = [
 	storyGroup,
 	settingsGroup,
 	testGroup,
+	viewGroup,
 	workerGroup,
 ]
 
