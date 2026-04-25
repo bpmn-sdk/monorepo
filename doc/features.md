@@ -1,5 +1,147 @@
 # Features
 
+## CLI — `casen generate` and `casen view` (2026-04-25)
+
+### `casen generate bpmn` — Generate BPMN files from parameters or JSON
+
+Two input modes:
+
+**Template mode** — predefined patterns:
+```sh
+casen generate bpmn --template minimal --process-id order --name "Order Processing"
+casen generate bpmn --template approval --process-id leave-request
+casen generate bpmn --template parallel --process-id enrichment
+casen generate bpmn --template error-boundary --process-id resilient-job
+casen generate bpmn --template event-subprocess --process-id with-error-handler
+casen generate bpmn --template timer-start --process-id nightly-sync
+casen generate bpmn --template message-start --process-id message-driven
+```
+
+**Definition mode** — full control via CompactDiagram JSON (AI path):
+```sh
+# Pass JSON inline
+casen generate bpmn --definition '{"id":"Defs","processes":[...]}'
+
+# Pipe from AI output or file
+echo '{"id":"Defs","processes":[...]}' | casen generate bpmn --output my-process.bpmn
+
+# Print the full JSON schema reference
+casen generate bpmn --help-schema
+```
+
+**Templates** (auto-layout applied to all):
+
+| Template | Pattern |
+|---|---|
+| `empty` | Start event only |
+| `minimal` | Start → service task → end |
+| `user-task` | Start → user task → end |
+| `call-activity` | Start → call activity → end |
+| `business-rule` | Start → business rule task → end |
+| `approval` | Start → user task → XOR gateway → approve/reject paths |
+| `parallel` | Start → parallel fork → 2 tasks → join → end |
+| `inclusive` | Start → inclusive gateway → 2 conditional tasks → merge → end |
+| `timer-start` | Timer start event → service task → end |
+| `message-start` | Message start event → service task → end |
+| `error-boundary` | Service task with error boundary → two end events |
+| `subprocess` | Start → sub-process (with inner flow) → end |
+| `event-subprocess` | Process with non-interrupting error event sub-process |
+
+**All flags:**
+
+| Flag | Short | Description | Default |
+|---|---|---|---|
+| `--process-id` | `-i` | Process ID (template mode) | `process` |
+| `--name` | `-n` | Process display name (template mode) | — |
+| `--output` | `-o` | Output path (`-` for stdout) | `<process-id>.bpmn` |
+| `--template` | | Template name | `minimal` |
+| `--definition` | `-d` | CompactDiagram JSON string | — |
+| `--help-schema` | | Print JSON schema reference and exit | — |
+| `--input` | `-f` | Existing .bpmn file to modify | — |
+| `--patch` | | Patch JSON `{elements:[...],flows:[...]}` to add to `--input` | — |
+| `--dump-compact` | | Print compact JSON of `--input` for AI inspection | — |
+
+**Modifying existing files** (`--input` mode):
+
+```sh
+# Step 1 — inspect existing file as compact JSON (AI reads this to learn element IDs)
+casen generate bpmn --input order.bpmn --dump-compact
+
+# Step 2 — add a new path to an existing gateway
+casen generate bpmn --input order.bpmn \
+  --patch '{"elements":[{"id":"notify","type":"serviceTask","name":"Notify","jobType":"notify-worker"},{"id":"end-notify","type":"endEvent","name":"Notified"}],"flows":[{"id":"fn1","from":"gw","to":"notify","condition":"= urgent"},{"id":"fn2","from":"notify","to":"end-notify"}]}'
+
+# Or pipe the patch from AI
+echo '{...}' | casen generate bpmn --input order.bpmn
+
+# Re-apply auto-layout without changes (normalize positions)
+casen generate bpmn --input messy.bpmn --output clean.bpmn
+```
+
+Patch mode targets the first process in the file. The patch JSON is `{elements:[...], flows:[...]}` where flows can reference existing element IDs already in the file.
+
+**CompactDiagram JSON schema** (shown by `--help-schema`):
+
+The `--definition` flag and stdin accept a `CompactDiagram` JSON object — the same compact format used internally by the AI improvement tools. It supports all 23 BPMN element types, all event definition types, boundary events, sub-processes, and Zeebe extensions (job type, task headers, form references, decision references).
+
+---
+
+### `casen view` — View BPMN, DMN, and Form files in the browser
+
+Spawns a local HTTP server (default port 3044) and opens the system browser. All renderers work server-side — no dependencies required in the browser.
+
+**Subcommands:**
+
+| Command | Input | Rendering |
+|---|---|---|
+| `casen view open <paths>` | Any mix of .bpmn/.dmn/.form files or folders | Auto-detects by extension |
+| `casen view bpmn <paths>` | .bpmn files or folders | SVG (via `exportSvg`) |
+| `casen view dmn <paths>` | .dmn files or folders | ASCII table (monospace) |
+| `casen view form <paths>` | .form files or folders | ASCII layout (monospace) |
+
+**Folder support:** Pass a directory path — all matching files are scanned and each gets its own tab.
+
+```sh
+# View a single BPMN file
+casen view bpmn process.bpmn
+
+# View all .bpmn files in a folder
+casen view bpmn ./processes/
+
+# View multiple specific files with tabs
+casen view bpmn order.bpmn payment.bpmn
+
+# View a DMN decision table
+casen view dmn eligibility.dmn
+
+# View all DMN files in a folder
+casen view dmn ./decisions/
+
+# View a Camunda form
+casen view form approval.form
+
+# View any mix of types (auto-detect)
+casen view open ./project/
+
+# Mixed explicit files
+casen view open order.bpmn routing.dmn review.form
+
+# Dark theme, custom port, no auto-open
+casen view bpmn process.bpmn --theme dark --port 8080 --no-open
+```
+
+**Flags (all subcommands):**
+
+| Flag | Description | Default |
+|---|---|---|
+| `--port` | Local server port | `3044` |
+| `--theme` | `light` or `dark` | `light` |
+| `--no-open` | Do not open browser automatically | false |
+
+Press `Ctrl+C` in the terminal to stop the server.
+
+---
+
 ## Claude Code Plugin — `/plugin install bpmnkit` (2026-04-17)
 
 A Claude Code plugin that makes Claude AI-first for BPMN workflows. Install once, works automatically.

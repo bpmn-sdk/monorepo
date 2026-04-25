@@ -1,5 +1,31 @@
 # Progress
 
+## 2026-04-25 — Feat: CLI `generate bpmn` (all element types + AI path) and `view` (BPMN/DMN/Form, folder support)
+
+**`apps/cli/src/commands/generate.ts` — `generate bpmn` extended with modify-existing mode:**
+- `--input <file>` loads an existing BPMN and compactifies it
+- `--dump-compact` prints the CompactDiagram JSON of the input file for AI inspection and exits
+- `--patch <json>` appends `{elements:[...], flows:[...]}` to the first process; re-applies auto-layout; defaults to overwriting the input file
+- Piped stdin when `--input` is provided is interpreted as a patch (not a full CompactDiagram)
+- `--input` without `--patch` normalizes/re-lays-out the file; `--output` controls destination
+
+**`apps/cli/src/commands/generate.ts` — `generate bpmn` command, fully rewritten:**
+- 13 templates covering all major BPMN patterns: `empty`, `minimal`, `user-task`, `call-activity`, `business-rule`, `approval`, `parallel`, `inclusive`, `timer-start`, `message-start`, `error-boundary`, `subprocess`, `event-subprocess`
+- All templates use `CompactDiagram` → `expand()` internally (Sugiyama auto-layout applied)
+- `--definition <json>` accepts a full `CompactDiagram` JSON string — covers all 23 BPMN element types, all event types, boundary events, sub-processes, Zeebe extensions
+- Stdin mode: when stdin is not a TTY and `--definition` is absent, reads `CompactDiagram` JSON from stdin (pipe-friendly AI path)
+- `--help-schema` prints the complete JSON schema reference with examples and exits — designed for AI introspection
+- `--output -` writes XML to stdout
+
+**`apps/cli/src/commands/view.ts` — `view` command group, fully rewritten:**
+- 4 subcommands: `open` (auto-detect), `bpmn`, `dmn`, `form`
+- Folder support: directory paths are scanned top-level for matching extensions; all matched files get individual tabs
+- BPMN: renders SVG server-side via `exportSvg()` from `@bpmnkit/core`
+- DMN: renders ASCII decision table via `renderDmnAscii()` from `@bpmnkit/ascii`; displayed in styled `<pre>` with monospace font
+- Form: renders ASCII form layout via `renderFormAscii()` from `@bpmnkit/ascii`; same treatment
+- HTML page updated: tabs carry `data-type` attribute; CSS scoped to `.panel[data-type="bpmn"]` vs dmn/form
+- `--theme light|dark`, `--port`, `--no-open` flags on all subcommands
+
 ## 2026-04-21 — Feat: form_create + dmn_create MCP tools, /design skill, CLI install fix
 
 **`apps/proxy` — 2 new AIKit MCP tools:**
