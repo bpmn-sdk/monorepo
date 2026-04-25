@@ -1,5 +1,11 @@
 # @bpmnkit/docs
 
+## 0.0.9
+
+### Patch Changes
+
+- [#93](https://github.com/bpmnkit/monorepo/pull/93) [`b7f6b1f`](https://github.com/bpmnkit/monorepo/commit/b7f6b1f8190c3d3be7439f832146169c26c25ae1) Thanks [@urbanisierung](https://github.com/urbanisierung)! - CLI: generate and view
+
 ## 0.0.8
 
 ### Patch Changes
