@@ -16,6 +16,7 @@ const POOL_GAP = 30
 const CHAIN_GAP = 30
 const CHAIN_V_GAP = 20
 const ANN_H = 50
+const ANN_GAP = 40
 
 /**
  * Reposition boundary events to the bottom edge of their host task, then walk
@@ -145,12 +146,12 @@ function repositionBoundaryEvents(flowElements: BpmnFlowElement[], result: Layou
 	}
 }
 
-function contentBbox(nodes: LayoutNode[]): {
-	minX: number
-	minY: number
-	maxX: number
-	maxY: number
-} {
+type LocalBounds = { x: number; y: number; width: number; height: number }
+
+function contentBbox(
+	nodes: LayoutNode[],
+	extra?: Iterable<LocalBounds>,
+): { minX: number; minY: number; maxX: number; maxY: number } {
 	let minX = Number.POSITIVE_INFINITY
 	let minY = Number.POSITIVE_INFINITY
 	let maxX = Number.NEGATIVE_INFINITY
@@ -167,7 +168,52 @@ function contentBbox(nodes: LayoutNode[]): {
 			maxY = Math.max(maxY, n.labelBounds.y + n.labelBounds.height)
 		}
 	}
+	if (extra) {
+		for (const b of extra) {
+			minX = Math.min(minX, b.x)
+			minY = Math.min(minY, b.y)
+			maxX = Math.max(maxX, b.x + b.width)
+			maxY = Math.max(maxY, b.y + b.height)
+		}
+	}
 	return { minX, minY, maxX, maxY }
+}
+
+/** Pre-compute annotation positions in layout space (before dx/dy shift). */
+function computeAnnotationLocalBounds(
+	process: BpmnProcess,
+	layoutNodes: LayoutNode[],
+): Map<string, LocalBounds> {
+	const nodeById = new Map(layoutNodes.map((n) => [n.id, n]))
+	const placements = new Map<string, LocalBounds>()
+
+	for (const ta of process.textAnnotations) {
+		const assoc = process.associations.find((a) => a.sourceRef === ta.id || a.targetRef === ta.id)
+		const connId = assoc
+			? assoc.sourceRef === ta.id
+				? assoc.targetRef
+				: assoc.sourceRef
+			: undefined
+		const connNode = connId ? nodeById.get(connId) : undefined
+
+		const annW = Math.min(200, Math.max(100, (ta.text?.length ?? 10) * 5))
+		let localX: number
+		let localY: number
+
+		if (connNode) {
+			// Place below connected element with gap
+			localX = connNode.bounds.x + connNode.bounds.width / 2 - annW / 2
+			localY = connNode.bounds.y + connNode.bounds.height + ANN_GAP
+		} else {
+			// No connection: top-left of layout space (shifted by dx/dy later)
+			localX = 0
+			localY = 0
+		}
+
+		placements.set(ta.id, { x: localX, y: localY, width: annW, height: ANN_H })
+	}
+
+	return placements
 }
 
 function nodeToShape(node: LayoutNode, dx: number, dy: number): BpmnDiShape {
@@ -275,6 +321,7 @@ function buildLaneShapes(
 function addAnnotationShapes(
 	process: BpmnProcess,
 	layoutNodes: LayoutNode[],
+	annLocalBounds: Map<string, LocalBounds>,
 	allShapes: BpmnDiShape[],
 	allEdges: BpmnDiEdge[],
 	dx: number,
@@ -283,67 +330,65 @@ function addAnnotationShapes(
 	if (process.textAnnotations.length === 0 && process.associations.length === 0) return
 
 	const nodeById = new Map(layoutNodes.map((n) => [n.id, n]))
-	const annLocalBounds = new Map<string, { x: number; y: number; width: number; height: number }>()
 
 	for (const ta of process.textAnnotations) {
-		const assoc = process.associations.find((a) => a.sourceRef === ta.id || a.targetRef === ta.id)
-		const connId = assoc
-			? assoc.sourceRef === ta.id
-				? assoc.targetRef
-				: assoc.sourceRef
-			: undefined
-		const connNode = connId ? nodeById.get(connId) : undefined
-
-		const annW = Math.min(200, Math.max(100, (ta.text?.length ?? 10) * 5))
-		let localX: number
-		let localY: number
-
-		if (connNode) {
-			localX = connNode.bounds.x + connNode.bounds.width / 2 - annW / 2
-			localY = connNode.bounds.y - ANN_H - 20
-		} else {
-			localX = 20 - dx
-			localY = 20 - dy
-		}
-
+		const b = annLocalBounds.get(ta.id)
+		if (!b) continue
 		allShapes.push({
 			id: `${ta.id}_di`,
 			bpmnElement: ta.id,
 			bounds: {
-				x: Math.round(localX + dx),
-				y: Math.round(localY + dy),
-				width: annW,
-				height: ANN_H,
+				x: Math.round(b.x + dx),
+				y: Math.round(b.y + dy),
+				width: b.width,
+				height: b.height,
 			},
 			unknownAttributes: {},
 		})
-		annLocalBounds.set(ta.id, { x: localX, y: localY, width: annW, height: ANN_H })
 	}
 
 	for (const assoc of process.associations) {
-		const srcNode = nodeById.get(assoc.sourceRef)
-		const srcAnn = annLocalBounds.get(assoc.sourceRef)
-		const tgtNode = nodeById.get(assoc.targetRef)
-		const tgtAnn = annLocalBounds.get(assoc.targetRef)
+		const annId = annLocalBounds.has(assoc.sourceRef)
+			? assoc.sourceRef
+			: annLocalBounds.has(assoc.targetRef)
+				? assoc.targetRef
+				: undefined
+		const elId = annId === assoc.sourceRef ? assoc.targetRef : assoc.sourceRef
 
-		const srcLocalB = srcNode?.bounds ?? (srcAnn ? srcAnn : undefined)
-		const tgtLocalB = tgtNode?.bounds ?? (tgtAnn ? tgtAnn : undefined)
+		const annB = annId ? annLocalBounds.get(annId) : undefined
+		const elNode = nodeById.get(elId)
 
-		if (!srcLocalB || !tgtLocalB) continue
+		if (!annB || !elNode) continue
+
+		const elB = elNode.bounds
+		const annCx = Math.round(annB.x + annB.width / 2 + dx)
+		const elCx = Math.round(elB.x + elB.width / 2 + dx)
+
+		let waypoints: Array<{ x: number; y: number }>
+		if (annB.y >= elB.y + elB.height) {
+			// annotation below: element bottom-center → annotation top-center
+			waypoints = [
+				{ x: elCx, y: Math.round(elB.y + elB.height + dy) },
+				{ x: annCx, y: Math.round(annB.y + dy) },
+			]
+		} else if (annB.y + annB.height <= elB.y) {
+			// annotation above: element top-center → annotation bottom-center
+			waypoints = [
+				{ x: elCx, y: Math.round(elB.y + dy) },
+				{ x: annCx, y: Math.round(annB.y + annB.height + dy) },
+			]
+		} else {
+			// side-by-side: center-to-center
+			waypoints = [
+				{ x: Math.round(elB.x + elB.width / 2 + dx), y: Math.round(elB.y + elB.height / 2 + dy) },
+				{ x: annCx, y: Math.round(annB.y + annB.height / 2 + dy) },
+			]
+		}
 
 		allEdges.push({
 			id: `${assoc.id}_di`,
 			bpmnElement: assoc.id,
-			waypoints: [
-				{
-					x: Math.round(srcLocalB.x + srcLocalB.width / 2 + dx),
-					y: Math.round(srcLocalB.y + srcLocalB.height / 2 + dy),
-				},
-				{
-					x: Math.round(tgtLocalB.x + tgtLocalB.width / 2 + dx),
-					y: Math.round(tgtLocalB.y + tgtLocalB.height / 2 + dy),
-				},
-			],
+			waypoints,
 			unknownAttributes: {},
 		})
 	}
@@ -387,7 +432,10 @@ export function applyAutoLayout(defs: BpmnDefinitions): BpmnDefinitions {
 
 		if (result.nodes.length === 0) continue
 
-		const { minX, minY, maxX, maxY } = contentBbox(result.nodes)
+		// Pre-compute annotation positions in layout space so they're included in the bbox
+		const annBounds = computeAnnotationLocalBounds(process, result.nodes)
+
+		const { minX, minY, maxX, maxY } = contentBbox(result.nodes, annBounds.values())
 		const contentW = maxX - minX
 		const contentH = maxY - minY
 
@@ -405,7 +453,7 @@ export function applyAutoLayout(defs: BpmnDefinitions): BpmnDefinitions {
 
 		for (const node of result.nodes) allShapes.push(nodeToShape(node, dx, dy))
 		for (const edge of result.edges) allEdges.push(edgeToShape(edge, dx, dy))
-		addAnnotationShapes(process, result.nodes, allShapes, allEdges, dx, dy)
+		addAnnotationShapes(process, result.nodes, annBounds, allShapes, allEdges, dx, dy)
 
 		if (participantId) {
 			const innerW = (hasLanes ? LANE_HEADER : 0) + contentW + 2 * PADDING
