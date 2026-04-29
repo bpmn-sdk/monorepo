@@ -1,5 +1,25 @@
 # Progress
 
+## 2026-04-29 — Fix: Auto-layout boundary events, gateway bypass overlap, and block layout centering
+
+**`packages/core/src/bpmn/auto-layout.ts`** — boundary event post-processing:
+- New `repositionBoundaryEvents()` helper called after `layoutProcess`
+- Repositions each boundary event to the bottom edge of its host task (evenly spaced when multiple)
+- Walks the exclusive downstream chain (nodes reachable only from the boundary event) and positions them in a horizontal line to the right of the host task
+- Re-routes all edges: boundary event → chain uses down-then-right orthogonal routing; within-chain uses straight horizontal edges
+- Fixes issue where boundary events and their flows were placed at the start of the diagram
+
+**`packages/core/src/layout/coordinates.ts`** — `findBaselinePath` fix:
+- Removed inner if/else that routed the baseline through the task-bearing branch when a direct bypass edge exists
+- Baseline now always jumps to the join gateway; task-bearing branches are off-baseline and distributed by `distributeSplitBranches`
+- Fixes gateway-to-gateway bypass+task overlap where task and bypass edge shared center-Y
+
+**`packages/core/src/layout/block-layout.ts`** — empty branch effective height:
+- Empty branches (height=0, representing direct bypass edges) now use `Math.max(branch.height, V_GAP)` as effective height in totalBranchH and branchY advancement
+- Prevents subsequent task branches from being positioned where the direct edge routes through them
+
+**All 336 tests pass; zero lint/type errors.**
+
 ## 2026-04-29 — Feat: Block-based BPMN auto-layout (Hierarchical Bounding-Box Routing)
 
 **`packages/core/src/layout/block-builder.ts`** — new file:

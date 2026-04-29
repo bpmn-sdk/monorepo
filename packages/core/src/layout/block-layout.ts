@@ -66,8 +66,10 @@ function sizeBlock(block: FlowBlock): void {
 
 		block.width = block.split.width + H_GAP + block.branchColumnWidth + H_GAP + block.join.width
 
+		// Empty branches (height=0) represent direct bypass edges and need a minimum
+		// lane height so subsequent task branches don't overlap the direct edge routing.
 		const totalBranchH =
-			block.branches.reduce((sum, b) => sum + b.height, 0) +
+			block.branches.reduce((sum, b) => sum + Math.max(b.height, V_GAP), 0) +
 			Math.max(0, block.branches.length - 1) * V_GAP
 
 		block.height = Math.max(totalBranchH, block.split.height, block.join.height)
@@ -107,8 +109,9 @@ function positionBlock(block: FlowBlock, x: number, y: number): void {
 		let branchY = y + (block.height - totalBranchH) / 2
 
 		for (const branch of block.branches) {
-			positionBlock(branch, branchX, branchY)
-			branchY += branch.height + V_GAP
+			const effectiveH = Math.max(branch.height, V_GAP)
+			positionBlock(branch, branchX, branchY + (effectiveH - branch.height) / 2)
+			branchY += effectiveH + V_GAP
 		}
 	}
 }

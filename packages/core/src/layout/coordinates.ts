@@ -574,18 +574,10 @@ export function findBaselinePath(
 					// True split gateway: find join and jump to it
 					const joinId = findJoinGateway(currentId, dag, nodeMap)
 					if (joinId) {
-						// If the join is a direct successor (bypass edge exists), follow the longer
-						// task-bearing branch instead of jumping over it. This keeps task nodes on
-						// the baseline so they stay flat (same y as the gateways).
-						if (trueSuccs.includes(joinId)) {
-							const nonBypass = trueSuccs.filter((s) => s !== joinId)
-							currentId =
-								nonBypass.length === 1
-									? nonBypass[0]
-									: (findContinuationSuccessor(nonBypass, dag, nodeMap, visited) ?? joinId)
-						} else {
-							currentId = joinId
-						}
+						// Always jump directly to the join gateway. Task-bearing branches are
+						// off-baseline and distributed by distributeSplitBranches, so the direct
+						// bypass edge never routes through task nodes.
+						currentId = joinId
 					} else {
 						currentId = findContinuationSuccessor(trueSuccs, dag, nodeMap, visited)
 					}
