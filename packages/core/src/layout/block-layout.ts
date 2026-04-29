@@ -5,7 +5,7 @@ import type { Bounds, LayoutNode } from "./types.js"
 import { GRID_CELL_WIDTH } from "./types.js"
 
 const H_GAP = 50
-const V_GAP = 60
+const V_GAP = 80
 const OUTER_PADDING = 40
 
 /** Compute label bounds for a laid-out block node (same logic as coordinates.ts). */
@@ -37,6 +37,12 @@ function computeLabelBoundsForBlock(
 		default:
 			return undefined
 	}
+}
+
+function countBlockNodes(block: FlowBlock): number {
+	if (block.kind === "node") return 1
+	if (block.kind === "sequence") return block.items.reduce((s, b) => s + countBlockNodes(b), 0)
+	return 2 + block.branches.reduce((s, b) => s + countBlockNodes(b), 0)
 }
 
 /** Size a block bottom-up: sets width/height on all blocks in the tree. */
@@ -99,6 +105,23 @@ function positionBlock(block: FlowBlock, x: number, y: number): void {
 		const joinX = x + block.width - block.join.width
 		const joinY = y + block.height / 2 - block.join.height / 2
 		positionBlock(block.join, joinX, joinY)
+
+		// Reorder branches: heaviest (most nodes) at center, alternating above/below
+		const sortedBySize = [...block.branches].sort((a, b) => countBlockNodes(b) - countBlockNodes(a))
+		const bc = block.branches.length
+		const orderedBranches = new Array<SequenceBlock>(bc)
+		const bm = Math.floor((bc - 1) / 2)
+		// biome-ignore lint/style/noNonNullAssertion: sortedBySize is non-empty (bc >= 1)
+		orderedBranches[bm] = sortedBySize[0]!
+		let ba = bm - 1
+		let bb = bm + 1
+		for (let si = 1; si < bc; ) {
+			// biome-ignore lint/style/noNonNullAssertion: si < bc ensures element exists
+			if (bb < bc && si < bc) orderedBranches[bb++] = sortedBySize[si++]!
+			// biome-ignore lint/style/noNonNullAssertion: si < bc ensures element exists
+			if (ba >= 0 && si < bc) orderedBranches[ba--] = sortedBySize[si++]!
+		}
+		block.branches = orderedBranches
 
 		// Branches stacked top-to-bottom, centered vertically
 		const totalBranchH =

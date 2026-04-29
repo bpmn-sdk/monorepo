@@ -25,6 +25,7 @@ import type {
 	BpmnParticipant,
 	BpmnProcess,
 	BpmnSequenceFlow,
+	BpmnSignal,
 	BpmnTextAnnotation,
 } from "./bpmn-model.js"
 
@@ -582,6 +583,13 @@ function parseMessage(element: XmlElement): BpmnMessage {
 	}
 }
 
+function parseSignal(element: XmlElement): BpmnSignal {
+	return {
+		id: requiredAttr(element, "id"),
+		name: attr(element, "name"),
+	}
+}
+
 // ---------------------------------------------------------------------------
 // Diagram interchange
 // ---------------------------------------------------------------------------
@@ -701,6 +709,7 @@ export function parseBpmn(xml: string): BpmnDefinitions {
 	const errors: BpmnError[] = []
 	const escalations: BpmnEscalation[] = []
 	const messages: BpmnMessage[] = []
+	const signals: BpmnSignal[] = []
 	const collaborations: BpmnCollaboration[] = []
 	const processes: BpmnProcess[] = []
 	const diagrams: BpmnDiagram[] = []
@@ -710,6 +719,7 @@ export function parseBpmn(xml: string): BpmnDefinitions {
 		if (ln === "error") errors.push(parseError(child))
 		else if (ln === "escalation") escalations.push(parseEscalation(child))
 		else if (ln === "message") messages.push(parseMessage(child))
+		else if (ln === "signal") signals.push(parseSignal(child))
 		else if (ln === "collaboration") collaborations.push(parseCollaboration(child))
 		else if (ln === "process") processes.push(parseProcess(child))
 		else if (ln === "BPMNDiagram") diagrams.push(parseDiagram(child))
@@ -725,6 +735,7 @@ export function parseBpmn(xml: string): BpmnDefinitions {
 		errors,
 		escalations,
 		messages,
+		signals,
 		collaborations,
 		processes,
 		diagrams,

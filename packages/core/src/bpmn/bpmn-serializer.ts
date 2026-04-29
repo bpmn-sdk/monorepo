@@ -21,6 +21,7 @@ import type {
 	BpmnParticipant,
 	BpmnProcess,
 	BpmnSequenceFlow,
+	BpmnSignal,
 	BpmnTextAnnotation,
 } from "./bpmn-model.js"
 
@@ -468,6 +469,12 @@ function serializeMessage(m: BpmnMessage, bp: string): XmlElement {
 	return el(`${bp}:message`, attrs, [])
 }
 
+function serializeSignal(s: BpmnSignal, bp: string): XmlElement {
+	const attrs: Record<string, string> = { id: s.id }
+	if (s.name !== undefined) attrs.name = s.name
+	return el(`${bp}:signal`, attrs, [])
+}
+
 // ---------------------------------------------------------------------------
 // Diagram interchange
 // ---------------------------------------------------------------------------
@@ -607,7 +614,7 @@ export function serializeBpmn(definitions: BpmnDefinitions): string {
 
 	const children: XmlElement[] = []
 
-	// Root elements: errors, escalations, messages first
+	// Root elements: errors, escalations, messages, signals first
 	for (const e of definitions.escalations) {
 		children.push(serializeEscalation(e, bp))
 	}
@@ -616,6 +623,9 @@ export function serializeBpmn(definitions: BpmnDefinitions): string {
 	}
 	for (const m of definitions.messages) {
 		children.push(serializeMessage(m, bp))
+	}
+	for (const s of definitions.signals) {
+		children.push(serializeSignal(s, bp))
 	}
 
 	// Collaborations

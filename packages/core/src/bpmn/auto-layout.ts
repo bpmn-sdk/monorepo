@@ -6,6 +6,7 @@ import type {
 	BpmnDiShape,
 	BpmnFlowElement,
 	BpmnLane,
+	BpmnProcess,
 } from "./bpmn-model.js"
 
 const POOL_HEADER = 30
@@ -13,6 +14,8 @@ const LANE_HEADER = 30
 const PADDING = 20
 const POOL_GAP = 30
 const CHAIN_GAP = 30
+const CHAIN_V_GAP = 20
+const ANN_H = 50
 
 /**
  * Reposition boundary events to the bottom edge of their host task, then walk
@@ -82,10 +85,18 @@ function repositionBoundaryEvents(flowElements: BpmnFlowElement[], result: Layou
 				}
 			}
 
-			// Position chain nodes in a horizontal line starting after host task right edge
-			const chainStartX =
-				Math.max(beNode.bounds.x + bW, hostNode.bounds.x + hostNode.bounds.width) + CHAIN_GAP
-			const chainCenterY = beNode.bounds.y + Math.round(bH / 2)
+			// Find tallest chain element to compute center Y below boundary event
+			let maxChainH = 0
+			for (const id of chainOrder) {
+				const n = nodeById.get(id)
+				if (n) maxChainH = Math.max(maxChainH, n.bounds.height)
+			}
+			// Place chain below boundary event bottom so edge goes down-then-right
+			const chainCenterY = Math.round(beNode.bounds.y + bH + CHAIN_V_GAP + maxChainH / 2)
+			const chainStartX = Math.max(
+				Math.round(beNode.bounds.x + bW / 2) + CHAIN_GAP,
+				hostNode.bounds.x + hostNode.bounds.width + CHAIN_GAP,
+			)
 			let curX = chainStartX
 
 			for (const id of chainOrder) {
@@ -261,6 +272,83 @@ function buildLaneShapes(
 	}))
 }
 
+function addAnnotationShapes(
+	process: BpmnProcess,
+	layoutNodes: LayoutNode[],
+	allShapes: BpmnDiShape[],
+	allEdges: BpmnDiEdge[],
+	dx: number,
+	dy: number,
+): void {
+	if (process.textAnnotations.length === 0 && process.associations.length === 0) return
+
+	const nodeById = new Map(layoutNodes.map((n) => [n.id, n]))
+	const annLocalBounds = new Map<string, { x: number; y: number; width: number; height: number }>()
+
+	for (const ta of process.textAnnotations) {
+		const assoc = process.associations.find((a) => a.sourceRef === ta.id || a.targetRef === ta.id)
+		const connId = assoc
+			? assoc.sourceRef === ta.id
+				? assoc.targetRef
+				: assoc.sourceRef
+			: undefined
+		const connNode = connId ? nodeById.get(connId) : undefined
+
+		const annW = Math.min(200, Math.max(100, (ta.text?.length ?? 10) * 5))
+		let localX: number
+		let localY: number
+
+		if (connNode) {
+			localX = connNode.bounds.x + connNode.bounds.width / 2 - annW / 2
+			localY = connNode.bounds.y - ANN_H - 20
+		} else {
+			localX = 20 - dx
+			localY = 20 - dy
+		}
+
+		allShapes.push({
+			id: `${ta.id}_di`,
+			bpmnElement: ta.id,
+			bounds: {
+				x: Math.round(localX + dx),
+				y: Math.round(localY + dy),
+				width: annW,
+				height: ANN_H,
+			},
+			unknownAttributes: {},
+		})
+		annLocalBounds.set(ta.id, { x: localX, y: localY, width: annW, height: ANN_H })
+	}
+
+	for (const assoc of process.associations) {
+		const srcNode = nodeById.get(assoc.sourceRef)
+		const srcAnn = annLocalBounds.get(assoc.sourceRef)
+		const tgtNode = nodeById.get(assoc.targetRef)
+		const tgtAnn = annLocalBounds.get(assoc.targetRef)
+
+		const srcLocalB = srcNode?.bounds ?? (srcAnn ? srcAnn : undefined)
+		const tgtLocalB = tgtNode?.bounds ?? (tgtAnn ? tgtAnn : undefined)
+
+		if (!srcLocalB || !tgtLocalB) continue
+
+		allEdges.push({
+			id: `${assoc.id}_di`,
+			bpmnElement: assoc.id,
+			waypoints: [
+				{
+					x: Math.round(srcLocalB.x + srcLocalB.width / 2 + dx),
+					y: Math.round(srcLocalB.y + srcLocalB.height / 2 + dy),
+				},
+				{
+					x: Math.round(tgtLocalB.x + tgtLocalB.width / 2 + dx),
+					y: Math.round(tgtLocalB.y + tgtLocalB.height / 2 + dy),
+				},
+			],
+			unknownAttributes: {},
+		})
+	}
+}
+
 /**
  * Apply auto-layout to all processes in a BpmnDefinitions, replacing the
  * diagram interchange (BPMNDi) with freshly computed positions.
@@ -303,23 +391,27 @@ export function applyAutoLayout(defs: BpmnDefinitions): BpmnDefinitions {
 		const contentW = maxX - minX
 		const contentH = maxY - minY
 
+		let dx: number
+		let dy: number
 		if (participantId) {
-			// Elements sit inside pool content area:
-			// x starts at: POOL_HEADER + optional LANE_HEADER + PADDING
-			// y starts at: poolY + PADDING
 			const elemX = POOL_HEADER + (hasLanes ? LANE_HEADER : 0) + PADDING
 			const elemY = poolY + PADDING
-			const dx = elemX - minX
-			const dy = elemY - minY
+			dx = elemX - minX
+			dy = elemY - minY
+		} else {
+			dx = PADDING - minX
+			dy = PADDING - minY
+		}
 
-			for (const node of result.nodes) allShapes.push(nodeToShape(node, dx, dy))
-			for (const edge of result.edges) allEdges.push(edgeToShape(edge, dx, dy))
+		for (const node of result.nodes) allShapes.push(nodeToShape(node, dx, dy))
+		for (const edge of result.edges) allEdges.push(edgeToShape(edge, dx, dy))
+		addAnnotationShapes(process, result.nodes, allShapes, allEdges, dx, dy)
 
+		if (participantId) {
 			const innerW = (hasLanes ? LANE_HEADER : 0) + contentW + 2 * PADDING
 			const innerH = contentH + 2 * PADDING
 			const poolW = POOL_HEADER + innerW
 
-			// Pool (participant) shape
 			allShapes.push({
 				id: `${participantId}_di`,
 				bpmnElement: participantId,
@@ -343,12 +435,6 @@ export function applyAutoLayout(defs: BpmnDefinitions): BpmnDefinitions {
 			}
 
 			poolY += innerH + POOL_GAP
-		} else {
-			// No collaboration — layout at (PADDING, PADDING)
-			const dx = PADDING - minX
-			const dy = PADDING - minY
-			for (const node of result.nodes) allShapes.push(nodeToShape(node, dx, dy))
-			for (const edge of result.edges) allEdges.push(edgeToShape(edge, dx, dy))
 		}
 	}
 

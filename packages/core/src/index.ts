@@ -96,6 +96,7 @@ export type {
 	BpmnError,
 	BpmnEscalation,
 	BpmnMessage,
+	BpmnSignal,
 	BpmnTextAnnotation,
 	BpmnAssociation,
 	BpmnConditionExpression,

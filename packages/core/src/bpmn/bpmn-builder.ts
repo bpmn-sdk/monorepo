@@ -1469,6 +1469,7 @@ export class ProcessBuilder {
 			errors: this.rootErrors,
 			escalations: [],
 			messages: this.rootMessages,
+			signals: [],
 			collaborations: [],
 			processes: [process],
 			diagrams: this._autoLayout ? [this.buildDiagram(process)] : [],

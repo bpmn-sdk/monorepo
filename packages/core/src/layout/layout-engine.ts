@@ -158,6 +158,9 @@ function sugiyamaLayout(
 	// Phase 4f: Distribute split gateway branches symmetrically
 	distributeSplitBranches(layoutNodes, dag, backEdges)
 
+	// Re-align split/join pairs that may have been separated during branch distribution
+	alignSplitJoinPairs(layoutNodes, dag, backEdges)
+
 	// Phase 4g: Resolve any layer overlaps from redistribution
 	resolveLayerOverlaps(layoutNodes)
 

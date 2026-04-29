@@ -709,25 +709,38 @@ export function distributeSplitBranches(
 		splitGateways.push({ node: n, succs: trueSuccs, branchStarts, joinId })
 	}
 
-	// Pass 1: multi-branch gateways (distribute symmetrically)
+	// Pass 1: multi-branch gateways (distribute symmetrically, heaviest branch at center)
 	for (const { node: n, branchStarts, joinId } of splitGateways) {
 		if (branchStarts.length < 2) continue
 
 		const gatewayCY = n.bounds.y + n.bounds.height / 2
 
-		branchStarts.sort((a, b) => {
-			const na = nodeMap.get(a)
-			const nb = nodeMap.get(b)
-			if (!na || !nb) return 0
-			return na.bounds.y + na.bounds.height / 2 - (nb.bounds.y + nb.bounds.height / 2)
-		})
+		// Sort by chain length DESC so the heaviest branch goes to the center position
+		const sorted = [...branchStarts].sort(
+			(a, b) =>
+				collectBranchChain(b, dag, joinId).length - collectBranchChain(a, dag, joinId).length,
+		)
 
-		const count = branchStarts.length
-		const spacing = GRID_CELL_HEIGHT
+		// Assign positions center-first: heaviest at median, then below, then above alternating
+		const count = sorted.length
+		const positioned = new Array<string>(count)
+		const m = Math.floor((count - 1) / 2)
+		// biome-ignore lint/style/noNonNullAssertion: sorted is non-empty (count >= 2)
+		positioned[m] = sorted[0]!
+		let above = m - 1
+		let below = m + 1
+		for (let si = 1; si < count; ) {
+			// biome-ignore lint/style/noNonNullAssertion: si < count ensures element exists
+			if (below < count && si < count) positioned[below++] = sorted[si++]!
+			// biome-ignore lint/style/noNonNullAssertion: si < count ensures element exists
+			if (above >= 0 && si < count) positioned[above--] = sorted[si++]!
+		}
+
+		const spacing = Math.round(GRID_CELL_HEIGHT * 1.5)
 		const startOffset = -((count - 1) / 2) * spacing
 
 		for (let i = 0; i < count; i++) {
-			const branchId = branchStarts[i]
+			const branchId = positioned[i]
 			if (!branchId) continue
 			const branchNode = nodeMap.get(branchId)
 			if (!branchNode) continue
