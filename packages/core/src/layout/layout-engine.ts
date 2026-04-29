@@ -1,4 +1,6 @@
 import type { BpmnFlowElement, BpmnProcess, BpmnSequenceFlow } from "../bpmn/bpmn-model.js"
+import { buildBlockTree } from "./block-builder.js"
+import { applyBlockLayout } from "./block-layout.js"
 import {
 	alignBaselinePath,
 	alignBranchBaselines,
@@ -15,6 +17,7 @@ import { assertNoOverlap } from "./overlap.js"
 import { routeEdges } from "./routing.js"
 import { layoutSubProcesses } from "./subprocess.js"
 import type { LayoutNode, LayoutResult, SubProcessChildResult } from "./types.js"
+
 /**
  * Auto-layout a BPMN process using the Sugiyama/layered algorithm.
  *
@@ -56,6 +59,80 @@ export function layoutFlowNodes(
 	const backEdges = detectBackEdges(graph, sequenceFlows)
 	const dag = backEdges.length > 0 ? reverseBackEdges(graph, backEdges) : graph
 
+	// Phase 2: Try block-based layout (primary path for structured processes)
+	// Block layout only works well for processes without back-edges (loops).
+	let layoutNodes: LayoutNode[]
+	const blockTree = backEdges.length === 0 ? buildBlockTree(dag, nodeIndex) : null
+	const usedBlockLayout = blockTree !== null
+
+	if (blockTree) {
+		layoutNodes = applyBlockLayout(blockTree, nodeIndex)
+	} else {
+		layoutNodes = sugiyamaLayout(dag, nodeIndex, backEdges)
+	}
+
+	// Phase 5: Sub-process layout — expand containers and lay out children
+	const childResults = layoutSubProcesses(layoutNodes, nodeIndex)
+
+	// After subprocess expansion, push nodes that now overlap with expanded containers.
+	// For block layout, assign unique layer indices first so resolveLayerOverlaps works
+	// correctly (block layout nodes all start at layer=0).
+	if (usedBlockLayout && childResults.length > 0) {
+		// Assign each block-layout node a unique layer so overlap resolution doesn't
+		// collapse them all into the same bucket and push them vertically apart.
+		for (let idx = 0; idx < layoutNodes.length; idx++) {
+			const n = layoutNodes[idx]
+			if (n) n.layer = idx
+		}
+	}
+
+	resolveSubProcessOverlaps(layoutNodes)
+
+	// Phase 5b: Resolve Y-direction overlaps caused by subprocess expansion.
+	// Expanded subprocesses grow in-place and can overlap same-layer siblings.
+	// For block layout without subprocesses, skip this — overlaps are impossible by construction.
+	if (!usedBlockLayout || childResults.length > 0) {
+		resolveLayerOverlaps(layoutNodes)
+	}
+
+	// Phase 5c: Sync child positions to their subprocess containers.
+	// resolveLayerOverlaps (including its Y-normalization pass) may have shifted
+	// subprocess containers after their children were already translated to
+	// absolute coordinates — children must follow.
+	syncSubProcessChildren(childResults, layoutNodes)
+
+	// Phase 6: Edge routing (uses original back-edges for routing, not reversed)
+	const nodeMap = new Map<string, LayoutNode>()
+	for (const node of layoutNodes) {
+		nodeMap.set(node.id, node)
+	}
+
+	const edges = routeEdges(sequenceFlows, nodeMap, backEdges)
+
+	// Flatten child results into the main layout
+	const allNodes = [...layoutNodes]
+	const allEdges = [...edges]
+	for (const child of childResults) {
+		for (const cn of child.result.nodes) {
+			allNodes.push(cn)
+		}
+		for (const ce of child.result.edges) {
+			allEdges.push(ce)
+		}
+	}
+
+	return { nodes: allNodes, edges: allEdges }
+}
+
+/**
+ * Run the Sugiyama layered layout pipeline.
+ * Used as fallback for unstructured or loop-containing processes.
+ */
+function sugiyamaLayout(
+	dag: ReturnType<typeof buildGraph>,
+	nodeIndex: Map<string, BpmnFlowElement>,
+	backEdges: ReturnType<typeof detectBackEdges>,
+): LayoutNode[] {
 	// Phase 2: Layer assignment
 	const layers = assignLayers(dag)
 
@@ -92,43 +169,7 @@ export function layoutFlowNodes(
 	// an overlap that resolveLayerOverlaps already fixed; one more pass eliminates these.
 	resolveLayerOverlaps(layoutNodes)
 
-	// Phase 5: Sub-process layout — expand containers and lay out children
-	const childResults = layoutSubProcesses(layoutNodes, nodeIndex)
-
-	// After subprocess expansion, push nodes that now overlap with expanded containers
-	resolveSubProcessOverlaps(layoutNodes)
-
-	// Phase 5b: Resolve Y-direction overlaps caused by subprocess expansion.
-	// Expanded subprocesses grow in-place and can overlap same-layer siblings.
-	resolveLayerOverlaps(layoutNodes)
-
-	// Phase 5c: Sync child positions to their subprocess containers.
-	// resolveLayerOverlaps (including its Y-normalization pass) may have shifted
-	// subprocess containers after their children were already translated to
-	// absolute coordinates — children must follow.
-	syncSubProcessChildren(childResults, layoutNodes)
-
-	// Phase 6: Edge routing (uses original back-edges for routing, not reversed)
-	const nodeMap = new Map<string, LayoutNode>()
-	for (const node of layoutNodes) {
-		nodeMap.set(node.id, node)
-	}
-
-	const edges = routeEdges(sequenceFlows, nodeMap, backEdges)
-
-	// Flatten child results into the main layout
-	const allNodes = [...layoutNodes]
-	const allEdges = [...edges]
-	for (const child of childResults) {
-		for (const cn of child.result.nodes) {
-			allNodes.push(cn)
-		}
-		for (const ce of child.result.edges) {
-			allEdges.push(ce)
-		}
-	}
-
-	return { nodes: allNodes, edges: allEdges }
+	return layoutNodes
 }
 
 /**

@@ -1,4 +1,8 @@
 export { layoutProcess, layoutFlowNodes } from "./layout-engine.js"
+export { buildBlockTree } from "./block-builder.js"
+export type { FlowBlock, GatewayBlock, NodeBlock, SequenceBlock } from "./block-builder.js"
+export { applyBlockLayout } from "./block-layout.js"
+export { routeEdgeAstar } from "./astar.js"
 export {
 	benchmarkLayout,
 	compareLayouts,

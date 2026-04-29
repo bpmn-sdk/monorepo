@@ -1,5 +1,33 @@
 # Progress
 
+## 2026-04-29 — Feat: Block-based BPMN auto-layout (Hierarchical Bounding-Box Routing)
+
+**`packages/core/src/layout/block-builder.ts`** — new file:
+- Builds a hierarchical block tree from the normalized DAG using topological order
+- Depth-counter scan matches split gateways (outDegree≥2) to their join gateways (inDegree≥2)
+- BFS collects branch nodes per successor; recursively builds nested gateway blocks
+- Only gateway types trigger split/join detection (checked against `GATEWAY_TYPES` set including `complexGateway`)
+- Returns `null` for unstructured processes → Sugiyama fallback
+
+**`packages/core/src/layout/block-layout.ts`** — new file:
+- Bottom-up sizing: `NodeBlock` = `ELEMENT_SIZES[type]`; `SequenceBlock` = sum(widths) + gaps; `GatewayBlock` = split + branches + join
+- Top-down positioning: sequence items centered vertically (H_GAP=50); branches stacked top-to-bottom (V_GAP=60); split/join gateways centered on gateway block midpoint
+- Flatten to `LayoutNode[]` with label bounds computed same as existing coordinates.ts logic
+
+**`packages/core/src/layout/astar.ts`** — new file:
+- Grid-based A* (GRID_RES=10px) with inline binary min-heap
+- Direction-aware state: turning penalty (TURN_PENALTY=5) prefers straight paths
+- Obstacle inflation by 6px; canvas extended 80px beyond element bounds
+- Path simplification removes collinear intermediate waypoints
+- Available for future integration; current routing still uses existing `routeEdges`
+
+**`packages/core/src/layout/layout-engine.ts`** — modified:
+- Block layout attempted first for processes without back-edges
+- `buildBlockTree` + `applyBlockLayout` replace the 7-phase Sugiyama coordinate pipeline
+- Sugiyama extracted into `sugiyamaLayout()` helper; used as fallback for loops/unstructured
+- `resolveLayerOverlaps` skipped for pure block-layout results (overlaps impossible by construction)
+- 336/336 tests pass; zero overlaps guaranteed by block construction
+
 ## 2026-04-25 — Feat: CLI `generate bpmn` (all element types + AI path) and `view` (BPMN/DMN/Form, folder support)
 
 **`apps/cli/src/commands/generate.ts` — `generate bpmn` extended with modify-existing mode:**
