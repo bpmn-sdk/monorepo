@@ -1,5 +1,12 @@
 # Progress
 
+## 2026-04-29 — Fix: API build swagger caching
+
+**`packages/api/scripts/generate.mjs`** — C8 API entry file download:
+- Changed `downloadFile(ENTRY_FILE, true)` to `downloadFile(ENTRY_FILE, force)` where `force = process.argv.includes("--force")`
+- Aligns with the existing Admin API caching strategy: use cached swagger when available, only force-download on `--force`
+- Fixes `pnpm run test` failing in environments without network access (e.g. self-signed certs)
+
 ## 2026-04-29 — Fix: Auto-layout boundary events, gateway bypass overlap, and block layout centering
 
 **`packages/core/src/bpmn/auto-layout.ts`** — boundary event post-processing:

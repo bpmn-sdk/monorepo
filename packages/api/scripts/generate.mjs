@@ -1968,7 +1968,8 @@ async function generateC8() {
 
 	// 1. Download all YAML files
 	console.log("\n1. Downloading OpenAPI specs...")
-	const entryYaml = await downloadFile(ENTRY_FILE, true)
+	const force = process.argv.includes("--force")
+	const entryYaml = await downloadFile(ENTRY_FILE, force)
 	const allFiles = await downloadAllFiles(entryYaml)
 	console.log(`   Downloaded ${allFiles.size} files.`)
 
