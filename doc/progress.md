@@ -1,5 +1,50 @@
 # Progress
 
+## 2026-04-30 — Feat: Y-row snapping for matrix-like alignment
+
+**`packages/core/src/layout/coordinates.ts`** — new `snapToYRows()` function:
+- After all Sugiyama alignment passes, groups nodes by CY proximity (3px epsilon)
+- Merges close consecutive rows (≤35px threshold) by moving the smaller group to the larger group's CY
+- Same-layer conflict check prevents merging rows that would create overlapping elements at the same X
+- Boundary events excluded from snapping (they are repositioned later in auto-layout.ts)
+- Whole semantic groups (rows established by alignment passes) move as units, preserving chain alignment
+
+**`packages/core/src/layout/layout-engine.ts`** — pipeline integration:
+- `snapToYRows` called after final `resolveLayerOverlaps` in the Sugiyama pipeline
+- Followed by another `resolveLayerOverlaps` pass to fix any overlaps from snapping
+
+**Result**: Elements that are at similar CY (from different branches) now align perfectly. Approval process: ManuallyRouteApproval+ReviseQuote now share CY, JoinToRejected+QuoteRejected share CY. Both processes have 0 misaligned rows.
+
+## 2026-04-30 — Feat: Obstacle-aware edge routing
+
+**`packages/core/src/layout/routing.ts`** — edge obstacle avoidance:
+- New `resolveEdgeCrossings()` exported function: post-processes routed edges to avoid crossing intermediate shapes
+- `fixOneCrossing()`: finds first segment crossing an obstacle and generates a detour (horizontal or vertical)
+- `buildDetour()`: creates 4-waypoint orthogonal detour around obstacle, choosing left/right or above/below based on which produces fewer new crossings
+- `fixCornersInsideObstacles()`: fixes corner waypoints that ended up inside obstacles after detours by moving the corner past the obstacle
+- `collapseCollinear()`: removes redundant collinear waypoints after detours
+- Called from both `routeEdges` (for initial layout) and from auto-layout.ts (after boundary event repositioning)
+
+**`packages/core/src/bpmn/auto-layout.ts`** — second crossing resolution pass:
+- Added `resolveEdgeCrossings()` call after `repositionBoundaryEvents()` to fix crossings caused by boundary event chain repositioning
+
+**Result: 0 edge-shape crossings** (was 5 in both test processes). All 336 tests pass; 102/102 verify tasks pass.
+
+## 2026-04-29 — Feat: Per-element 2D collision detection for gateway branch distribution
+
+**`packages/core/src/layout/coordinates.ts`** — `distributeSplitBranches` rewrite:
+- Replaced blanket corridor check (baselineExtentAbove/Below) with per-element 2D collision detection
+- New `resolveBranchObstacles()` helper: only pushes branches when actual X+Y rectangles overlap
+- Multi-branch: computes anchor-relative extents (extAbove/extBelow) per branch instead of symmetric halfBH
+- Multi-branch: frontier tracking ensures placed branches enforce minimum spacing between each other
+- Single-branch: collision-based offset replaces inflated baselineExtent-based offset
+- Both paths: `baselineSet.has(bid)` guard prevents baseline nodes from moving during branch distribution
+- Removed `resolveGlobalOverlaps` (unused) and `nodeBottom` helper
+- Removed annotation margin (`+= GRID_CELL_HEIGHT`) that compounded at each nesting level
+- Result: approval process reduced from 4140px to 1532px (63% reduction); contracting process from 1234px to 749px
+
+**All 336 tests pass; 102/102 verify tasks pass; zero lint/type errors.**
+
 ## 2026-04-29 — Fix: API build swagger caching
 
 **`packages/api/scripts/generate.mjs`** — C8 API entry file download:

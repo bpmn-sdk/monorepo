@@ -9,6 +9,7 @@ import {
 	distributeSplitBranches,
 	ensureEarlyReturnOffBaseline,
 	resolveLayerOverlaps,
+	snapToYRows,
 } from "./coordinates.js"
 import { minimizeCrossings } from "./crossing.js"
 import { buildGraph, detectBackEdges, reverseBackEdges } from "./graph.js"
@@ -155,11 +156,18 @@ function sugiyamaLayout(
 	// Phase 4e: Ensure early-return branches are never on the baseline
 	ensureEarlyReturnOffBaseline(layoutNodes, dag, backEdges)
 
+	// Re-align linear chains that may have been disrupted by position swaps
+	alignBranchBaselines(layoutNodes, dag)
+
 	// Phase 4f: Distribute split gateway branches symmetrically
 	distributeSplitBranches(layoutNodes, dag, backEdges)
 
 	// Re-align split/join pairs that may have been separated during branch distribution
 	alignSplitJoinPairs(layoutNodes, dag, backEdges)
+
+	// Re-align branch spines after distribution moved chains and alignSplitJoinPairs
+	// adjusted join gateways (continuation nodes after joins must follow)
+	alignBranchBaselines(layoutNodes, dag)
 
 	// Phase 4g: Resolve any layer overlaps from redistribution
 	resolveLayerOverlaps(layoutNodes)
@@ -170,6 +178,10 @@ function sugiyamaLayout(
 
 	// Phase 4i: Final overlap resolution — baseline re-alignment may pull a node back into
 	// an overlap that resolveLayerOverlaps already fixed; one more pass eliminates these.
+	resolveLayerOverlaps(layoutNodes)
+
+	// Phase 4j: Row snapping — merge close Y rows for matrix-like alignment
+	snapToYRows(layoutNodes)
 	resolveLayerOverlaps(layoutNodes)
 
 	return layoutNodes

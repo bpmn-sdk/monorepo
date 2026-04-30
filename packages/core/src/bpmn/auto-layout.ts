@@ -1,4 +1,5 @@
 import { layoutProcess } from "../layout/layout-engine.js"
+import { resolveEdgeCrossings } from "../layout/routing.js"
 import type { LayoutEdge, LayoutNode, LayoutResult } from "../layout/types.js"
 import type {
 	BpmnDefinitions,
@@ -61,9 +62,9 @@ function repositionBoundaryEvents(flowElements: BpmnFlowElement[], result: Layou
 			const bW = beNode.bounds.width
 			const bH = beNode.bounds.height
 
-			// Place boundary event at bottom edge of host task, evenly spaced when multiple
-			const xFrac = (i + 1) / (beIds.length + 1)
-			beNode.bounds.x = Math.round(hostNode.bounds.x + hostNode.bounds.width * xFrac - bW / 2)
+			// Place boundary event at bottom-right of host task, stacking leftward
+			const rightEdge = hostNode.bounds.x + hostNode.bounds.width
+			beNode.bounds.x = Math.round(rightEdge - bW / 2 - i * (bW + 4))
 			beNode.bounds.y = Math.round(hostNode.bounds.y + hostNode.bounds.height - bH / 2)
 			if (beNode.labelBounds) {
 				beNode.labelBounds.x = beNode.bounds.x + Math.round(bW / 2 - beNode.labelBounds.width / 2)
@@ -86,14 +87,17 @@ function repositionBoundaryEvents(flowElements: BpmnFlowElement[], result: Layou
 				}
 			}
 
-			// Find tallest chain element to compute center Y below boundary event
+			// Find tallest chain element to compute center Y below boundary event.
+			// Each boundary event's chain gets its own vertical lane to avoid overlaps.
 			let maxChainH = 0
 			for (const id of chainOrder) {
 				const n = nodeById.get(id)
 				if (n) maxChainH = Math.max(maxChainH, n.bounds.height)
 			}
-			// Place chain below boundary event bottom so edge goes down-then-right
-			const chainCenterY = Math.round(beNode.bounds.y + bH + CHAIN_V_GAP + maxChainH / 2)
+			const laneOffset = i * (maxChainH + CHAIN_V_GAP + 10)
+			const chainCenterY = Math.round(
+				beNode.bounds.y + bH + CHAIN_V_GAP + maxChainH / 2 + laneOffset,
+			)
 			const chainStartX = Math.max(
 				Math.round(beNode.bounds.x + bW / 2) + CHAIN_GAP,
 				hostNode.bounds.x + hostNode.bounds.width + CHAIN_GAP,
@@ -187,6 +191,16 @@ function computeAnnotationLocalBounds(
 	const nodeById = new Map(layoutNodes.map((n) => [n.id, n]))
 	const placements = new Map<string, LocalBounds>()
 
+	// Occupied regions for overlap checks (node bounds + label bounds)
+	const occupied: LocalBounds[] = []
+	for (const n of layoutNodes) {
+		occupied.push({ ...n.bounds })
+		if (n.labelBounds) occupied.push({ ...n.labelBounds })
+	}
+
+	// Static obstacles for crossing detection (nodes + labels only, not annotations)
+	const obstacles: LocalBounds[] = [...occupied]
+
 	for (const ta of process.textAnnotations) {
 		const assoc = process.associations.find((a) => a.sourceRef === ta.id || a.targetRef === ta.id)
 		const connId = assoc
@@ -197,23 +211,73 @@ function computeAnnotationLocalBounds(
 		const connNode = connId ? nodeById.get(connId) : undefined
 
 		const annW = Math.min(200, Math.max(100, (ta.text?.length ?? 10) * 5))
-		let localX: number
-		let localY: number
 
-		if (connNode) {
-			// Place below connected element with gap
-			localX = connNode.bounds.x + connNode.bounds.width / 2 - annW / 2
-			localY = connNode.bounds.y + connNode.bounds.height + ANN_GAP
-		} else {
-			// No connection: top-left of layout space (shifted by dx/dy later)
-			localX = 0
-			localY = 0
+		if (!connNode) {
+			const candidate: LocalBounds = { x: 0, y: 0, width: annW, height: ANN_H }
+			occupied.push({ ...candidate })
+			placements.set(ta.id, candidate)
+			continue
 		}
 
-		placements.set(ta.id, { x: localX, y: localY, width: annW, height: ANN_H })
+		const localX = connNode.bounds.x + connNode.bounds.width / 2 - annW / 2
+		const anchorX = connNode.bounds.x + connNode.bounds.width / 2
+
+		// Try below: start below connected element, push down for overlaps
+		const belowY = connNode.bounds.y + connNode.bounds.height + ANN_GAP
+		const below: LocalBounds = { x: localX, y: belowY, width: annW, height: ANN_H }
+		for (let i = 0; i < 10 && hasOverlap(below, occupied); i++) below.y += ANN_H + 10
+
+		// Try above: gap scales with text length so longer annotations have more breathing room
+		const aboveGap = ANN_GAP + Math.round(annW * 0.2)
+		const aboveY = connNode.bounds.y - aboveGap - ANN_H
+		const above: LocalBounds = { x: localX, y: aboveY, width: annW, height: ANN_H }
+		for (let i = 0; i < 10 && hasOverlap(above, occupied); i++) above.y -= ANN_H + 10
+
+		// Count how many obstacles the association line would cross for each candidate
+		const belowCrossings = countLineCrossings(anchorX, connNode.bounds, below, obstacles)
+		const aboveCrossings = countLineCrossings(anchorX, connNode.bounds, above, obstacles)
+
+		const candidate = belowCrossings <= aboveCrossings ? below : above
+
+		occupied.push({ ...candidate })
+		obstacles.push({ ...candidate })
+		placements.set(ta.id, candidate)
 	}
 
 	return placements
+}
+
+/** Count how many obstacles the vertical association line from connNode to annotation crosses. */
+function countLineCrossings(
+	lineX: number,
+	connBounds: LocalBounds,
+	annBounds: LocalBounds,
+	obstacles: LocalBounds[],
+): number {
+	const annCY = annBounds.y + annBounds.height / 2
+	const connCY = connBounds.y + connBounds.height / 2
+	const top = Math.min(annCY, connCY)
+	const bottom = Math.max(annCY, connCY)
+	const tolerance = 20
+	let crossings = 0
+	for (const b of obstacles) {
+		// Skip the connected element itself
+		if (b.x === connBounds.x && b.y === connBounds.y && b.width === connBounds.width) continue
+		// Obstacle must overlap with the line's X corridor
+		if (b.x + b.width < lineX - tolerance || b.x > lineX + tolerance) continue
+		// Obstacle must be between connNode and annotation vertically
+		if (b.y + b.height <= top || b.y >= bottom) continue
+		crossings++
+	}
+	return crossings
+}
+
+function hasOverlap(a: LocalBounds, others: LocalBounds[]): boolean {
+	for (const b of others) {
+		if (a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y)
+			return true
+	}
+	return false
 }
 
 function nodeToShape(node: LayoutNode, dx: number, dy: number): BpmnDiShape {
@@ -429,6 +493,10 @@ export function applyAutoLayout(defs: BpmnDefinitions): BpmnDefinitions {
 		// of its host task, then walk its exclusive downstream chain and reposition
 		// those nodes horizontally to the right of the host task.
 		repositionBoundaryEvents(process.flowElements, result)
+
+		// Re-resolve edge crossings after boundary events moved shapes
+		const nodeMap = new Map(result.nodes.map((n) => [n.id, n]))
+		resolveEdgeCrossings(result.edges, nodeMap)
 
 		if (result.nodes.length === 0) continue
 
