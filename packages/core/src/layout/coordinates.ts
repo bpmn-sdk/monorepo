@@ -799,10 +799,13 @@ export function distributeSplitBranches(
 			}
 
 			// Compute anchor-relative extents and X range per branch
+			// Uses backbone extent for stacking height (initial placement),
+			// and full subtree extent for collision detection (safety validation).
 			const branchInfo: Array<{
 				chain: string[]
 				extAbove: number
 				extBelow: number
+				backboneHeight: number
 				height: number
 				minX: number
 				maxX: number
@@ -836,10 +839,28 @@ export function distributeSplitBranches(
 					maxX = Math.max(maxX, bnode.bounds.x + bnode.bounds.width)
 				}
 				const height = minY < maxY ? Math.max(maxY - minY, GRID_CELL_HEIGHT) : GRID_CELL_HEIGHT
+
+				// Backbone extent for stacking
+				const backbone = collectBranchBackbone(branchId, dag, joinId, nodeMap)
+				let bbMinY = Number.POSITIVE_INFINITY
+				let bbMaxY = Number.NEGATIVE_INFINITY
+				for (const bid of backbone) {
+					if (baselineSet.has(bid)) continue
+					const bnode = nodeMap.get(bid)
+					if (!bnode) continue
+					bbMinY = Math.min(bbMinY, bnode.bounds.y)
+					bbMaxY = Math.max(bbMaxY, bnode.bounds.y + bnode.bounds.height)
+					if (bnode.labelBounds)
+						bbMaxY = Math.max(bbMaxY, bnode.labelBounds.y + bnode.labelBounds.height)
+				}
+				const backboneHeight =
+					bbMinY < bbMaxY ? Math.max(bbMaxY - bbMinY, GRID_CELL_HEIGHT) : height
+
 				branchInfo.push({
 					chain,
 					extAbove: minY < Number.POSITIVE_INFINITY ? startCY - minY : height / 2,
 					extBelow: maxY > Number.NEGATIVE_INFINITY ? maxY - startCY : height / 2,
+					backboneHeight,
 					height,
 					minX: minX < Number.POSITIVE_INFINITY ? minX : startNode.bounds.x,
 					maxX:
@@ -848,9 +869,10 @@ export function distributeSplitBranches(
 			}
 
 			const minSpacing = GRID_CELL_HEIGHT / 2
+			// Use backbone height for initial stacking (tighter spacing)
 			let totalH = 0
 			for (let i = 0; i < count; i++) {
-				totalH += branchInfo[i]?.height ?? GRID_CELL_HEIGHT
+				totalH += branchInfo[i]?.backboneHeight ?? GRID_CELL_HEIGHT
 				if (i < count - 1) totalH += minSpacing
 			}
 			let currentTop = gatewayCY - totalH / 2
@@ -870,10 +892,11 @@ export function distributeSplitBranches(
 				const branchNode = nodeMap.get(branchId)
 				if (!branchNode) continue
 
-				const bh = info.height
+				// Use backbone height for initial placement, full extent for collision
+				const bh = info.backboneHeight
 				let targetCY = currentTop + bh / 2
 
-				// Resolve 2D collisions with baseline obstacles
+				// Resolve 2D collisions with baseline obstacles (full extent)
 				targetCY = resolveBranchObstacles(
 					targetCY,
 					info.extAbove,
@@ -886,7 +909,7 @@ export function distributeSplitBranches(
 					xMargin,
 				)
 
-				// Enforce frontier: prevent branch-to-branch overlap
+				// Enforce frontier: prevent branch-to-branch overlap (full extent)
 				if (targetCY >= gatewayCY) {
 					const newTop = targetCY - info.extAbove
 					if (newTop < belowFrontierY + minSpacing) {
@@ -924,7 +947,7 @@ export function distributeSplitBranches(
 
 			const chain = collectBranchChain(branchId, dag, joinId)
 
-			// Compute anchor-relative extents (excluding baseline nodes)
+			// Compute full subtree extents (for collision validation)
 			let branchMinY = Number.POSITIVE_INFINITY
 			let branchMaxY = Number.NEGATIVE_INFINITY
 			let branchMinX = Number.POSITIVE_INFINITY
@@ -951,35 +974,69 @@ export function distributeSplitBranches(
 			if (branchMaxX === Number.NEGATIVE_INFINITY)
 				branchMaxX = branchNode.bounds.x + branchNode.bounds.width
 
-			// Start with a basic minimum offset
+			// Compute backbone extent (spine only, skipping sub-gateway branches)
+			// for a tighter initial offset that places the branch closer to baseline.
+			const backbone = collectBranchBackbone(branchId, dag, joinId, nodeMap)
+			let bbMinY = Number.POSITIVE_INFINITY
+			let bbMaxY = Number.NEGATIVE_INFINITY
+			for (const bid of backbone) {
+				if (baselineSet.has(bid)) continue
+				const bnode = nodeMap.get(bid)
+				if (!bnode) continue
+				bbMinY = Math.min(bbMinY, bnode.bounds.y)
+				bbMaxY = Math.max(bbMaxY, bnode.bounds.y + bnode.bounds.height)
+				if (bnode.labelBounds) {
+					bbMaxY = Math.max(bbMaxY, bnode.labelBounds.y + bnode.labelBounds.height)
+				}
+			}
+			const bbExtAbove = bbMinY < Number.POSITIVE_INFINITY ? currentCY - bbMinY : extAbove
+			const bbExtBelow = bbMaxY > Number.NEGATIVE_INFINITY ? bbMaxY - currentCY : extBelow
+
+			// Use backbone extent for initial offset (closer to baseline)
 			const basicMinOffset = Math.max(
 				GRID_CELL_HEIGHT,
-				extAbove + extBelow + n.bounds.height / 2 + 20,
+				bbExtAbove + bbExtBelow + n.bounds.height / 2 + 20,
 			)
 
 			const direction = currentCY < gatewayCY ? -1 : 1
 			let targetCY = gatewayCY + direction * basicMinOffset
 
-			// Resolve 2D collisions with baseline obstacles
-			targetCY = resolveBranchObstacles(
-				targetCY,
-				extAbove,
-				extBelow,
-				branchMinX,
-				branchMaxX,
-				gatewayCY,
-				baselineObstacles,
-				yMargin,
-				xMargin,
-			)
+			// Validate using per-element collision against baseline obstacles.
+			// Only backbone elements checked — sub-branches at different X
+			// positions don't constrain placement.
+			for (const obs of baselineObstacles) {
+				for (const bid of backbone) {
+					if (baselineSet.has(bid)) continue
+					const bnode = nodeMap.get(bid)
+					if (!bnode) continue
+					const elemRight = bnode.bounds.x + bnode.bounds.width
+					if (elemRight + xMargin < obs.x || bnode.bounds.x - xMargin > obs.right) continue
+					if (direction === 1) {
+						const elemNewY = bnode.bounds.y + (targetCY - currentCY)
+						if (elemNewY < obs.bottom + yMargin) {
+							const needed = currentCY + obs.bottom + yMargin - bnode.bounds.y
+							if (needed > targetCY) targetCY = needed
+						}
+					} else {
+						const elemNewBottom = bnode.bounds.y + bnode.bounds.height + (targetCY - currentCY)
+						if (elemNewBottom > obs.y - yMargin) {
+							const needed = currentCY + obs.y - yMargin - bnode.bounds.y - bnode.bounds.height
+							if (needed < targetCY) targetCY = needed
+						}
+					}
+				}
+			}
 
-			// Peer-aware gap enforcement (same-layer non-chain elements)
+			// Peer-aware gap enforcement — only backbone elements checked against
+			// same-layer peers. Sub-branch elements from nested gateways are
+			// handled by the nested gateway's own distribution step.
 			const chainSet = new Set(chain)
+			const backboneSet = new Set(backbone)
 			const minGap = GRID_CELL_HEIGHT / 2
 			const initialDy = targetCY - currentCY
 			let extraDy = 0
 
-			for (const chainNodeId of chain) {
+			for (const chainNodeId of backbone) {
 				if (baselineSet.has(chainNodeId)) continue
 				const chainNode = nodeMap.get(chainNodeId)
 				if (!chainNode) continue
@@ -1132,6 +1189,139 @@ export function snapToYRows(layoutNodes: LayoutNode[]): void {
 	}
 }
 
+/**
+ * Pull each branch subtree toward the baseline, closing unnecessary vertical gaps.
+ * Uses per-element 2D collision detection — only actual element-to-element overlaps
+ * constrain the movement, not the branch's full bounding box.
+ */
+export function compactBranches(
+	layoutNodes: LayoutNode[],
+	dag: DirectedGraph,
+	backEdges: BackEdge[] = [],
+): void {
+	const backEdgeOriginals = buildBackEdgeOriginals(backEdges)
+	const nodeMap = new Map<string, LayoutNode>()
+	for (const n of layoutNodes) nodeMap.set(n.id, n)
+
+	const baselinePath = findBaselinePath(layoutNodes, dag, backEdges)
+	const baselineSet = new Set(baselinePath)
+
+	// Collect split gateways and their branches
+	const splitGateways: {
+		node: LayoutNode
+		branchStarts: string[]
+		joinId: string | undefined
+	}[] = []
+
+	for (const n of layoutNodes) {
+		if (!GATEWAY_TYPE_SET.has(n.type)) continue
+		const trueSuccs = getTrueSuccessors(n.id, dag, backEdgeOriginals)
+		if (trueSuccs.length < 2) continue
+		const joinId = findJoinGateway(n.id, dag, nodeMap)
+		const branchStarts = trueSuccs.filter((s) => !baselineSet.has(s))
+		if (branchStarts.length === 0) continue
+		splitGateways.push({ node: n, branchStarts, joinId })
+	}
+
+	// Process outermost gateways first (shallowest-first)
+	splitGateways.sort((a, b) => a.node.layer - b.node.layer)
+
+	const margin = GRID_CELL_HEIGHT / 2
+	const movedElements = new Set<string>()
+
+	for (const { node: gw, branchStarts, joinId } of splitGateways) {
+		// Skip open-ended branches (joinId=undefined) — unbounded chains
+		if (!joinId) continue
+		const gatewayCY = getCY(gw)
+
+		for (const branchId of branchStarts) {
+			const chain = collectBranchChain(branchId, dag, joinId)
+			if (chain.some((id) => movedElements.has(id))) continue
+
+			// Get non-baseline elements in the chain
+			const chainElements: LayoutNode[] = []
+			for (const bid of chain) {
+				if (baselineSet.has(bid)) continue
+				const bnode = nodeMap.get(bid)
+				if (bnode) chainElements.push(bnode)
+			}
+			if (chainElements.length === 0) continue
+			const chainSet = new Set(chain)
+
+			const startNode = nodeMap.get(branchId)
+			if (!startNode) continue
+			const currentCY = getCY(startNode)
+			const direction = currentCY > gatewayCY ? 1 : -1
+
+			// Compute minimum offset from gateway (backbone + half gateway)
+			const backbone = collectBranchBackbone(branchId, dag, joinId, nodeMap)
+			let bbMinY = Number.POSITIVE_INFINITY
+			let bbMaxY = Number.NEGATIVE_INFINITY
+			for (const bid of backbone) {
+				if (baselineSet.has(bid)) continue
+				const bnode = nodeMap.get(bid)
+				if (!bnode) continue
+				bbMinY = Math.min(bbMinY, bnode.bounds.y)
+				bbMaxY = Math.max(bbMaxY, bnode.bounds.y + bnode.bounds.height)
+			}
+			const bbExtAbove =
+				bbMinY < Number.POSITIVE_INFINITY ? currentCY - bbMinY : GRID_CELL_HEIGHT / 2
+			const bbExtBelow =
+				bbMaxY > Number.NEGATIVE_INFINITY ? bbMaxY - currentCY : GRID_CELL_HEIGHT / 2
+
+			const closestCY =
+				direction > 0 ? gatewayCY + bbExtAbove + margin : gatewayCY - bbExtBelow - margin
+
+			if (direction > 0 ? closestCY >= currentCY : closestCY <= currentCY) continue
+
+			// Per-element collision detection: for each obstacle, check every element
+			// in the chain. Only actual X+Y overlaps constrain movement.
+			let bestCY = closestCY
+			for (const obs of layoutNodes) {
+				if (chainSet.has(obs.id)) continue
+				const obsLeft = obs.bounds.x
+				const obsRight = obs.bounds.x + obs.bounds.width
+				const obsTop = obs.labelBounds ? Math.min(obs.bounds.y, obs.labelBounds.y) : obs.bounds.y
+				const obsBottom = obs.labelBounds
+					? Math.max(obs.bounds.y + obs.bounds.height, obs.labelBounds.y + obs.labelBounds.height)
+					: obs.bounds.y + obs.bounds.height
+
+				for (const elem of chainElements) {
+					const elemRight = elem.bounds.x + elem.bounds.width
+					// X overlap check
+					if (elemRight < obsLeft - margin || elem.bounds.x > obsRight + margin) continue
+
+					if (direction > 0) {
+						// Element top (after moving) must be below obstacle bottom
+						// elem.bounds.y + dy ≥ obsBottom + margin
+						// bestCY ≥ currentCY + obsBottom + margin - elem.bounds.y
+						const needed = currentCY + obsBottom + margin - elem.bounds.y
+						if (needed > bestCY) bestCY = needed
+					} else {
+						// Element bottom (after moving) must be above obstacle top
+						const elemBottom = elem.bounds.y + elem.bounds.height
+						const needed = currentCY + obsTop - margin - elemBottom
+						if (needed < bestCY) bestCY = needed
+					}
+				}
+			}
+
+			// Only move if we're actually pulling closer
+			if (direction > 0 ? bestCY >= currentCY : bestCY <= currentCY) continue
+
+			const dy = bestCY - currentCY
+			for (const bid of chain) {
+				if (baselineSet.has(bid)) continue
+				const bnode = nodeMap.get(bid)
+				if (!bnode) continue
+				bnode.bounds.y += dy
+				if (bnode.labelBounds) bnode.labelBounds.y += dy
+				movedElements.add(bid)
+			}
+		}
+	}
+}
+
 /** Collect all nodes in a branch subtree, stopping at the join gateway. */
 function collectBranchChain(
 	startId: string,
@@ -1149,6 +1339,49 @@ function collectBranchChain(
 		ids.push(id)
 		for (const s of dag.successors.get(id) ?? []) {
 			if (!seen.has(s)) queue.push(s)
+		}
+	}
+	return ids
+}
+
+/**
+ * Collect only the backbone (spine) of a branch — following the linear path
+ * and jumping over nested sub-gateways via their join.
+ * Used to compute a tighter extent estimate for distribution placement.
+ */
+function collectBranchBackbone(
+	startId: string,
+	dag: DirectedGraph,
+	joinId: string | undefined,
+	nodeMap: Map<string, LayoutNode>,
+): string[] {
+	const ids: string[] = []
+	let currentId: string | undefined = startId
+	const seen = new Set<string>()
+
+	while (currentId && !seen.has(currentId)) {
+		if (joinId && currentId === joinId) break
+		seen.add(currentId)
+		ids.push(currentId)
+
+		const succs: string[] = dag.successors.get(currentId) ?? []
+		if (succs.length === 0) break
+		if (succs.length === 1) {
+			currentId = succs[0]
+		} else {
+			// At a sub-split gateway: jump to its join
+			const node = nodeMap.get(currentId)
+			if (node && GATEWAY_TYPE_SET.has(node.type)) {
+				const subJoinId = findJoinGateway(currentId, dag, nodeMap)
+				if (subJoinId) {
+					currentId = subJoinId
+				} else {
+					// No join found — stop backbone here, fall back to full extent
+					break
+				}
+			} else {
+				currentId = succs[0]
+			}
 		}
 	}
 	return ids

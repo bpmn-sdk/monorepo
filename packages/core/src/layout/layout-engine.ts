@@ -6,6 +6,7 @@ import {
 	alignBranchBaselines,
 	alignSplitJoinPairs,
 	assignCoordinates,
+	compactBranches,
 	distributeSplitBranches,
 	ensureEarlyReturnOffBaseline,
 	resolveLayerOverlaps,
@@ -180,7 +181,12 @@ function sugiyamaLayout(
 	// an overlap that resolveLayerOverlaps already fixed; one more pass eliminates these.
 	resolveLayerOverlaps(layoutNodes)
 
-	// Phase 4j: Row snapping — merge close Y rows for matrix-like alignment
+	// Phase 4j: Branch compaction — pull branch subtrees toward baseline
+	compactBranches(layoutNodes, dag, backEdges)
+	resolveLayerOverlaps(layoutNodes)
+	alignBaselinePath(layoutNodes, dag, backEdges)
+
+	// Phase 4k: Row snapping — merge close Y rows for matrix-like alignment
 	snapToYRows(layoutNodes)
 	resolveLayerOverlaps(layoutNodes)
 

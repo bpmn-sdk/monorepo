@@ -1,5 +1,20 @@
 # Progress
 
+## 2026-05-01 — Feat: Backbone-aware branch distribution & compaction
+
+**`packages/core/src/layout/coordinates.ts`** — major layout compaction:
+
+- New `collectBranchBackbone()` function: follows linear spine of a branch, jumping over nested sub-gateways via `findJoinGateway`. Returns ordered list of backbone node IDs used for extent calculation.
+- Modified `distributeSplitBranches` single-branch: uses backbone extent (not full subtree) for initial placement offset (`basicMinOffset`), and per-element 2D collision detection against baseline obstacles for validation. Only backbone elements constrain placement.
+- Modified `distributeSplitBranches` multi-branch: uses backbone height for totalH stacking computation, full extent for frontier/collision.
+- Peer-aware gap enforcement now iterates only backbone elements (not full chain) when checking same-layer peers, preventing sub-branch elements at different X positions from pushing parent branches far from baseline.
+- New `compactBranches()` function: post-distribution pass that pulls branches closer to the baseline. Processes gateways shallowest-first, uses per-element 2D collision detection, tracks moved elements to prevent double-movement, skips gateways with undefined joinId.
+
+**`packages/core/src/layout/layout-engine.ts`** — pipeline integration:
+- Added Phase 4j: `compactBranches` → `resolveLayerOverlaps` → `alignBaselinePath` after distribution passes.
+
+**Result**: Approval process height reduced 46% (1532px → 823px), more compact than manually-adjusted version (1380px). L2 branch distance from baseline: +105px (was +1009px, manual +157px). Zero overlaps in both test processes. All 336 core tests pass.
+
 ## 2026-04-30 — Feat: Y-row snapping for matrix-like alignment
 
 **`packages/core/src/layout/coordinates.ts`** — new `snapToYRows()` function:
