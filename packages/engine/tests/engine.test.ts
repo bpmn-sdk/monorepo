@@ -32,6 +32,7 @@ function makeDefs(processes: BpmnProcess[]): BpmnDefinitions {
 		errors: [],
 		escalations: [],
 		messages: [],
+		signals: [],
 		collaborations: [],
 		processes,
 		diagrams: [],

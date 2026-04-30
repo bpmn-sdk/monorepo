@@ -50,6 +50,7 @@ function makeSubProcessDefs(
 		errors: [],
 		escalations: [],
 		messages: [],
+		signals: [],
 		collaborations: [],
 		processes: [
 			{

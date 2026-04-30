@@ -20,6 +20,7 @@ function makeServiceTaskDefs(id = "task1", name = "My Task"): BpmnDefinitions {
 		errors: [],
 		escalations: [],
 		messages: [],
+		signals: [],
 		collaborations: [],
 		processes: [
 			{

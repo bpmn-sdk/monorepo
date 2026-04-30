@@ -624,7 +624,7 @@ export function serializeBpmn(definitions: BpmnDefinitions): string {
 	for (const m of definitions.messages) {
 		children.push(serializeMessage(m, bp))
 	}
-	for (const s of definitions.signals) {
+	for (const s of definitions.signals ?? []) {
 		children.push(serializeSignal(s, bp))
 	}
 

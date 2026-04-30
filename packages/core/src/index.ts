@@ -254,7 +254,7 @@ export type {
 	FlowOrderViolation,
 } from "./layout/index.js"
 export type { Bounds, LayoutEdge, LayoutNode, LayoutResult, Waypoint } from "./layout/index.js"
-export { ELEMENT_SIZES, GRID_CELL_HEIGHT } from "./layout/index.js"
+export { ELEMENT_SIZES, GRID_CELL_HEIGHT, GRID_CELL_WIDTH } from "./layout/index.js"
 export { compactify, expand } from "./bpmn/compact.js"
 export { applyOperations } from "./bpmn/operations.js"
 export type { BpmnOperation } from "./bpmn/operations.js"

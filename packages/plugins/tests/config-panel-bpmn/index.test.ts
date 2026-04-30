@@ -31,6 +31,7 @@ function makeMinimalDefs(
 		errors: [],
 		escalations: [],
 		messages: [],
+		signals: [],
 		collaborations: [],
 		processes: [
 			{
@@ -434,6 +435,7 @@ function makeAdHocDefs(
 		errors: [],
 		escalations: [],
 		messages: [],
+		signals: [],
 		collaborations: [],
 		processes: [
 			{
