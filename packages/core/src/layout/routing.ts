@@ -13,6 +13,9 @@ const GATEWAY_TYPES: ReadonlySet<string> = new Set([
 	"eventBasedGateway",
 ])
 
+/** Tolerance for treating two CY values as "same level" in port decisions. */
+const PORT_SAME_Y_TOLERANCE = 25
+
 /**
  * Determine which side of the target a forward edge should connect to.
  * Non-gateway targets always receive edges from the left side.
@@ -42,9 +45,8 @@ export function resolveTargetPort(
 
 /**
  * Assign source ports for outgoing edges of a gateway.
- * - Single output: right port.
- * - Odd count: middle (by target y) → right, upper half → top, lower half → bottom.
- * - Even count: upper half → top, lower half → bottom, no right port.
+ * Uses absolute direction: target above → top, below → bottom, same level → right.
+ * Single output always exits from the right port.
  */
 export function assignGatewayPorts(
 	outgoingFlows: BpmnSequenceFlow[],
@@ -60,34 +62,23 @@ export function assignGatewayPorts(
 		return portMap
 	}
 
-	// Sort flows by target's center-y (ascending = topmost first)
-	const sorted = [...outgoingFlows].sort((a, b) => {
-		const targetA = nodeMap.get(a.targetRef)
-		const targetB = nodeMap.get(b.targetRef)
-		const yA = targetA ? targetA.bounds.y + targetA.bounds.height / 2 : 0
-		const yB = targetB ? targetB.bounds.y + targetB.bounds.height / 2 : 0
-		return yA - yB
-	})
+	const firstFlow = outgoingFlows[0]
+	if (!firstFlow) return portMap
+	const gateway = nodeMap.get(firstFlow.sourceRef)
+	if (!gateway) return portMap
+	const gatewayCY = gateway.bounds.y + gateway.bounds.height / 2
 
-	if (count % 2 === 1) {
-		const midIndex = Math.floor(count / 2)
-		for (let i = 0; i < sorted.length; i++) {
-			const flow = sorted[i]
-			if (!flow) continue
-			if (i < midIndex) {
-				portMap.set(flow.id, "top")
-			} else if (i === midIndex) {
-				portMap.set(flow.id, "right")
-			} else {
-				portMap.set(flow.id, "bottom")
-			}
-		}
-	} else {
-		const midIndex = count / 2
-		for (let i = 0; i < sorted.length; i++) {
-			const flow = sorted[i]
-			if (!flow) continue
-			portMap.set(flow.id, i < midIndex ? "top" : "bottom")
+	for (const flow of outgoingFlows) {
+		const target = nodeMap.get(flow.targetRef)
+		if (!target) continue
+		const targetCY = target.bounds.y + target.bounds.height / 2
+		const dy = targetCY - gatewayCY
+		if (dy < -PORT_SAME_Y_TOLERANCE) {
+			portMap.set(flow.id, "top")
+		} else if (dy > PORT_SAME_Y_TOLERANCE) {
+			portMap.set(flow.id, "bottom")
+		} else {
+			portMap.set(flow.id, "right")
 		}
 	}
 
@@ -321,6 +312,7 @@ function routeFromPortDirect(
 
 /**
  * Route a back-edge (loop) above or below all nodes, choosing the shorter path.
+ * Gateway targets are entered from the right (since back-edges come from the right).
  */
 function routeBackEdge(
 	source: LayoutNode,
@@ -338,8 +330,12 @@ function routeBackEdge(
 
 	const sourceRight = source.bounds.x + source.bounds.width
 	const sourceCenterY = source.bounds.y + source.bounds.height / 2
-	const targetLeft = target.bounds.x
 	const targetCenterY = target.bounds.y + target.bounds.height / 2
+
+	// Gateways: enter from right side; non-gateways: enter from left side
+	const enterRight = GATEWAY_TYPES.has(target.type)
+	const entryX = enterRight ? target.bounds.x + target.bounds.width : target.bounds.x
+	const stemX = enterRight ? entryX + 20 : entryX - 20
 
 	// Route above
 	const routeAboveY = minY - 30
@@ -347,9 +343,9 @@ function routeBackEdge(
 		{ x: sourceRight, y: sourceCenterY },
 		{ x: sourceRight + 20, y: sourceCenterY },
 		{ x: sourceRight + 20, y: routeAboveY },
-		{ x: targetLeft - 20, y: routeAboveY },
-		{ x: targetLeft - 20, y: targetCenterY },
-		{ x: targetLeft, y: targetCenterY },
+		{ x: stemX, y: routeAboveY },
+		{ x: stemX, y: targetCenterY },
+		{ x: entryX, y: targetCenterY },
 	]
 
 	// Route below
@@ -358,9 +354,9 @@ function routeBackEdge(
 		{ x: sourceRight, y: sourceCenterY },
 		{ x: sourceRight + 20, y: sourceCenterY },
 		{ x: sourceRight + 20, y: routeBelowY },
-		{ x: targetLeft - 20, y: routeBelowY },
-		{ x: targetLeft - 20, y: targetCenterY },
-		{ x: targetLeft, y: targetCenterY },
+		{ x: stemX, y: routeBelowY },
+		{ x: stemX, y: targetCenterY },
+		{ x: entryX, y: targetCenterY },
 	]
 
 	// Compare total path length and pick shorter

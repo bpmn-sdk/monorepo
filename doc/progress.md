@@ -1,5 +1,19 @@
 # Progress
 
+## 2026-04-30 — Fix: Gateway port routing & annotation spacing
+
+**`packages/core/src/layout/routing.ts`** — gateway port improvements:
+- `assignGatewayPorts`: uses absolute direction (target CY vs gateway CY) instead of relative index ordering. Target above → top, below → bottom, same level → right. Fixes edges exiting the wrong side (e.g., bottom port for a target above the gateway).
+- `routeBackEdge`: back-edges entering a gateway now connect to the right side (since back-edges approach from the right). Non-gateway targets keep entering from the left.
+- Added `PORT_SAME_Y_TOLERANCE = 25` constant for same-level detection in source port assignment.
+
+**`packages/core/src/bpmn/auto-layout.ts`** — annotation spacing:
+- Increased `ANN_GAP` from 40 to 60 (initial gap from element to annotation).
+- Added `ANN_PADDING = 20` with new `hasOverlapPadded` function ensuring ~20px margin between annotations.
+- Increased push step from 60px to 100px and retry cap from 10 to 30.
+
+**Result**: Gateway exit ports match direction (all exits verified correct). Back-edges enter gateways from the right. Minimum annotation-to-annotation gap improved from ~25px to 50px.
+
 ## 2026-05-01 — Feat: Backbone-aware branch distribution & compaction
 
 **`packages/core/src/layout/coordinates.ts`** — major layout compaction:

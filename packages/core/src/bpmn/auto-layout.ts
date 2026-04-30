@@ -17,7 +17,8 @@ const POOL_GAP = 30
 const CHAIN_GAP = 30
 const CHAIN_V_GAP = 20
 const ANN_H = 50
-const ANN_GAP = 40
+const ANN_GAP = 60
+const ANN_PADDING = 20
 
 /**
  * Reposition boundary events to the bottom edge of their host task, then walk
@@ -221,17 +222,20 @@ function computeAnnotationLocalBounds(
 
 		const localX = connNode.bounds.x + connNode.bounds.width / 2 - annW / 2
 		const anchorX = connNode.bounds.x + connNode.bounds.width / 2
+		const pushStep = ANN_H + ANN_PADDING * 2 + 10
 
 		// Try below: start below connected element, push down for overlaps
 		const belowY = connNode.bounds.y + connNode.bounds.height + ANN_GAP
 		const below: LocalBounds = { x: localX, y: belowY, width: annW, height: ANN_H }
-		for (let i = 0; i < 10 && hasOverlap(below, occupied); i++) below.y += ANN_H + 10
+		for (let i = 0; i < 30 && hasOverlapPadded(below, occupied, ANN_PADDING); i++)
+			below.y += pushStep
 
 		// Try above: gap scales with text length so longer annotations have more breathing room
 		const aboveGap = ANN_GAP + Math.round(annW * 0.2)
 		const aboveY = connNode.bounds.y - aboveGap - ANN_H
 		const above: LocalBounds = { x: localX, y: aboveY, width: annW, height: ANN_H }
-		for (let i = 0; i < 10 && hasOverlap(above, occupied); i++) above.y -= ANN_H + 10
+		for (let i = 0; i < 30 && hasOverlapPadded(above, occupied, ANN_PADDING); i++)
+			above.y -= pushStep
 
 		// Count how many obstacles the association line would cross for each candidate
 		const belowCrossings = countLineCrossings(anchorX, connNode.bounds, below, obstacles)
@@ -275,6 +279,19 @@ function countLineCrossings(
 function hasOverlap(a: LocalBounds, others: LocalBounds[]): boolean {
 	for (const b of others) {
 		if (a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y)
+			return true
+	}
+	return false
+}
+
+function hasOverlapPadded(a: LocalBounds, others: LocalBounds[], padding: number): boolean {
+	for (const b of others) {
+		if (
+			a.x - padding < b.x + b.width &&
+			a.x + a.width + padding > b.x &&
+			a.y - padding < b.y + b.height &&
+			a.y + a.height + padding > b.y
+		)
 			return true
 	}
 	return false
