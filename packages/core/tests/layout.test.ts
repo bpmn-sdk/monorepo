@@ -1145,8 +1145,15 @@ describe("resolveTargetPort", () => {
 		const gwAlmostSameY = portNode("gw5", "exclusiveGateway", 200, 100.5)
 		expect(resolveTargetPort(source, gwAlmostSameY, joinIds)).toBe("left")
 
+		// 2px center-Y difference is within PORT_SAME_Y_TOLERANCE (25) → same row → left
 		const gwJustOutside = portNode("gw6", "exclusiveGateway", 200, 102)
-		expect(resolveTargetPort(source, gwJustOutside, joinIds)).toBe("top")
+		expect(resolveTargetPort(source, gwJustOutside, joinIds)).toBe("left")
+
+		// Genuine different row (> 25px center-Y difference) → top/bottom
+		const gwDifferentRow = portNode("gw7", "exclusiveGateway", 200, 140)
+		joinIds.add("gw7")
+		// source center = 100+18=118, target center = 140+18=158, diff=40 > 25 → "top"
+		expect(resolveTargetPort(source, gwDifferentRow, joinIds)).toBe("top")
 	})
 })
 

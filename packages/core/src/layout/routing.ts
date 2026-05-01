@@ -37,7 +37,7 @@ export function resolveTargetPort(
 	// Join/closing gateways: connect based on relative position
 	const srcCy = source.bounds.y + source.bounds.height / 2
 	const tgtCy = target.bounds.y + target.bounds.height / 2
-	if (Math.abs(srcCy - tgtCy) <= 1) {
+	if (Math.abs(srcCy - tgtCy) <= PORT_SAME_Y_TOLERANCE) {
 		return "left"
 	}
 	return srcCy < tgtCy ? "top" : "bottom"
@@ -216,30 +216,7 @@ function routeForwardEdge(
 	]
 }
 
-/** Count the number of direction changes (bends) in a waypoint sequence. */
-function countBends(waypoints: Waypoint[]): number {
-	let bends = 0
-	for (let i = 1; i < waypoints.length - 1; i++) {
-		const prev = waypoints[i - 1]
-		const curr = waypoints[i]
-		const next = waypoints[i + 1]
-		if (!prev || !curr || !next) continue
-		const dx1 = curr.x - prev.x
-		const dy1 = curr.y - prev.y
-		const dx2 = next.x - curr.x
-		const dy2 = next.y - curr.y
-		// Direction changes when we go from horizontal to vertical or vice versa
-		if (
-			(Math.abs(dx1) > 0.1 && Math.abs(dy2) > 0.1) ||
-			(Math.abs(dy1) > 0.1 && Math.abs(dx2) > 0.1)
-		) {
-			bends++
-		}
-	}
-	return bends
-}
-
-/** Route a forward edge from a specific port side on the source node, choosing minimum bends. */
+/** Route a forward edge from a specific port side on the source node. */
 function routeFromPort(
 	source: LayoutNode,
 	target: LayoutNode,
@@ -249,16 +226,9 @@ function routeFromPort(
 	if (port === "right") {
 		return routeForwardEdge(source, target, joinGateways)
 	}
-
-	// Generate candidate routes: assigned port route + right-port alternative
-	const portRoute = routeFromPortDirect(source, target, port, joinGateways)
-	const rightRoute = routeForwardEdge(source, target, joinGateways)
-
-	const portBends = countBends(portRoute)
-	const rightBends = countBends(rightRoute)
-
-	// Prefer the assigned port route unless right route has strictly fewer bends
-	return rightBends < portBends ? rightRoute : portRoute
+	// top/bottom ports are assigned because the target is genuinely above/below —
+	// always honour the assigned side rather than falling back to right-exit.
+	return routeFromPortDirect(source, target, port, joinGateways)
 }
 
 /** Route directly from top/bottom port, preferring L-shaped path. */
