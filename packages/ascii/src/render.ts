@@ -1,4 +1,4 @@
-import { Bpmn, GRID_CELL_HEIGHT, layoutFlowNodes } from "@bpmnkit/core"
+import { Bpmn, GRID_CELL_HEIGHT, GRID_CELL_WIDTH, layoutFlowNodes } from "@bpmnkit/core"
 import type { LayoutEdge, LayoutNode } from "@bpmnkit/core"
 import { drawPortedEdge } from "./edges.js"
 import { AsciiGrid } from "./grid.js"
@@ -20,6 +20,18 @@ function nodeMidRow(node: LayoutNode): number {
 	const asciiCellRow = Math.round((cellY / GRID_CELL_HEIGHT) * CELL_H)
 	// midRow = cell top + vertical padding + 1 (same formula as the old elemRow+1)
 	return asciiCellRow + Math.floor((CELL_H - 3) / 2) + 1
+}
+
+/**
+ * Derive the layer (column index) from a node's pixel x-coordinate.
+ *
+ * The block-based layout engine does not assign meaningful `layer` values
+ * (all nodes get layer=0), but positions elements correctly in pixel space.
+ * We recover the column index from the x-center of the element's bounds.
+ */
+function nodeLayer(node: LayoutNode): number {
+	const centerX = node.bounds.x + node.bounds.width / 2
+	return Math.round(centerX / GRID_CELL_WIDTH)
 }
 
 const GATEWAY_TYPES = new Set([
@@ -49,7 +61,7 @@ export function renderBpmnAscii(xml: string, options?: RenderOptions): string {
 	if (nodes.length === 0) return "(empty)"
 
 	// Compute grid dimensions from the layout's layer extents and pixel bounds
-	const maxLayer = Math.max(...nodes.map((n) => n.layer))
+	const maxLayer = Math.max(...nodes.map(nodeLayer))
 	const maxMidRow = Math.max(...nodes.map(nodeMidRow))
 	const gridCols = (maxLayer + 1) * CELL_W + 4
 	// Element bottom is at maxMidRow+1; leave CELL_H rows of padding below.
@@ -74,10 +86,10 @@ export function renderBpmnAscii(xml: string, options?: RenderOptions): string {
 
 		drawPortedEdge(
 			grid,
-			srcPort === "right" ? exitCol(src.type, src.layer) : midCol(src.type, src.layer),
+			srcPort === "right" ? exitCol(src.type, nodeLayer(src)) : midCol(src.type, nodeLayer(src)),
 			nodeMidRow(src),
 			srcPort,
-			dstPort === "left" ? entryCol(dst.type, dst.layer) : midCol(dst.type, dst.layer),
+			dstPort === "left" ? entryCol(dst.type, nodeLayer(dst)) : midCol(dst.type, nodeLayer(dst)),
 			nodeMidRow(dst),
 			dstPort,
 			edge.label,
@@ -86,7 +98,7 @@ export function renderBpmnAscii(xml: string, options?: RenderOptions): string {
 
 	// Draw element boxes on top
 	for (const node of nodes) {
-		drawElement(grid, node.type, node.layer, nodeMidRow(node) - 1, node.label)
+		drawElement(grid, node.type, nodeLayer(node), nodeMidRow(node) - 1, node.label)
 	}
 
 	const diagram = grid.toString()
@@ -143,7 +155,7 @@ function computeEdgePorts(
 		const src = nodeById.get(edge.sourceRef)
 		const dst = nodeById.get(edge.targetRef)
 		// Back-edges (dst layer ≤ src layer) and non-gateway sources always exit right
-		if (!src || !dst || !GATEWAY_TYPES.has(src.type) || dst.layer <= src.layer) {
+		if (!src || !dst || !GATEWAY_TYPES.has(src.type) || nodeLayer(dst) <= nodeLayer(src)) {
 			srcPorts.set(edge.id, "right")
 			continue
 		}
@@ -162,9 +174,8 @@ function computeEdgePorts(
 
 		// Sort outgoing edges by their target's row position (ascending = topmost first)
 		const sorted = [...outgoing].sort((a, b) => {
-			const pa = nodeById.get(a.targetRef)?.position ?? 0
-			const pb = nodeById.get(b.targetRef)?.position ?? 0
-			return pa - pb
+			// biome-ignore lint/style/noNonNullAssertion: edges reference existing nodes
+			return nodeMidRow(nodeById.get(a.targetRef)!) - nodeMidRow(nodeById.get(b.targetRef)!)
 		})
 
 		for (let i = 0; i < sorted.length; i++) {
@@ -196,8 +207,10 @@ function computeEdgePorts(
 			const src = nodeById.get(edge.sourceRef)
 			const dst = nodeById.get(edge.targetRef)
 			if (src && dst && GATEWAY_TYPES.has(dst.type)) {
-				if (src.position < dst.position) dstPort = "top"
-				else if (src.position > dst.position) dstPort = "bottom"
+				const srcRow = nodeMidRow(src)
+				const dstRow = nodeMidRow(dst)
+				if (srcRow < dstRow) dstPort = "top"
+				else if (srcRow > dstRow) dstPort = "bottom"
 				// else same row → left (default)
 			}
 		}

@@ -515,6 +515,12 @@ export interface BpmnMessage {
 	unknownAttributes: Record<string, string>
 }
 
+/** A root-level BPMN signal definition referenced by signal catch/throw events. */
+export interface BpmnSignal {
+	id: string
+	name?: string
+}
+
 // ---------------------------------------------------------------------------
 // Diagram interchange
 // ---------------------------------------------------------------------------
@@ -589,6 +595,7 @@ export interface BpmnDefinitions {
 	errors: BpmnError[]
 	escalations: BpmnEscalation[]
 	messages: BpmnMessage[]
+	signals: BpmnSignal[]
 	collaborations: BpmnCollaboration[]
 	processes: BpmnProcess[]
 	diagrams: BpmnDiagram[]

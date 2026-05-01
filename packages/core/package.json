@@ -15,7 +15,8 @@
 		"build": "tsc",
 		"typecheck": "tsc --noEmit",
 		"check": "biome check .",
-		"test": "vitest run"
+		"test": "vitest run",
+		"format-bpmn": "node scripts/format-bpmn.mjs"
 	},
 	"dependencies": {
 		"@bpmnkit/feel": "workspace:*"

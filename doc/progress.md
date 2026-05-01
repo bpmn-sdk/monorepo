@@ -1,5 +1,134 @@
 # Progress
 
+## 2026-04-30 — Fix: Gateway port routing & annotation spacing
+
+**`packages/core/src/layout/routing.ts`** — gateway port improvements:
+- `assignGatewayPorts`: uses absolute direction (target CY vs gateway CY) instead of relative index ordering. Target above → top, below → bottom, same level → right. Fixes edges exiting the wrong side (e.g., bottom port for a target above the gateway).
+- `routeBackEdge`: back-edges entering a gateway now connect to the right side (since back-edges approach from the right). Non-gateway targets keep entering from the left.
+- Added `PORT_SAME_Y_TOLERANCE = 25` constant for same-level detection in source port assignment.
+
+**`packages/core/src/bpmn/auto-layout.ts`** — annotation spacing:
+- Increased `ANN_GAP` from 40 to 60 (initial gap from element to annotation).
+- Added `ANN_PADDING = 20` with new `hasOverlapPadded` function ensuring ~20px margin between annotations.
+- Increased push step from 60px to 100px and retry cap from 10 to 30.
+
+**Result**: Gateway exit ports match direction (all exits verified correct). Back-edges enter gateways from the right. Minimum annotation-to-annotation gap improved from ~25px to 50px.
+
+## 2026-05-01 — Feat: Backbone-aware branch distribution & compaction
+
+**`packages/core/src/layout/coordinates.ts`** — major layout compaction:
+
+- New `collectBranchBackbone()` function: follows linear spine of a branch, jumping over nested sub-gateways via `findJoinGateway`. Returns ordered list of backbone node IDs used for extent calculation.
+- Modified `distributeSplitBranches` single-branch: uses backbone extent (not full subtree) for initial placement offset (`basicMinOffset`), and per-element 2D collision detection against baseline obstacles for validation. Only backbone elements constrain placement.
+- Modified `distributeSplitBranches` multi-branch: uses backbone height for totalH stacking computation, full extent for frontier/collision.
+- Peer-aware gap enforcement now iterates only backbone elements (not full chain) when checking same-layer peers, preventing sub-branch elements at different X positions from pushing parent branches far from baseline.
+- New `compactBranches()` function: post-distribution pass that pulls branches closer to the baseline. Processes gateways shallowest-first, uses per-element 2D collision detection, tracks moved elements to prevent double-movement, skips gateways with undefined joinId.
+
+**`packages/core/src/layout/layout-engine.ts`** — pipeline integration:
+- Added Phase 4j: `compactBranches` → `resolveLayerOverlaps` → `alignBaselinePath` after distribution passes.
+
+**Result**: Approval process height reduced 46% (1532px → 823px), more compact than manually-adjusted version (1380px). L2 branch distance from baseline: +105px (was +1009px, manual +157px). Zero overlaps in both test processes. All 336 core tests pass.
+
+## 2026-04-30 — Feat: Y-row snapping for matrix-like alignment
+
+**`packages/core/src/layout/coordinates.ts`** — new `snapToYRows()` function:
+- After all Sugiyama alignment passes, groups nodes by CY proximity (3px epsilon)
+- Merges close consecutive rows (≤35px threshold) by moving the smaller group to the larger group's CY
+- Same-layer conflict check prevents merging rows that would create overlapping elements at the same X
+- Boundary events excluded from snapping (they are repositioned later in auto-layout.ts)
+- Whole semantic groups (rows established by alignment passes) move as units, preserving chain alignment
+
+**`packages/core/src/layout/layout-engine.ts`** — pipeline integration:
+- `snapToYRows` called after final `resolveLayerOverlaps` in the Sugiyama pipeline
+- Followed by another `resolveLayerOverlaps` pass to fix any overlaps from snapping
+
+**Result**: Elements that are at similar CY (from different branches) now align perfectly. Approval process: ManuallyRouteApproval+ReviseQuote now share CY, JoinToRejected+QuoteRejected share CY. Both processes have 0 misaligned rows.
+
+## 2026-04-30 — Feat: Obstacle-aware edge routing
+
+**`packages/core/src/layout/routing.ts`** — edge obstacle avoidance:
+- New `resolveEdgeCrossings()` exported function: post-processes routed edges to avoid crossing intermediate shapes
+- `fixOneCrossing()`: finds first segment crossing an obstacle and generates a detour (horizontal or vertical)
+- `buildDetour()`: creates 4-waypoint orthogonal detour around obstacle, choosing left/right or above/below based on which produces fewer new crossings
+- `fixCornersInsideObstacles()`: fixes corner waypoints that ended up inside obstacles after detours by moving the corner past the obstacle
+- `collapseCollinear()`: removes redundant collinear waypoints after detours
+- Called from both `routeEdges` (for initial layout) and from auto-layout.ts (after boundary event repositioning)
+
+**`packages/core/src/bpmn/auto-layout.ts`** — second crossing resolution pass:
+- Added `resolveEdgeCrossings()` call after `repositionBoundaryEvents()` to fix crossings caused by boundary event chain repositioning
+
+**Result: 0 edge-shape crossings** (was 5 in both test processes). All 336 tests pass; 102/102 verify tasks pass.
+
+## 2026-04-29 — Feat: Per-element 2D collision detection for gateway branch distribution
+
+**`packages/core/src/layout/coordinates.ts`** — `distributeSplitBranches` rewrite:
+- Replaced blanket corridor check (baselineExtentAbove/Below) with per-element 2D collision detection
+- New `resolveBranchObstacles()` helper: only pushes branches when actual X+Y rectangles overlap
+- Multi-branch: computes anchor-relative extents (extAbove/extBelow) per branch instead of symmetric halfBH
+- Multi-branch: frontier tracking ensures placed branches enforce minimum spacing between each other
+- Single-branch: collision-based offset replaces inflated baselineExtent-based offset
+- Both paths: `baselineSet.has(bid)` guard prevents baseline nodes from moving during branch distribution
+- Removed `resolveGlobalOverlaps` (unused) and `nodeBottom` helper
+- Removed annotation margin (`+= GRID_CELL_HEIGHT`) that compounded at each nesting level
+- Result: approval process reduced from 4140px to 1532px (63% reduction); contracting process from 1234px to 749px
+
+**All 336 tests pass; 102/102 verify tasks pass; zero lint/type errors.**
+
+## 2026-04-29 — Fix: API build swagger caching
+
+**`packages/api/scripts/generate.mjs`** — C8 API entry file download:
+- Changed `downloadFile(ENTRY_FILE, true)` to `downloadFile(ENTRY_FILE, force)` where `force = process.argv.includes("--force")`
+- Aligns with the existing Admin API caching strategy: use cached swagger when available, only force-download on `--force`
+- Fixes `pnpm run test` failing in environments without network access (e.g. self-signed certs)
+
+## 2026-04-29 — Fix: Auto-layout boundary events, gateway bypass overlap, and block layout centering
+
+**`packages/core/src/bpmn/auto-layout.ts`** — boundary event post-processing:
+- New `repositionBoundaryEvents()` helper called after `layoutProcess`
+- Repositions each boundary event to the bottom edge of its host task (evenly spaced when multiple)
+- Walks the exclusive downstream chain (nodes reachable only from the boundary event) and positions them in a horizontal line to the right of the host task
+- Re-routes all edges: boundary event → chain uses down-then-right orthogonal routing; within-chain uses straight horizontal edges
+- Fixes issue where boundary events and their flows were placed at the start of the diagram
+
+**`packages/core/src/layout/coordinates.ts`** — `findBaselinePath` fix:
+- Removed inner if/else that routed the baseline through the task-bearing branch when a direct bypass edge exists
+- Baseline now always jumps to the join gateway; task-bearing branches are off-baseline and distributed by `distributeSplitBranches`
+- Fixes gateway-to-gateway bypass+task overlap where task and bypass edge shared center-Y
+
+**`packages/core/src/layout/block-layout.ts`** — empty branch effective height:
+- Empty branches (height=0, representing direct bypass edges) now use `Math.max(branch.height, V_GAP)` as effective height in totalBranchH and branchY advancement
+- Prevents subsequent task branches from being positioned where the direct edge routes through them
+
+**All 336 tests pass; zero lint/type errors.**
+
+## 2026-04-29 — Feat: Block-based BPMN auto-layout (Hierarchical Bounding-Box Routing)
+
+**`packages/core/src/layout/block-builder.ts`** — new file:
+- Builds a hierarchical block tree from the normalized DAG using topological order
+- Depth-counter scan matches split gateways (outDegree≥2) to their join gateways (inDegree≥2)
+- BFS collects branch nodes per successor; recursively builds nested gateway blocks
+- Only gateway types trigger split/join detection (checked against `GATEWAY_TYPES` set including `complexGateway`)
+- Returns `null` for unstructured processes → Sugiyama fallback
+
+**`packages/core/src/layout/block-layout.ts`** — new file:
+- Bottom-up sizing: `NodeBlock` = `ELEMENT_SIZES[type]`; `SequenceBlock` = sum(widths) + gaps; `GatewayBlock` = split + branches + join
+- Top-down positioning: sequence items centered vertically (H_GAP=50); branches stacked top-to-bottom (V_GAP=60); split/join gateways centered on gateway block midpoint
+- Flatten to `LayoutNode[]` with label bounds computed same as existing coordinates.ts logic
+
+**`packages/core/src/layout/astar.ts`** — new file:
+- Grid-based A* (GRID_RES=10px) with inline binary min-heap
+- Direction-aware state: turning penalty (TURN_PENALTY=5) prefers straight paths
+- Obstacle inflation by 6px; canvas extended 80px beyond element bounds
+- Path simplification removes collinear intermediate waypoints
+- Available for future integration; current routing still uses existing `routeEdges`
+
+**`packages/core/src/layout/layout-engine.ts`** — modified:
+- Block layout attempted first for processes without back-edges
+- `buildBlockTree` + `applyBlockLayout` replace the 7-phase Sugiyama coordinate pipeline
+- Sugiyama extracted into `sugiyamaLayout()` helper; used as fallback for loops/unstructured
+- `resolveLayerOverlaps` skipped for pure block-layout results (overlaps impossible by construction)
+- 336/336 tests pass; zero overlaps guaranteed by block construction
+
 ## 2026-04-25 — Feat: CLI `generate bpmn` (all element types + AI path) and `view` (BPMN/DMN/Form, folder support)
 
 **`apps/cli/src/commands/generate.ts` — `generate bpmn` extended with modify-existing mode:**

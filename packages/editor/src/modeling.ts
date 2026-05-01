@@ -44,6 +44,7 @@ export function createEmptyDefinitions(): BpmnDefinitions {
 		errors: [],
 		escalations: [],
 		messages: [],
+		signals: [],
 		collaborations: [],
 		processes: [
 			{

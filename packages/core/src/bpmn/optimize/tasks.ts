@@ -233,6 +233,7 @@ function buildExtractedDefs(
 		errors: [],
 		escalations: [],
 		messages: [],
+		signals: [],
 		collaborations: [],
 		processes: [extractedProcess],
 		diagrams: [diagram],

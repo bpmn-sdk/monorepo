@@ -485,6 +485,7 @@ export function expand(compact: CompactDiagram): BpmnDefinitions {
 		errors: [],
 		escalations: [],
 		messages: [],
+		signals: [],
 		collaborations: [],
 		processes,
 		diagrams,

@@ -11,3 +11,4 @@ apps/reebe-wasm/snippets/
 # Rust build output
 apps/reebe/target/
 .superpowers
+tmp

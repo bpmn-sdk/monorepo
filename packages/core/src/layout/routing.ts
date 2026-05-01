@@ -13,6 +13,9 @@ const GATEWAY_TYPES: ReadonlySet<string> = new Set([
 	"eventBasedGateway",
 ])
 
+/** Tolerance for treating two CY values as "same level" in port decisions. */
+const PORT_SAME_Y_TOLERANCE = 25
+
 /**
  * Determine which side of the target a forward edge should connect to.
  * Non-gateway targets always receive edges from the left side.
@@ -42,9 +45,8 @@ export function resolveTargetPort(
 
 /**
  * Assign source ports for outgoing edges of a gateway.
- * - Single output: right port.
- * - Odd count: middle (by target y) → right, upper half → top, lower half → bottom.
- * - Even count: upper half → top, lower half → bottom, no right port.
+ * Uses absolute direction: target above → top, below → bottom, same level → right.
+ * Single output always exits from the right port.
  */
 export function assignGatewayPorts(
 	outgoingFlows: BpmnSequenceFlow[],
@@ -60,34 +62,23 @@ export function assignGatewayPorts(
 		return portMap
 	}
 
-	// Sort flows by target's center-y (ascending = topmost first)
-	const sorted = [...outgoingFlows].sort((a, b) => {
-		const targetA = nodeMap.get(a.targetRef)
-		const targetB = nodeMap.get(b.targetRef)
-		const yA = targetA ? targetA.bounds.y + targetA.bounds.height / 2 : 0
-		const yB = targetB ? targetB.bounds.y + targetB.bounds.height / 2 : 0
-		return yA - yB
-	})
+	const firstFlow = outgoingFlows[0]
+	if (!firstFlow) return portMap
+	const gateway = nodeMap.get(firstFlow.sourceRef)
+	if (!gateway) return portMap
+	const gatewayCY = gateway.bounds.y + gateway.bounds.height / 2
 
-	if (count % 2 === 1) {
-		const midIndex = Math.floor(count / 2)
-		for (let i = 0; i < sorted.length; i++) {
-			const flow = sorted[i]
-			if (!flow) continue
-			if (i < midIndex) {
-				portMap.set(flow.id, "top")
-			} else if (i === midIndex) {
-				portMap.set(flow.id, "right")
-			} else {
-				portMap.set(flow.id, "bottom")
-			}
-		}
-	} else {
-		const midIndex = count / 2
-		for (let i = 0; i < sorted.length; i++) {
-			const flow = sorted[i]
-			if (!flow) continue
-			portMap.set(flow.id, i < midIndex ? "top" : "bottom")
+	for (const flow of outgoingFlows) {
+		const target = nodeMap.get(flow.targetRef)
+		if (!target) continue
+		const targetCY = target.bounds.y + target.bounds.height / 2
+		const dy = targetCY - gatewayCY
+		if (dy < -PORT_SAME_Y_TOLERANCE) {
+			portMap.set(flow.id, "top")
+		} else if (dy > PORT_SAME_Y_TOLERANCE) {
+			portMap.set(flow.id, "bottom")
+		} else {
+			portMap.set(flow.id, "right")
 		}
 	}
 
@@ -170,6 +161,9 @@ export function routeEdges(
 			labelBounds: undefined,
 		})
 	}
+
+	// Resolve edges that cross through intermediate shapes
+	resolveEdgeCrossings(edges, nodeMap)
 
 	// Collision-aware label placement
 	placeEdgeLabels(edges, nodeMap)
@@ -318,6 +312,7 @@ function routeFromPortDirect(
 
 /**
  * Route a back-edge (loop) above or below all nodes, choosing the shorter path.
+ * Gateway targets are entered from the right (since back-edges come from the right).
  */
 function routeBackEdge(
 	source: LayoutNode,
@@ -335,8 +330,12 @@ function routeBackEdge(
 
 	const sourceRight = source.bounds.x + source.bounds.width
 	const sourceCenterY = source.bounds.y + source.bounds.height / 2
-	const targetLeft = target.bounds.x
 	const targetCenterY = target.bounds.y + target.bounds.height / 2
+
+	// Gateways: enter from right side; non-gateways: enter from left side
+	const enterRight = GATEWAY_TYPES.has(target.type)
+	const entryX = enterRight ? target.bounds.x + target.bounds.width : target.bounds.x
+	const stemX = enterRight ? entryX + 20 : entryX - 20
 
 	// Route above
 	const routeAboveY = minY - 30
@@ -344,9 +343,9 @@ function routeBackEdge(
 		{ x: sourceRight, y: sourceCenterY },
 		{ x: sourceRight + 20, y: sourceCenterY },
 		{ x: sourceRight + 20, y: routeAboveY },
-		{ x: targetLeft - 20, y: routeAboveY },
-		{ x: targetLeft - 20, y: targetCenterY },
-		{ x: targetLeft, y: targetCenterY },
+		{ x: stemX, y: routeAboveY },
+		{ x: stemX, y: targetCenterY },
+		{ x: entryX, y: targetCenterY },
 	]
 
 	// Route below
@@ -355,9 +354,9 @@ function routeBackEdge(
 		{ x: sourceRight, y: sourceCenterY },
 		{ x: sourceRight + 20, y: sourceCenterY },
 		{ x: sourceRight + 20, y: routeBelowY },
-		{ x: targetLeft - 20, y: routeBelowY },
-		{ x: targetLeft - 20, y: targetCenterY },
-		{ x: targetLeft, y: targetCenterY },
+		{ x: stemX, y: routeBelowY },
+		{ x: stemX, y: targetCenterY },
+		{ x: entryX, y: targetCenterY },
 	]
 
 	// Compare total path length and pick shorter
@@ -375,6 +374,254 @@ function pathLength(waypoints: Waypoint[]): number {
 		len += Math.abs(b.x - a.x) + Math.abs(b.y - a.y)
 	}
 	return len
+}
+
+interface Rect {
+	x: number
+	y: number
+	right: number
+	bottom: number
+}
+
+/**
+ * Post-process routed edges to avoid crossing through intermediate shapes.
+ * For each segment that passes through a shape, adds detour waypoints around it.
+ */
+export function resolveEdgeCrossings(edges: LayoutEdge[], nodeMap: Map<string, LayoutNode>): void {
+	const margin = 20
+	const allShapes: Array<Rect & { id: string }> = []
+	for (const [id, node] of nodeMap) {
+		allShapes.push({
+			id,
+			x: node.bounds.x,
+			y: node.bounds.y,
+			right: node.bounds.x + node.bounds.width,
+			bottom: node.bounds.y + node.bounds.height,
+		})
+	}
+
+	for (const edge of edges) {
+		const obstacles = allShapes.filter((s) => s.id !== edge.sourceRef && s.id !== edge.targetRef)
+
+		// Pass 1: Detour around obstacles crossing segments
+		for (let pass = 0; pass < 5; pass++) {
+			const fixed = fixOneCrossing(edge.waypoints, obstacles, margin)
+			if (!fixed) break
+			edge.waypoints = collapseCollinear(fixed)
+		}
+
+		// Pass 2: Fix corner waypoints that ended up inside obstacles
+		edge.waypoints = fixCornersInsideObstacles(edge.waypoints, obstacles, margin)
+		edge.waypoints = collapseCollinear(edge.waypoints)
+	}
+}
+
+/**
+ * Find the first segment that crosses an obstacle and return a new waypoint
+ * array with a detour around it. Returns undefined if no crossing found.
+ */
+function fixOneCrossing(
+	waypoints: Waypoint[],
+	obstacles: ReadonlyArray<Rect>,
+	margin: number,
+): Waypoint[] | undefined {
+	for (let i = 0; i < waypoints.length - 1; i++) {
+		const p1 = waypoints[i] as Waypoint
+		const p2 = waypoints[i + 1] as Waypoint
+		const crossing = findCrossing(p1, p2, obstacles)
+		if (!crossing) continue
+
+		const detour = buildDetour(p1, p2, crossing, margin, obstacles)
+		if (!detour) continue
+
+		const result = [...waypoints.slice(0, i + 1), ...detour, ...waypoints.slice(i + 1)]
+		return result
+	}
+	return undefined
+}
+
+/** Find the first obstacle that a segment crosses through (not just touches). */
+function findCrossing(
+	p1: Waypoint,
+	p2: Waypoint,
+	obstacles: ReadonlyArray<Rect>,
+): Rect | undefined {
+	const minX = Math.min(p1.x, p2.x)
+	const maxX = Math.max(p1.x, p2.x)
+	const minY = Math.min(p1.y, p2.y)
+	const maxY = Math.max(p1.y, p2.y)
+	const shrink = 3
+
+	for (const obs of obstacles) {
+		if (
+			maxX > obs.x + shrink &&
+			minX < obs.right - shrink &&
+			maxY > obs.y + shrink &&
+			minY < obs.bottom - shrink
+		) {
+			return obs
+		}
+	}
+	return undefined
+}
+
+/**
+ * Build detour waypoints to route around an obstacle.
+ * For vertical segments: detour horizontally (left or right).
+ * For horizontal segments: detour vertically (above or below).
+ */
+function buildDetour(
+	p1: Waypoint,
+	p2: Waypoint,
+	obs: Rect,
+	margin: number,
+	allObs: ReadonlyArray<Rect>,
+): Waypoint[] | undefined {
+	const isVertical = Math.abs(p1.x - p2.x) < 1
+	const isHorizontal = Math.abs(p1.y - p2.y) < 1
+
+	if (isVertical) {
+		const x = p1.x
+		const goingDown = p2.y > p1.y
+		const beforeY = goingDown ? obs.y - margin : obs.bottom + margin
+		const afterY = goingDown ? obs.bottom + margin : obs.y - margin
+
+		// Try both sides; pick the one with fewer new crossings
+		const leftX = obs.x - margin
+		const rightX = obs.right + margin
+		const leftCross = countNewCrossings(
+			[
+				{ x, y: beforeY },
+				{ x: leftX, y: beforeY },
+				{ x: leftX, y: afterY },
+				{ x, y: afterY },
+			],
+			allObs,
+		)
+		const rightCross = countNewCrossings(
+			[
+				{ x, y: beforeY },
+				{ x: rightX, y: beforeY },
+				{ x: rightX, y: afterY },
+				{ x, y: afterY },
+			],
+			allObs,
+		)
+		const detourX = leftCross <= rightCross ? leftX : rightX
+
+		return [
+			{ x, y: beforeY },
+			{ x: detourX, y: beforeY },
+			{ x: detourX, y: afterY },
+			{ x, y: afterY },
+		]
+	}
+
+	if (isHorizontal) {
+		const y = p1.y
+		const goingRight = p2.x > p1.x
+		const beforeX = goingRight ? obs.x - margin : obs.right + margin
+		const afterX = goingRight ? obs.right + margin : obs.x - margin
+
+		const aboveY = obs.y - margin
+		const belowY = obs.bottom + margin
+		const aboveCross = countNewCrossings(
+			[
+				{ x: beforeX, y },
+				{ x: beforeX, y: aboveY },
+				{ x: afterX, y: aboveY },
+				{ x: afterX, y },
+			],
+			allObs,
+		)
+		const belowCross = countNewCrossings(
+			[
+				{ x: beforeX, y },
+				{ x: beforeX, y: belowY },
+				{ x: afterX, y: belowY },
+				{ x: afterX, y },
+			],
+			allObs,
+		)
+		const detourY = aboveCross <= belowCross ? aboveY : belowY
+
+		return [
+			{ x: beforeX, y },
+			{ x: beforeX, y: detourY },
+			{ x: afterX, y: detourY },
+			{ x: afterX, y },
+		]
+	}
+
+	// Diagonal segment — skip (shouldn't happen in orthogonal routing)
+	return undefined
+}
+
+/** Count how many obstacles a set of consecutive segments would cross. */
+function countNewCrossings(points: Waypoint[], obstacles: ReadonlyArray<Rect>): number {
+	let count = 0
+	for (let i = 0; i < points.length - 1; i++) {
+		const a = points[i] as Waypoint
+		const b = points[i + 1] as Waypoint
+		if (findCrossing(a, b, obstacles)) count++
+	}
+	return count
+}
+
+/** Remove collinear intermediate waypoints (same X or same Y in a row). */
+function collapseCollinear(waypoints: Waypoint[]): Waypoint[] {
+	if (waypoints.length <= 2) return waypoints
+	const result: Waypoint[] = [waypoints[0] as Waypoint]
+	for (let i = 1; i < waypoints.length - 1; i++) {
+		const prev = result[result.length - 1] as Waypoint
+		const curr = waypoints[i] as Waypoint
+		const next = waypoints[i + 1] as Waypoint
+		const sameX = Math.abs(prev.x - curr.x) < 0.5 && Math.abs(curr.x - next.x) < 0.5
+		const sameY = Math.abs(prev.y - curr.y) < 0.5 && Math.abs(curr.y - next.y) < 0.5
+		if (sameX || sameY) continue
+		result.push(curr)
+	}
+	result.push(waypoints[waypoints.length - 1] as Waypoint)
+	return result
+}
+
+function isInsideRect(p: Waypoint, r: Rect): boolean {
+	return p.x > r.x && p.x < r.right && p.y > r.y && p.y < r.bottom
+}
+
+/**
+ * Fix corner waypoints that ended up inside obstacles after detours.
+ * Moves the corner below/above the obstacle while maintaining orthogonal routing.
+ */
+function fixCornersInsideObstacles(
+	waypoints: Waypoint[],
+	obstacles: ReadonlyArray<Rect>,
+	margin: number,
+): Waypoint[] {
+	const result = [...waypoints]
+
+	// Process backwards to maintain indices after splicing
+	for (let i = result.length - 2; i >= 1; i--) {
+		const wp = result[i] as Waypoint
+		const obs = obstacles.find((o) => isInsideRect(wp, o))
+		if (!obs) continue
+
+		const prev = result[i - 1] as Waypoint
+		const next = result[i + 1] as Waypoint
+
+		const isHorizToVert = Math.abs(prev.y - wp.y) < 1 && Math.abs(wp.x - next.x) < 1
+		const isVertToHoriz = Math.abs(prev.x - wp.x) < 1 && Math.abs(wp.y - next.y) < 1
+
+		if (isHorizToVert) {
+			const newY = next.y > wp.y ? obs.bottom + margin : obs.y - margin
+			result.splice(i, 1, { x: prev.x, y: newY }, { x: wp.x, y: newY })
+		} else if (isVertToHoriz) {
+			const newX = next.x > wp.x ? obs.right + margin : obs.x - margin
+			result.splice(i, 1, { x: newX, y: prev.y }, { x: newX, y: wp.y })
+		}
+	}
+
+	return result
 }
 
 /** Collision tolerance in pixels — small overlap allowed for rounding. */

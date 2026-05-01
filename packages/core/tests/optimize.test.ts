@@ -41,6 +41,7 @@ function makeDefs(process: BpmnProcess, diagrams?: BpmnDiagram[]): BpmnDefinitio
 		errors: [],
 		escalations: [],
 		messages: [],
+		signals: [],
 		collaborations: [],
 		processes: [process],
 		diagrams: diagrams ?? [],

@@ -1,12 +1,16 @@
 import type { BpmnFlowElement, BpmnProcess, BpmnSequenceFlow } from "../bpmn/bpmn-model.js"
+import { buildBlockTree } from "./block-builder.js"
+import { applyBlockLayout } from "./block-layout.js"
 import {
 	alignBaselinePath,
 	alignBranchBaselines,
 	alignSplitJoinPairs,
 	assignCoordinates,
+	compactBranches,
 	distributeSplitBranches,
 	ensureEarlyReturnOffBaseline,
 	resolveLayerOverlaps,
+	snapToYRows,
 } from "./coordinates.js"
 import { minimizeCrossings } from "./crossing.js"
 import { buildGraph, detectBackEdges, reverseBackEdges } from "./graph.js"
@@ -15,6 +19,7 @@ import { assertNoOverlap } from "./overlap.js"
 import { routeEdges } from "./routing.js"
 import { layoutSubProcesses } from "./subprocess.js"
 import type { LayoutNode, LayoutResult, SubProcessChildResult } from "./types.js"
+
 /**
  * Auto-layout a BPMN process using the Sugiyama/layered algorithm.
  *
@@ -56,51 +61,41 @@ export function layoutFlowNodes(
 	const backEdges = detectBackEdges(graph, sequenceFlows)
 	const dag = backEdges.length > 0 ? reverseBackEdges(graph, backEdges) : graph
 
-	// Phase 2: Layer assignment
-	const layers = assignLayers(dag)
+	// Phase 2: Try block-based layout (primary path for structured processes)
+	// Block layout only works well for processes without back-edges (loops).
+	let layoutNodes: LayoutNode[]
+	const blockTree = backEdges.length === 0 ? buildBlockTree(dag, nodeIndex) : null
+	const usedBlockLayout = blockTree !== null
 
-	// Phase 3: Group by layer and minimize crossings
-	const layerGroups = groupByLayer(layers)
-	const orderedLayers = minimizeCrossings(layerGroups, dag)
-
-	// Phase 4: Coordinate assignment
-	const layoutNodes = assignCoordinates(orderedLayers, nodeIndex)
-
-	// Phase 4b: Align linear sequences to a common y-baseline
-	alignBranchBaselines(layoutNodes, dag)
-
-	// Phase 4c: Align split/join gateway pairs to same y-coordinate
-	alignSplitJoinPairs(layoutNodes, dag, backEdges)
-
-	// Phase 4d: Align all baseline-path nodes to the same center-Y
-	alignBaselinePath(layoutNodes, dag, backEdges)
-
-	// Phase 4e: Ensure early-return branches are never on the baseline
-	ensureEarlyReturnOffBaseline(layoutNodes, dag, backEdges)
-
-	// Phase 4f: Distribute split gateway branches symmetrically
-	distributeSplitBranches(layoutNodes, dag, backEdges)
-
-	// Phase 4g: Resolve any layer overlaps from redistribution
-	resolveLayerOverlaps(layoutNodes)
-
-	// Phase 4h: Re-align baseline after overlap resolution (overlap resolution may push
-	// baseline nodes off-center when they share a layer with branch nodes)
-	alignBaselinePath(layoutNodes, dag, backEdges)
-
-	// Phase 4i: Final overlap resolution — baseline re-alignment may pull a node back into
-	// an overlap that resolveLayerOverlaps already fixed; one more pass eliminates these.
-	resolveLayerOverlaps(layoutNodes)
+	if (blockTree) {
+		layoutNodes = applyBlockLayout(blockTree, nodeIndex)
+	} else {
+		layoutNodes = sugiyamaLayout(dag, nodeIndex, backEdges)
+	}
 
 	// Phase 5: Sub-process layout — expand containers and lay out children
 	const childResults = layoutSubProcesses(layoutNodes, nodeIndex)
 
-	// After subprocess expansion, push nodes that now overlap with expanded containers
+	// After subprocess expansion, push nodes that now overlap with expanded containers.
+	// For block layout, assign unique layer indices first so resolveLayerOverlaps works
+	// correctly (block layout nodes all start at layer=0).
+	if (usedBlockLayout && childResults.length > 0) {
+		// Assign each block-layout node a unique layer so overlap resolution doesn't
+		// collapse them all into the same bucket and push them vertically apart.
+		for (let idx = 0; idx < layoutNodes.length; idx++) {
+			const n = layoutNodes[idx]
+			if (n) n.layer = idx
+		}
+	}
+
 	resolveSubProcessOverlaps(layoutNodes)
 
 	// Phase 5b: Resolve Y-direction overlaps caused by subprocess expansion.
 	// Expanded subprocesses grow in-place and can overlap same-layer siblings.
-	resolveLayerOverlaps(layoutNodes)
+	// For block layout without subprocesses, skip this — overlaps are impossible by construction.
+	if (!usedBlockLayout || childResults.length > 0) {
+		resolveLayerOverlaps(layoutNodes)
+	}
 
 	// Phase 5c: Sync child positions to their subprocess containers.
 	// resolveLayerOverlaps (including its Y-normalization pass) may have shifted
@@ -129,6 +124,73 @@ export function layoutFlowNodes(
 	}
 
 	return { nodes: allNodes, edges: allEdges }
+}
+
+/**
+ * Run the Sugiyama layered layout pipeline.
+ * Used as fallback for unstructured or loop-containing processes.
+ */
+function sugiyamaLayout(
+	dag: ReturnType<typeof buildGraph>,
+	nodeIndex: Map<string, BpmnFlowElement>,
+	backEdges: ReturnType<typeof detectBackEdges>,
+): LayoutNode[] {
+	// Phase 2: Layer assignment
+	const layers = assignLayers(dag)
+
+	// Phase 3: Group by layer and minimize crossings
+	const layerGroups = groupByLayer(layers)
+	const orderedLayers = minimizeCrossings(layerGroups, dag)
+
+	// Phase 4: Coordinate assignment
+	const layoutNodes = assignCoordinates(orderedLayers, nodeIndex)
+
+	// Phase 4b: Align linear sequences to a common y-baseline
+	alignBranchBaselines(layoutNodes, dag)
+
+	// Phase 4c: Align split/join gateway pairs to same y-coordinate
+	alignSplitJoinPairs(layoutNodes, dag, backEdges)
+
+	// Phase 4d: Align all baseline-path nodes to the same center-Y
+	alignBaselinePath(layoutNodes, dag, backEdges)
+
+	// Phase 4e: Ensure early-return branches are never on the baseline
+	ensureEarlyReturnOffBaseline(layoutNodes, dag, backEdges)
+
+	// Re-align linear chains that may have been disrupted by position swaps
+	alignBranchBaselines(layoutNodes, dag)
+
+	// Phase 4f: Distribute split gateway branches symmetrically
+	distributeSplitBranches(layoutNodes, dag, backEdges)
+
+	// Re-align split/join pairs that may have been separated during branch distribution
+	alignSplitJoinPairs(layoutNodes, dag, backEdges)
+
+	// Re-align branch spines after distribution moved chains and alignSplitJoinPairs
+	// adjusted join gateways (continuation nodes after joins must follow)
+	alignBranchBaselines(layoutNodes, dag)
+
+	// Phase 4g: Resolve any layer overlaps from redistribution
+	resolveLayerOverlaps(layoutNodes)
+
+	// Phase 4h: Re-align baseline after overlap resolution (overlap resolution may push
+	// baseline nodes off-center when they share a layer with branch nodes)
+	alignBaselinePath(layoutNodes, dag, backEdges)
+
+	// Phase 4i: Final overlap resolution — baseline re-alignment may pull a node back into
+	// an overlap that resolveLayerOverlaps already fixed; one more pass eliminates these.
+	resolveLayerOverlaps(layoutNodes)
+
+	// Phase 4j: Branch compaction — pull branch subtrees toward baseline
+	compactBranches(layoutNodes, dag, backEdges)
+	resolveLayerOverlaps(layoutNodes)
+	alignBaselinePath(layoutNodes, dag, backEdges)
+
+	// Phase 4k: Row snapping — merge close Y rows for matrix-like alignment
+	snapToYRows(layoutNodes)
+	resolveLayerOverlaps(layoutNodes)
+
+	return layoutNodes
 }
 
 /**

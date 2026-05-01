@@ -415,7 +415,7 @@ describe("Gateway port assignment", () => {
 		expect(sides.filter((s) => s === "bottom")).toHaveLength(2)
 	})
 
-	it("distributes 4 outgoing edges: 2 top, 2 bottom (no right)", () => {
+	it("distributes 4 outgoing edges: absolute direction based on gateway CY", () => {
 		const flows = Array.from({ length: 4 }, (_, i) => namedFlow(`f${i}`, "gw", `t${i}`))
 		const nodeMap = new Map<string, LayoutNode>([
 			["gw", layoutNode("gw", "inclusiveGateway", 0, 200)],
@@ -430,8 +430,8 @@ describe("Gateway port assignment", () => {
 
 		const sides = [...ports.values()]
 		expect(sides.filter((s) => s === "top")).toHaveLength(2)
-		expect(sides.filter((s) => s === "right")).toHaveLength(0)
-		expect(sides.filter((s) => s === "bottom")).toHaveLength(2)
+		expect(sides.filter((s) => s === "right")).toHaveLength(1)
+		expect(sides.filter((s) => s === "bottom")).toHaveLength(1)
 	})
 
 	it("returns empty map for no outgoing edges", () => {
