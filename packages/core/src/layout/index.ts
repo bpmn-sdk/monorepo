@@ -17,6 +17,7 @@ export type {
 	ElementPosition,
 	FlowOrderViolation,
 } from "./bench.js"
+export { assignGridRows } from "./coordinates.js"
 export { assertNoOverlap } from "./overlap.js"
 export type { Bounds, LayoutEdge, LayoutNode, LayoutResult, Waypoint } from "./types.js"
 export {

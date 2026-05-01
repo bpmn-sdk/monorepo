@@ -64,6 +64,12 @@ export interface LayoutNode {
 	layer: number
 	/** Position within the layer (row index). */
 	position: number
+	/**
+	 * Grid row index assigned after all coordinate adjustments, just before routing.
+	 * Nodes with the same gridRow are on the same horizontal row and connect left-to-right.
+	 * Set by assignGridRows(); used by port-side decisions in routing.ts.
+	 */
+	gridRow?: number
 	/** Label text for the node. */
 	label?: string
 	/** Label bounds for overlap checking. */

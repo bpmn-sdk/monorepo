@@ -21,6 +21,9 @@ const PORT_SAME_Y_TOLERANCE = 25
  * Non-gateway targets always receive edges from the left side.
  * Split gateways (starting): incoming always from the left.
  * Join gateways (closing): incoming based on relative position (top/bottom/left).
+ *
+ * Uses gridRow (integer row index) when available for exact comparison;
+ * falls back to pixel-Y with PORT_SAME_Y_TOLERANCE for nodes without gridRow.
  */
 export function resolveTargetPort(
 	source: LayoutNode,
@@ -35,6 +38,11 @@ export function resolveTargetPort(
 		return "left"
 	}
 	// Join/closing gateways: connect based on relative position
+	if (source.gridRow !== undefined && target.gridRow !== undefined) {
+		if (source.gridRow === target.gridRow) return "left"
+		return source.gridRow < target.gridRow ? "top" : "bottom"
+	}
+	// Fallback: pixel-Y comparison with tolerance
 	const srcCy = source.bounds.y + source.bounds.height / 2
 	const tgtCy = target.bounds.y + target.bounds.height / 2
 	if (Math.abs(srcCy - tgtCy) <= PORT_SAME_Y_TOLERANCE) {
@@ -67,19 +75,27 @@ export function assignGatewayPorts(
 	const gateway = nodeMap.get(firstFlow.sourceRef)
 	if (!gateway) return portMap
 	const gatewayCY = gateway.bounds.y + gateway.bounds.height / 2
+	const gatewayGridRow = gateway.gridRow
 
 	for (const flow of outgoingFlows) {
 		const target = nodeMap.get(flow.targetRef)
 		if (!target) continue
-		const targetCY = target.bounds.y + target.bounds.height / 2
-		const dy = targetCY - gatewayCY
-		if (dy < -PORT_SAME_Y_TOLERANCE) {
-			portMap.set(flow.id, "top")
-		} else if (dy > PORT_SAME_Y_TOLERANCE) {
-			portMap.set(flow.id, "bottom")
+
+		let side: PortSide
+		if (gatewayGridRow !== undefined && target.gridRow !== undefined) {
+			// Exact integer row comparison — no tolerance needed
+			if (target.gridRow < gatewayGridRow) side = "top"
+			else if (target.gridRow > gatewayGridRow) side = "bottom"
+			else side = "right"
 		} else {
-			portMap.set(flow.id, "right")
+			// Fallback: pixel-Y comparison with tolerance
+			const targetCY = target.bounds.y + target.bounds.height / 2
+			const dy = targetCY - gatewayCY
+			if (dy < -PORT_SAME_Y_TOLERANCE) side = "top"
+			else if (dy > PORT_SAME_Y_TOLERANCE) side = "bottom"
+			else side = "right"
 		}
+		portMap.set(flow.id, side)
 	}
 
 	return portMap

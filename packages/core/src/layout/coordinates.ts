@@ -1118,6 +1118,35 @@ function getCY(node: LayoutNode): number {
 }
 
 /**
+ * Assign integer grid-row indices to all nodes based on their final center-Y positions.
+ * Nodes whose center-Y values are within EPSILON pixels are placed in the same row.
+ * This eliminates pixel-tolerance guessing in port-side decisions: two nodes with the
+ * same gridRow are on the same horizontal row and should connect left-to-right.
+ *
+ * Called once, after ALL coordinate adjustments, just before edge routing.
+ */
+export function assignGridRows(layoutNodes: LayoutNode[]): void {
+	if (layoutNodes.length === 0) return
+	const EPSILON = 5 // nodes within 5px center-Y share a row
+
+	const sorted = [...layoutNodes].sort((a, b) => getCY(a) - getCY(b))
+	const first = sorted[0]
+	if (!first) return
+
+	let rowIdx = 0
+	let rowCY = getCY(first)
+
+	for (const node of sorted) {
+		const cy = getCY(node)
+		if (cy - rowCY > EPSILON) {
+			rowIdx++
+			rowCY = cy
+		}
+		node.gridRow = rowIdx
+	}
+}
+
+/**
  * Snap nodes to common Y rows for matrix-like alignment.
  * Groups nodes that share a CY (from alignment passes), then merges
  * close groups into a single row — moving entire groups as units.
