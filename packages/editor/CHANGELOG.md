@@ -1,5 +1,15 @@
 # @bpmnkit/editor
 
+## 0.0.26
+
+### Patch Changes
+
+- [#95](https://github.com/bpmnkit/monorepo/pull/95) [`5897d0f`](https://github.com/bpmnkit/monorepo/commit/5897d0f77a9d29dc7e88c5123f467686ff6e1960) Thanks [@urbanisierung](https://github.com/urbanisierung)! - Improve auto-layout
+
+- Updated dependencies [[`c9aa98d`](https://github.com/bpmnkit/monorepo/commit/c9aa98d6430ec2022278631dae7c281aae9ae499), [`5897d0f`](https://github.com/bpmnkit/monorepo/commit/5897d0f77a9d29dc7e88c5123f467686ff6e1960)]:
+  - @bpmnkit/core@0.0.23
+  - @bpmnkit/canvas@0.0.23
+
 ## 0.0.25
 
 ### Patch Changes
