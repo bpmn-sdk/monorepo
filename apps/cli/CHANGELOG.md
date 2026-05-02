@@ -1,5 +1,15 @@
 # @bpmnkit/cli
 
+## 0.0.30
+
+### Patch Changes
+
+- Updated dependencies [[`c9aa98d`](https://github.com/bpmnkit/monorepo/commit/c9aa98d6430ec2022278631dae7c281aae9ae499), [`5897d0f`](https://github.com/bpmnkit/monorepo/commit/5897d0f77a9d29dc7e88c5123f467686ff6e1960)]:
+  - @bpmnkit/core@0.0.23
+  - @bpmnkit/proxy@0.0.26
+  - @bpmnkit/ascii@0.0.23
+  - @bpmnkit/engine@0.1.23
+
 ## 0.0.29
 
 ### Patch Changes
