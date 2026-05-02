@@ -21,6 +21,9 @@ const PORT_SAME_Y_TOLERANCE = 25
  * Non-gateway targets always receive edges from the left side.
  * Split gateways (starting): incoming always from the left.
  * Join gateways (closing): incoming based on relative position (top/bottom/left).
+ *
+ * Uses gridRow (integer row index) when available for exact comparison;
+ * falls back to pixel-Y with PORT_SAME_Y_TOLERANCE for nodes without gridRow.
  */
 export function resolveTargetPort(
 	source: LayoutNode,
@@ -35,9 +38,14 @@ export function resolveTargetPort(
 		return "left"
 	}
 	// Join/closing gateways: connect based on relative position
+	if (source.gridRow !== undefined && target.gridRow !== undefined) {
+		if (source.gridRow === target.gridRow) return "left"
+		return source.gridRow < target.gridRow ? "top" : "bottom"
+	}
+	// Fallback: pixel-Y comparison with tolerance
 	const srcCy = source.bounds.y + source.bounds.height / 2
 	const tgtCy = target.bounds.y + target.bounds.height / 2
-	if (Math.abs(srcCy - tgtCy) <= 1) {
+	if (Math.abs(srcCy - tgtCy) <= PORT_SAME_Y_TOLERANCE) {
 		return "left"
 	}
 	return srcCy < tgtCy ? "top" : "bottom"
@@ -67,19 +75,27 @@ export function assignGatewayPorts(
 	const gateway = nodeMap.get(firstFlow.sourceRef)
 	if (!gateway) return portMap
 	const gatewayCY = gateway.bounds.y + gateway.bounds.height / 2
+	const gatewayGridRow = gateway.gridRow
 
 	for (const flow of outgoingFlows) {
 		const target = nodeMap.get(flow.targetRef)
 		if (!target) continue
-		const targetCY = target.bounds.y + target.bounds.height / 2
-		const dy = targetCY - gatewayCY
-		if (dy < -PORT_SAME_Y_TOLERANCE) {
-			portMap.set(flow.id, "top")
-		} else if (dy > PORT_SAME_Y_TOLERANCE) {
-			portMap.set(flow.id, "bottom")
+
+		let side: PortSide
+		if (gatewayGridRow !== undefined && target.gridRow !== undefined) {
+			// Exact integer row comparison — no tolerance needed
+			if (target.gridRow < gatewayGridRow) side = "top"
+			else if (target.gridRow > gatewayGridRow) side = "bottom"
+			else side = "right"
 		} else {
-			portMap.set(flow.id, "right")
+			// Fallback: pixel-Y comparison with tolerance
+			const targetCY = target.bounds.y + target.bounds.height / 2
+			const dy = targetCY - gatewayCY
+			if (dy < -PORT_SAME_Y_TOLERANCE) side = "top"
+			else if (dy > PORT_SAME_Y_TOLERANCE) side = "bottom"
+			else side = "right"
 		}
+		portMap.set(flow.id, side)
 	}
 
 	return portMap
@@ -216,30 +232,7 @@ function routeForwardEdge(
 	]
 }
 
-/** Count the number of direction changes (bends) in a waypoint sequence. */
-function countBends(waypoints: Waypoint[]): number {
-	let bends = 0
-	for (let i = 1; i < waypoints.length - 1; i++) {
-		const prev = waypoints[i - 1]
-		const curr = waypoints[i]
-		const next = waypoints[i + 1]
-		if (!prev || !curr || !next) continue
-		const dx1 = curr.x - prev.x
-		const dy1 = curr.y - prev.y
-		const dx2 = next.x - curr.x
-		const dy2 = next.y - curr.y
-		// Direction changes when we go from horizontal to vertical or vice versa
-		if (
-			(Math.abs(dx1) > 0.1 && Math.abs(dy2) > 0.1) ||
-			(Math.abs(dy1) > 0.1 && Math.abs(dx2) > 0.1)
-		) {
-			bends++
-		}
-	}
-	return bends
-}
-
-/** Route a forward edge from a specific port side on the source node, choosing minimum bends. */
+/** Route a forward edge from a specific port side on the source node. */
 function routeFromPort(
 	source: LayoutNode,
 	target: LayoutNode,
@@ -249,16 +242,9 @@ function routeFromPort(
 	if (port === "right") {
 		return routeForwardEdge(source, target, joinGateways)
 	}
-
-	// Generate candidate routes: assigned port route + right-port alternative
-	const portRoute = routeFromPortDirect(source, target, port, joinGateways)
-	const rightRoute = routeForwardEdge(source, target, joinGateways)
-
-	const portBends = countBends(portRoute)
-	const rightBends = countBends(rightRoute)
-
-	// Prefer the assigned port route unless right route has strictly fewer bends
-	return rightBends < portBends ? rightRoute : portRoute
+	// top/bottom ports are assigned because the target is genuinely above/below —
+	// always honour the assigned side rather than falling back to right-exit.
+	return routeFromPortDirect(source, target, port, joinGateways)
 }
 
 /** Route directly from top/bottom port, preferring L-shaped path. */
