@@ -6,7 +6,6 @@ import {
 	alignBranchBaselines,
 	alignSplitJoinPairs,
 	assignCoordinates,
-	assignGridRows,
 	compactBranches,
 	distributeSplitBranches,
 	ensureEarlyReturnOffBaseline,
@@ -103,10 +102,6 @@ export function layoutFlowNodes(
 	// subprocess containers after their children were already translated to
 	// absolute coordinates — children must follow.
 	syncSubProcessChildren(childResults, layoutNodes)
-
-	// Assign grid-row indices based on final center-Y positions (eliminates pixel-tolerance
-	// guessing in port-side decisions).
-	assignGridRows(layoutNodes)
 
 	// Phase 6: Edge routing (uses original back-edges for routing, not reversed)
 	const nodeMap = new Map<string, LayoutNode>()
